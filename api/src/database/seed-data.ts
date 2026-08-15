@@ -1,34 +1,31 @@
 /**
- * ARBOR 목업 데이터 시드 로직 (데이터 생성부만 - 연결/해제는 호출자 책임).
+ * ARBOR 목업 데이터 시드 로직. 이미 resolve된 Model 묶음을 받아서 채워 넣기만 한다 -
+ * 연결(실제 DB든 인메모리든)은 전적으로 호출자 책임이다.
  *
  * 두 곳에서 재사용된다:
  * 1) `npm run seed` (api/seed/seed.ts) - 실제 MONGODB_URI에 대해 수동 실행.
- * 2) DatabaseModule의 자동 인메모리 모드 - MONGODB_URI 미설정 시 부팅 시점에 자동 실행.
+ * 2) SeedRunnerService - MONGODB_URI 미설정(=인메모리 모드) 시 부팅 시점에 자동 실행.
  *
  * 생성 데이터: 과제 2개, IP 3개, 산출물 약 30개(+series 인스턴스 포함), HLD 스냅샷 2건.
  * 설계서(docs/arbor-design-v2.md) 4장 데이터 모델 기준.
  */
-import mongoose, { Connection, Model, Types } from 'mongoose';
-import { UserSchema, UserDocument } from '../users/schemas/user.schema';
-import { ProjectSchema, ProjectDocument } from '../projects/schemas/project.schema';
-import { IpSchema, IpDocument } from '../ips/schemas/ip.schema';
-import { DeliverableSchema, DeliverableDocument, DeliverableVersion } from '../deliverables/schemas/deliverable.schema';
-import { MemoSchema, MemoDocument } from '../memos/schemas/memo.schema';
-import { EdgeSchema, EdgeDocument } from '../edges/schemas/edge.schema';
-import { HldReleaseSchema, HldReleaseDocument } from '../hld/schemas/hld-release.schema';
+import { Model, Types } from 'mongoose';
+import { UserDocument } from '../users/schemas/user.schema';
+import { ProjectDocument } from '../projects/schemas/project.schema';
+import { IpDocument } from '../ips/schemas/ip.schema';
+import { DeliverableDocument, DeliverableVersion } from '../deliverables/schemas/deliverable.schema';
+import { MemoDocument } from '../memos/schemas/memo.schema';
+import { EdgeDocument } from '../edges/schemas/edge.schema';
+import { HldReleaseDocument } from '../hld/schemas/hld-release.schema';
 
-/**
- * 이미 등록된 모델이 있으면 재사용한다(Nest가 forFeature로 먼저 등록해둔 경우 대비 - OverwriteModelError 방지).
- *
- * 주의: `connection.model<T>(name, schema)`처럼 제네릭 타입 인자를 명시해서 호출하면
- * mongoose 8.x의 Model 오버로드 해석 비용이 급격히 커져 tsc가 OOM까지 간다(실측 확인됨 -
- * 이 프로젝트에서 가장 단순한 스키마 하나만 이렇게 호출해도 재현됨). 제네릭 없이 호출한 뒤
- * 결과를 캐스팅하는 방식으로 그 경로를 피한다.
- */
-function modelFor<T>(connection: Connection, name: string, schema: mongoose.Schema): Model<T> {
-  const existing = connection.models[name];
-  if (existing) return existing as Model<T>;
-  return connection.model(name, schema) as unknown as Model<T>;
+export interface SeedModels {
+  User: Model<UserDocument>;
+  Project: Model<ProjectDocument>;
+  Ip: Model<IpDocument>;
+  Deliverable: Model<DeliverableDocument>;
+  Memo: Model<MemoDocument>;
+  Edge: Model<EdgeDocument>;
+  HldRelease: Model<HldReleaseDocument>;
 }
 
 const PHASE_TEMPLATE = [
@@ -88,14 +85,16 @@ function minorVersion(
   } as DeliverableVersion;
 }
 
-export async function seedDatabase(connection: Connection = mongoose.connection): Promise<void> {
-  const UserModel = modelFor<UserDocument>(connection, 'User', UserSchema);
-  const ProjectModel = modelFor<ProjectDocument>(connection, 'Project', ProjectSchema);
-  const IpModel = modelFor<IpDocument>(connection, 'Ip', IpSchema);
-  const DeliverableModel = modelFor<DeliverableDocument>(connection, 'Deliverable', DeliverableSchema);
-  const MemoModel = modelFor<MemoDocument>(connection, 'Memo', MemoSchema);
-  const EdgeModel = modelFor<EdgeDocument>(connection, 'Edge', EdgeSchema);
-  const HldReleaseModel = modelFor<HldReleaseDocument>(connection, 'HldRelease', HldReleaseSchema);
+export async function seedDatabase(models: SeedModels): Promise<void> {
+  const {
+    User: UserModel,
+    Project: ProjectModel,
+    Ip: IpModel,
+    Deliverable: DeliverableModel,
+    Memo: MemoModel,
+    Edge: EdgeModel,
+    HldRelease: HldReleaseModel,
+  } = models;
 
   await Promise.all([
     UserModel.deleteMany({}),

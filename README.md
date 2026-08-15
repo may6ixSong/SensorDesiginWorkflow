@@ -24,30 +24,29 @@ docs/   설계서, 킥오프 프롬프트
 
 ### 1) MongoDB (DB 없이 바로 시작하기)
 
-**DB를 아직 구성하지 않았다면 아무것도 안 해도 된다.** `.env`의 `MONGODB_URI`가 비어 있으면
-`api/`가 부팅 시점에 임시 인메모리 MongoDB(`mongodb-memory-server`)를 자동으로 띄우고 목업
-데이터를 자동 시드한다 — 그냥 `npm run start:dev`만 실행하면 된다. 재시작하면 데이터는 초기화된다.
+**DB를 아직 구성하지 않았다면 아무것도 안 해도 된다 — 실제 DB에 전혀 연결하지 않는다.**
+`.env`의 `MONGODB_URI`가 비어 있으면 `api/`가 순수 인메모리(JS 프로세스 메모리) 데이터 계층으로
+동작하며 부팅 시점에 목업 데이터를 자동 시드한다. 네트워크 연결·바이너리 다운로드가 전혀
+없다(`src/database/in-memory-driver.ts`). 그냥 `npm run start:dev`만 실행하면 된다.
+재시작하면 데이터는 초기화된다.
 
-> 최초 실행 시 MongoDB 바이너리를 인터넷에서 한 번 내려받는다(이후 캐시됨). 사내망/방화벽이
-> `fastdl.mongodb.org`로의 다운로드를 막으면 부팅 시 그 사실을 알려주는 에러가 뜬다 — 이 경우
-> 아래처럼 실제 MongoDB를 지정하면 된다.
-
-지속되는 데이터가 필요하거나 인메모리 모드가 막히면, 킥오프 프롬프트 [A]에 지정된 개발 DB
+지속되는 데이터가 필요해지면, 킥오프 프롬프트 [A]에 지정된 개발 DB
 (`mongodb://10.172.42.128:27017/`)나 로컬 `mongod`/`docker run -p 27017:27017 mongo:7`을 쓰고
-`.env`의 `MONGODB_URI`에 채워 넣는다.
+`.env`의 `MONGODB_URI`에 채워 넣는다 — 그러면 `MongooseModule`로 실제 DB에 연결하는 원래 경로로
+전환된다.
 
 ### 2) API (`api/`)
 
 ```bash
 cd api
-cp .env.example .env   # 기본값은 MONGODB_URI가 비어있음(=DB 없이 인메모리로 자동 시작)
+cp .env.example .env   # 기본값은 MONGODB_URI가 비어있음(=DB 연결 없이 인메모리로 자동 시작)
 npm install
 npm run start:dev       # http://localhost:3000/api/v1 - 인메모리 모드면 목업 데이터 자동 시드
 ```
 
 실제 DB(`MONGODB_URI`를 채운 경우)를 쓸 때는 최초 1회 `npm run seed`로 목업 데이터를 넣는다
 (과제 2개, IP 3개, 산출물 ~31개, HLD 2건). 인메모리 모드에서는 매 부팅마다 자동으로 시드되므로
-`npm run seed`를 따로 실행할 필요가 없다.
+`npm run seed`를 따로 실행할 필요가 없다(오히려 실행하면 실패한다 — MONGODB_URI가 없다는 에러가 뜬다).
 
 Object Storage(S3) 관련 값은 `.env.example`에 비어 있다 — 개발자가 로컬 환경에서 채워 넣을 값이며,
 비어 있는 동안 `storage` 모듈은 `mock://` presigned URL을 반환해 업로드 플로우 개발이 막히지 않게 한다.
