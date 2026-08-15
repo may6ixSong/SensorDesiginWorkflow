@@ -22,7 +22,10 @@ function LoginGate({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (token || attempted.current || !users?.length) return;
     attempted.current = true;
-    devLogin.mutate(users[0].id);
+    // Analog 부서는 반드시 IP의 Edit 권한자(owner)이므로 접근 가능한 프로젝트가 보장된다.
+    // 그 외 부서는 viewGrant가 없으면 접근 가능한 IP가 하나도 없을 수 있다(설계서 3.3).
+    const target = users.find((u) => u.department === 'analog') ?? users[0];
+    devLogin.mutate(target.id);
   }, [token, users, devLogin]);
 
   if (token) return <>{children}</>;
