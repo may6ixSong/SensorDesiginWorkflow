@@ -22,20 +22,32 @@ docs/   설계서, 킥오프 프롬프트
 
 ## 실행 방법
 
-### 1) MongoDB
+### 1) MongoDB (DB 없이 바로 시작하기)
 
-킥오프 프롬프트 [A]에 지정된 개발 DB(`mongodb://10.172.42.128:27017/`)를 사용한다. 접근 불가능하면
-로컬 `mongod` 또는 `docker run -p 27017:27017 mongo:7`로 대체하고 `.env`의 `MONGODB_URI`를 바꾼다.
+**DB를 아직 구성하지 않았다면 아무것도 안 해도 된다.** `.env`의 `MONGODB_URI`가 비어 있으면
+`api/`가 부팅 시점에 임시 인메모리 MongoDB(`mongodb-memory-server`)를 자동으로 띄우고 목업
+데이터를 자동 시드한다 — 그냥 `npm run start:dev`만 실행하면 된다. 재시작하면 데이터는 초기화된다.
+
+> 최초 실행 시 MongoDB 바이너리를 인터넷에서 한 번 내려받는다(이후 캐시됨). 사내망/방화벽이
+> `fastdl.mongodb.org`로의 다운로드를 막으면 부팅 시 그 사실을 알려주는 에러가 뜬다 — 이 경우
+> 아래처럼 실제 MongoDB를 지정하면 된다.
+
+지속되는 데이터가 필요하거나 인메모리 모드가 막히면, 킥오프 프롬프트 [A]에 지정된 개발 DB
+(`mongodb://10.172.42.128:27017/`)나 로컬 `mongod`/`docker run -p 27017:27017 mongo:7`을 쓰고
+`.env`의 `MONGODB_URI`에 채워 넣는다.
 
 ### 2) API (`api/`)
 
 ```bash
 cd api
-cp .env.example .env   # MONGODB_URI 등 값 확인/수정
+cp .env.example .env   # 기본값은 MONGODB_URI가 비어있음(=DB 없이 인메모리로 자동 시작)
 npm install
-npm run seed            # 목업 데이터 시드 (과제 2개, IP 3개, 산출물 ~31개, HLD 2건)
-npm run start:dev       # http://localhost:3000/api/v1
+npm run start:dev       # http://localhost:3000/api/v1 - 인메모리 모드면 목업 데이터 자동 시드
 ```
+
+실제 DB(`MONGODB_URI`를 채운 경우)를 쓸 때는 최초 1회 `npm run seed`로 목업 데이터를 넣는다
+(과제 2개, IP 3개, 산출물 ~31개, HLD 2건). 인메모리 모드에서는 매 부팅마다 자동으로 시드되므로
+`npm run seed`를 따로 실행할 필요가 없다.
 
 Object Storage(S3) 관련 값은 `.env.example`에 비어 있다 — 개발자가 로컬 환경에서 채워 넣을 값이며,
 비어 있는 동안 `storage` 모듈은 `mock://` presigned URL을 반환해 업로드 플로우 개발이 막히지 않게 한다.
@@ -51,10 +63,10 @@ npm run dev              # http://localhost:5173
 
 ### 4) 로그인 (SSO 대체)
 
-사내 SSO 연동 전까지는 로그인 화면 대신 "사용자 스위처"를 사용한다(설계서 1.3). 웹 앱 접속 시
-시드된 사용자 목록에서 하나를 선택하면 `/auth/dev-login`이 개발용 JWT를 발급한다.
-`// TODO: SSO 연동 지점` 주석이 달린 위치(`api/src/auth/*`, `web/src/App.tsx`, `web/src/store/authStore.ts`)를
-실제 IdP 연동으로 교체하면 된다.
+사내 SSO 연동 전까지는 로그인 검사를 생략한다(설계서 1.3). 웹 앱 접속 시 시드된 사용자 목록의
+첫 번째 사용자로 자동 로그인되어 바로 보드 화면으로 들어간다. 다른 사용자로 전환하려면
+상단바의 사용자 스위처를 쓰면 된다. `// TODO: SSO 연동 지점` 주석이 달린 위치
+(`api/src/auth/*`, `web/src/App.tsx`, `web/src/store/authStore.ts`)를 실제 IdP 연동으로 교체하면 된다.
 
 ## 권한 재검증 원칙
 

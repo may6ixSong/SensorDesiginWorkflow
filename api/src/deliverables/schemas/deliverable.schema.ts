@@ -28,16 +28,16 @@ export class DeliverableVersion {
   @Prop({ required: true })
   minor: number;
 
-  @Prop({ required: true, enum: ['major', 'minor'] })
+  @Prop({ type: String, required: true, enum: ['major', 'minor'] })
   kind: VersionKind;
 
   @Prop({ required: true })
   fileName: string;
 
-  @Prop({ default: null })
+  @Prop({ type: String, default: null })
   storageKey: string | null;
 
-  @Prop({ default: null })
+  @Prop({ type: String, default: null })
   hpcPath: string | null;
 
   @Prop({ default: '' })
@@ -70,11 +70,11 @@ export class Deliverable {
   @Prop({ required: true })
   docType: string;
 
-  @Prop({ required: true, enum: ['OA', 'HPC'] })
+  @Prop({ type: String, required: true, enum: ['OA', 'HPC'] })
   network: NetworkKind;
 
   /** null이면 원본. 회차 인스턴스는 원본의 _id를 담는다 (설계서 3.6, 4.6). */
-  @Prop({ type: Types.ObjectId, ref: 'Deliverable', default: null, index: true })
+  @Prop({ type: Types.ObjectId, ref: 'Deliverable', default: null })
   series: Types.ObjectId | null;
 
   @Prop({ default: 1 })
@@ -84,7 +84,7 @@ export class Deliverable {
   seriesTotal: number;
 
   /** DEPARTMENTS 중 "analog" 제외 값만 허용 (BE 검증, 설계서 3.4, 4.6). */
-  @Prop({ default: null })
+  @Prop({ type: String, default: null })
   recvDept: string | null;
 
   @Prop({ type: Types.ObjectId, ref: 'User', default: null })

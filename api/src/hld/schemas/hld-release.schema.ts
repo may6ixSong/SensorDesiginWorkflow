@@ -6,7 +6,7 @@ export class HldItem {
   @Prop({ required: true })
   version: string;
 
-  @Prop({ default: null })
+  @Prop({ type: String, default: null })
   file: string | null;
 
   @Prop({ required: true })

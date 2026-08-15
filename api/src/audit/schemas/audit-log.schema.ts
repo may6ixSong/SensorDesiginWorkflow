@@ -26,7 +26,7 @@ export class AuditLog {
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   actorId: Types.ObjectId;
 
-  @Prop({ required: true, enum: AUDIT_ACTIONS })
+  @Prop({ type: String, required: true, enum: AUDIT_ACTIONS })
   action: AuditAction;
 
   @Prop({ required: true })
