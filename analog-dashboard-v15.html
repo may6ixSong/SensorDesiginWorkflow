@@ -1,0 +1,1933 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>ARBOR · CIS 산출물 관리</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#eceff5;--sf:#fff;--sf2:#f6f8fc;--sf3:#eef2f8;
+  --ln:#dde4ee;--ln2:#c4cfe0;--ln3:#aab8cc;
+  --tx:#14202f;--dm:#5c6d84;--dm2:#8b99ab;
+  --tl:#0c9a83;--tl2:#e0f5f0;--tl3:#8ad9c9;
+  --am:#ac6f08;--am2:#fdf0da;--am3:#e8c184;
+  --vi:#5849cf;--vi2:#ece9fd;--vi3:#b8afef;
+  --hp:#bc4f1a;--hp2:#fceadf;--hp3:#eaa87c;
+  --bl:#2563c9;--rd:#c8352c;
+  --ss:0 1px 2px rgba(20,32,47,.06);
+  --sm:0 4px 10px rgba(20,32,47,.08),0 1px 3px rgba(20,32,47,.05);
+  --sl:0 16px 34px rgba(20,32,47,.15),0 4px 10px rgba(20,32,47,.08);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{font-family:'IBM Plex Sans KR',system-ui,sans-serif;background:var(--bg);color:var(--tx);
+  font-size:14px;-webkit-font-smoothing:antialiased;display:flex;flex-direction:column;user-select:none}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input,select,textarea{font-family:inherit;font-size:13px;background:var(--sf);color:var(--tx);
+  border:1px solid var(--ln2);border-radius:7px;padding:8px 10px;width:100%;outline:none;user-select:text}
+input:focus,select:focus,textarea:focus{border-color:var(--tl);box-shadow:0 0 0 3px var(--tl2)}
+input.err{border-color:var(--rd)}
+::-webkit-scrollbar{width:7px;height:7px}
+::-webkit-scrollbar-thumb{background:var(--ln2);border-radius:7px}
+.mono{font-family:'IBM Plex Mono',monospace}
+.ey{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:var(--dm2)}
+/* topbar */
+.tb{height:54px;flex:0 0 54px;display:flex;align-items:center;gap:12px;padding:0 18px;
+  border-bottom:1px solid var(--ln);background:var(--sf);z-index:50;box-shadow:var(--ss)}
+.mark{flex:0 0 auto;display:block}
+.wm{font-size:15px;font-weight:800;font-family:'Syne',sans-serif;line-height:1.05}
+.wm small{display:block;font-size:9px;letter-spacing:.18em;color:var(--dm2);font-family:'IBM Plex Mono',monospace;margin-top:2px}
+.dv{width:1px;height:22px;background:var(--ln)}
+.sb{display:flex;align-items:center;gap:7px;padding:5px 9px;border-radius:8px;background:var(--sf2);border:1px solid var(--ln)}
+.sb select{border:none;background:none;padding:0;width:auto;font-weight:600;font-size:13px;box-shadow:none;cursor:pointer}
+.sb select:focus{box-shadow:none}
+.sp{flex:1}
+.av{border-radius:7px;display:grid;place-items:center;font-weight:700;color:#fff;flex:0 0 auto}
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:3px 8px;border-radius:6px;
+  background:var(--sf2);border:1px solid var(--ln);color:var(--dm)}
+.chip.s{background:var(--tl2);border-color:var(--tl3);color:var(--tl)}
+.chip.v{background:var(--vi2);border-color:var(--vi3);color:var(--vi)}
+/* ip head */
+.ih{padding:9px 20px;border-bottom:1px solid var(--ln);background:var(--sf);
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+/* stepper — lives OUTSIDE the scrolling area, stays fixed */
+.st-shell{overflow:hidden;border-bottom:1px solid var(--ln);background:var(--sf2);position:relative;flex:0 0 auto}
+.st-track{display:flex;white-space:nowrap;will-change:transform}
+/* one arrow cell */
+.ph{position:relative;display:inline-flex;flex-direction:column;justify-content:center;
+  padding:8px 22px 8px 28px;background:var(--sf);border:1px solid var(--ln);text-align:left;
+  transition:background .15s;flex:0 0 auto;
+  clip-path:polygon(0 0,calc(100% - 14px) 0,100% 50%,calc(100% - 14px) 100%,0 100%,14px 50%);overflow:hidden;
+  cursor:pointer}
+.ph:first-child{clip-path:polygon(0 0,calc(100% - 14px) 0,100% 50%,calc(100% - 14px) 100%,0 100%);padding-left:18px}
+.ph:hover{background:var(--sf3)}
+.ph.on{background:linear-gradient(180deg,#d9f3ec,#eaf9f5);
+  filter:
+    drop-shadow(1.5px 0 0 var(--tl))
+    drop-shadow(-1.5px 0 0 var(--tl))
+    drop-shadow(0 1.5px 0 var(--tl))
+    drop-shadow(0 -1.5px 0 var(--tl));
+  z-index:3}
+.ph.on .ph-k{color:var(--tl)}
+.ph.past{background:var(--sf2)}.ph.past .ph-k{color:var(--dm)}
+.ph-k{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;letter-spacing:.05em}
+.ph-l{font-size:11px;color:var(--dm);margin:1px 0 2px;overflow:hidden;text-overflow:ellipsis}
+.ph-d{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--dm2)}
+.ph-c{position:absolute;bottom:7px;right:20px;font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--dm2)}
+.ph-bar{position:absolute;left:0;bottom:0;height:3px;background:var(--tl);opacity:.5}
+.ph-badge{position:absolute;top:5px;right:20px;font-size:8px;font-family:'IBM Plex Mono',monospace;color:var(--vi)}
+/* phase resize handle — right edge of each phase cell */
+.ph-resize{position:absolute;right:0;top:0;bottom:0;width:10px;cursor:col-resize;z-index:5;
+  display:flex;align-items:center;justify-content:center;background:transparent;transition:background .14s}
+.ph-resize:hover{background:rgba(12,154,131,.18)}
+/* ↔ arrows drawn with pseudo-elements */
+.ph-resize::before,.ph-resize::after{content:'';position:absolute;top:50%;
+  width:0;height:0;border-top:4px solid transparent;border-bottom:4px solid transparent;opacity:.55;transition:opacity .14s}
+.ph-resize::before{right:6px;border-right:5px solid var(--dm2);transform:translateY(-50%)}
+.ph-resize::after{left:0;border-left:5px solid var(--dm2);transform:translateY(-50%) translateX(0)}
+.ph-resize:hover::before,.ph-resize:hover::after{opacity:1;border-right-color:var(--tl);border-left-color:var(--tl)}
+/* dotted line in center */
+.ph-resize-line{position:absolute;right:0;top:0;bottom:0;width:1px;background:var(--ln2);pointer-events:none;z-index:4;transition:background .14s}
+.ph:hover .ph-resize-line{background:var(--tl3)}
+.ph-resize:active ~ .ph-resize-line,.ph-resize:hover ~ .ph-resize-line{background:var(--tl)}
+/* shared button */
+.btn{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;font-weight:500;padding:6px 11px;
+  border-radius:7px;background:var(--sf);border:1px solid var(--ln2);transition:.14s;box-shadow:var(--ss)}
+.btn:hover{background:var(--sf3)}
+.btn.on{background:var(--tl2);border-color:var(--tl3);color:var(--tl)}
+.btn.pr{background:var(--tl);color:#fff;border-color:transparent}
+.btn.pr:hover{background:#0bab90}
+.btn.gh{background:transparent;border-color:transparent;box-shadow:none}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+/* legend strip (now in ip-head area via inline render) */
+.lg{display:flex;gap:11px;font-size:11px;color:var(--dm);align-items:center;flex-wrap:wrap}
+.lg span{display:inline-flex;align-items:center;gap:4px}
+.lgd{width:8px;height:8px;border-radius:3px}
+/* floating toolbox — bottom-left of canvas */
+.toolbox{position:absolute;left:14px;bottom:14px;z-index:20;display:flex;flex-direction:row;
+  align-items:flex-end;gap:6px;pointer-events:none}
+.toolbox.active{pointer-events:all}
+.tb-group{display:flex;flex-direction:row;gap:4px;background:var(--sf);border:1px solid var(--ln2);
+  border-radius:11px;padding:6px;box-shadow:var(--sl)}
+.tb-btn{width:36px;height:36px;border-radius:8px;border:1px solid transparent;background:transparent;
+  display:flex;align-items:center;justify-content:center;color:var(--dm);cursor:pointer;transition:.14s;position:relative}
+.tb-btn:hover{background:var(--sf2);color:var(--tx)}
+.tb-btn.on{background:var(--tl2);border-color:var(--tl3);color:var(--tl)}
+.tb-btn.danger:hover{background:#fde8e7;color:var(--rd)}
+/* tooltip appears ABOVE since toolbox is at the bottom */
+.tb-btn[title]:hover::after{content:attr(title);position:absolute;bottom:calc(100% + 8px);left:50%;
+  transform:translateX(-50%);background:var(--tx);color:#fff;font-size:11.5px;padding:4px 9px;
+  border-radius:6px;white-space:nowrap;pointer-events:none;box-shadow:var(--sm);z-index:30}
+.tb-sep{width:1px;background:var(--ln);margin:0 2px}
+/* edit mode ring on canvas */
+body.edit #vp{outline:2px solid var(--tl3);outline-offset:-2px}
+/* viewport */
+.vp{flex:1;overflow-x:hidden;overflow-y:auto;position:relative;background:var(--bg)}
+/* canvas — 가로만 transform(pan+zoom), 세로는 부모 스크롤 */
+.cv{position:relative;transform-origin:0 0;will-change:transform}
+body.view .cv{background:var(--sf)}
+body.edit .cv{
+  background-image:radial-gradient(circle,var(--ln) 1px,transparent 1px);
+  background-size:20px 20px;background-color:var(--sf)}
+@keyframes flowdash{0%{stroke-dashoffset:18}to{stroke-dashoffset:0}}
+.flowdash-bg{opacity:0}  /* 하이라이트 시 실선 숨김 */
+/* today marker — 블록 뒤에 깔림 */
+.today-line{position:absolute;top:0;bottom:0;width:1.5px;background:var(--rd);opacity:.55;z-index:0;pointer-events:none}
+/* stepper 위에 겹치는 today 마커 */
+.today-st{position:absolute;top:0;bottom:0;width:1.5px;background:var(--rd);opacity:.75;z-index:6;pointer-events:none}
+.today-cap{position:absolute;top:0;transform:translateX(-50%);background:var(--rd);color:#fff;
+  font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.08em;padding:2px 7px;
+  border-radius:0 0 6px 6px;white-space:nowrap;z-index:7;pointer-events:none;box-shadow:var(--ss)}
+/* lane dividers */
+.lane{position:absolute;top:0;bottom:0;border-right:2px dashed var(--ln2);pointer-events:none}
+.lane-k{position:absolute;top:10px;left:10px;font-family:'IBM Plex Mono',monospace;font-size:10px;
+  letter-spacing:.1em;color:var(--dm2)}
+.lane-l{position:absolute;bottom:10px;left:10px;font-size:10px;color:var(--ln3)}
+/* phase resize handle ON CANVAS */
+.lane-resize{position:absolute;right:-5px;top:0;bottom:0;width:10px;cursor:col-resize;z-index:6;
+  background:transparent;pointer-events:all;display:flex;align-items:center;justify-content:center}
+.lane-resize::before{content:'⟺';position:absolute;top:50%;transform:translateY(-50%);
+  font-size:12px;color:var(--dm2);opacity:0;transition:opacity .14s;pointer-events:none;
+  background:var(--sf);border:1px solid var(--ln2);border-radius:4px;padding:1px 3px;white-space:nowrap}
+.lane-resize:hover::before{opacity:1;color:var(--tl);border-color:var(--tl3)}
+.lane-resize:hover{background:rgba(12,154,131,.15)}
+/* edges */
+.edges{position:absolute;inset:0;overflow:visible;pointer-events:none}
+.eh{pointer-events:stroke;cursor:pointer}
+/* blocks */
+.blk{position:absolute;border-radius:10px;background:var(--sf);border:1px solid var(--ln2);
+  box-shadow:var(--sm);overflow:hidden}
+.blk.nd{padding:8px 9px 7px}
+.blk.nd::before{content:'';position:absolute;top:7px;left:7px;width:4px;height:4px;
+  border-radius:50%;background:var(--ln3)}
+body.view .blk.nd{cursor:pointer;transition:box-shadow .15s,transform .15s,border-color .14s}
+body.view .blk.nd:hover{transform:translateY(-2px);box-shadow:var(--sl);border-color:var(--ln3)}
+body.edit .blk{cursor:grab}
+.blk.dg{cursor:grabbing!important;box-shadow:var(--sl);border-color:var(--tl);z-index:30;transition:none!important}
+.blk.rs{z-index:30;transition:none!important}
+.blk.bump{border-color:var(--rd)}
+.blk.hl{outline:2px solid var(--vi);outline-offset:2px}
+.blk.lk{border-color:var(--vi)}
+.blk.sel{border-color:var(--tl);box-shadow:0 0 0 3px var(--tl2),var(--sm)}
+.nt{display:flex;align-items:flex-start;gap:7px;padding-left:8px}
+.ntx{font-size:11.5px;font-weight:600;line-height:1.35;flex:1;
+  overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.nm{font-size:9.5px;color:var(--dm2);margin:6px 0 6px;padding-left:8px;
+  font-family:'IBM Plex Mono',monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nv{display:flex;gap:4px;padding-left:8px;flex-wrap:wrap}
+.vc{font-family:'IBM Plex Mono',monospace;font-size:8.5px;padding:1px 4px;border-radius:5px;border:1px solid transparent}
+.vc.r{background:var(--tl2);color:var(--tl);border-color:var(--tl3)}
+.vc.w{background:var(--am2);color:var(--am);border-color:var(--am3)}
+.vc.n{background:var(--sf2);color:var(--dm2);border-color:var(--ln)}
+.vc.d{background:var(--vi2);color:var(--vi);border-color:var(--vi3)}
+.bdg{font-size:8px;font-family:'IBM Plex Mono',monospace;padding:1px 4px;border-radius:5px;border:1px solid transparent}
+.phpick{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;padding:5px 10px;
+  border-radius:7px;background:var(--sf);border:1px solid var(--ln2);color:var(--dm);transition:.14s}
+.phpick:hover{background:var(--sf3)}
+.phpick.on{background:var(--tl2);border-color:var(--tl);color:var(--tl)}
+.openbtn{position:absolute;left:50%;top:-32px;transform:translateX(-50%);
+  display:inline-flex;align-items:center;gap:5px;white-space:nowrap;
+  background:var(--tx);color:#fff;font-size:11.5px;font-weight:500;padding:5px 11px;
+  border-radius:7px;box-shadow:var(--sl);z-index:40;cursor:pointer;animation:pop .16s ease-out}
+.openbtn::after{content:'';position:absolute;left:50%;bottom:-4px;width:8px;height:8px;
+  background:var(--tx);transform:translateX(-50%) rotate(45deg)}
+.openbtn:hover{background:#000}
+@keyframes pop{from{opacity:0;transform:translateX(-50%) translateY(4px)}}
+.blk.nd{overflow:visible}
+.seq{font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:600;padding:1px 5px;border-radius:9px;
+  background:var(--vi2);color:var(--vi);border:1px solid var(--vi3);flex:0 0 auto;margin-top:1px}
+.ntag{position:absolute;top:0;right:0;font-family:'IBM Plex Mono',monospace;font-size:8px;
+  letter-spacing:.08em;padding:2px 7px 3px;border-bottom-left-radius:8px}
+.ntag.oa{background:var(--sf3);color:var(--dm)}
+.ntag.hpc{background:var(--hp2);color:var(--hp)}
+.blk.mo{padding:10px 11px;
+  background:repeating-linear-gradient(135deg,#fbfaf3 0 9px,#f5f3e8 9px 18px);
+  border:1px dashed var(--ln3);color:var(--dm);font-size:12px;line-height:1.5;cursor:default}
+body.edit .blk.mo{cursor:grab}
+.mtag{font-family:'IBM Plex Mono',monospace;font-size:8px;letter-spacing:.12em;color:var(--dm2);display:block;margin-bottom:5px}
+.mtx{overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical}
+.pin{position:absolute;top:50%;width:12px;height:12px;margin-top:-6px;border-radius:50%;
+  background:var(--sf);border:2px solid var(--ln3);transition:.12s;z-index:4}
+.pin.l{left:-6px}.pin.r{right:-6px}
+.pin.r:hover,.pin.a{background:var(--tl);border-color:var(--tl);transform:scale(1.3);cursor:crosshair}
+.blk.lk .pin.l{background:var(--vi);border-color:var(--vi)}
+.grip{position:absolute;right:0;bottom:0;width:16px;height:16px;cursor:nwse-resize;z-index:5}
+.grip::after{content:'';position:absolute;right:3px;bottom:3px;width:8px;height:8px;
+  border-right:2px solid var(--ln3);border-bottom:2px solid var(--ln3)}
+.grip:hover::after{border-color:var(--tl)}
+/* pan hint */
+.pan-hint{position:absolute;top:12px;left:50%;transform:translateX(-50%);background:var(--tx);color:#fff;
+  font-size:11.5px;padding:5px 12px;border-radius:7px;opacity:0;pointer-events:none;z-index:10;transition:opacity .2s}
+.pan-hint.show{opacity:.85}
+/* modal */
+.scrim{position:fixed;inset:0;background:rgba(20,32,47,.35);backdrop-filter:blur(2px);
+  display:grid;place-items:center;z-index:60;padding:20px}
+.modal{width:640px;max-width:100%;max-height:90vh;background:var(--sf);border:1px solid var(--ln2);
+  border-radius:14px;display:flex;flex-direction:column;box-shadow:0 28px 60px rgba(20,32,47,.27);overflow:hidden}
+.mh{padding:15px 20px 0}
+.mb{padding:15px 20px 20px;overflow-y:auto;background:var(--sf2)}
+.tabs{display:flex;gap:2px;margin-top:11px;border-bottom:1px solid var(--ln)}
+.tab{padding:8px 13px;font-size:12.5px;font-weight:500;color:var(--dm);border-bottom:2px solid transparent;margin-bottom:-1px}
+.tab.on{color:var(--tl);border-bottom-color:var(--tl)}
+.fld{margin-bottom:11px}
+.fld label{display:block;font-size:11px;color:var(--dm);margin-bottom:5px;font-weight:500}
+.row{display:flex;gap:9px}
+.card{background:var(--sf);border:1px solid var(--ln);border-radius:10px;padding:13px}
+.vs{perspective:1000px;padding:4px 0}
+.vl{background:var(--sf);border:1px solid var(--ln);border-radius:9px;padding:10px 13px;
+  margin-bottom:6px;transition:transform .2s,box-shadow .2s;transform-style:preserve-3d}
+.vl.mj{border-left:3px solid var(--tl)}
+.vl.mn{border-left:3px solid var(--am3);background:var(--sf2)}
+.vl:hover{transform:translateZ(20px) rotateX(3deg);box-shadow:var(--sl);z-index:2}
+.vn{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600}
+.vno{font-size:12px;color:var(--dm);margin-top:4px}
+.vme{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--dm2);margin-top:4px;word-break:break-all}
+.warn{display:flex;gap:9px;padding:10px 13px;border-radius:9px;font-size:12px;
+  background:var(--hp2);border:1px solid var(--hp3);color:#8d3c12;line-height:1.55}
+.el{font-size:11px;color:var(--rd);margin:-5px 0 10px}
+.empty{flex:1;display:grid;place-items:center;padding:40px}
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--tx);color:#fff;
+  font-size:12.5px;padding:8px 15px;border-radius:8px;box-shadow:var(--sl);z-index:80;opacity:0;
+  transition:opacity .18s,transform .18s;pointer-events:none}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(-4px)}
+</style>
+</head>
+<body class="view">
+<div class="tb">
+  <svg class="mark" width="28" height="28" viewBox="0 0 32 32" fill="none" aria-label="Arbor">
+    <path d="M16 29V13" stroke="#0c9a83" stroke-width="2.2" stroke-linecap="round"/>
+    <path d="M16 20.5 L9.5 15M16 17 L22.5 11.5M16 24 L21.5 19.5" stroke="#0c9a83"
+      stroke-width="1.7" stroke-linecap="round"/>
+    <circle cx="16" cy="9.5" r="4.6" fill="#e0f5f0" stroke="#0c9a83" stroke-width="1.5"/>
+    <circle cx="8.6" cy="14.2" r="3.1" fill="#e0f5f0" stroke="#0c9a83" stroke-width="1.4"/>
+    <circle cx="23.4" cy="10.6" r="2.8" fill="#e0f5f0" stroke="#0c9a83" stroke-width="1.4"/>
+    <circle cx="22.4" cy="18.8" r="2.4" fill="#e0f5f0" stroke="#0c9a83" stroke-width="1.3"/>
+    <circle cx="16" cy="9.5" r="1.5" fill="#0c9a83"/>
+    <path d="M12 29h8" stroke="#0c9a83" stroke-width="2" stroke-linecap="round"/>
+  </svg>
+  <div class="wm">ARBOR<small>CIS DELIVERABLE CONTROL</small></div>
+  <div class="dv"></div>
+  <div class="sb"><span class="ey">과제</span><select id="projSel"></select></div>
+  <div class="sb"><span class="ey">IP</span><select id="ipSel" style="min-width:110px"></select></div>
+  <div class="sp"></div>
+  <button class="btn" id="recvTog" style="display:none"></button>
+  <div class="sb" style="padding-left:6px"><span id="meAv"></span>
+    <select id="userSel" style="width:158px"></select></div>
+</div>
+<main style="flex:1;display:flex;flex-direction:column;min-height:0" id="main"></main>
+<div id="mroot"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const I=(p,s=15)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+  stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+const IC={
+  word:I('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/>',14),
+  excel:I('<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/>',14),
+  path:I('<rect x="2" y="3" width="20" height="7" rx="2"/><rect x="2" y="14" width="20" height="7" rx="2"/><path d="M6 6.5h.01M6 17.5h.01"/>',14),
+  lock:I('<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',14),
+  eye:I('<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>',14),
+  edit:I('<path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',14),
+  check:I('<path d="M20 6 9 17l-5-5"/>',14),
+  plus:I('<path d="M12 5v14M5 12h14"/>',13),
+  x:I('<path d="M18 6 6 18M6 6l12 12"/>',15),
+  up:I('<path d="M12 19V5M5 12l7-7 7 7"/>',13),
+  dn:I('<path d="M12 5v14M19 12l-7 7-7-7"/>',13),
+  send:I('<path d="M22 2 11 13M22 2l-7 20-4-9-9-4z"/>',13),
+  shield:I('<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/>',13),
+  users:I('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/>',11),
+  trash:I('<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>',13),
+  note:I('<path d="M4 4h16v11l-5 5H4z"/><path d="M20 15h-5v5"/>',13),
+  slash:I('<circle cx="12" cy="12" r="10"/><path d="m5 5 14 14"/>',30),
+  copy:I('<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/>',13),
+  cal:I('<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',13),
+  pan:I('<path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3M2 12h20M12 2v20"/>',13),
+  grid:I('<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/>',14),
+  undo:I('<path d="M3 7v6h6"/><path d="M3.5 13a9 9 0 1 0 2.1-9.4L3 7"/>',14),
+  expand:I('<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>',12),
+  fit:I('<path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/><rect x="8" y="8" width="8" height="8" rx="1"/>',14),
+  hist:I('<path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/>',13),
+  link:I('<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>',13),
+};
+
+/* ── DATA ── */
+const DEPT_LIST=[
+  {id:"analog",name:"Analog"},
+  {id:"digital",name:"Digital"},
+  {id:"aps",name:"APS"},
+  {id:"pipd",name:"PI/PD"},
+  {id:"solution",name:"Solution"},
+  {id:"pte",name:"PTE"},
+];
+const DEPTS=Object.fromEntries(DEPT_LIST.map(d=>[d.id,d.name]));
+const nonAnalogDepts=()=>DEPT_LIST.filter(d=>d.id!=="analog");
+const USERS={
+  u1:{id:"u1",name:"김선우",dept:"analog",color:"#0c9a83"},
+  u2:{id:"u2",name:"박지훈",dept:"analog",color:"#5849cf"},
+  u3:{id:"u3",name:"이수민",dept:"digital",color:"#2563c9"},
+  u4:{id:"u4",name:"정하윤",dept:"solution",color:"#ac6f08"},
+  u5:{id:"u5",name:"최다인",dept:"pte",color:"#c8352c"},
+  u6:{id:"u6",name:"오세훈",dept:"analog",color:"#3aa66b"},   // Analog, edit 위임 후보
+  u7:{id:"u7",name:"한지연",dept:"aps",color:"#b3521e"},
+  u8:{id:"u8",name:"류다현",dept:"pipd",color:"#7a4fbf"},
+};
+const PROJS=[{id:"p1",code:"CIS-A7",name:"50MP 모바일 CIS"},{id:"p2",code:"CIS-B3",name:"8MP 오토모티브 CIS"}];
+
+/* phasePW: per-phase width map, keyed by phase.id */
+let phasePW={};
+const LANE_PAD=46;                 // Phase 레인 좌우 여백 — flow 화살표 공간
+const DEFAULT_PW=Math.round((180+LANE_PAD*2)*2*0.7);  // 기본 레인 폭
+const getPW=id=>phasePW[id]||DEFAULT_PW;
+
+let COM_PH=[
+  {id:"KO",key:"KO",label:"Kick-off",start:"2026-01-05",end:"2026-02-16"},
+  {id:"ML1",key:"ML1",label:"Milestone 1",start:"2026-02-16",end:"2026-03-16"},
+  {id:"AR",key:"AR",label:"Architecture Review",start:"2026-03-16",end:"2026-04-13"},
+  {id:"ML2",key:"ML2",label:"Milestone 2",start:"2026-04-13",end:"2026-05-25"},
+  {id:"ML3",key:"ML3",label:"Milestone 3",start:"2026-05-25",end:"2026-06-22"},
+  {id:"MDR",key:"MDR",label:"Mid Design Review",start:"2026-06-22",end:"2026-07-20"},
+  {id:"ML4",key:"ML4",label:"Milestone 4",start:"2026-07-20",end:"2026-08-31"},
+  {id:"FDR",key:"FDR",label:"Final Design Review",start:"2026-08-31",end:"2026-09-21"},
+  {id:"MTO",key:"MTO",label:"Mask Tape-out",start:"2026-09-21",end:"2026-10-12"},
+  {id:"FABOUT",key:"Fab out",label:"Fab Out",start:"2026-10-12",end:"2026-12-21"},
+];
+let EX_PH=[];
+/* IP workflow 권한:
+   owners = edit 권한자 (반드시 Analog 부서 소속) — owners[0]이 대표 담당자
+   viewGrants = view 권한자 목록. 부여 시 해당 사용자의 "포지션"(부서)을 함께 지정 —
+                이 포지션이 산출물의 "전달 받을 부서" 매핑 기준이 된다. */
+const IPS=[
+  {id:"ip1",name:"PLL_MAIN",desc:"메인 클럭 생성 PLL",owners:["u1"],
+    viewGrants:[{user:"u3",dept:"digital"},{user:"u5",dept:"pte"}],color:"#0c9a83"},
+  {id:"ip2",name:"LDO_CORE",desc:"코어 전원 레귤레이터",owners:["u1"],
+    viewGrants:[{user:"u4",dept:"solution"}],color:"#5849cf"},
+  {id:"ip3",name:"ADC_RAMP",desc:"Ramp 방식 컬럼 ADC",owners:["u2"],
+    viewGrants:[{user:"u5",dept:"pte"},{user:"u3",dept:"digital"}],color:"#2563c9"},
+];
+const MV=(M,m,k,by,at,n,f)=>({major:M,minor:m,kind:k,by,at,note:n,file:f});
+let ITEMS=[
+  {id:"d01",ip:"ip1",phase:"KO",row:0,name:"PLL 요구사양 접수서",type:"word",net:"OA",recvDept:"digital",recvContact:"u3",versions:[MV(1,0,"major","u1","2026-01-09 10:20","초판","PLL_req_v1.0.docx")]},
+  {id:"d02",ip:"ip1",phase:"ML1",row:0,name:"PLL 아키텍처 검토서",type:"word",net:"OA",recvDept:null,recvContact:null,versions:[MV(1,0,"major","u1","2026-02-18 16:05","초판","PLL_arch_v1.0.docx")]},
+  {id:"d03",ip:"ip1",phase:"AR",row:0,name:"AR 리뷰 패키지",type:"word",net:"OA",recvDept:"digital",recvContact:"u3",versions:[MV(2,1,"minor","u1","2026-04-02 09:30","액션아이템 추가","PLL_AR_v2.1.docx"),MV(2,0,"major","u1","2026-03-18 14:00","2차 릴리스","PLL_AR_v2.0.docx"),MV(1,0,"major","u1","2026-03-12 11:20","초판","PLL_AR_v1.0.docx")]},
+  {id:"d04",ip:"ip1",phase:"ML2",row:0,name:"회로 설계 문서",type:"word",net:"OA",recvDept:null,recvContact:null,versions:[MV(1,0,"major","u1","2026-04-22 17:40","1차 릴리스","PLL_ckt_design_v1.0.docx")]},
+  {id:"d05",ip:"ip1",phase:"ML2",row:1,name:"Loop Filter 계산서",type:"excel",net:"OA",recvDept:null,recvContact:null,versions:[MV(1,0,"major","u1","2026-04-21 13:10","1차","PLL_loopfilter_v1.0.xlsx")]},
+  {id:"d06",ip:"ip1",phase:"ML3",row:0,name:"Pre-layout 시뮬 결과",type:"excel",net:"OA",recvDept:"pte",recvContact:"u5",versions:[MV(1,2,"minor","u1","2026-06-08 21:15","SS/FF corner","PLL_prelay_sim_v1.2.xlsx"),MV(1,0,"major","u1","2026-06-03 10:40","1차","PLL_prelay_sim_v1.0.xlsx")]},
+  {id:"d07",ip:"ip1",phase:"ML3",row:1,name:"Netlist / PEX",type:"path",net:"HPC",recvDept:null,recvContact:null,versions:[MV(1,0,"major","u1","2026-06-04 19:55","RC 추출","/vwp/cis_a7/pll_main/pex/r1")]},
+  {id:"d08",ip:"ip1",phase:"MDR",row:0,name:"설계 리뷰 패키지",type:"word",net:"OA",series:"d08",seriesIdx:1,seriesTotal:3,recvDept:"digital",recvContact:"u3",versions:[MV(1,0,"major","u1","2026-07-02 14:10","MDR 시점 릴리스","PLL_review_v1.0.docx")]},
+  {id:"d08_ML4",ip:"ip1",phase:"ML4",row:1,name:"설계 리뷰 패키지",type:"word",net:"OA",series:"d08",seriesIdx:2,seriesTotal:3,recvDept:"digital",recvContact:"u3",versions:[MV(1,2,"minor","u1","2026-08-06 18:22","ML4 지적사항 반영중","PLL_review_v1.2.docx")]},
+  {id:"d08_FDR",ip:"ip1",phase:"FDR",row:1,name:"설계 리뷰 패키지",type:"word",net:"OA",series:"d08",seriesIdx:3,seriesTotal:3,recvDept:"digital",recvContact:"u3",versions:[]},
+  {id:"d09",ip:"ip1",phase:"ML4",row:0,name:"Post-layout 시뮬 결과",type:"excel",net:"OA",recvDept:null,recvContact:null,versions:[]},
+  {id:"d10",ip:"ip1",phase:"ML4",row:1,name:"Layout DB",type:"path",net:"HPC",recvDept:null,recvContact:null,versions:[]},
+  {id:"d11",ip:"ip1",phase:"FDR",row:0,name:"FDR 체크리스트",type:"word",net:"OA",recvDept:"digital",recvContact:"u3",versions:[]},
+  {id:"d12",ip:"ip1",phase:"MTO",row:0,name:"MTO 서명 시트",type:"excel",net:"OA",recvDept:"pte",recvContact:"u5",versions:[]},
+  {id:"d13",ip:"ip1",phase:"FABOUT",row:0,name:"Fab out 특성 평가 계획",type:"word",net:"OA",recvDept:null,recvContact:null,versions:[]},
+  {id:"e01",ip:"ip2",phase:"KO",row:0,name:"LDO 요구사양 접수서",type:"word",net:"OA",recvDept:"solution",recvContact:"u4",versions:[MV(1,0,"major","u1","2026-01-10 09:40","초판","LDO_req_v1.0.docx")]},
+  {id:"e02",ip:"ip2",phase:"ML1",row:0,name:"전원 트리 검토서",type:"word",net:"OA",recvDept:null,recvContact:null,versions:[MV(1,0,"major","u1","2026-02-19 15:10","초판","LDO_powertree_v1.0.docx")]},
+  {id:"e03",ip:"ip2",phase:"AR",row:0,name:"AR 리뷰 패키지",type:"word",net:"OA",recvDept:null,recvContact:null,versions:[MV(1,0,"major","u1","2026-03-17 11:35","1차","LDO_AR_v1.0.docx")]},
+  {id:"e04",ip:"ip2",phase:"ML3",row:0,name:"Load/Line Regulation 시뮬",type:"excel",net:"OA",recvDept:null,recvContact:null,versions:[MV(1,2,"minor","u1","2026-08-09 17:31","부하 스텝 추가","LDO_reg_v1.2.xlsx")]},
+  {id:"e05",ip:"ip2",phase:"ML3",row:1,name:"Startup 시퀀스 파형",type:"path",net:"HPC",recvDept:null,recvContact:null,versions:[MV(1,0,"major","u1","2026-06-10 22:05","트랜지언트","/vwp/cis_a7/ldo_core/tran/startup")]},
+  {id:"e06",ip:"ip2",phase:"MDR",row:0,name:"MDR 리뷰 패키지",type:"word",net:"OA",recvDept:null,recvContact:null,versions:[]},
+  {id:"e07",ip:"ip2",phase:"ML4",row:0,name:"Post-layout 재검증",type:"excel",net:"OA",recvDept:null,recvContact:null,versions:[]},
+  {id:"e08",ip:"ip2",phase:"FDR",row:0,name:"신뢰성 검토서",type:"word",net:"OA",recvDept:"solution",recvContact:"u4",versions:[]},
+  {id:"e09",ip:"ip2",phase:"FABOUT",row:0,name:"양산 이관 패키지",type:"word",net:"OA",recvDept:"solution",recvContact:"u4",versions:[]},
+  {id:"f01",ip:"ip3",phase:"KO",row:0,name:"ADC 요구사양 접수서",type:"word",net:"OA",recvDept:"pte",recvContact:"u5",versions:[MV(1,0,"major","u2","2026-01-08 13:50","초판","ADC_req_v1.0.docx")]},
+  {id:"f02",ip:"ip3",phase:"AR",row:0,name:"아키텍처 리뷰 자료",type:"word",net:"OA",recvDept:null,recvContact:null,versions:[MV(2,0,"major","u2","2026-03-19 16:30","Ramp 확정","ADC_arch_v2.0.docx")]},
+  {id:"f03",ip:"ip3",phase:"ML2",row:0,name:"INL/DNL 시뮬 결과",type:"excel",net:"OA",recvDept:null,recvContact:null,versions:[MV(2,0,"major","u2","2026-04-23 09:44","2차","ADC_inl_dnl_v2.0.xlsx")]},
+  {id:"f04",ip:"ip3",phase:"ML3",row:0,name:"Noise 분석 리포트",type:"excel",net:"OA",recvDept:null,recvContact:null,versions:[MV(1,1,"minor","u2","2026-08-10 11:02","kTC noise","ADC_noise_v1.1.xlsx")]},
+  {id:"f05",ip:"ip3",phase:"ML3",row:1,name:"Column Layout DB",type:"path",net:"HPC",recvDept:null,recvContact:null,versions:[MV(1,0,"major","u2","2026-06-05 20:40","레이아웃 프리즈","/vwp/cis_a7/adc_ramp/layout/r1")]},
+  {id:"f06",ip:"ip3",phase:"MDR",row:0,name:"MDR 리뷰 패키지",type:"word",net:"OA",recvDept:null,recvContact:null,versions:[]},
+  {id:"f07",ip:"ip3",phase:"ML4",row:0,name:"Post-layout 재검증",type:"excel",net:"OA",recvDept:null,recvContact:null,versions:[]},
+  {id:"f08",ip:"ip3",phase:"FDR",row:0,name:"FDR 체크리스트",type:"word",net:"OA",recvDept:"pte",recvContact:"u5",versions:[]},
+  {id:"f09",ip:"ip3",phase:"MTO",row:0,name:"MTO 서명 시트",type:"excel",net:"OA",recvDept:null,recvContact:null,versions:[]},
+];
+let NOTES=[
+  {id:"n1",ip:"ip1",phase:"ML2",row:2,text:"디지털팀 CDC 검토 회신 후 Post-layout 착수"},
+  {id:"n2",ip:"ip1",phase:"ML4",row:2,text:"검증팀 리뷰 결과를 FDR 체크리스트에 반영"},
+  {id:"n3",ip:"ip1",phase:"FABOUT",row:1,text:"→ 제품기술팀·양산기술팀으로 최종 전달"},
+  {id:"n4",ip:"ip2",phase:"ML4",row:1,text:"MP 이관 전 신뢰성 항목(HTOL) 확인 필요"},
+  {id:"n5",ip:"ip3",phase:"ML3",row:2,text:"레이아웃 DB는 HPC망에만 존재 — 경로만 전달"},
+];
+let EDGES=[
+  {id:"g1",from:"d01",to:"d02"},{id:"g2",from:"d02",to:"d03"},{id:"g3",from:"d03",to:"d04"},
+  {id:"g4",from:"d03",to:"d05"},{id:"g5",from:"d04",to:"d06"},{id:"g6",from:"d05",to:"d06"},
+  {id:"g7",from:"d06",to:"d07"},{id:"g7r",from:"d07",to:"d06"},{id:"g8",from:"d06",to:"d08"},{id:"g9",from:"d08",to:"d09"},{id:"sq1",from:"d08",to:"d08_ML4",auto:true},{id:"sq2",from:"d08_ML4",to:"d08_FDR",auto:true},
+  {id:"g10",from:"d07",to:"d10"},{id:"g11",from:"d09",to:"d11"},{id:"g12",from:"d11",to:"d12"},
+  {id:"g13",from:"d12",to:"d13"},  {id:"h1",from:"e01",to:"e02"},{id:"h2",from:"e02",to:"e03"},{id:"h3",from:"e03",to:"e04"},
+  {id:"h4",from:"e03",to:"e05"},{id:"h5",from:"e04",to:"e06"},{id:"h6",from:"e06",to:"e07"},
+  {id:"h7",from:"e07",to:"e08"},{id:"h8",from:"e08",to:"e09"},
+  {id:"i1",from:"f01",to:"f02"},{id:"i2",from:"f02",to:"f03"},{id:"i3",from:"f03",to:"f04"},
+  {id:"i4",from:"f03",to:"f05"},{id:"i5",from:"f04",to:"f06"},{id:"i6",from:"f05",to:"f07"},
+  {id:"i7",from:"f06",to:"f07"},{id:"i8",from:"f07",to:"f08"},{id:"i9",from:"f08",to:"f09"},
+  ];
+
+/* ── HLD RELEASES ──
+   IP 단위 HLD 스냅샷. items[deliverableId] = {ver, file, at, cmt}
+   ver 가 이전 HLD 대비 달라진 row 는 dialog 에서 highlight 된다. */
+let HLDS=[
+  {id:"hl1",ip:"ip1",ver:"1.0",date:"2026-03-20",by:"u1",note:"AR 통과 시점 1차 HLD 확정",
+   items:{
+     d01:{ver:"1.0",file:"PLL_req_v1.0.docx",at:"2026-01-09 10:20",cmt:"초판 릴리스"},
+     d02:{ver:"1.0",file:"PLL_arch_v1.0.docx",at:"2026-02-18 16:05",cmt:"초판 릴리스"},
+     d03:{ver:"1.0",file:"PLL_AR_v1.0.docx",at:"2026-03-12 11:20",cmt:"리뷰 전 초판"},
+   }},
+  {id:"hl2",ip:"ip1",ver:"2.0",date:"2026-06-12",by:"u1",note:"ML3 완료 · 회로/시뮬 결과 반영",
+   items:{
+     d01:{ver:"1.0",file:"PLL_req_v1.0.docx",at:"2026-01-09 10:20",cmt:"초판 릴리스"},
+     d02:{ver:"1.0",file:"PLL_arch_v1.0.docx",at:"2026-02-18 16:05",cmt:"초판 릴리스"},
+     d03:{ver:"2.0",file:"PLL_AR_v2.0.docx",at:"2026-03-18 14:00",cmt:"2차 릴리스 — 아키텍처 확정"},
+     d04:{ver:"1.0",file:"PLL_ckt_design_v1.0.docx",at:"2026-04-22 17:40",cmt:"1차 릴리스"},
+     d05:{ver:"1.0",file:"PLL_loopfilter_v1.0.xlsx",at:"2026-04-21 13:10",cmt:"1차 릴리스"},
+     d06:{ver:"1.0",file:"PLL_prelay_sim_v1.0.xlsx",at:"2026-06-03 10:40",cmt:"1차 릴리스"},
+     d07:{ver:"1.0",file:"/vwp/cis_a7/pll_main/pex/r1",at:"2026-06-04 19:55",cmt:"RC 추출 완료"},
+   }},
+  {id:"hl3",ip:"ip2",ver:"1.0",date:"2026-03-25",by:"u1",note:"LDO 1차 HLD",
+   items:{
+     e01:{ver:"1.0",file:"LDO_req_v1.0.docx",at:"2026-01-10 09:40",cmt:"초판 릴리스"},
+     e02:{ver:"1.0",file:"LDO_powertree_v1.0.docx",at:"2026-02-19 15:10",cmt:"초판 릴리스"},
+     e03:{ver:"1.0",file:"LDO_AR_v1.0.docx",at:"2026-03-17 11:35",cmt:"1차 릴리스"},
+   }},
+  {id:"hl4",ip:"ip2",ver:"2.0",date:"2026-06-18",by:"u1",note:"Regulation·Startup 결과 추가",
+   items:{
+     e01:{ver:"1.0",file:"LDO_req_v1.0.docx",at:"2026-01-10 09:40",cmt:"초판 릴리스"},
+     e02:{ver:"1.0",file:"LDO_powertree_v1.0.docx",at:"2026-02-19 15:10",cmt:"초판 릴리스"},
+     e03:{ver:"1.0",file:"LDO_AR_v1.0.docx",at:"2026-03-17 11:35",cmt:"1차 릴리스"},
+     e04:{ver:"1.0",file:"LDO_reg_v1.0.xlsx",at:"2026-06-02 14:20",cmt:"1차 릴리스"},
+     e05:{ver:"1.0",file:"/vwp/cis_a7/ldo_core/tran/startup",at:"2026-06-10 22:05",cmt:"트랜지언트 결과 저장"},
+   }},
+  {id:"hl5",ip:"ip3",ver:"1.0",date:"2026-03-25",by:"u2",note:"ADC 1차 HLD",
+   items:{
+     f01:{ver:"1.0",file:"ADC_req_v1.0.docx",at:"2026-01-08 13:50",cmt:"초판 릴리스"},
+     f02:{ver:"1.0",file:"ADC_arch_v1.0.docx",at:"2026-03-11 10:15",cmt:"초판"},
+   }},
+  {id:"hl6",ip:"ip3",ver:"2.0",date:"2026-06-20",by:"u2",note:"Ramp 방식 확정 · 레이아웃 프리즈",
+   items:{
+     f01:{ver:"1.0",file:"ADC_req_v1.0.docx",at:"2026-01-08 13:50",cmt:"초판 릴리스"},
+     f02:{ver:"2.0",file:"ADC_arch_v2.0.docx",at:"2026-03-19 16:30",cmt:"2차 릴리스 — Ramp 방식 확정"},
+     f03:{ver:"2.0",file:"ADC_inl_dnl_v2.0.xlsx",at:"2026-04-23 09:44",cmt:"2차 릴리스"},
+     f04:{ver:"1.0",file:"ADC_noise_v1.0.xlsx",at:"2026-06-01 17:25",cmt:"1차 릴리스"},
+     f05:{ver:"1.0",file:"/vwp/cis_a7/adc_ramp/layout/r1",at:"2026-06-05 20:40",cmt:"레이아웃 프리즈"},
+   }},
+];
+const hldsOf=ip=>HLDS.filter(h=>h.ip===ip);
+
+/* ── 산출물 Release 일정(다중 Phase) ──
+   같은 산출물이 여러 Phase에서 갱신·릴리스될 때, Phase마다 인스턴스를 만든다.
+   series: 원본 산출물 id, seriesIdx: 회차(1부터) */
+function seriesOf(ip,sid){
+  return ITEMS.filter(d=>d.ip===ip&&(d.series||d.id)===sid)
+    .sort((a,b)=>(a.seriesIdx||1)-(b.seriesIdx||1));
+}
+const seriesKey=d=>d.series||d.id;
+/* 산출물의 Release 일정을 phaseIds 배열로 재설정 */
+function setSchedule(base,phaseIds){
+  const ip=base.ip, sid=seriesKey(base);
+  const cur=seriesOf(ip,sid);
+  const order={};phsFor(ip).forEach((p,i)=>order[p.id]=i);
+  const want=[...new Set(phaseIds)].sort((a,b)=>(order[a]??99)-(order[b]??99));
+  // 제거 대상
+  cur.filter(d=>!want.includes(d.phase)).forEach(d=>{
+    if(d.id===sid&&want.length){          // 원본은 유지하고 첫 Phase로 이동
+      d.phase=want[0];
+    }else{
+      ITEMS=ITEMS.filter(x=>x.id!==d.id);
+      EDGES=EDGES.filter(e=>e.from!==d.id&&e.to!==d.id);
+    }
+  });
+  // 추가 대상
+  want.forEach(ph=>{
+    if(!ITEMS.some(d=>d.ip===ip&&seriesKey(d)===sid&&d.phase===ph)){
+      const g=laneG(ip)[ph]||{x:0,w:DEFAULT_PW};
+      ITEMS.push({id:sid+"_"+ph,ip,phase:ph,name:base.name,type:base.type,net:base.net,
+        series:sid,recvDept:base.recvDept,recvContact:base.recvContact,versions:[],
+        w:base.w||NW,h:base.h||NH,x:g.x+LANE_PAD,y:1e6});
+    }
+  });
+  // 회차 번호 재부여 + 순차 flow 자동 연결(사용자가 만든 다른 연결은 보존)
+  const list=seriesOf(ip,sid);
+  list.forEach((d,i)=>{d.seriesIdx=i+1;d.seriesTotal=list.length;});
+  for(let i=0;i<list.length-1;i++){
+    const a=list[i],b=list[i+1];
+    if(!EDGES.some(e=>e.from===a.id&&e.to===b.id))
+      EDGES.push({id:"sq"+a.id+"_"+b.id,from:a.id,to:b.id,auto:true});
+  }
+  // 더 이상 인접하지 않은 auto edge 정리
+  EDGES=EDGES.filter(e=>{
+    if(!e.auto)return true;
+    const A=itm(e.from),B=itm(e.to);
+    if(!A||!B)return false;
+    if(seriesKey(A)!==sid||seriesKey(B)!==sid)return true;
+    return (B.seriesIdx-A.seriesIdx)===1;
+  });
+  want.forEach(ph=>reflowLane(ip,ph));
+}
+
+
+/* ── CONSTANTS ── */
+const GRID=10,GAP=10,PAD=8,CH=880,ROW_H=150,TOP_PAD=40;
+const NW=160,NH=82,MW=160,MH=68,MINW=120,MINH=58,MAXW=380,MAXH=260;
+const WALL_FORCE=50,ZOOM_MIN=0.3,ZOOM_MAX=2.2,ZOOM_STEP=0.08;
+
+/* ── VIEWPORT STATE ── */
+const VP={z:1,x:0,y:0};  // zoom, panX, panY
+
+/* ── APP STATE ── */
+const S={me:"u1",proj:"p1",ipId:null,hl:null,recv:false,edit:false,
+  openId:null,tab:"overview",link:null,linkPos:null,sel:null,
+  drag:null,pan:null,phResize:null,
+  addDlg:false,noteDlg:null,hldDlg:false,hldSel:null,hldBack:false,hlSet:null,phInfo:null,ownerDlg:false,snapshot:null};
+
+/* ── HELPERS ── */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const vstr=v=>`v${v.major}.${v.minor}`;
+const latA=d=>d.versions[0]||null;
+const latR=d=>d.versions.find(v=>v.kind==="major")||null;
+const hasW=d=>{const l=latA(d);return !!l&&l.kind==="minor";};
+const itm=id=>ITEMS.find(d=>d.id===id);
+const nOf=id=>NOTES.find(n=>n.id===id);
+const blk=id=>itm(id)||nOf(id);
+const snp=v=>Math.round(v/GRID)*GRID;
+const phsFor=ip=>COM_PH; // 모든 IP 공통 Milestone만 사용
+function laneG(ip){let x=0;const o={};phsFor(ip).forEach(p=>{const w=getPW(p.id);o[p.id]={x,w};x+=w;});o.__tot=x;return o;}
+
+/* 현재 캔버스 높이 (블록이 아래로 밀리면 늘어남) */
+let CUR_H=CH;
+
+/* x 좌표가 속한 Phase id */
+function phaseAtX(ip,cx){
+  const G=laneG(ip),ps=phsFor(ip);
+  for(const p of ps){const g=G[p.id];if(cx>=g.x&&cx<g.x+g.w)return p.id;}
+  return cx<0?ps[0].id:ps[ps.length-1].id;
+}
+/* 레인 밖으로 삐져나간 블록이 있는지 */
+function laneOverflow(ip,pid){
+  const g=laneG(ip)[pid];if(!g)return false;
+  const bs=[...ITEMS.filter(d=>d.ip===ip&&d.phase===pid),
+            ...NOTES.filter(n=>n.ip===ip&&n.phase===pid)];
+  return bs.some(b=>b.x<g.x+LANE_PAD||b.x+b.w>g.x+g.w-LANE_PAD);
+}
+/* 모든 Phase 레인 x를 재계산해 블록을 레인 안으로 당김 (Phase 순서 변경 후) */
+function realignAllLanes(ip){
+  const G=laneG(ip);
+  blksOf(ip).forEach(b=>{
+    const g=G[b.phase];if(!g)return;
+    // x가 해당 레인 범위 밖이면 레인 안쪽 LANE_PAD로 이동
+    if(b.x<g.x||b.x+b.w>g.x+g.w)b.x=snp(g.x+LANE_PAD);
+  });
+  phsFor(ip).forEach(p=>reflowLane(ip,p.id));
+}
+
+/* 레인 안에서 좌→우 배치, 폭이 모자라면 아래 줄로 개행 */
+function reflowLane(ip,pid){
+  const g=laneG(ip)[pid];if(!g)return;
+  const lx=g.x+LANE_PAD, lw=g.w-LANE_PAD*2;
+  const bs=[...ITEMS.filter(d=>d.ip===ip&&d.phase===pid),
+            ...NOTES.filter(n=>n.ip===ip&&n.phase===pid)];
+  if(!bs.length)return;
+  // 기존 시각 순서(위→아래, 좌→우) 보존
+  bs.sort((a,b)=>Math.abs(a.y-b.y)>ROW_H/2?a.y-b.y:a.x-b.x);
+  let cx=lx, cy=TOP_PAD, rowH=0;
+  bs.forEach(b=>{
+    if(cx>lx && cx+b.w>lx+lw){   // 개행
+      cx=lx; cy+=rowH+GAP; rowH=0;
+    }
+    b.x=snp(cx); b.y=snp(cy);
+    cx+=b.w+GAP; rowH=Math.max(rowH,b.h);
+  });
+}
+function stOf(d){
+  if(!d.versions.length)return{lb:"미제출",c:"var(--dm2)",bg:"var(--sf2)",bd:"var(--ln)"};
+  if(hasW(d))return{lb:"작업중",c:"var(--am)",bg:"var(--am2)",bd:"var(--am3)"};
+  return{lb:"Released",c:"var(--tl)",bg:"var(--tl2)",bd:"var(--tl3)"};
+}
+const phOf=(ip,id)=>phsFor(ip).find(p=>p.id===id);
+const av=(u,s=26)=>`<span class="av" style="background:${USERS[u].color};width:${s}px;height:${s}px;font-size:${s*.42}px">${USERS[u].name[1]}</span>`;
+function stamp(){const t=new Date(),p=n=>String(n).padStart(2,"0");
+  return `${t.getFullYear()}-${p(t.getMonth()+1)}-${p(t.getDate())} ${p(t.getHours())}:${p(t.getMinutes())}`;}
+const ipOf=ip=>IPS.find(i=>i.id===ip);
+const isOwn=ip=>{const o=ipOf(ip);return !!o&&o.owners.includes(S.me);};
+const myView=ip=>{const o=ipOf(ip);return !!o&&(o.viewGrants||[]).some(g=>g.user===S.me);};
+const hasAccess=ip=>isOwn(ip)||myView(ip);
+/* IP workflow 열람 권한 = edit(owner) 또는 view(viewGrants) 보유자만 */
+const visIPs=()=>IPS.filter(ip=>hasAccess(ip.id));
+/* 접근 가능한 IP는 산출물/메모 전체를 본다 — 개별 산출물 위임 개념 없음 */
+function visItems(){if(!S.ipId)return[];return ITEMS.filter(d=>d.ip===S.ipId);}
+const visNotes=()=>(S.ipId&&hasAccess(S.ipId))?NOTES.filter(n=>n.ip===S.ipId):[];
+const canEd=()=>!!S.ipId&&isOwn(S.ipId)&&!S.recv;
+let toastT;
+function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("show");
+  clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove("show"),1900);}
+
+/* seed coords */
+function seedXY(){[...ITEMS,...NOTES].forEach(o=>{
+  if(o.x!=null)return;
+  const g=laneG(o.ip)[o.phase]||{x:0,w:DEFAULT_PW};
+  const isN=o.text!=null;o.w=isN?MW:NW;o.h=isN?MH:NH;
+  o.x=snp(g.x+Math.max(6,(g.w-o.w)/2));o.y=TOP_PAD+(o.row||0)*ROW_H;});}
+
+/* collision */
+const blksOf=ip=>[...ITEMS.filter(d=>d.ip===ip),...NOTES.filter(n=>n.ip===ip)];
+function resolve(moveId,tgt,dx,dy,B){
+  const bl=blksOf(S.ipId),P={};
+  const LG=laneG(S.ipId);              // 각 블록이 속한 Phase 레인 범위
+  bl.forEach(b=>P[b.id]={x:b.x,y:b.y,w:b.w,h:b.h});
+  P[moveId]={x:tgt.x,y:tgt.y,w:tgt.w,h:tgt.h};
+  const hit=(a,b)=>a.x<b.x+b.w+GAP&&a.x+a.w+GAP>b.x&&a.y<b.y+b.h+GAP&&a.y+a.h+GAP>b.y;
+  const q=[moveId];let g=0;
+  while(q.length){if(++g>400)return null;
+    const id=q.shift(),A=P[id];
+    for(const b of bl){if(b.id===id)continue;const C=P[b.id];if(!hit(A,C))continue;
+      const pR=A.x+A.w+GAP-C.x,pL=C.x+C.w+GAP-A.x,pD=A.y+A.h+GAP-C.y,pU=C.y+C.h+GAP-A.y;
+      let ex=0,ey=0;
+      if(dx!==0&&Math.abs(dx)>=Math.abs(dy))ex=dx>0?pR:-pL;
+      else if(dy!==0)ey=dy>0?pD:-pU;
+      else{const m=Math.min(pR,pL,pD,pU);if(m===pR)ex=pR;else if(m===pL)ex=-pL;else if(m===pD)ey=pD;else ey=-pU;}
+      let nb={w:C.w,h:C.h,x:snp(C.x+ex),y:snp(C.y+ey)};
+      // 밀려나는 블록이 자기 Phase 레인을 벗어나면 → 수평 대신 아래로 개행
+      if(ex!==0&&b.id!==moveId){
+        const lr=LG[b.phase];
+        if(lr&&(nb.x<lr.x+LANE_PAD||nb.x+nb.w>lr.x+lr.w-LANE_PAD)){
+          nb={w:C.w,h:C.h,x:C.x,y:snp(C.y+pD)};
+        }
+      }
+      if(nb.x<PAD||nb.y<PAD||nb.x+nb.w>B.w-PAD||nb.y+nb.h>B.h-PAD)return null;
+      P[b.id]=nb;q.push(b.id);}}return P;
+}
+const applyP=P=>Object.entries(P).forEach(([id,r])=>{const b=blk(id);if(b){b.x=r.x;b.y=r.y;b.w=r.w;b.h=r.h;}});
+
+/* ── PHASE RESIZE WITH BLOCK REFLOW ── */
+// Minimum phase width = max(block_w_in_phase * 2, 120)
+function minPW(pid){
+  const ip=S.ipId;if(!ip)return 120;
+  const blks=[...ITEMS.filter(d=>d.ip===ip&&d.phase===pid),
+              ...NOTES.filter(n=>n.ip===ip&&n.phase===pid)];
+  const maxW=blks.reduce((m,b)=>Math.max(m,b.w||NW),NW);
+  return Math.max(maxW+LANE_PAD*2+GAP, 240);
+}
+
+function resizePhase(pid, rawNewW){
+  if(!S.ipId)return;
+  const ip=S.ipId;
+  const phs=phsFor(ip);
+  const pidIdx=phs.findIndex(p=>p.id===pid);
+  if(pidIdx<0)return;
+
+  // clamp to minimum
+  const nw=Math.max(minPW(pid), Math.round(rawNewW));
+  const oldW=getPW(pid);
+  if(nw===oldW)return;
+  phasePW[pid]=nw;
+
+  // recompute all lane x offsets
+  const G=laneG(ip); // uses updated phasePW
+
+  // ── recalc old lane starts, diff against new, move blocks ──
+  // Compute old lane starts (before resize) by temporarily restoring old width
+  phasePW[pid]=oldW;
+  const Gol=laneG(ip);
+  phasePW[pid]=nw;   // restore new value
+  const Gnew=laneG(ip);
+
+  phs.forEach((p,i)=>{
+    if(i<pidIdx)return; // phases before resized: unchanged
+    const oldLaneX=(Gol[p.id]||{x:0}).x;
+    const newLaneX=(Gnew[p.id]||{x:0}).x;
+    const dx=newLaneX-oldLaneX;
+    if(dx===0)return;
+
+    const phBlks=[...ITEMS.filter(d=>d.ip===ip&&d.phase===p.id),
+                  ...NOTES.filter(n=>n.ip===ip&&n.phase===p.id)];
+    phBlks.forEach(b=>{ b.x=snp(Math.max(PAD,b.x+dx)); });
+  });
+
+  // ── 리사이즈된 레인: 폭이 모자라면 좌→우 재배치 + 개행 ──
+  if(laneOverflow(ip,pid)) reflowLane(ip,pid);
+
+  // ── run collision resolve pass for entire ip ──
+  const allBlks=blksOf(ip);
+  // simple iterative: sort by x,y and push collisions downward
+  for(let iter=0;iter<8;iter++){
+    allBlks.sort((a,b)=>a.x!==b.x?a.x-b.x:a.y-b.y);
+    let moved=false;
+    for(let i=0;i<allBlks.length;i++){
+      for(let j=i+1;j<allBlks.length;j++){
+        const A=allBlks[i],B=allBlks[j];
+        if(A.x<B.x+B.w+GAP&&A.x+A.w+GAP>B.x&&A.y<B.y+B.h+GAP&&A.y+A.h+GAP>B.y){
+          B.y=snp(A.y+A.h+GAP);moved=true;
+        }
+      }
+    }
+    if(!moved)break;
+  }
+
+  // ── update DOM ──
+  // stepper cells
+  phs.forEach(p=>{
+    const phEl=document.querySelector(`.ph[data-pid="${p.id}"]`);
+    if(phEl){const w=getPW(p.id)*VP.z;phEl.style.width=w+"px";phEl.style.minWidth=w+"px";phEl.style.flexBasis=w+"px";}
+  });
+  // canvas lanes
+  phs.forEach(p=>{
+    const le=document.querySelector(`.lane[data-pid="${p.id}"]`);
+    if(le){le.style.left=Gnew[p.id].x+"px";le.style.width=getPW(p.id)+"px";}
+  });
+  // canvas and svg width
+  const cv=document.getElementById("cv"),svg=document.getElementById("esvg");
+  const tot=Gnew.__tot+120;
+  if(cv)cv.style.width=tot+"px";
+  if(svg){svg.style.width=tot+"px";svg.setAttribute("width",tot);}
+  // blocks
+  paintBlks();
+}
+
+/* wall resistance */
+const wallT={};
+function wallAdj(bx,bw,cx,accum){
+  const G=laneG(S.ipId);
+  const bnds=phsFor(S.ipId).slice(1).map(p=>G[p.id].x);
+  for(const bnd of bnds){
+    if(cx<bnd&&cx+bw>bnd){
+      if(Math.abs(accum)<WALL_FORCE){return bx+bw/2<bnd?bnd-bw-GAP:bnd+GAP;}
+      flashLane(bnd);
+    }
+  }return cx;
+}
+function flashLane(bnd){
+  document.querySelectorAll(".lane").forEach(el=>{
+    const lx=parseInt(el.style.left)||0;
+    if(Math.abs(lx+getPW(el.dataset.pid||"")-bnd)<4||Math.abs(lx-bnd)<4){
+      el.style.borderRightColor="var(--tl)";
+      clearTimeout(wallT[bnd]);
+      wallT[bnd]=setTimeout(()=>el.style.borderRightColor="",350);
+    }
+  });
+}
+
+/* ── VIEWPORT ── */
+function applyVP(){
+  const cv=$("#cv");if(!cv)return;
+  // 가로만 스케일 · 세로는 고정(부모가 스크롤)
+  cv.style.transform=`translateX(${VP.x}px) scaleX(${VP.z})`;
+  syncStepper();
+}
+function syncStepper(){
+  const track=$("#stTrack");if(!track)return;
+  track.style.transform=`translateX(${VP.x}px)`;
+  if(S.ipId){const tx=todayX(S.ipId);
+    if(tx!==null){const L=tx*VP.z+VP.x;
+      const a=$("#todaySt"),b=$("#todayCap");
+      if(a)a.style.left=L+"px";if(b)b.style.left=L+"px";}}
+  track.querySelectorAll(".ph").forEach(el=>{
+    const w=getPW(el.dataset.pid)*VP.z;
+    el.style.width=w+"px";el.style.minWidth=w+"px";el.style.flexBasis=w+"px";
+  });
+}
+/* 캔버스가 뷰포트보다 좁아지지 않는 최소 배율 */
+function minZoom(){
+  if(!S.ipId)return ZOOM_MIN;
+  const vp=$("#vp");if(!vp)return ZOOM_MIN;
+  const G=laneG(S.ipId),W=G.__tot+120;
+  return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, vp.clientWidth/W));
+}
+function clampVP(){
+  if(!S.ipId)return;
+  const mz=minZoom();
+  if(VP.z<mz)VP.z=mz;
+  const G=laneG(S.ipId),W=(G.__tot+120)*VP.z;
+  const vp=$("#vp");if(!vp)return;
+  VP.x=Math.min(0,Math.max(vp.clientWidth-W,VP.x));
+  VP.y=0;
+}
+
+/* 오늘 날짜의 캔버스 x 좌표 */
+function todayX(ip){
+  const G=laneG(ip),ps=phsFor(ip),t=new Date();
+  if(!ps.length)return null;
+  const first=new Date(ps[0].start),last=new Date(ps[ps.length-1].end);
+  if(t<first)return 0;
+  if(t>last)return G.__tot;
+  for(const p of ps){
+    const st=new Date(p.start),en=new Date(p.end);
+    if(t>=st&&t<=en){
+      const g=G[p.id],r=(t-st)/Math.max(1,(en-st));
+      return Math.round(g.x+g.w*r);
+    }
+  }
+  return null;
+}
+
+/* ── AUTO FIT ── 지그재그 토폴로지 배치 ──
+   A→B→C 연결 시: B는 A 우하단, C는 B 우하단 (지그재그)
+   AutoFit 내에서만 겹침 방지 (일반 드래그는 자유) */
+function autoFit(){
+  const ip=S.ipId;if(!ip)return;
+  const ps=phsFor(ip);
+  const allIds=ITEMS.filter(d=>d.ip===ip).map(d=>d.id);
+  const visSet=new Set(allIds);
+
+  /* 위상 정렬으로 flow 순서 결정 */
+  const inDeg={},adj={};
+  allIds.forEach(id=>{inDeg[id]=0;adj[id]=[];});
+  EDGES.filter(e=>visSet.has(e.from)&&visSet.has(e.to)).forEach(e=>{
+    if(!adj[e.from].includes(e.to))adj[e.from].push(e.to);
+    inDeg[e.to]=(inDeg[e.to]||0)+1;
+  });
+  const queue=allIds.filter(id=>(inDeg[id]||0)===0);
+  const order=[],vis=new Set();
+  while(queue.length){
+    const id=queue.shift();if(vis.has(id))continue;
+    vis.add(id);order.push(id);
+    adj[id].forEach(n=>{inDeg[n]--;if(inDeg[n]<=0&&!vis.has(n))queue.push(n);});
+  }
+  allIds.forEach(id=>{if(!vis.has(id))order.push(id);});
+
+  /* 각 노드에 flow-depth 부여 */
+  const depth={};
+  order.forEach(id=>{
+    let d=0;
+    allIds.forEach(src=>{if(adj[src]&&adj[src].includes(id))d=Math.max(d,(depth[src]??-1)+1);});
+    depth[id]=d;
+  });
+
+  /* Phase별 지그재그 배치 */
+  const ZDXR=Math.round(NW*0.55);  // 홀수 depth: x 오른쪽 오프셋
+  const ZDY =Math.round(NH*0.70);  // depth마다 y 증가량
+
+  /* Phase 폭 먼저 결정 */
+  ps.forEach(p=>{
+    const pbs=allIds.filter(id=>{const d=itm(id);return d&&d.phase===p.id;});
+    const days=Math.max(1,Math.round((new Date(p.end)-new Date(p.start))/864e5));
+    const cols=days>=56?3:days>=28?2:1;
+    phasePW[p.id]=Math.max(DEFAULT_PW, LANE_PAD*2+cols*NW+(cols-1)*GAP+ZDXR);
+  });
+  const G=laneG(ip);
+
+  const placed={};
+  ps.forEach(p=>{
+    const g=G[p.id];if(!g)return;
+    const pbs=order.filter(id=>{const d=itm(id);return d&&d.ip===ip&&d.phase===p.id;});
+    if(!pbs.length)return;
+    const minD=Math.min(...pbs.map(id=>depth[id]??0));
+    /* depth 그룹 */
+    const byD={};
+    pbs.forEach(id=>{const d=depth[id]??0;(byD[d]||(byD[d]=[])).push(id);});
+    let rowY=TOP_PAD;
+    Object.keys(byD).map(Number).sort((a,b)=>a-b).forEach(d=>{
+      const row=byD[d];
+      const isOdd=(d-minD)%2===1;
+      let cx=g.x+LANE_PAD+(isOdd?ZDXR:0);
+      let maxH=0;
+      row.forEach(id=>{
+        const bk=itm(id);if(!bk)return;
+        if(cx+bk.w>g.x+g.w-LANE_PAD){cx=g.x+LANE_PAD+(isOdd?ZDXR:0);rowY+=maxH+GAP;maxH=0;}
+        placed[id]={x:snp(cx),y:snp(rowY)};
+        cx+=bk.w+GAP;maxH=Math.max(maxH,bk.h);
+      });
+      rowY+=maxH+ZDY;
+    });
+  });
+
+  /* AutoFit 내 겹침 방지: 같은 Phase 내만 */
+  const flatBlks=ITEMS.filter(d=>d.ip===ip);
+  for(let it=0;it<8;it++){
+    let mv=false;
+    for(let i=0;i<flatBlks.length;i++){
+      const A=flatBlks[i],pa=placed[A.id]||{x:A.x,y:A.y,w:A.w,h:A.h};
+      for(let j=i+1;j<flatBlks.length;j++){
+        const B=flatBlks[j],pb=placed[B.id]||{x:B.x,y:B.y,w:B.w,h:B.h};
+        if(A.phase!==B.phase)continue;
+        if(pa.x<pb.x+pb.w+GAP&&pa.x+pa.w+GAP>pb.x&&pa.y<pb.y+pb.h+GAP&&pa.y+pa.h+GAP>pb.y){
+          placed[B.id]={x:pb.x,y:snp(pa.y+pa.h+GAP),w:pb.w,h:pb.h};mv=true;
+        }
+      }
+    }
+    if(!mv)break;
+  }
+
+  /* 좌표 적용 */
+  flatBlks.forEach(d=>{if(placed[d.id]){d.x=placed[d.id].x;d.y=placed[d.id].y;}});
+  render();
+}
+
+/* 공통 Phase가 선점한 날짜 범위 목록 */
+function comRanges(){return COM_PH.map(p=>({s:p.start,e:p.end,key:p.key}));}
+/* 다른 모든 Phase(공통+IP추가)가 선점한 범위에서 pid 자신은 제외 */
+function occupiedRanges(pid){
+  const all=[...COM_PH,...EX_PH.filter(p=>p.ip===S.ipId)];
+  return all.filter(p=>p.id!==pid).map(p=>({s:p.start,e:p.end}));
+}
+
+/* 클릭한 블록 기준 — prev 방향은 prev만, next 방향은 next만 계속 타고감 (양방향 섞지 않음) */
+function connectedSet(id){
+  const seen=new Set([id]);
+  // prev 방향: id로 들어오는 edge만 계속 추적
+  let q=[id];
+  while(q.length){const c=q.shift();
+    EDGES.forEach(e=>{ if(e.to===c&&!seen.has(e.from)){seen.add(e.from);q.push(e.from);} });
+  }
+  // next 방향: id에서 나가는 edge만 계속 추적
+  q=[id];
+  while(q.length){const c=q.shift();
+    EDGES.forEach(e=>{ if(e.from===c&&!seen.has(e.to)){seen.add(e.to);q.push(e.to);} });
+  }
+  return seen;
+}
+
+/* ── EDGES ── */
+function orth(a,b){
+  const x1=a.x+a.w,y1=Math.round(a.y+a.h/2),x2=b.x,y2=Math.round(b.y+b.h/2);
+  if(x2>=x1+24){const mx=Math.round((x1+x2)/2);
+    return y1===y2?`M${x1},${y1}H${x2}`:`M${x1},${y1}H${mx}V${y2}H${x2}`;}
+  const out=x1+22,inn=x2-22,low=Math.max(a.y+a.h,b.y+b.h)+26;
+  return `M${x1},${y1}H${out}V${low}H${inn}V${y2}H${x2}`;
+}
+function drawEdges(){
+  const svg=$("#esvg");if(!svg)return;
+  const vis=visItems().map(d=>d.id);
+  let h=`<defs>
+    <marker id="ah" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0L8,4L0,8Z" fill="#8b99ab"/></marker>
+    <marker id="ahb" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0L8,4L0,8Z" fill="#ac6f08"/></marker>
+    <marker id="ahl" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0L8,4L0,8Z" fill="#0c9a83"/></marker>
+    <marker id="ah-s" markerWidth="8" markerHeight="8" refX="1" refY="4" orient="auto"><path d="M8,0L0,4L8,8Z" fill="#8b99ab"/></marker>
+    <marker id="ahl-s" markerWidth="8" markerHeight="8" refX="1" refY="4" orient="auto"><path d="M8,0L0,4L8,8Z" fill="#0c9a83"/></marker></defs>`;
+  const seen=new Set();
+  EDGES.filter(e=>vis.includes(e.from)&&vis.includes(e.to)).forEach(e=>{
+    const a=itm(e.from),b=itm(e.to);if(!a||!b)return;
+    const bi=EDGES.some(x=>x.from===e.to&&x.to===e.from);   // 양방향?
+    const key=bi?[e.from,e.to].sort().join("|"):e.id;
+    if(bi){if(seen.has(key))return;seen.add(key);}
+    const blocked=!bi&&!latR(a)&&stOf(b).lb!=="미제출";
+    const on=S.hlSet&&S.hlSet.has(e.from)&&S.hlSet.has(e.to);
+    const col=on?"#0c9a83":(blocked?"#ac6f08":"#8b99ab");
+    const mk=on?"ahl":(blocked?"ahb":"ah");
+    const dpath=orth(a,b);
+    h+=`<path d="${dpath}" stroke="${col}" stroke-width="${on?2.1:1.6}" fill="none"
+      marker-end="url(#${mk})" ${bi?`marker-start="url(#${on?"ahl-s":"ah-s"})"`:""}
+      ${blocked?'stroke-dasharray="5 4"':""} shape-rendering="crispEdges"/>`;
+    if(on){   // 1) 점선 흐름 애니메이션 — 실선 대신 점선이 이동
+      // 배경: 원래 선 숨김
+      h+=`<path d="${dpath}" stroke="${col}" stroke-width="1.6" fill="none"
+        opacity="0.18" shape-rendering="crispEdges"/>`;
+      // 점선 레이어
+      h+=`<path d="${dpath}" stroke="#0c9a83" stroke-width="2.2" fill="none"
+        stroke-linecap="round" stroke-dasharray="8 10"
+        style="animation:flowdash .65s linear infinite"
+        marker-end="url(#ahl)"/>`;
+    }
+    if(bi){   // 순환(refresh) 아이콘
+      const mx=Math.round((a.x+a.w+b.x)/2), my=Math.round((a.y+a.h/2+b.y+b.h/2)/2);
+      if(!S.edit){   // 2) 편집 모드에서는 순환 아이콘 숨김
+        // flow 선의 실제 중점 계산 (orth 경로의 midpoint)
+        const ax=a.x+a.w, ay=Math.round(a.y+a.h/2), bx=b.x, by=Math.round(b.y+b.h/2);
+        let cx2,cy2;
+        if(bx>=ax+24){cx2=Math.round((ax+bx)/2);cy2=Math.round((ay+by)/2);}
+        else{cx2=ax+22;cy2=Math.max(a.y+a.h,b.y+b.h)+26;}
+        h+=`<g transform="translate(${cx2-11},${cy2-11})" pointer-events="none">
+          <path d="M16.8 9.8A5.4 5.4 0 0 0 6.8 8.9" stroke="#bc4f1a" stroke-width="1.9"
+            fill="none" stroke-linecap="round"/>
+          <path d="M5.2 13.2a5.4 5.4 0 0 0 9.8 1.1" stroke="#bc4f1a" stroke-width="1.9"
+            fill="none" stroke-linecap="round"/>
+          <path d="M17 6v3.8h-3.8" stroke="#bc4f1a" stroke-width="1.9" fill="none"
+            stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M5 16v-3.8h3.8" stroke="#bc4f1a" stroke-width="1.9" fill="none"
+            stroke-linecap="round" stroke-linejoin="round"/>
+        </g>`;
+      }
+    }
+    if(S.edit&&canEd())h+=`<path class="eh" data-eid="${e.id}" d="${dpath}" stroke="transparent"
+      stroke-width="12" fill="none"><title>클릭하면 연결 삭제</title></path>`;});
+  if(S.link&&itm(S.link)&&S.linkPos){const a=itm(S.link);
+    h+=`<path d="M${a.x+a.w},${Math.round(a.y+a.h/2)}H${S.linkPos.x}V${S.linkPos.y}"
+      stroke="#0c9a83" stroke-width="1.6" stroke-dasharray="5 4" fill="none" marker-end="url(#ahl)"/>`;}
+  svg.innerHTML=h;
+  svg.querySelectorAll(".eh").forEach(p=>p.onclick=ev=>{ev.stopPropagation();
+    EDGES=EDGES.filter(x=>x.id!==p.dataset.eid);drawEdges();toast("연결을 지웠습니다");});
+}
+
+/* ── RENDER TOP ── */
+function renderTop(){
+  $("#projSel").innerHTML=PROJS.map(p=>`<option value="${p.id}">${p.code} · ${p.name}</option>`).join("");
+  $("#projSel").value=S.proj;
+  const vs=visIPs();
+  $("#ipSel").innerHTML=vs.length?vs.map(i=>`<option value="${i.id}">${i.name}</option>`).join(""):`<option>권한 없음</option>`;
+  if(S.ipId)$("#ipSel").value=S.ipId;
+  $("#ipSel").disabled=!vs.length;
+  $("#userSel").innerHTML=Object.values(USERS).map(u=>`<option value="${u.id}">${u.name} · ${DEPTS[u.dept]}</option>`).join("");
+  $("#userSel").value=S.me;$("#meAv").innerHTML=av(S.me);
+  const t=$("#recvTog");t.style.display=(S.ipId&&isOwn(S.ipId))?"inline-flex":"none";
+  t.className="btn"+(S.recv?" on":"");t.innerHTML=IC.eye+" 수신 부서 시점";
+}
+
+/* ── MAIN RENDER ── */
+function render(){
+  const vs=visIPs();
+  if(!vs.find(i=>i.id===S.ipId))S.ipId=vs.length?vs[0].id:null;
+  if(!canEd())S.edit=false;
+  document.body.className=S.edit?"edit":"view";
+  renderTop();
+  const m=$("#main");
+  if(!S.ipId){m.innerHTML=`<div class="empty"><div style="text-align:center;max-width:420px">
+    <div style="font-size:20px;font-weight:700;margin-bottom:10px">열람할 수 있는 IP가 없습니다</div>
+    <div style="font-size:13px;color:var(--dm);line-height:1.8">${USERS[S.me].name}님은 이 과제의 Analog IP에 대한 권한이 없습니다.</div>
+    </div></div>`;renderModal();return;}
+
+  const ip=IPS.find(i=>i.id===S.ipId),phs=phsFor(ip.id),G=laneG(ip.id);
+  const items=visItems(),notes=visNotes();
+  const lowest=[...items,...notes].reduce((m,b)=>Math.max(m,b.y+b.h),0);
+  const W=G.__tot+120,H=Math.max(CH,lowest+160),today=new Date();
+  CUR_H=H;
+
+  m.innerHTML=`
+  <div class="ih">
+    <span class="mono" style="font-size:15px;font-weight:700">${ip.name}</span>
+    <span style="font-size:13px;color:var(--dm)">${ip.desc}</span>
+    ${canEd()?`<span class="chip s">${IC.shield} 담당 IP</span>`:""}
+    ${S.recv?`<span class="chip v">${IC.eye} 수신 부서 시점</span>`:""}
+    ${(!isOwn(ip.id)&&myView(ip.id))?`<span class="chip v">열람 권한</span>`:""}
+    <span class="dv"></span>
+    <button class="chip" id="ownerChip" style="cursor:pointer">${IC.users} ${USERS[ip.owners[0]].name} 외 ${Math.max(0,ip.owners.length-1+((ip.viewGrants||[]).length))}명</button>
+    <span style="margin-left:auto"></span>
+    <button class="btn" id="hldBtn">${IC.grid} HLD Release</button>
+  </div>
+
+  <div class="st-shell" style="position:relative">
+    ${(()=>{const tx=todayX(ip);return (!S.edit&&tx!==null)
+      ?`<div class="today-st" id="todaySt" style="left:${tx*VP.z+VP.x}px"></div>
+        <div class="today-cap" id="todayCap" style="left:${tx*VP.z+VP.x}px">TODAY</div>`:"";})()}
+    <div class="st-track" id="stTrack" style="display:flex">
+      ${phs.map(p=>{
+        const extra=!!p.ip,cnt=items.filter(d=>d.phase===p.id).length;
+        const en=new Date(p.end),st2=new Date(p.start),past=en<today,cur=st2<=today&&today<=en;
+        const prog=cur?Math.min(1,(today-st2)/(en-st2)):past?1:0;
+        const pw=getPW(p.id);
+        const isToday=cur;
+        return `<div class="ph ${extra?"extra":""} ${isToday?"on":""} ${past?"past":""}"
+          data-pid="${p.id}" data-ph="${p.id}" style="width:${pw*VP.z}px;min-width:${pw*VP.z}px">
+          ${extra?`<span class="ph-badge">IP 전용</span>`:""}
+          <div class="ph-k">${p.key}</div>
+          <div class="ph-l">${p.label}</div>
+          <div class="ph-d">${p.start.slice(2)} → ${p.end.slice(2)}</div>
+          <span class="ph-c">${cnt}</span>
+          ${prog>0?`<span class="ph-bar" style="width:${(prog*100).toFixed(1)}%"></span>`:""}
+          ${S.edit?`<span class="ph-resize" data-phrid="${p.id}"></span><span class="ph-resize-line"></span>`:""}
+        </div>`;}).join("")}
+    </div>
+  </div>
+
+  <div class="vp" id="vp" style="position:relative">
+    <div class="cv" id="cv" style="width:${W}px;height:${H}px">
+      ${phs.map(p=>{const g=G[p.id];
+        return `<div class="lane ${p.ip?"extra":""}" data-pid="${p.id}"
+          style="left:${g.x}px;width:${g.w}px">
+          <span class="lane-k">${p.key}</span>
+          <span class="lane-l">${p.label}</span>
+          ${S.edit?`<span class="lane-resize" data-lrid="${p.id}"></span>`:""}
+        </div>`;}).join("")}
+      ${(()=>{const tx=todayX(ip);
+        return (!S.edit&&tx!==null)?`<div class="today-line" style="left:${tx}px"></div>`:"";})()}
+      <svg class="edges" id="esvg" style="width:${W}px;height:${H}px;position:absolute;inset:0"></svg>
+      ${notes.map(memoH).join("")}
+      ${items.map(nodeH).join("")}
+    </div>
+
+    <!-- legend (bottom-right) -->
+    <div style="position:absolute;right:14px;bottom:14px;z-index:10;
+      background:var(--sf);border:1px solid var(--ln2);border-radius:9px;padding:7px 11px;
+      box-shadow:var(--sm);display:flex;gap:11px;font-size:11px;color:var(--dm);align-items:center">
+      <span style="display:inline-flex;align-items:center;gap:4px"><i style="width:8px;height:8px;border-radius:3px;background:var(--dm2);display:block"></i>미제출</span>
+      <span style="display:inline-flex;align-items:center;gap:4px"><i style="width:8px;height:8px;border-radius:3px;background:var(--am);display:block"></i>작업중</span>
+      <span style="display:inline-flex;align-items:center;gap:4px"><i style="width:8px;height:8px;border-radius:3px;background:var(--tl);display:block"></i>Released</span>
+    </div>
+
+    <!-- floating toolbox (bottom-left) -->
+    <div class="toolbox ${canEd()?"active":""}" id="toolbox">
+      ${canEd()?`
+      <div class="tb-group">
+        <button class="tb-btn ${S.edit?"on":""}" id="editBtn"
+          title="${S.edit?"편집 끝내기":"배치 편집 시작"}">
+          ${S.edit?IC.check:IC.edit}
+        </button>
+      </div>
+      ${S.edit?`
+      <div class="tb-group">
+        <button class="tb-btn danger" id="cancelBtn" title="변경 취소">${IC.undo}</button>
+      </div>
+      <div class="tb-group">
+        <button class="tb-btn" id="addBtn" title="산출물 추가">${IC.plus}</button>
+        <div class="tb-sep"></div>
+        <button class="tb-btn" id="noteBtn" title="메모 추가">${IC.note}</button>
+        <div class="tb-sep"></div>
+        <button class="tb-btn" id="fitBtn" title="Auto Fit">${IC.fit}</button>
+      </div>`:""}
+      `:""}
+    </div>
+  </div>`;
+
+  applyVP();drawEdges();bindAll(W,H,G);
+  bindChrome();renderModal();
+}
+
+function nodeH(d){
+  const st=stOf(d),rel=latR(d),work=hasW(d)?latA(d):null,own=canEd();
+  const ph=phOf(d.ip,d.phase),compact=d.h<96;
+  const col=d.net==="HPC"?"var(--hp)":(d.type==="excel"?"var(--tl)":"var(--bl)");
+  const lk=S.link&&S.link!==d.id;
+  const onHl=S.hlSet&&S.hlSet.has(d.id);
+  const isPick=S.sel===d.id;
+  return `<div class="blk nd ${onHl?"hl":""} ${lk?"lk":""} ${isPick?"sel":""}"
+    data-bid="${d.id}" style="left:${d.x}px;top:${d.y}px;width:${d.w}px;height:${d.h}px">
+    ${(!S.edit&&isPick)?`<button class="openbtn" data-open="${d.id}">${IC.expand} 상세</button>`:""}
+    <span class="ntag ${d.net==="HPC"?"hpc":"oa"}">${d.net}</span>
+    <span class="pin l"></span>
+    ${S.edit?`<span class="pin r ${S.link===d.id?"a":""}" data-pin="${d.id}"></span>
+      <span class="grip" data-grip="${d.id}"></span>`:""}
+    <div class="nt"><span style="color:${col};flex:0 0 auto;margin-top:0px">${IC[d.type]}</span>
+      <span class="ntx" style="font-size:11.5px">${esc(d.name)}</span>
+      ${d.seriesTotal>1?`<span class="seq" title="Release 일정 ${d.seriesIdx}/${d.seriesTotal}">${d.seriesIdx}/${d.seriesTotal}</span>`:""}</div>
+    <div class="nm">${ph?ph.key:"-"} · ${d.versions.length?USERS[latA(d).by].name:"—"} · ${d.versions.length?latA(d).at.slice(5,16):"업데이트 없음"}</div>
+    ${compact?"":`<div class="nv">
+      <span class="bdg" style="color:${st.c};background:${st.bg};border-color:${st.bd}">${st.lb}</span>
+      ${rel?`<span class="vc r">${vstr(rel)}</span>`:`<span class="vc n">릴리스 없음</span>`}
+      ${(own&&work)?`<span class="vc w">작업중 ${vstr(work)}</span>`:""}
+      ${d.recvDept?`<span class="vc n">${DEPTS[d.recvDept]}</span>`:""}
+    </div>`}
+  </div>`;
+}
+const memoH=n=>`<div class="blk mo ${S.hlSet&&S.hlSet.has(n.id)?"hl":""} ${S.sel===n.id?"sel":""}"
+  data-bid="${n.id}" style="left:${n.x}px;top:${n.y}px;width:${n.w}px;height:${n.h}px">
+  <span class="mtag">MEMO · 버전 관리 없음</span>
+  <div class="mtx">${esc(n.text)}</div>
+  ${S.edit?`<span class="grip" data-grip="${n.id}"></span>`:""}</div>`;
+
+/* ── BIND ALL INTERACTIONS ── */
+function bindAll(W,H,G){
+  const vp=$("#vp"),cv=$("#cv");if(!vp||!cv)return;
+  const cvPt=e=>{const r=cv.getBoundingClientRect();
+    return{x:(e.clientX-r.left)/VP.z, y:e.clientY-r.top};};
+
+  /* ZOOM */
+  vp.addEventListener("wheel",e=>{
+    if(S.edit)return;                              // 12) 편집 중 줌 금지
+    if(e.shiftKey)return;                          // shift+휠 → 세로 스크롤
+    if(Math.abs(e.deltaX)>Math.abs(e.deltaY))return; // 3) 횡 휠 무시
+    e.preventDefault();
+    const r=vp.getBoundingClientRect(),mx=e.clientX-r.left;
+    const dz=e.deltaY<0?ZOOM_STEP:-ZOOM_STEP;
+    const nz=Math.min(ZOOM_MAX,Math.max(minZoom(),VP.z+dz)); // 2) 최소=화면 채움
+    VP.x=mx-(mx-VP.x)*(nz/VP.z);
+    VP.z=nz;clampVP();applyVP();
+  },{passive:false});
+
+  /* PHASE RESIZE — stepper handle */
+  document.querySelectorAll(".ph-resize").forEach(h=>{
+    h.addEventListener("pointerdown",e=>{
+      e.stopPropagation();e.preventDefault();
+      const pid=h.dataset.phrid;
+      S.phResize={pid,startX:e.clientX,startW:getPW(pid)};
+      h.setPointerCapture(e.pointerId);
+    });
+    h.addEventListener("pointermove",e=>{
+      if(!S.phResize||S.phResize.pid!==h.dataset.phrid)return;
+      const dx=(e.clientX-S.phResize.startX)/VP.z;
+      resizePhase(S.phResize.pid, S.phResize.startW+dx);
+    });
+    h.addEventListener("pointerup",()=>{if(S.phResize){S.phResize=null;render();}});
+  });
+
+  /* PHASE RESIZE — canvas lane handle */
+  document.querySelectorAll(".lane-resize").forEach(h=>{
+    h.addEventListener("pointerdown",e=>{
+      e.stopPropagation();e.preventDefault();
+      const pid=h.dataset.lrid;
+      S.phResize={pid,startX:e.clientX,startW:getPW(pid)};
+      h.setPointerCapture(e.pointerId);
+    });
+    h.addEventListener("pointermove",e=>{
+      if(!S.phResize||S.phResize.pid!==h.dataset.lrid)return;
+      const dx=(e.clientX-S.phResize.startX)/VP.z;
+      resizePhase(S.phResize.pid, S.phResize.startW+dx);
+    });
+    h.addEventListener("pointerup",()=>{if(S.phResize){S.phResize=null;render();}});
+  });
+
+  /* pin */
+  cv.querySelectorAll("[data-pin]").forEach(p=>{
+    p.addEventListener("pointerdown",e=>e.stopPropagation());
+    p.addEventListener("click",e=>{e.stopPropagation();
+      S.link=S.link===p.dataset.pin?null:p.dataset.pin;S.linkPos=null;render();});});
+
+  /* grip */
+  cv.querySelectorAll("[data-grip]").forEach(g=>{
+    g.addEventListener("pointerdown",e=>{e.stopPropagation();e.preventDefault();
+      const b=blk(g.dataset.grip),p=cvPt(e);
+      S.drag={mode:"resize",b,el:g.closest("[data-bid]"),ox:p.x-b.w,oy:p.y-b.h};
+      S.drag.el.classList.add("rs");g.setPointerCapture(e.pointerId);});
+    g.addEventListener("pointermove",e=>{
+      if(!S.drag||S.drag.mode!=="resize"||S.drag.el!==g.closest("[data-bid]"))return;
+      const p=cvPt(e),D=S.drag;
+      const nw=snp(Math.max(MINW,Math.min(MAXW,p.x-D.ox)));
+      const nh=snp(Math.max(MINH,Math.min(MAXH,p.y-D.oy)));
+      if(nw===D.b.w&&nh===D.b.h)return;
+      D.b.w=nw;D.b.h=nh;
+      D.el.style.width=nw+"px";D.el.style.height=nh+"px";
+      drawEdges();});
+    g.addEventListener("pointerup",()=>{if(S.drag?.mode==="resize"){S.drag.el.classList.remove("rs","bump");S.drag=null;render();}});});
+
+  /* block pointerdown for dragging */
+  cv.querySelectorAll("[data-bid]").forEach(el=>{
+    const b=blk(el.dataset.bid);
+    el.addEventListener("pointerdown",e=>{
+      if(!S.edit||!canEd())return;
+      if(e.target.dataset.pin!==undefined||e.target.dataset.grip!==undefined)return;
+      e.preventDefault();e.stopPropagation();
+      const p=cvPt(e);
+      S.drag={mode:"move",b,el,dx:p.x-b.x,dy:p.y-b.y,px:p.x,py:p.y,moved:false,accX:0};
+      el.classList.add("dg");el.setPointerCapture(e.pointerId);});
+    el.addEventListener("pointermove",e=>{
+      if(!S.drag||S.drag.el!==el||S.drag.mode!=="move")return;
+      const p=cvPt(e),D=S.drag;
+      const rawX=Math.max(PAD,Math.min(W-D.b.w-PAD,p.x-D.dx));
+      const rawY=Math.max(PAD,Math.min(H-D.b.h-PAD,p.y-D.dy));
+      D.accX+=rawX-D.b.x;
+      const nx=snp(wallAdj(D.b.x,D.b.w,rawX,D.accX));
+      if(nx!==snp(rawX))D.accX=0;
+      const ny=snp(rawY);
+      D.px=p.x;D.py=p.y;D.moved=true;
+      D.b.x=nx;D.b.y=ny;
+      D.el.style.left=nx+"px";D.el.style.top=ny+"px";
+      drawEdges();});
+    el.addEventListener("pointerup",e=>{
+      if(!S.drag||S.drag.el!==el)return;
+      const D=S.drag;el.classList.remove("dg","bump");
+      const moved=D.moved;S.drag=null;
+      if(moved){
+        // 놓인 위치의 Phase 레인으로 소속 변경
+        const cx=D.b.x+D.b.w/2;
+        const np=phaseAtX(S.ipId,cx);
+        if(np&&np!==D.b.phase){
+          const oldP=D.b.phase;
+          D.b.phase=np;
+          // 새 레인이 좁아 넘치면 개행 정리
+          if(laneOverflow(S.ipId,np))reflowLane(S.ipId,np);
+          render();
+          const pk=(phOf(S.ipId,np)||{key:""}).key;
+          toast(`${pk} 구간으로 옮겼습니다`);
+        }
+        return;
+      }
+      // click while in edit mode
+      if(S.link&&S.link!==b.id&&itm(b.id)&&itm(S.link)){
+        if(!EDGES.some(x=>x.from===S.link&&x.to===b.id))EDGES.push({id:"g"+Date.now(),from:S.link,to:b.id});
+        S.link=null;render();toast("연결했습니다");return;}
+      if(nOf(b.id)){S.noteDlg=b.id;renderModal();return;}
+      S.sel=S.sel===b.id?null:b.id;render();});
+    // VIEW MODE: 클릭 = 선택 + 연결 flow 하이라이트 (dialog는 상세 버튼으로)
+    el.addEventListener("click",e=>{
+      e.stopPropagation();
+      if(S.edit)return;
+      if(S.drag&&S.drag.moved)return;
+      if(S.sel===b.id){S.sel=null;S.hlSet=null;}
+      else{S.sel=b.id;S.hlSet=connectedSet(b.id);}
+      render();
+    });});
+
+  /* link cursor line */
+  cv.querySelectorAll("[data-open]").forEach(btn=>{
+    btn.addEventListener("pointerdown",e=>e.stopPropagation());
+    btn.addEventListener("click",e=>{e.stopPropagation();
+      const id=btn.dataset.open;
+      if(itm(id)){S.openId=id;S.tab="overview";renderModal();}
+      else if(nOf(id)){S.noteDlg=id;renderModal();}});});
+  cv.addEventListener("mousemove",e=>{if(S.link){S.linkPos=cvPt(e);drawEdges();}});
+  // 1) 뷰포트 레벨 클릭 → 해제 (블록은 stopPropagation으로 막음)
+  vp.addEventListener("click",e=>{
+    // 블록이나 버튼 위 클릭은 무시
+    if(e.target.closest("[data-bid]")||e.target.closest("[data-open]")||e.target.closest(".tb-btn"))return;
+    if(S.link){S.link=null;render();}
+    else if(S.sel||S.hlSet){S.sel=null;S.hlSet=null;render();}
+  });
+
+  /* ── PAN ── left-drag on empty canvas / middle-button anywhere */
+  let panPid=null;
+  vp.addEventListener("pointerdown",e=>{
+    // block drag takes priority — only start pan if nothing was captured
+    if(S.drag)return;
+    if(S.phResize)return;
+    // middle button always pans
+    const isMiddle=e.button===1;
+    // left button: only if click target is vp, cv, lane, or esvg (not a block)
+    const isEmptyLeft=e.button===0&&(
+      e.target===vp||e.target===cv||
+      e.target.classList.contains("lane")||
+      e.target.classList.contains("lane-k")||
+      e.target.classList.contains("lane-l")||
+      e.target===document.getElementById("esvg"));
+    if(!isMiddle&&!isEmptyLeft)return;
+    e.preventDefault();
+    S.pan={startX:e.clientX-VP.x};
+    vp.setPointerCapture(e.pointerId);panPid=e.pointerId;
+    vp.style.cursor="grabbing";
+  });
+  vp.addEventListener("pointermove",e=>{
+    if(!S.pan||panPid!==e.pointerId)return;
+    VP.x=e.clientX-S.pan.startX;         // 좌우 이동만
+    clampVP();applyVP();
+  });
+  vp.addEventListener("pointerup",e=>{
+    if(panPid!==e.pointerId)return;
+    S.pan=null;panPid=null;vp.style.cursor="";
+  });
+  vp.addEventListener("pointercancel",()=>{S.pan=null;panPid=null;vp.style.cursor="";});
+}
+
+function paintBlks(){
+  document.querySelectorAll("[data-bid]").forEach(el=>{
+    const b=blk(el.dataset.bid);if(!b)return;
+    el.style.left=b.x+"px";el.style.top=b.y+"px";el.style.width=b.w+"px";el.style.height=b.h+"px";});
+  drawEdges();
+}
+
+/* ── CHROME ── */
+function bindChrome(){
+  // phase highlight: NO full render, DOM only
+  document.querySelectorAll(".ph[data-ph]").forEach(btn=>btn.addEventListener("click",e=>{
+    if(e.target.classList.contains("ph-resize"))return;
+    e.stopPropagation();
+    S.phInfo=btn.dataset.ph;renderModal();
+  }));
+  const eb=$("#editBtn");if(eb)eb.addEventListener("click",()=>{
+    if(!S.edit){
+      S.snapshot=JSON.stringify({I:ITEMS,N:NOTES,E:EDGES,P:phasePW,X:EX_PH});
+      S.edit=true;
+    }else{ S.snapshot=null;S.edit=false; }
+    S.link=null;S.sel=null;S.hlSet=null;render();});
+  const cb=$("#cancelBtn");if(cb)cb.addEventListener("click",()=>{
+    if(S.snapshot){const o=JSON.parse(S.snapshot);
+      ITEMS=o.I;NOTES=o.N;EDGES=o.E;phasePW=o.P;EX_PH=o.X;}
+    S.snapshot=null;S.edit=false;S.link=null;S.sel=null;S.hlSet=null;render();
+    toast("변경을 취소했습니다");});
+  const ab=$("#addBtn");if(ab)ab.addEventListener("click",()=>{S.addDlg=true;renderModal();});
+  const nb=$("#noteBtn");if(nb)nb.addEventListener("click",()=>{
+    const n={id:"n"+Date.now(),ip:S.ipId,phase:phsFor(S.ipId)[0].id,
+      text:"새 메모",w:MW,h:MH,x:PAD+GRID,y:TOP_PAD+3*ROW_H};
+    NOTES.push(n);
+    const R=resolve(n.id,{x:n.x,y:n.y,w:n.w,h:n.h},0,1,{w:1e6,h:Math.max(CH,CUR_H)});if(R)applyP(R);
+    render();toast("메모를 추가했습니다");});
+  // Phase 설정은 toolbox floating 버튼으로
+  const hb=$("#hldBtn");if(hb)hb.addEventListener("click",()=>{S.hldDlg=true;S.hldSel=null;renderModal();});
+  const oc=$("#ownerChip");if(oc)oc.addEventListener("click",()=>{S.ownerDlg=true;renderModal();});
+  const fb=$("#fitBtn");if(fb)fb.addEventListener("click",()=>{autoFit();toast("재배치했습니다");});
+}
+
+/* ── OWNER / PERMISSION DIALOG ── */
+function ownerDlgH(){
+  const ip=IPS.find(i=>i.id===S.ipId);if(!ip)return "";
+  const primary=ip.owners[0];
+  const otherOwners=ip.owners.slice(1);
+  const own=isOwn(ip.id);
+  const analogCandidates=Object.values(USERS).filter(u=>u.dept==="analog"&&!ip.owners.includes(u.id));
+  const viewCandidates=Object.values(USERS).filter(u=>!ip.owners.includes(u.id)&&!(ip.viewGrants||[]).some(g=>g.user===u.id));
+  return `<div class="scrim"><div class="modal" style="width:560px">
+    <div class="mh" style="padding-bottom:14px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="flex:1"><div class="ey">${ip.name}</div>
+          <div style="font-size:17px;font-weight:700;margin-top:2px">담당자 · 권한</div></div>
+        <button class="btn gh" id="clOwn">${IC.x}</button>
+      </div>
+    </div>
+    <div class="mb">
+      <div class="card" style="margin-bottom:12px">
+        <div class="ey" style="margin-bottom:9px">대표 담당자</div>
+        <div style="display:flex;align-items:center;gap:9px">
+          ${av(primary,30)}
+          <div><div style="font-size:14px;font-weight:600">${USERS[primary].name}</div>
+            <div style="font-size:11px;color:var(--dm2)">${DEPTS[USERS[primary].dept]} · 이 IP workflow를 최초 구성</div></div>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:12px">
+        <div class="ey" style="margin-bottom:9px">수정 권한(Edit) — Analog 부서만 가능</div>
+        ${ip.owners.map((o,i)=>`<div style="display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid var(--ln)">
+          ${av(o,26)}<div style="flex:1"><div style="font-size:13px;font-weight:500">${USERS[o].name}${i===0?` <span class="chip s" style="padding:1px 6px;font-size:10px">대표</span>`:""}</div>
+            <div style="font-size:11px;color:var(--dm2)">${DEPTS[USERS[o].dept]}</div></div>
+          ${(own&&i>0)?`<button class="btn gh" data-rmowner="${o}">${IC.trash}</button>`:""}
+        </div>`).join("")}
+        ${own?`<div class="row" style="margin-top:10px">
+          <div class="fld" style="flex:1;margin-bottom:0"><label>Analog 부서원 추가</label>
+            <select id="addOwnerSel">${analogCandidates.length?analogCandidates.map(u=>`<option value="${u.id}">${u.name}</option>`).join(""):`<option value="">추가 가능한 인원 없음</option>`}</select></div>
+          <div style="display:flex;align-items:flex-end"><button class="btn" id="addOwnerBtn" ${analogCandidates.length?"":"disabled"}>${IC.plus} 추가</button></div>
+        </div>`:""}
+      </div>
+      <div class="card">
+        <div class="ey" style="margin-bottom:9px">열람 권한(View) — 전체 부서 가능</div>
+        ${(ip.viewGrants||[]).length?ip.viewGrants.map(g=>`<div style="display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid var(--ln)">
+          ${av(g.user,26)}<div style="flex:1"><div style="font-size:13px;font-weight:500">${USERS[g.user].name}</div>
+            <div style="font-size:11px;color:var(--dm2)">포지션: ${DEPTS[g.dept]}</div></div>
+          ${own?`<button class="btn gh" data-rmview="${g.user}">${IC.trash}</button>`:""}
+        </div>`).join(""):`<div style="font-size:12.5px;color:var(--dm2)">열람 권한을 받은 사용자가 없습니다.</div>`}
+        ${own?`<div class="row" style="margin-top:10px">
+          <div class="fld" style="flex:1;margin-bottom:0"><label>대상</label>
+            <select id="addViewUser">${viewCandidates.length?viewCandidates.map(u=>`<option value="${u.id}">${u.name}</option>`).join(""):`<option value="">추가 가능한 인원 없음</option>`}</select></div>
+          <div class="fld" style="width:150px;margin-bottom:0"><label>포지션(부서)</label>
+            <select id="addViewDept">${DEPT_LIST.map(dp=>`<option value="${dp.id}">${dp.name}</option>`).join("")}</select></div>
+          <div style="display:flex;align-items:flex-end"><button class="btn" id="addViewBtn" ${viewCandidates.length?"":"disabled"}>${IC.plus} 추가</button></div>
+        </div>
+        <div style="font-size:11px;color:var(--dm2);margin-top:8px">여기서 지정한 포지션이 산출물의 "전달 받을 부서" 목록과 매핑됩니다.</div>`:""}
+      </div>
+    </div>
+  </div></div>`;
+}
+function bindOwnerDlg(){
+  const close=()=>{S.ownerDlg=false;renderModal();};
+  $("#clOwn").addEventListener("click",close);
+  const ip=IPS.find(i=>i.id===S.ipId);
+  document.querySelectorAll("[data-rmowner]").forEach(b=>b.addEventListener("click",()=>{
+    ip.owners=ip.owners.filter(o=>o!==b.dataset.rmowner);S.ownerDlg=true;renderModal();render();}));
+  document.querySelectorAll("[data-rmview]").forEach(b=>b.addEventListener("click",()=>{
+    ip.viewGrants=(ip.viewGrants||[]).filter(g=>g.user!==b.dataset.rmview);S.ownerDlg=true;renderModal();render();}));
+  const ao=$("#addOwnerBtn");if(ao)ao.addEventListener("click",()=>{
+    const u=$("#addOwnerSel").value;if(!u)return;
+    ip.owners.push(u);S.ownerDlg=true;renderModal();render();toast("수정 권한을 추가했습니다");});
+  const av2=$("#addViewBtn");if(av2)av2.addEventListener("click",()=>{
+    const u=$("#addViewUser").value;if(!u)return;
+    const dept=$("#addViewDept").value;
+    ip.viewGrants=ip.viewGrants||[];ip.viewGrants.push({user:u,dept});
+    S.ownerDlg=true;renderModal();render();toast("열람 권한을 추가했습니다");});
+}
+
+/* ── PHASE INFO DIALOG ── */
+function phInfoH(){
+  const p=phOf(S.ipId,S.phInfo);if(!p)return "";
+  const ds=visItems().filter(d=>d.phase===p.id).sort((a,b)=>a.x-b.x);
+  const days=Math.max(1,Math.round((new Date(p.end)-new Date(p.start))/864e5));
+  const t=new Date(),st=new Date(p.start),en=new Date(p.end);
+  const state=t<st?{t:"예정",c:"var(--dm)",b:"var(--sf2)",d:"var(--ln)"}
+    :t>en?{t:"완료",c:"var(--dm)",b:"var(--sf2)",d:"var(--ln)"}
+    :{t:"진행 중",c:"var(--tl)",b:"var(--tl2)",d:"var(--tl3)"};
+  const rel=ds.filter(d=>latR(d)).length;
+  return `<div class="scrim"><div class="modal" style="width:600px">
+    <div class="mh" style="padding-bottom:14px">
+      <div style="display:flex;align-items:flex-start;gap:11px">
+        <div style="flex:1">
+          <div class="ey">${(IPS.find(i=>i.id===S.ipId)||{}).name} · PHASE</div>
+          <div style="font-size:19px;font-weight:700;margin-top:2px;display:flex;align-items:center;gap:9px">
+            <span class="mono">${p.key}</span>
+            <span style="font-size:14px;font-weight:400;color:var(--dm)">${esc(p.label)}</span>
+            <span class="bdg" style="color:${state.c};background:${state.b};border-color:${state.d}">${state.t}</span>
+            ${p.ip?`<span class="bdg" style="color:var(--vi);background:var(--vi2);border-color:var(--vi3)">IP 전용</span>`:""}
+          </div>
+        </div>
+        <button class="btn gh" id="clPI">${IC.x}</button>
+      </div>
+    </div>
+    <div class="mb">
+      <div class="row" style="margin-bottom:13px">
+        <div class="card" style="flex:1"><div class="ey">시작</div>
+          <div class="mono" style="font-size:15px;font-weight:600;margin-top:5px">${p.start}</div></div>
+        <div class="card" style="flex:1"><div class="ey">종료</div>
+          <div class="mono" style="font-size:15px;font-weight:600;margin-top:5px">${p.end}</div></div>
+        <div class="card" style="flex:1"><div class="ey">기간</div>
+          <div class="mono" style="font-size:15px;font-weight:600;margin-top:5px">${days}일</div></div>
+        <div class="card" style="flex:1"><div class="ey">Released</div>
+          <div class="mono" style="font-size:15px;font-weight:600;margin-top:5px;color:var(--tl)">${rel}/${ds.length}</div></div>
+      </div>
+      <div class="card">
+        <div class="ey" style="margin-bottom:10px">주요 산출물</div>
+        ${ds.length?ds.map(d=>{const st2=stOf(d),r=latR(d);
+          return `<div data-pinfo="${d.id}" style="display:flex;align-items:center;gap:9px;padding:8px 0;
+            border-bottom:1px solid var(--ln);cursor:pointer">
+            <span style="color:${d.net==="HPC"?"var(--hp)":"var(--bl)"}">${IC[d.type]}</span>
+            <span style="flex:1;font-size:13px;font-weight:500">${esc(d.name)}
+              ${d.seriesTotal>1?`<span class="seq">${d.seriesIdx}/${d.seriesTotal}</span>`:""}</span>
+            <span class="mono" style="font-size:11px;color:var(--dm2)">${r?"v"+r.major+"."+r.minor:""}</span>
+            <span class="bdg" style="color:${st2.c};background:${st2.bg};border-color:${st2.bd}">${st2.lb}</span>
+          </div>`;}).join("")
+        :`<div style="font-size:12.5px;color:var(--dm2)">산출물 없음</div>`}
+      </div>
+    </div>
+  </div></div>`;
+}
+function bindPhInfo(){
+  $("#clPI").addEventListener("click",()=>{S.phInfo=null;renderModal();});
+  document.querySelectorAll("[data-pinfo]").forEach(r=>r.addEventListener("click",()=>{
+    S.phInfo=null;S.openId=r.dataset.pinfo;S.tab="overview";renderModal();}));
+}
+
+/* ── HLD RELEASE GRID DIALOG ── */
+function hldDlgH(){
+  const list=hldsOf(S.ipId);
+  const ipName=(IPS.find(i=>i.id===S.ipId)||{}).name||"";
+  if(!list.length){
+    return `<div class="scrim" id="scHL"><div class="modal" style="width:520px">
+      <div class="mh" style="padding-bottom:14px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="flex:1"><div class="ey">${ipName}</div>
+            <div style="font-size:16px;font-weight:700;margin-top:2px">HLD Release</div></div>
+          <button class="btn gh" id="clHL">${IC.x}</button></div></div>
+      <div class="mb"><div class="card" style="color:var(--dm2);font-size:12.5px">HLD Release 없음</div></div>
+    </div></div>`;
+  }
+  const sorted=[...list].sort((a,b)=>a.date<b.date?1:-1);
+  const cur=sorted.find(h=>h.id===S.hldSel)||sorted[0];
+  const prev=sorted[sorted.findIndex(h=>h.id===cur.id)+1]||null;
+
+  // 현재 기준 산출물 전체(권한 반영), Phase 순 → x 순
+  const order={};phsFor(S.ipId).forEach((p,i)=>order[p.id]=i);
+  const rows=visItems().slice().sort((a,b)=>
+    (order[a.phase]??99)!==(order[b.phase]??99)?(order[a.phase]??99)-(order[b.phase]??99):a.x-b.x);
+
+  return `<div class="scrim" id="scHL"><div class="modal" style="width:880px;max-width:96vw">
+    <div class="mh" style="padding-bottom:0">
+      <div style="display:flex;align-items:flex-start;gap:11px">
+        <span style="color:var(--tl);margin-top:3px">${IC.grid}</span>
+        <div style="flex:1">
+          <div class="ey">${ipName} · HLD RELEASE</div>
+          <div style="font-size:18px;font-weight:700;margin-top:2px">
+            HLD ${cur.ver}
+            <span style="font-size:12px;font-weight:400;color:var(--dm);margin-left:8px">${cur.date}</span>
+          </div>
+        </div>
+        <div class="sb" style="padding:4px 9px">
+          <span class="ey">버전</span>
+          <select id="hldVerSel">
+            ${sorted.map(h=>`<option value="${h.id}" ${h.id===cur.id?"selected":""}>HLD ${h.ver} · ${h.date}</option>`).join("")}
+          </select>
+        </div>
+        <button class="btn gh" id="clHL">${IC.x}</button>
+      </div>
+      <div style="display:flex;gap:16px;align-items:flex-start;padding:12px 0 14px;
+        border-bottom:1px solid var(--ln);margin-top:10px">
+        <div style="display:flex;align-items:center;gap:8px">
+          ${av(cur.by,28)}
+          <div><div style="font-size:12.5px;font-weight:600">${USERS[cur.by].name}</div>
+            <div style="font-size:11px;color:var(--dm2)">${DEPTS[USERS[cur.by].dept]}</div></div>
+        </div>
+        <div style="flex:1;border-left:1px solid var(--ln);padding-left:16px">
+          <div class="ey" style="margin-bottom:4px">Release Note</div>
+          <div style="font-size:12.5px;line-height:1.55">${esc(cur.note)}</div>
+        </div>
+      </div>
+    </div>
+    <div class="mb" style="padding-top:12px">
+      <div style="border:1px solid var(--ln);border-radius:10px;overflow:hidden;background:var(--sf)">
+      <table style="width:100%;border-collapse:collapse;font-size:12.5px">
+        <thead><tr style="background:var(--sf2);border-bottom:1px solid var(--ln)">
+          <th style="text-align:left;padding:9px 12px;color:var(--dm);font-weight:600">Artifact</th>
+          <th style="text-align:left;padding:9px 12px;color:var(--dm);font-weight:600">Files/Path</th>
+          <th style="text-align:left;padding:9px 12px;color:var(--dm);font-weight:600;width:64px">Version</th>
+          <th style="text-align:left;padding:9px 12px;color:var(--dm);font-weight:600;width:124px">Released</th>
+          <th style="text-align:left;padding:9px 12px;color:var(--dm);font-weight:600">Comment</th>
+        </tr></thead>
+        <tbody>
+        ${rows.map(d=>{
+          const rec=cur.items[d.id]||null;
+          const pv=prev?(prev.items[d.id]||null):null;
+          const curV=rec?rec.ver:null, pvV=pv?pv.ver:null;
+          const changed=prev?(curV!==pvV):false;
+          const hi=changed?`background:#fff8e6;box-shadow:inset 3px 0 0 var(--am3);`:"";
+          return `<tr data-hldrow="${d.id}" style="border-bottom:1px solid var(--ln);${hi}cursor:pointer">
+            <td style="padding:9px 12px">
+              <div style="display:flex;align-items:center;gap:7px">
+                <span style="font-weight:600">${esc(d.name)}</span>
+                <span class="bdg" style="background:${d.net==="HPC"?"var(--hp2)":"var(--sf2)"};
+                  color:${d.net==="HPC"?"var(--hp)":"var(--dm)"};
+                  border-color:${d.net==="HPC"?"var(--hp3)":"var(--ln)"}">${d.net}</span>
+              </div></td>
+            <td style="padding:9px 12px"><span class="mono" style="font-size:11.5px;word-break:break-all;
+              color:${rec?(d.net==="HPC"?"var(--hp)":"var(--tx)"):"var(--dm2)"}">${rec?esc(rec.file):""}</span></td>
+            <td style="padding:9px 12px"><span class="mono" style="font-weight:600;color:var(--tl)">${rec?"v"+rec.ver:""}</span></td>
+            <td style="padding:9px 12px"><span class="mono" style="font-size:11px;color:var(--dm)">${rec?rec.at:""}</span></td>
+            <td style="padding:9px 12px;color:var(--dm)">${rec?esc(rec.cmt||""):""}</td>
+          </tr>`;}).join("")}
+        </tbody>
+      </table>
+      </div>
+    </div>
+  </div></div>`;
+}
+function bindHldDlg(){
+  const close=()=>{S.hldDlg=false;S.hldSel=null;renderModal();};
+  const cl=$("#clHL");if(cl)cl.addEventListener("click",close);
+  const sel=$("#hldVerSel");
+  if(sel)sel.addEventListener("change",e=>{S.hldSel=e.target.value;renderModal();});
+  document.querySelectorAll("[data-hldrow]").forEach(tr=>{
+    tr.addEventListener("click",()=>{
+      S.hldDlg=false;S.hldBack=true;
+      S.openId=tr.dataset.hldrow;S.tab="overview";renderModal();});
+  });
+}
+
+/* ── MODAL ROUTER ── */
+function renderModal(){
+  const root=$("#mroot");
+  if(S.ownerDlg){root.innerHTML=ownerDlgH();bindOwnerDlg();return;}
+  if(S.phInfo){root.innerHTML=phInfoH();bindPhInfo();return;}
+  if(S.hldDlg){root.innerHTML=hldDlgH();bindHldDlg();return;}
+  if(S.addDlg){root.innerHTML=addDlgH();bindAddDlg();return;}
+  if(S.noteDlg){root.innerHTML=noteDlgH();bindNoteDlg();return;}
+  if(!S.openId){root.innerHTML="";return;}
+  const d=itm(S.openId);if(!d){root.innerHTML="";return;}
+  const own=isOwn(d.ip)&&!S.recv,ph=phOf(d.ip,d.phase),st=stOf(d);
+  root.innerHTML=`<div class="scrim" id="sc"><div class="modal">
+    <div class="mh">
+      <div style="display:flex;align-items:flex-start;gap:10px">
+        <span style="color:${d.net==="HPC"?"var(--hp)":"var(--bl)"};margin-top:4px">${IC[d.type]}</span>
+        <div style="flex:1">
+          <div class="ey">${ph?ph.key+" · "+ph.label:""}</div>
+          <div style="font-size:18px;font-weight:700;margin-top:3px">${esc(d.name)}</div>
+        </div>
+        <span class="bdg" style="color:${st.c};background:${st.bg};border-color:${st.bd};margin-top:6px">${st.lb}</span>
+        <span class="bdg" style="margin-top:6px;background:${d.net==="HPC"?"var(--hp2)":"var(--sf2)"};
+          color:${d.net==="HPC"?"var(--hp)":"var(--dm)"};border-color:${d.net==="HPC"?"var(--hp3)":"var(--ln)"}">${d.net}망</span>
+        <button class="btn gh" id="clM">${IC.x}</button>
+      </div>
+      <div class="tabs">${[["overview","개요"],["versions","버전 이력"],["recv","전달"]].map(([k,l])=>
+        `<button class="tab ${S.tab===k?"on":""}" data-tab="${k}">${l}</button>`).join("")}</div>
+    </div>
+    <div class="mb">${mBody(d,own)}</div>
+  </div></div>`;
+  bindModal(d,own);
+}
+
+/* phase dialog */
+function addDlgH(){
+  const phs=phsFor(S.ipId);
+  return `<div class="scrim" id="sc2"><div class="modal" style="width:460px">
+    <div class="mh" style="padding-bottom:13px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="flex:1"><div class="ey">${IPS.find(i=>i.id===S.ipId).name}</div>
+          <div style="font-size:16px;font-weight:700;margin-top:2px">산출물 추가</div></div>
+        <button class="btn gh" id="clA">${IC.x}</button></div></div>
+    <div class="mb">
+      <div class="fld"><label>이름</label><input id="nN" placeholder="예: Startup 시퀀스 검증 결과"></div>
+      <div class="row">
+        <div class="fld" style="flex:1"><label>Phase</label>
+          <select id="nP">${phs.map(p=>`<option value="${p.id}">${p.key} · ${p.label}</option>`).join("")}</select></div>
+        <div class="fld" style="width:90px"><label>망</label>
+          <select id="nNet"><option value="OA">OA</option><option value="HPC">HPC</option></select></div>
+        <div class="fld" style="width:90px"><label>형식</label>
+          <select id="nTy"><option value="word">Word</option><option value="excel">Excel</option>
+            <option value="path">경로</option></select></div>
+      </div>
+      <button class="btn pr" id="crBtn">${IC.plus} 만들기</button>
+    </div></div></div>`;
+}
+function bindAddDlg(){
+  const cl=()=>{S.addDlg=false;renderModal();};
+  $("#clA").addEventListener("click",cl);
+  const nn=$("#nNet"),nt=$("#nTy");
+  nn.addEventListener("change",()=>{if(nn.value==="HPC"){nt.value="path";nt.disabled=true;}else{nt.disabled=false;if(nt.value==="path")nt.value="word";}});
+  $("#crBtn").addEventListener("click",()=>{
+    const name=$("#nN").value.trim();if(!name){$("#nN").classList.add("err");return;}
+    const phase=$("#nP").value,net=nn.value,type=net==="HPC"?"path":nt.value;
+    const G=laneG(S.ipId),g=G[phase]||{x:0,w:DEFAULT_PW};
+    const nd={id:"x"+Date.now(),ip:S.ipId,phase,name,type,net,recvDept:null,recvContact:null,versions:[],
+      w:NW,h:NH,x:g.x+LANE_PAD,y:1e6};
+    ITEMS.push(nd);
+    reflowLane(S.ipId,phase);
+    S.addDlg=false;render();toast("산출물을 추가했습니다");});
+}
+function noteDlgH(){
+  const n=nOf(S.noteDlg);
+  return `<div class="scrim" id="sc3"><div class="modal" style="width:400px">
+    <div class="mh" style="padding-bottom:13px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="flex:1"><div class="ey">MEMO</div><div style="font-size:16px;font-weight:700;margin-top:2px">메모 편집</div></div>
+        <button class="btn gh" id="clNo">${IC.x}</button></div></div>
+    <div class="mb">
+      <div class="fld"><label>내용</label><textarea id="nTxt" rows="4">${esc(n.text)}</textarea></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn pr" id="svNo">${IC.check} 저장</button>
+        <button class="btn" id="dlNo" style="color:var(--rd)">${IC.trash} 삭제</button>
+      </div></div></div></div>`;
+}
+function bindNoteDlg(){
+  const cl=()=>{S.noteDlg=null;renderModal();};
+  $("#clNo").addEventListener("click",cl);
+  $("#svNo").addEventListener("click",()=>{nOf(S.noteDlg).text=$("#nTxt").value;S.noteDlg=null;render();toast("메모 저장");});
+  $("#dlNo").addEventListener("click",()=>{NOTES=NOTES.filter(n=>n.id!==S.noteDlg);S.noteDlg=null;render();toast("메모 삭제");});
+}
+
+function mBody(d,own){
+  const rel=latR(d),work=hasW(d)?latA(d):null,canU=own;
+  if(S.tab==="overview"){
+    const cur=own?(latA(d)&&latA(d).file):(rel&&rel.file);
+    const phs=phsFor(d.ip);
+    return `${own?`<div class="card" style="margin-bottom:12px">
+      <div class="ey" style="margin-bottom:9px">기본 정보 수정</div>
+      <div class="row">
+        <div class="fld" style="flex:1"><label>이름</label><input id="dNm" value="${esc(d.name)}"></div>
+        <div class="fld" style="width:100px"><label>망</label>
+          <select id="dNt"><option value="OA" ${d.net==="OA"?"selected":""}>OA</option>
+            <option value="HPC" ${d.net==="HPC"?"selected":""}>HPC</option></select></div>
+      </div>
+      <div class="row">
+        <div class="fld" style="flex:1"><label>형식</label>
+          <select id="dTy"><option value="word" ${d.type==="word"?"selected":""}>Word</option>
+            <option value="excel" ${d.type==="excel"?"selected":""}>Excel</option>
+            <option value="path" ${d.type==="path"?"selected":""}>경로</option></select></div>
+      </div>
+      <div class="fld">
+        <label>Release 일정</label>
+        <div style="display:flex;flex-wrap:wrap;gap:5px">
+          ${(()=>{const sel=new Set(seriesOf(d.ip,seriesKey(d)).map(x=>x.phase));
+            return phs.map(p=>`<button type="button" class="phpick ${sel.has(p.id)?"on":""}"
+              data-phpick="${p.id}">${p.key}</button>`).join("");})()}
+        </div>
+      </div>
+      <button class="btn pr" id="svInfo">${IC.check} 저장</button>
+    </div>
+
+    <div class="card" style="margin-bottom:12px">
+      <div class="ey" style="margin-bottom:9px">${IC.link} Flow 연결</div>
+      ${(()=>{
+        const outs=EDGES.filter(e=>e.from===d.id),ins=EDGES.filter(e=>e.to===d.id);
+        const sameIp=ITEMS.filter(x=>x.ip===d.ip&&x.id!==d.id);
+        const linkable=sameIp.filter(x=>!EDGES.some(e=>e.from===d.id&&e.to===x.id));
+        const rowH=(e,dir)=>{
+          const other=itm(dir==="out"?e.to:e.from);if(!other)return "";
+          return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--ln)">
+            <span class="mono" style="font-size:11px;color:var(--dm2);width:52px">${dir==="out"?"→ 다음":"← 이전"}</span>
+            <span style="flex:1;font-size:12.5px">${esc(other.name)}${other.seriesTotal>1?` <span class="seq">${other.seriesIdx}/${other.seriesTotal}</span>`:""}</span>
+            <span class="mono" style="font-size:10.5px;color:var(--dm2)">${(phOf(other.ip,other.phase)||{key:"—"}).key}</span>
+            <button class="btn gh" data-unlink="${e.id}" title="연결 해제">${IC.trash}</button>
+          </div>`;};
+        const body=[...ins.map(e=>rowH(e,"in")),...outs.map(e=>rowH(e,"out"))].join("");
+        return (body||`<div style="font-size:12px;color:var(--dm2);padding-bottom:8px">연결된 산출물이 없습니다.</div>`)
+          +`<div class="row" style="margin-top:10px">
+              <div class="fld" style="flex:1;margin-bottom:0"><label>다음 산출물로 연결</label>
+                <select id="lkTgt">${linkable.length?linkable.map(x=>
+                  `<option value="${x.id}">${esc(x.name)}${x.seriesTotal>1?` (${x.seriesIdx}/${x.seriesTotal})`:""} · ${(phOf(x.ip,x.phase)||{key:""}).key}</option>`).join("")
+                  :`<option value="">연결 가능한 산출물 없음</option>`}</select></div>
+              <div style="display:flex;align-items:flex-end">
+                <button class="btn" id="lkAdd" ${linkable.length?"":"disabled"}>${IC.plus} 연결</button></div>
+            </div>`;
+      })()}
+    </div>`:""}
+    <div class="row" style="margin-bottom:12px">
+      <div class="card" style="flex:1">
+        <div class="ey">수신 부서가 보는 버전</div>
+        <div class="mono" style="font-size:21px;font-weight:600;color:var(--tl);margin-top:6px">${rel?vstr(rel):"—"}</div>
+        <div style="font-size:11px;color:var(--dm2);margin-top:3px">${rel?rel.at:"릴리스 이력 없음"}</div>
+      </div>
+      <div class="card" style="flex:1;opacity:${own?1:.5}">
+        <div class="ey">작성 측 작업본</div>
+        <div class="mono" style="font-size:21px;font-weight:600;color:var(--am);margin-top:6px">
+          ${own?(work?vstr(work):"없음"):IC.lock}</div>
+        <div style="font-size:11px;color:var(--dm2);margin-top:3px">
+          ${own?(work?work.at:"릴리스 이후 변경 없음"):"IP 담당자만 열람"}</div>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:12px">
+      <div class="ey" style="margin-bottom:7px">${d.net==="HPC"?"HPC vwp 경로":"현재 파일"}</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="color:var(--dm)">${IC[d.type]}</span>
+        <span class="mono" style="font-size:12px;word-break:break-all">${esc(cur||"등록된 항목 없음")}</span>
+      </div>
+      <div style="margin-top:11px">
+        ${d.net==="HPC"
+          ?`<button class="btn" ${cur?"":"disabled"}>${IC.copy} 경로 복사</button>`
+          :`<button class="btn" ${rel?"":"disabled"}>${IC.dn} 파일 내려받기</button>`}
+      </div>
+    </div>
+    ${canU?`<div class="card">
+      <div class="ey" style="margin-bottom:9px">새 작업본 올리기 — minor↑</div>
+      <div class="row">
+        <div class="fld" style="width:95px"><label>망</label>
+          <select id="fNt"><option value="OA" ${d.net==="OA"?"selected":""}>OA</option>
+            <option value="HPC" ${d.net==="HPC"?"selected":""}>HPC</option></select></div>
+        <div class="fld" style="width:95px"><label>형식</label>
+          <select id="fTy"><option value="word" ${d.type==="word"?"selected":""}>Word</option>
+            <option value="excel" ${d.type==="excel"?"selected":""}>Excel</option>
+            <option value="path" ${d.type==="path"?"selected":""}>경로</option></select></div>
+        <div class="fld" style="flex:1"><label id="fLb">파일명</label>
+          <input id="fFl" placeholder="spec_draft.docx"></div>
+      </div>
+      <div class="el" id="fEr" style="display:none"></div>
+      <div class="fld"><label>변경 내용</label><input id="fNo" placeholder="무엇이 바뀌었는지 한 줄로"></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn pr" id="upBtn">${IC.up} 작업본 올리기</button>
+        ${own?`<button class="btn" id="rlBtn" ${d.versions.length?"":"disabled"}
+          style="color:var(--tl);border-color:var(--tl3)">${IC.send} Release — v${(latR(d)?latR(d).major:0)+1}.0</button>`:""}
+      </div>
+    </div>`:""}`;
+  }
+  if(S.tab==="versions"){
+    const list=d.versions.filter(v=>own||v.kind==="major");
+    return `${list.length?`<div class="vs">${list.map((v,i)=>`
+      <div class="vl ${v.kind==="major"?"mj":"mn"}">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="vn" style="color:${v.kind==="major"?"var(--tl)":"var(--am)"}">${vstr(v)}</span>
+          <span class="bdg" style="color:${v.kind==="major"?"var(--tl)":"var(--am)"};
+            background:${v.kind==="major"?"var(--tl2)":"var(--am2)"};
+            border-color:${v.kind==="major"?"var(--tl3)":"var(--am3)"}">${v.kind==="major"?"RELEASE":"작업본"}</span>
+          ${i===0?`<span class="chip">최신</span>`:""}
+        </div>
+        <div class="vno">${esc(v.note)}</div>
+        <div class="vme">${esc(v.file||"(없음)")} · ${USERS[v.by].name} · ${v.at}</div>
+      </div>`).join("")}</div>`
+    :`<div class="card" style="color:var(--dm2);font-size:12px">아직 등록된 버전이 없습니다.</div>`}`;
+  }
+  /* recv 탭 — 전달 받는 부서 + 개별 담당자 */
+  const depts=nonAnalogDepts();
+  const contacts=d.recvDept?Object.values(USERS).filter(u=>u.dept===d.recvDept):[];
+  return `<div class="card">
+    <div class="ey" style="margin-bottom:9px">전달 받는 부서</div>
+    ${own?`
+    <div class="row">
+      <div class="fld" style="flex:1;margin-bottom:0"><label>부서</label>
+        <select id="rDept"><option value="">지정 안 함</option>
+          ${depts.map(dp=>`<option value="${dp.id}" ${d.recvDept===dp.id?"selected":""}>${dp.name}</option>`).join("")}</select></div>
+    </div>
+    <div class="row" style="margin-top:11px">
+      <div class="fld" style="flex:1;margin-bottom:0"><label>개별 담당자</label>
+        <select id="rContact"><option value="">지정 안 함</option>
+          ${Object.values(USERS).filter(u=>!d.recvDept||u.dept===d.recvDept).map(u=>
+            `<option value="${u.id}" ${d.recvContact===u.id?"selected":""}>${u.name} · ${DEPTS[u.dept]}</option>`).join("")}</select></div>
+    </div>
+    <button class="btn pr" id="svRecv" style="margin-top:11px">${IC.check} 저장</button>
+    `:`
+      ${d.recvDept?`<div style="display:flex;align-items:center;gap:9px;padding:9px 0">
+        <span class="bdg" style="background:var(--sf2);color:var(--dm);border-color:var(--ln)">${DEPTS[d.recvDept]}</span>
+        ${d.recvContact?`${av(d.recvContact,24)}<span style="font-size:13px">${USERS[d.recvContact].name}</span>`:""}
+      </div>`:`<div style="font-size:12.5px;color:var(--dm2)">지정된 전달 부서가 없습니다.</div>`}
+    `}
+  </div>`;
+}
+
+function bindModal(d,own){
+  const closeDeliv=()=>{S.openId=null;
+    if(S.hldBack){S.hldBack=false;S.hldDlg=true;}
+    renderModal();};
+  $("#clM").addEventListener("click",closeDeliv);
+  document.querySelectorAll("[data-tab]").forEach(b=>b.addEventListener("click",()=>{S.tab=b.dataset.tab;renderModal();}));
+  // Release 일정 토글
+  const picked=new Set(seriesOf(d.ip,seriesKey(d)).map(x=>x.phase));
+  document.querySelectorAll("[data-phpick]").forEach(b=>b.addEventListener("click",()=>{
+    const id=b.dataset.phpick;
+    if(picked.has(id)){ if(picked.size<=1)return; picked.delete(id);b.classList.remove("on"); }
+    else{ picked.add(id);b.classList.add("on"); }
+  }));
+  const si=$("#svInfo");if(si)si.addEventListener("click",()=>{
+    const nm=$("#dNm").value.trim();if(!nm){$("#dNm").classList.add("err");return;}
+    const net=$("#dNt").value, ty=net==="HPC"?"path":$("#dTy").value;
+    const sid=seriesKey(d);
+    seriesOf(d.ip,sid).forEach(x=>{x.name=nm;x.net=net;x.type=ty;});
+    const before=seriesOf(d.ip,sid).map(x=>x.phase).sort().join(",");
+    setSchedule(d,[...picked]);
+    const after=seriesOf(d.ip,sid).map(x=>x.phase).sort().join(",");
+    S.openId=null;const back=S.hldBack;S.hldBack=false;
+    render();if(back){S.hldDlg=true;renderModal();}
+    toast(before!==after?`Release 일정 ${picked.size}개 구간`:"저장했습니다");});
+  // flow link add / remove
+  const la=$("#lkAdd");if(la)la.addEventListener("click",()=>{
+    const t=$("#lkTgt").value;if(!t)return;
+    if(!EDGES.some(e=>e.from===d.id&&e.to===t))EDGES.push({id:"g"+Date.now(),from:d.id,to:t});
+    renderModal();drawEdges();toast("연결했습니다");});
+  document.querySelectorAll("[data-unlink]").forEach(b=>b.addEventListener("click",()=>{
+    EDGES=EDGES.filter(e=>e.id!==b.dataset.unlink);
+    renderModal();drawEdges();toast("연결을 해제했습니다");}));
+  const ns=$("#fNt"),ts=$("#fTy"),fi=$("#fFl"),lb=$("#fLb");
+  const sn=()=>{if(!ns)return;
+    if(ns.value==="HPC"){ts.value="path";ts.disabled=true;lb.textContent="HPC vwp 경로";fi.placeholder="/vwp/cis_a7/<ip>/...";}
+    else{ts.disabled=false;if(ts.value==="path")ts.value="word";lb.textContent="파일명";fi.placeholder="spec_draft.docx";}};
+  if(ns){ns.addEventListener("change",sn);sn();}
+  const up=$("#upBtn");if(up)up.addEventListener("click",()=>{
+    const file=fi.value.trim(),er=$("#fEr"),net=ns.value,type=net==="HPC"?"path":ts.value;
+    er.style.display="none";fi.classList.remove("err");
+    if(!file){fi.classList.add("err");er.textContent="파일명 또는 경로를 입력하세요.";er.style.display="block";return;}
+    if(net==="HPC"&&!file.startsWith("/vwp/")){fi.classList.add("err");
+      er.textContent="HPC 경로는 /vwp/ 로 시작해야 합니다.";er.style.display="block";return;}
+    const last=latA(d);
+    d.versions.unshift(MV(last?last.major:0,last?last.minor+1:1,"minor",S.me,stamp(),
+      $("#fNo").value.trim()||"작업본 갱신",file));
+    d.net=net;d.type=type;render();toast("작업본을 올렸습니다");});
+  const rl=$("#rlBtn");if(rl)rl.addEventListener("click",()=>{const last=latA(d);
+    d.versions.unshift(MV((latR(d)?latR(d).major:0)+1,0,"major",S.me,stamp(),"Release",last?last.file:d.file));
+    render();toast("Release 했습니다");});
+  // 전달 부서/담당자 저장
+  const rDept=$("#rDept");
+  if(rDept)rDept.addEventListener("change",()=>{
+    // 부서가 바뀌면 개별 담당자 옵션 갱신을 위해 다시 렌더
+    d.recvDept=rDept.value||null;d.recvContact=null;renderModal();});
+  const svR=$("#svRecv");if(svR)svR.addEventListener("click",()=>{
+    d.recvDept=$("#rDept").value||null;
+    d.recvContact=$("#rContact").value||null;
+    render();toast("전달 정보를 저장했습니다");});
+}
+
+
+/* ── BOOT ── */
+seedXY();
+$("#projSel").addEventListener("change",e=>{S.proj=e.target.value;render();});
+$("#ipSel").addEventListener("change",e=>{S.ipId=e.target.value;S.hlSet=null;S.sel=null;S.recv=false;S.edit=false;VP.x=0;VP.y=0;render();requestAnimationFrame(()=>{VP.z=Math.max(VP.z,minZoom());clampVP();applyVP();});});
+$("#userSel").addEventListener("change",e=>{S.me=e.target.value;S.recv=false;S.edit=false;S.openId=null;render();});
+$("#recvTog").addEventListener("click",()=>{S.recv=!S.recv;S.edit=false;render();});
+render();
+requestAnimationFrame(()=>{if(S.ipId){VP.z=Math.max(VP.z,minZoom());clampVP();applyVP();}});
+window.addEventListener('resize',()=>{if(S.ipId){VP.z=Math.max(VP.z,minZoom());clampVP();applyVP();}});
+</script>
+</body>
+</html>
