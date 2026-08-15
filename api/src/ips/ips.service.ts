@@ -1,0 +1,97 @@
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model, Types } from 'mongoose';
+import { Ip, IpDocument } from './schemas/ip.schema';
+import { UsersService } from '../users/users.service';
+import { AuditService } from '../audit/audit.service';
+import { UserDocument } from '../users/schemas/user.schema';
+
+@Injectable()
+export class IpsService {
+  constructor(
+    @InjectModel(Ip.name) private readonly model: Model<IpDocument>,
+    private readonly users: UsersService,
+    private readonly audit: AuditService,
+  ) {}
+
+  /** 접근 가능한(edit 또는 view) IP만 반환 (설계서 5.1). */
+  async listAccessibleForProject(projectId: string, userId: string) {
+    return this.model
+      .find({
+        projectId,
+        $or: [{ owners: userId }, { 'viewGrants.userId': userId }],
+      })
+      .sort({ name: 1 })
+      .exec();
+  }
+
+  /** GET /projects 에서 "접근 가능한 과제"를 판정하기 위해 사용 (설계서 5.1). */
+  async distinctAccessibleProjectIds(userId: string) {
+    const ids = await this.model.distinct('projectId', {
+      $or: [{ owners: userId }, { 'viewGrants.userId': userId }],
+    });
+    return ids as Types.ObjectId[];
+  }
+
+  async findPopulatedOrThrow(ipId: string) {
+    const ip = await this.model
+      .findById(ipId)
+      .populate('owners')
+      .populate('viewGrants.userId')
+      .exec();
+    if (!ip) throw new NotFoundException('IP를 찾을 수 없습니다.');
+    return ip;
+  }
+
+  async findRawOrThrow(ipId: string) {
+    const ip = await this.model.findById(ipId).exec();
+    if (!ip) throw new NotFoundException('IP를 찾을 수 없습니다.');
+    return ip;
+  }
+
+  /** Edit 권한(owners)은 반드시 Analog 부서 소속만 가능 (설계서 3.3, 4.5, 7.2). */
+  async addOwner(ipId: string, userId: string, actor: UserDocument) {
+    const user = await this.users.findById(userId);
+    if (user.department !== 'analog') {
+      throw new BadRequestException('Edit 권한은 Analog 부서 소속자만 가능합니다.');
+    }
+    const ip = await this.findRawOrThrow(ipId);
+    if (!ip.owners.some((o) => o.toString() === userId)) {
+      ip.owners.push(new Types.ObjectId(userId));
+      await ip.save();
+      await this.audit.log(actor._id, 'IP_OWNER_ADD', 'ip', ip._id, { userId });
+    }
+    return this.findPopulatedOrThrow(ipId);
+  }
+
+  /** 대표 담당자(owners[0])는 삭제 불가 (설계서 5.2). */
+  async removeOwner(ipId: string, userId: string, actor: UserDocument) {
+    const ip = await this.findRawOrThrow(ipId);
+    if (ip.owners.length > 0 && ip.owners[0].toString() === userId) {
+      throw new ForbiddenException('대표 담당자는 삭제할 수 없습니다.');
+    }
+    ip.owners = ip.owners.filter((o) => o.toString() !== userId);
+    await ip.save();
+    await this.audit.log(actor._id, 'IP_OWNER_REMOVE', 'ip', ip._id, { userId });
+    return this.findPopulatedOrThrow(ipId);
+  }
+
+  async addViewGrant(ipId: string, userId: string, department: string, actor: UserDocument) {
+    await this.users.findById(userId); // 존재 검증
+    const ip = await this.findRawOrThrow(ipId);
+    if (!ip.viewGrants.some((g) => g.userId.toString() === userId)) {
+      ip.viewGrants.push({ userId: new Types.ObjectId(userId), department, grantedAt: new Date() });
+      await ip.save();
+      await this.audit.log(actor._id, 'IP_VIEW_GRANT_ADD', 'ip', ip._id, { userId, department });
+    }
+    return this.findPopulatedOrThrow(ipId);
+  }
+
+  async removeViewGrant(ipId: string, userId: string, actor: UserDocument) {
+    const ip = await this.findRawOrThrow(ipId);
+    ip.viewGrants = ip.viewGrants.filter((g) => g.userId.toString() !== userId);
+    await ip.save();
+    await this.audit.log(actor._id, 'IP_VIEW_GRANT_REMOVE', 'ip', ip._id, { userId });
+    return this.findPopulatedOrThrow(ipId);
+  }
+}
