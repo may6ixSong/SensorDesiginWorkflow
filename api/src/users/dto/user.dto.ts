@@ -6,6 +6,7 @@ export interface UserDto {
   name: string;
   email: string;
   department: string;
+  color: string;
 }
 
 export function toUserDto(u: UserDocument): UserDto {
@@ -15,5 +16,6 @@ export function toUserDto(u: UserDocument): UserDto {
     name: u.name,
     email: u.email,
     department: u.department,
+    color: u.color,
   };
 }

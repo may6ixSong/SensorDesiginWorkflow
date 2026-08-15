@@ -5,7 +5,7 @@ import { EdgeDto } from '@/types/domain';
 import { useCanvasStore } from '@/store/canvasStore';
 
 export function useEdges(ipId: string | undefined) {
-  const isEditing = useCanvasStore((s) => s.isEditing);
+  const isEditing = useCanvasStore((s) => s.edit);
   return useQuery({
     queryKey: queryKeys.edges(ipId ?? ''),
     enabled: Boolean(ipId) && !isEditing,

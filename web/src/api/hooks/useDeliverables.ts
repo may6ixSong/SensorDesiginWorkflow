@@ -6,7 +6,7 @@ import { useCanvasStore } from '@/store/canvasStore';
 
 /** 캔버스 편집 중에는 refetch를 중단한다 (설계서 7.1). */
 export function useDeliverables(ipId: string | undefined) {
-  const isEditing = useCanvasStore((s) => s.isEditing);
+  const isEditing = useCanvasStore((s) => s.edit);
   return useQuery({
     queryKey: queryKeys.deliverables(ipId ?? ''),
     enabled: Boolean(ipId) && !isEditing,

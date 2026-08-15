@@ -2,18 +2,15 @@
  * ARBOR 목업 데이터 시드 로직. 이미 resolve된 Model 묶음을 받아서 채워 넣기만 한다 -
  * 연결(실제 DB든 인메모리든)은 전적으로 호출자 책임이다.
  *
- * 두 곳에서 재사용된다:
- * 1) `npm run seed` (api/seed/seed.ts) - 실제 MONGODB_URI에 대해 수동 실행.
- * 2) SeedRunnerService - MONGODB_URI 미설정(=인메모리 모드) 시 부팅 시점에 자동 실행.
- *
- * 생성 데이터: 과제 2개, IP 3개, 산출물 약 30개(+series 인스턴스 포함), HLD 스냅샷 2건.
- * 설계서(docs/arbor-design-v2.md) 4장 데이터 모델 기준.
+ * ★ 이 파일의 데이터는 UI 정본인 `analog-dashboard-v15.html` 목업의
+ *   USERS / PROJS / COM_PH / IPS / ITEMS / NOTES / EDGES / HLDS 와 1:1로 일치한다.
+ *   좌표(x,y)도 목업 seedXY()와 동일한 공식으로 계산한다.
  */
 import { Model, Types } from 'mongoose';
 import { UserDocument } from '../users/schemas/user.schema';
 import { ProjectDocument } from '../projects/schemas/project.schema';
 import { IpDocument } from '../ips/schemas/ip.schema';
-import { DeliverableDocument, DeliverableVersion } from '../deliverables/schemas/deliverable.schema';
+import { DeliverableDocument } from '../deliverables/schemas/deliverable.schema';
 import { MemoDocument } from '../memos/schemas/memo.schema';
 import { EdgeDocument } from '../edges/schemas/edge.schema';
 import { HldReleaseDocument } from '../hld/schemas/hld-release.schema';
@@ -28,451 +25,357 @@ export interface SeedModels {
   HldRelease: Model<HldReleaseDocument>;
 }
 
-const PHASE_TEMPLATE = [
-  { key: 'KO', label: 'Kick-off', order: 0 },
-  { key: 'ML1', label: 'Model 1', order: 1 },
-  { key: 'AR', label: 'Architecture Review', order: 2 },
-  { key: 'ML2', label: 'Model 2', order: 3 },
-  { key: 'ML3', label: 'Model 3', order: 4 },
-  { key: 'MDR', label: 'Mid Design Review', order: 5 },
-  { key: 'ML4', label: 'Model 4', order: 6 },
-  { key: 'FDR', label: 'Final Design Review', order: 7 },
-  { key: 'MTO', label: 'Mask Tape Out', order: 8 },
-  { key: 'Fab out', label: 'Fab Out', order: 9 },
+/* ── 목업 CONSTANTS (analog-dashboard-v15.html) ── */
+const GRID = 10;
+const ROW_H = 150;
+const TOP_PAD = 40;
+const NW = 160;
+const NH = 82;
+const MW = 160;
+const MH = 68;
+const LANE_PAD = 46;
+const DEFAULT_PW = Math.round((180 + LANE_PAD * 2) * 2 * 0.7);
+const snp = (v: number) => Math.round(v / GRID) * GRID;
+
+/* ── 목업 COM_PH ── */
+const COM_PH = [
+  { id: 'KO', key: 'KO', label: 'Kick-off', start: '2026-01-05', end: '2026-02-16' },
+  { id: 'ML1', key: 'ML1', label: 'Milestone 1', start: '2026-02-16', end: '2026-03-16' },
+  { id: 'AR', key: 'AR', label: 'Architecture Review', start: '2026-03-16', end: '2026-04-13' },
+  { id: 'ML2', key: 'ML2', label: 'Milestone 2', start: '2026-04-13', end: '2026-05-25' },
+  { id: 'ML3', key: 'ML3', label: 'Milestone 3', start: '2026-05-25', end: '2026-06-22' },
+  { id: 'MDR', key: 'MDR', label: 'Mid Design Review', start: '2026-06-22', end: '2026-07-20' },
+  { id: 'ML4', key: 'ML4', label: 'Milestone 4', start: '2026-07-20', end: '2026-08-31' },
+  { id: 'FDR', key: 'FDR', label: 'Final Design Review', start: '2026-08-31', end: '2026-09-21' },
+  { id: 'MTO', key: 'MTO', label: 'Mask Tape-out', start: '2026-09-21', end: '2026-10-12' },
+  { id: 'FABOUT', key: 'Fab out', label: 'Fab Out', start: '2026-10-12', end: '2026-12-21' },
+];
+const PHASE_INDEX: Record<string, number> = Object.fromEntries(COM_PH.map((p, i) => [p.id, i]));
+
+/** 목업 seedXY(): x = snp(laneX + max(6,(laneW-w)/2)), y = TOP_PAD + row*ROW_H */
+function seedXY(phaseId: string, row: number, w: number, h: number) {
+  const laneX = (PHASE_INDEX[phaseId] ?? 0) * DEFAULT_PW;
+  return {
+    x: snp(laneX + Math.max(6, (DEFAULT_PW - w) / 2)),
+    y: TOP_PAD + row * ROW_H,
+    w,
+    h,
+  };
+}
+
+/** 목업의 "YYYY-MM-DD HH:mm" 문자열을 로컬 Date로 (FE에서 같은 포맷으로 되돌린다). */
+const at = (s: string) => new Date(s.replace(' ', 'T') + ':00');
+
+type MockUserKey = 'u1' | 'u2' | 'u3' | 'u4' | 'u5' | 'u6' | 'u7' | 'u8';
+
+/* ── 목업 USERS ── */
+const MOCK_USERS: { key: MockUserKey; empNo: string; name: string; dept: string; color: string }[] = [
+  { key: 'u1', empNo: '20180114', name: '김선우', dept: 'analog', color: '#0c9a83' },
+  { key: 'u2', empNo: '20190233', name: '박지훈', dept: 'analog', color: '#5849cf' },
+  { key: 'u3', empNo: '20200591', name: '이수민', dept: 'digital', color: '#2563c9' },
+  { key: 'u4', empNo: '20170842', name: '정하윤', dept: 'solution', color: '#ac6f08' },
+  { key: 'u5', empNo: '20210377', name: '최다인', dept: 'pte', color: '#c8352c' },
+  { key: 'u6', empNo: '20160925', name: '오세훈', dept: 'analog', color: '#3aa66b' },
+  { key: 'u7', empNo: '20220148', name: '한지연', dept: 'aps', color: '#b3521e' },
+  { key: 'u8', empNo: '20150663', name: '류다현', dept: 'pipd', color: '#7a4fbf' },
 ];
 
-function buildPhases() {
-  // MDR 구간에 오늘(2026-08-15)이 포함되도록 CIS-A7 기준 날짜로 고정.
-  const ranges: [string, string][] = [
-    ['2026-01-05', '2026-02-16'],
-    ['2026-02-16', '2026-03-30'],
-    ['2026-03-30', '2026-04-27'],
-    ['2026-04-27', '2026-06-08'],
-    ['2026-06-08', '2026-07-20'],
-    ['2026-07-20', '2026-08-24'],
-    ['2026-08-24', '2026-10-05'],
-    ['2026-10-05', '2026-10-19'],
-    ['2026-10-19', '2026-11-02'],
-    ['2026-11-02', '2026-11-16'],
-  ];
-  return PHASE_TEMPLATE.map((p, i) => ({
-    key: p.key,
-    label: p.label,
-    order: p.order,
-    start: ranges[i][0],
-    end: ranges[i][1],
-  }));
+/* ── 목업 ITEMS (versions: [major,minor,kind,by,at,note,file]) ── */
+type MockVer = [number, number, 'major' | 'minor', MockUserKey, string, string, string];
+interface MockItem {
+  id: string;
+  ip: string;
+  phase: string;
+  row: number;
+  name: string;
+  type: string;
+  net: 'OA' | 'HPC';
+  recvDept?: string | null;
+  recvContact?: MockUserKey | null;
+  series?: string;
+  seriesIdx?: number;
+  seriesTotal?: number;
+  versions: MockVer[];
 }
 
-function minorVersion(
-  major: number,
-  minor: number,
-  fileName: string,
-  createdBy: Types.ObjectId,
-  daysAgo: number,
-  note = '',
-): DeliverableVersion {
-  return {
-    major,
-    minor,
-    kind: minor === 0 ? 'major' : 'minor',
-    fileName,
-    storageKey: `mock/${fileName}`,
-    hpcPath: null,
-    note,
-    createdBy,
-    createdAt: new Date(Date.now() - daysAgo * 86400000),
-  } as DeliverableVersion;
-}
+const MOCK_ITEMS: MockItem[] = [
+  { id:'d01', ip:'ip1', phase:'KO', row:0, name:'PLL 요구사양 접수서', type:'word', net:'OA', recvDept:'digital', recvContact:'u3',
+    versions:[[1,0,'major','u1','2026-01-09 10:20','초판','PLL_req_v1.0.docx']] },
+  { id:'d02', ip:'ip1', phase:'ML1', row:0, name:'PLL 아키텍처 검토서', type:'word', net:'OA',
+    versions:[[1,0,'major','u1','2026-02-18 16:05','초판','PLL_arch_v1.0.docx']] },
+  { id:'d03', ip:'ip1', phase:'AR', row:0, name:'AR 리뷰 패키지', type:'word', net:'OA', recvDept:'digital', recvContact:'u3',
+    versions:[
+      [2,1,'minor','u1','2026-04-02 09:30','액션아이템 추가','PLL_AR_v2.1.docx'],
+      [2,0,'major','u1','2026-03-18 14:00','2차 릴리스','PLL_AR_v2.0.docx'],
+      [1,0,'major','u1','2026-03-12 11:20','초판','PLL_AR_v1.0.docx'],
+    ] },
+  { id:'d04', ip:'ip1', phase:'ML2', row:0, name:'회로 설계 문서', type:'word', net:'OA',
+    versions:[[1,0,'major','u1','2026-04-22 17:40','1차 릴리스','PLL_ckt_design_v1.0.docx']] },
+  { id:'d05', ip:'ip1', phase:'ML2', row:1, name:'Loop Filter 계산서', type:'excel', net:'OA',
+    versions:[[1,0,'major','u1','2026-04-21 13:10','1차','PLL_loopfilter_v1.0.xlsx']] },
+  { id:'d06', ip:'ip1', phase:'ML3', row:0, name:'Pre-layout 시뮬 결과', type:'excel', net:'OA', recvDept:'pte', recvContact:'u5',
+    versions:[
+      [1,2,'minor','u1','2026-06-08 21:15','SS/FF corner','PLL_prelay_sim_v1.2.xlsx'],
+      [1,0,'major','u1','2026-06-03 10:40','1차','PLL_prelay_sim_v1.0.xlsx'],
+    ] },
+  { id:'d07', ip:'ip1', phase:'ML3', row:1, name:'Netlist / PEX', type:'path', net:'HPC',
+    versions:[[1,0,'major','u1','2026-06-04 19:55','RC 추출','/vwp/cis_a7/pll_main/pex/r1']] },
+  { id:'d08', ip:'ip1', phase:'MDR', row:0, name:'설계 리뷰 패키지', type:'word', net:'OA',
+    series:'d08', seriesIdx:1, seriesTotal:3, recvDept:'digital', recvContact:'u3',
+    versions:[[1,0,'major','u1','2026-07-02 14:10','MDR 시점 릴리스','PLL_review_v1.0.docx']] },
+  { id:'d08_ML4', ip:'ip1', phase:'ML4', row:1, name:'설계 리뷰 패키지', type:'word', net:'OA',
+    series:'d08', seriesIdx:2, seriesTotal:3, recvDept:'digital', recvContact:'u3',
+    versions:[[1,2,'minor','u1','2026-08-06 18:22','ML4 지적사항 반영중','PLL_review_v1.2.docx']] },
+  { id:'d08_FDR', ip:'ip1', phase:'FDR', row:1, name:'설계 리뷰 패키지', type:'word', net:'OA',
+    series:'d08', seriesIdx:3, seriesTotal:3, recvDept:'digital', recvContact:'u3', versions:[] },
+  { id:'d09', ip:'ip1', phase:'ML4', row:0, name:'Post-layout 시뮬 결과', type:'excel', net:'OA', versions:[] },
+  { id:'d10', ip:'ip1', phase:'ML4', row:1, name:'Layout DB', type:'path', net:'HPC', versions:[] },
+  { id:'d11', ip:'ip1', phase:'FDR', row:0, name:'FDR 체크리스트', type:'word', net:'OA', recvDept:'digital', recvContact:'u3', versions:[] },
+  { id:'d12', ip:'ip1', phase:'MTO', row:0, name:'MTO 서명 시트', type:'excel', net:'OA', recvDept:'pte', recvContact:'u5', versions:[] },
+  { id:'d13', ip:'ip1', phase:'FABOUT', row:0, name:'Fab out 특성 평가 계획', type:'word', net:'OA', versions:[] },
+
+  { id:'e01', ip:'ip2', phase:'KO', row:0, name:'LDO 요구사양 접수서', type:'word', net:'OA', recvDept:'solution', recvContact:'u4',
+    versions:[[1,0,'major','u1','2026-01-10 09:40','초판','LDO_req_v1.0.docx']] },
+  { id:'e02', ip:'ip2', phase:'ML1', row:0, name:'전원 트리 검토서', type:'word', net:'OA',
+    versions:[[1,0,'major','u1','2026-02-19 15:10','초판','LDO_powertree_v1.0.docx']] },
+  { id:'e03', ip:'ip2', phase:'AR', row:0, name:'AR 리뷰 패키지', type:'word', net:'OA',
+    versions:[[1,0,'major','u1','2026-03-17 11:35','1차','LDO_AR_v1.0.docx']] },
+  { id:'e04', ip:'ip2', phase:'ML3', row:0, name:'Load/Line Regulation 시뮬', type:'excel', net:'OA',
+    versions:[[1,2,'minor','u1','2026-08-09 17:31','부하 스텝 추가','LDO_reg_v1.2.xlsx']] },
+  { id:'e05', ip:'ip2', phase:'ML3', row:1, name:'Startup 시퀀스 파형', type:'path', net:'HPC',
+    versions:[[1,0,'major','u1','2026-06-10 22:05','트랜지언트','/vwp/cis_a7/ldo_core/tran/startup']] },
+  { id:'e06', ip:'ip2', phase:'MDR', row:0, name:'MDR 리뷰 패키지', type:'word', net:'OA', versions:[] },
+  { id:'e07', ip:'ip2', phase:'ML4', row:0, name:'Post-layout 재검증', type:'excel', net:'OA', versions:[] },
+  { id:'e08', ip:'ip2', phase:'FDR', row:0, name:'신뢰성 검토서', type:'word', net:'OA', recvDept:'solution', recvContact:'u4', versions:[] },
+  { id:'e09', ip:'ip2', phase:'FABOUT', row:0, name:'양산 이관 패키지', type:'word', net:'OA', recvDept:'solution', recvContact:'u4', versions:[] },
+
+  { id:'f01', ip:'ip3', phase:'KO', row:0, name:'ADC 요구사양 접수서', type:'word', net:'OA', recvDept:'pte', recvContact:'u5',
+    versions:[[1,0,'major','u2','2026-01-08 13:50','초판','ADC_req_v1.0.docx']] },
+  { id:'f02', ip:'ip3', phase:'AR', row:0, name:'아키텍처 리뷰 자료', type:'word', net:'OA',
+    versions:[[2,0,'major','u2','2026-03-19 16:30','Ramp 확정','ADC_arch_v2.0.docx']] },
+  { id:'f03', ip:'ip3', phase:'ML2', row:0, name:'INL/DNL 시뮬 결과', type:'excel', net:'OA',
+    versions:[[2,0,'major','u2','2026-04-23 09:44','2차','ADC_inl_dnl_v2.0.xlsx']] },
+  { id:'f04', ip:'ip3', phase:'ML3', row:0, name:'Noise 분석 리포트', type:'excel', net:'OA',
+    versions:[[1,1,'minor','u2','2026-08-10 11:02','kTC noise','ADC_noise_v1.1.xlsx']] },
+  { id:'f05', ip:'ip3', phase:'ML3', row:1, name:'Column Layout DB', type:'path', net:'HPC',
+    versions:[[1,0,'major','u2','2026-06-05 20:40','레이아웃 프리즈','/vwp/cis_a7/adc_ramp/layout/r1']] },
+  { id:'f06', ip:'ip3', phase:'MDR', row:0, name:'MDR 리뷰 패키지', type:'word', net:'OA', versions:[] },
+  { id:'f07', ip:'ip3', phase:'ML4', row:0, name:'Post-layout 재검증', type:'excel', net:'OA', versions:[] },
+  { id:'f08', ip:'ip3', phase:'FDR', row:0, name:'FDR 체크리스트', type:'word', net:'OA', recvDept:'pte', recvContact:'u5', versions:[] },
+  { id:'f09', ip:'ip3', phase:'MTO', row:0, name:'MTO 서명 시트', type:'excel', net:'OA', versions:[] },
+];
+
+const MOCK_NOTES = [
+  { id:'n1', ip:'ip1', phase:'ML2', row:2, text:'디지털팀 CDC 검토 회신 후 Post-layout 착수' },
+  { id:'n2', ip:'ip1', phase:'ML4', row:2, text:'검증팀 리뷰 결과를 FDR 체크리스트에 반영' },
+  { id:'n3', ip:'ip1', phase:'FABOUT', row:1, text:'→ 제품기술팀·양산기술팀으로 최종 전달' },
+  { id:'n4', ip:'ip2', phase:'ML4', row:1, text:'MP 이관 전 신뢰성 항목(HTOL) 확인 필요' },
+  { id:'n5', ip:'ip3', phase:'ML3', row:2, text:'레이아웃 DB는 HPC망에만 존재 — 경로만 전달' },
+];
+
+/** 목업 EDGES. 역방향 쌍(g7/g7r)이 곧 양방향 표현이므로 그대로 옮긴다. */
+const MOCK_EDGES: { id: string; from: string; to: string; auto?: boolean }[] = [
+  { id:'g1', from:'d01', to:'d02' }, { id:'g2', from:'d02', to:'d03' }, { id:'g3', from:'d03', to:'d04' },
+  { id:'g4', from:'d03', to:'d05' }, { id:'g5', from:'d04', to:'d06' }, { id:'g6', from:'d05', to:'d06' },
+  { id:'g7', from:'d06', to:'d07' }, { id:'g7r', from:'d07', to:'d06' },
+  { id:'g8', from:'d06', to:'d08' }, { id:'g9', from:'d08', to:'d09' },
+  { id:'sq1', from:'d08', to:'d08_ML4', auto:true }, { id:'sq2', from:'d08_ML4', to:'d08_FDR', auto:true },
+  { id:'g10', from:'d07', to:'d10' }, { id:'g11', from:'d09', to:'d11' }, { id:'g12', from:'d11', to:'d12' },
+  { id:'g13', from:'d12', to:'d13' },
+  { id:'h1', from:'e01', to:'e02' }, { id:'h2', from:'e02', to:'e03' }, { id:'h3', from:'e03', to:'e04' },
+  { id:'h4', from:'e03', to:'e05' }, { id:'h5', from:'e04', to:'e06' }, { id:'h6', from:'e06', to:'e07' },
+  { id:'h7', from:'e07', to:'e08' }, { id:'h8', from:'e08', to:'e09' },
+  { id:'i1', from:'f01', to:'f02' }, { id:'i2', from:'f02', to:'f03' }, { id:'i3', from:'f03', to:'f04' },
+  { id:'i4', from:'f03', to:'f05' }, { id:'i5', from:'f04', to:'f06' }, { id:'i6', from:'f05', to:'f07' },
+  { id:'i7', from:'f06', to:'f07' }, { id:'i8', from:'f07', to:'f08' }, { id:'i9', from:'f08', to:'f09' },
+];
+
+interface MockHldItem { ver: string; file: string; at: string; cmt: string }
+const MOCK_HLDS: { id:string; ip:string; ver:string; date:string; by:MockUserKey; note:string; items:Record<string,MockHldItem> }[] = [
+  { id:'hl1', ip:'ip1', ver:'1.0', date:'2026-03-20', by:'u1', note:'AR 통과 시점 1차 HLD 확정', items:{
+    d01:{ver:'1.0',file:'PLL_req_v1.0.docx',at:'2026-01-09 10:20',cmt:'초판 릴리스'},
+    d02:{ver:'1.0',file:'PLL_arch_v1.0.docx',at:'2026-02-18 16:05',cmt:'초판 릴리스'},
+    d03:{ver:'1.0',file:'PLL_AR_v1.0.docx',at:'2026-03-12 11:20',cmt:'리뷰 전 초판'},
+  }},
+  { id:'hl2', ip:'ip1', ver:'2.0', date:'2026-06-12', by:'u1', note:'ML3 완료 · 회로/시뮬 결과 반영', items:{
+    d01:{ver:'1.0',file:'PLL_req_v1.0.docx',at:'2026-01-09 10:20',cmt:'초판 릴리스'},
+    d02:{ver:'1.0',file:'PLL_arch_v1.0.docx',at:'2026-02-18 16:05',cmt:'초판 릴리스'},
+    d03:{ver:'2.0',file:'PLL_AR_v2.0.docx',at:'2026-03-18 14:00',cmt:'2차 릴리스 — 아키텍처 확정'},
+    d04:{ver:'1.0',file:'PLL_ckt_design_v1.0.docx',at:'2026-04-22 17:40',cmt:'1차 릴리스'},
+    d05:{ver:'1.0',file:'PLL_loopfilter_v1.0.xlsx',at:'2026-04-21 13:10',cmt:'1차 릴리스'},
+    d06:{ver:'1.0',file:'PLL_prelay_sim_v1.0.xlsx',at:'2026-06-03 10:40',cmt:'1차 릴리스'},
+    d07:{ver:'1.0',file:'/vwp/cis_a7/pll_main/pex/r1',at:'2026-06-04 19:55',cmt:'RC 추출 완료'},
+  }},
+  { id:'hl3', ip:'ip2', ver:'1.0', date:'2026-03-25', by:'u1', note:'LDO 1차 HLD', items:{
+    e01:{ver:'1.0',file:'LDO_req_v1.0.docx',at:'2026-01-10 09:40',cmt:'초판 릴리스'},
+    e02:{ver:'1.0',file:'LDO_powertree_v1.0.docx',at:'2026-02-19 15:10',cmt:'초판 릴리스'},
+    e03:{ver:'1.0',file:'LDO_AR_v1.0.docx',at:'2026-03-17 11:35',cmt:'1차 릴리스'},
+  }},
+  { id:'hl4', ip:'ip2', ver:'2.0', date:'2026-06-18', by:'u1', note:'Regulation·Startup 결과 추가', items:{
+    e01:{ver:'1.0',file:'LDO_req_v1.0.docx',at:'2026-01-10 09:40',cmt:'초판 릴리스'},
+    e02:{ver:'1.0',file:'LDO_powertree_v1.0.docx',at:'2026-02-19 15:10',cmt:'초판 릴리스'},
+    e03:{ver:'1.0',file:'LDO_AR_v1.0.docx',at:'2026-03-17 11:35',cmt:'1차 릴리스'},
+    e04:{ver:'1.0',file:'LDO_reg_v1.0.xlsx',at:'2026-06-02 14:20',cmt:'1차 릴리스'},
+    e05:{ver:'1.0',file:'/vwp/cis_a7/ldo_core/tran/startup',at:'2026-06-10 22:05',cmt:'트랜지언트 결과 저장'},
+  }},
+  { id:'hl5', ip:'ip3', ver:'1.0', date:'2026-03-25', by:'u2', note:'ADC 1차 HLD', items:{
+    f01:{ver:'1.0',file:'ADC_req_v1.0.docx',at:'2026-01-08 13:50',cmt:'초판 릴리스'},
+    f02:{ver:'1.0',file:'ADC_arch_v1.0.docx',at:'2026-03-11 10:15',cmt:'초판'},
+  }},
+  { id:'hl6', ip:'ip3', ver:'2.0', date:'2026-06-20', by:'u2', note:'Ramp 방식 확정 · 레이아웃 프리즈', items:{
+    f01:{ver:'1.0',file:'ADC_req_v1.0.docx',at:'2026-01-08 13:50',cmt:'초판 릴리스'},
+    f02:{ver:'2.0',file:'ADC_arch_v2.0.docx',at:'2026-03-19 16:30',cmt:'2차 릴리스 — Ramp 방식 확정'},
+    f03:{ver:'2.0',file:'ADC_inl_dnl_v2.0.xlsx',at:'2026-04-23 09:44',cmt:'2차 릴리스'},
+    f04:{ver:'1.0',file:'ADC_noise_v1.0.xlsx',at:'2026-06-01 17:25',cmt:'1차 릴리스'},
+    f05:{ver:'1.0',file:'/vwp/cis_a7/adc_ramp/layout/r1',at:'2026-06-05 20:40',cmt:'레이아웃 프리즈'},
+  }},
+];
 
 export async function seedDatabase(models: SeedModels): Promise<void> {
   const {
-    User: UserModel,
-    Project: ProjectModel,
-    Ip: IpModel,
-    Deliverable: DeliverableModel,
-    Memo: MemoModel,
-    Edge: EdgeModel,
-    HldRelease: HldReleaseModel,
+    User: UserModel, Project: ProjectModel, Ip: IpModel,
+    Deliverable: DeliverableModel, Memo: MemoModel,
+    Edge: EdgeModel, HldRelease: HldReleaseModel,
   } = models;
 
   await Promise.all([
-    UserModel.deleteMany({}),
-    ProjectModel.deleteMany({}),
-    IpModel.deleteMany({}),
-    DeliverableModel.deleteMany({}),
-    MemoModel.deleteMany({}),
-    EdgeModel.deleteMany({}),
-    HldReleaseModel.deleteMany({}),
+    UserModel.deleteMany({}), ProjectModel.deleteMany({}), IpModel.deleteMany({}),
+    DeliverableModel.deleteMany({}), MemoModel.deleteMany({}),
+    EdgeModel.deleteMany({}), HldReleaseModel.deleteMany({}),
   ]);
 
-  // --- Users ---
-  const [swKim, dhLee, jmPark, yjChoi, hnJung, smHan, jhBae, msOh] = await UserModel.insertMany([
-    { empNo: '10001', name: '김선우', email: 'sw.kim@example.com', department: 'analog' },
-    { empNo: '10002', name: '이도현', email: 'dh.lee@example.com', department: 'analog' },
-    { empNo: '10003', name: '박지민', email: 'jm.park@example.com', department: 'analog' },
-    { empNo: '20001', name: '최유진', email: 'yj.choi@example.com', department: 'digital' },
-    { empNo: '30001', name: '정하늘', email: 'hn.jung@example.com', department: 'aps' },
-    { empNo: '40001', name: '한소미', email: 'sm.han@example.com', department: 'pipd' },
-    { empNo: '50001', name: '배준혁', email: 'jh.bae@example.com', department: 'solution' },
-    { empNo: '60001', name: '오민서', email: 'ms.oh@example.com', department: 'pte' },
-    { empNo: '20002', name: '강태양', email: 'ty.kang@example.com', department: 'digital' },
-  ]);
+  /* ── Users ── */
+  const userDocs = await UserModel.insertMany(
+    MOCK_USERS.map((u) => ({
+      empNo: u.empNo,
+      name: u.name,
+      email: `${u.key}@example.com`,
+      department: u.dept,
+      color: u.color,
+      isActive: true,
+    })),
+  );
+  const U: Record<string, Types.ObjectId> = {};
+  MOCK_USERS.forEach((u, i) => (U[u.key] = userDocs[i]._id));
 
-  // --- Projects ---
-  const cisA7 = await ProjectModel.create({
-    code: 'CIS-A7',
-    name: '50MP 모바일 CIS',
-    domain: 'ANALOG',
-    phases: buildPhases(),
-    status: 'ACTIVE',
+  /* ── Projects (Phase는 두 과제 공통) ── */
+  const p1 = await ProjectModel.create({
+    code: 'CIS-A7', name: '50MP 모바일 CIS', domain: 'ANALOG', phases: COM_PH, status: 'ACTIVE',
   });
-  const cisB2 = await ProjectModel.create({
-    code: 'CIS-B2',
-    name: '13MP 광각 CIS',
-    domain: 'ANALOG',
-    phases: buildPhases(),
-    status: 'ACTIVE',
+  const p2 = await ProjectModel.create({
+    code: 'CIS-B3', name: '8MP 오토모티브 CIS', domain: 'ANALOG', phases: COM_PH, status: 'ACTIVE',
   });
 
-  // --- IPs ---
-  const pllMain = await IpModel.create({
-    projectId: cisA7._id,
-    name: 'PLL_MAIN',
-    description: '메인 클럭 생성 PLL',
-    owners: [swKim._id, dhLee._id],
+  /* ── IPs ── */
+  const ip1 = await IpModel.create({
+    projectId: p1._id, name: 'PLL_MAIN', description: '메인 클럭 생성 PLL',
+    owners: [U.u1],
     viewGrants: [
-      { userId: yjChoi._id, department: 'digital', grantedAt: new Date() },
-      { userId: smHan._id, department: 'pipd', grantedAt: new Date() },
+      { userId: U.u3, department: 'digital', grantedAt: new Date() },
+      { userId: U.u5, department: 'pte', grantedAt: new Date() },
     ],
     color: '#0c9a83',
   });
-  const adcTop = await IpModel.create({
-    projectId: cisA7._id,
-    name: 'ADC_TOP',
-    description: '컬럼 ADC 통합 블록',
-    owners: [jmPark._id],
+  const ip2 = await IpModel.create({
+    projectId: p1._id, name: 'LDO_CORE', description: '코어 전원 레귤레이터',
+    owners: [U.u1],
+    viewGrants: [{ userId: U.u4, department: 'solution', grantedAt: new Date() }],
+    color: '#5849cf',
+  });
+  const ip3 = await IpModel.create({
+    projectId: p1._id, name: 'ADC_RAMP', description: 'Ramp 방식 컬럼 ADC',
+    owners: [U.u2],
     viewGrants: [
-      { userId: hnJung._id, department: 'aps', grantedAt: new Date() },
-      { userId: jhBae._id, department: 'solution', grantedAt: new Date() },
+      { userId: U.u5, department: 'pte', grantedAt: new Date() },
+      { userId: U.u3, department: 'digital', grantedAt: new Date() },
     ],
-    color: '#2f6fed',
+    color: '#2563c9',
   });
-  const ldoReg = await IpModel.create({
-    projectId: cisB2._id,
-    name: 'LDO_REG',
-    description: '아날로그 코어 LDO 레귤레이터',
-    owners: [jmPark._id, dhLee._id],
-    viewGrants: [{ userId: msOh._id, department: 'pte', grantedAt: new Date() }],
-    color: '#c2410c',
-  });
+  const IPID: Record<string, Types.ObjectId> = { ip1: ip1._id, ip2: ip2._id, ip3: ip3._id };
 
-  // --- Deliverables ---
-  type DRow = {
-    ipId: Types.ObjectId;
-    projectId: Types.ObjectId;
-    phaseKey: string;
-    name: string;
-    docType: string;
-    network: 'OA' | 'HPC';
-    versions: DeliverableVersion[];
-    recvDept?: string;
-    recvContact?: Types.ObjectId;
-    createdBy: Types.ObjectId;
-  };
+  /* ── Deliverables ── (series 참조를 위해 id를 먼저 확정) */
+  const DID: Record<string, Types.ObjectId> = {};
+  MOCK_ITEMS.forEach((m) => (DID[m.id] = new Types.ObjectId()));
 
-  const rows: DRow[] = [];
-
-  // PLL_MAIN (10개)
-  const pllPlan: [string, string, string, 'OA' | 'HPC', number][] = [
-    ['KO', 'Spec 정의서', 'word', 'OA', 2],
-    ['ML1', 'Behavior 모델', 'path', 'HPC', 1],
-    ['ML1', 'Testbench 등록', 'path', 'HPC', 1],
-    ['AR', 'Architecture Review 자료', 'ppt', 'OA', 1],
-    ['ML2', 'Schematic 리뷰본', 'word', 'OA', 3],
-    ['ML2', 'Pre-layout 시뮬 결과', 'excel', 'OA', 2],
-    ['ML3', 'Post-layout 시뮬 결과', 'excel', 'OA', 2],
-    ['ML3', 'Layout 파일 경로', 'path', 'HPC', 1],
-    ['MDR', 'Mid Design Review 자료', 'ppt', 'OA', 1],
-    ['ML4', 'Corner 재검증 결과', 'excel', 'OA', 2],
-  ];
-  for (const [phaseKey, name, docType, network, verCount] of pllPlan) {
-    const versions: DeliverableVersion[] = [];
-    for (let i = verCount; i >= 1; i--) {
-      const isRelease = i === verCount && verCount > 1;
-      versions.push(
-        isRelease
-          ? minorVersion(
-              1,
-              0,
-              `${name}_v1.0.${docType === 'excel' ? 'xlsx' : docType === 'ppt' ? 'pptx' : 'docx'}`,
-              dhLee._id,
-              i * 5,
-            )
-          : minorVersion(verCount > 1 ? 1 : 0, verCount > 1 ? 0 : i, `${name}_draft.${docType}`, swKim._id, i * 5),
-      );
-    }
-    versions.reverse(); // 최신이 index 0
-    rows.push({
-      ipId: pllMain._id,
-      projectId: cisA7._id,
-      phaseKey,
-      name,
-      docType,
-      network,
-      versions,
-      recvDept: name.includes('시뮬') ? 'digital' : undefined,
-      recvContact: name.includes('시뮬') ? yjChoi._id : undefined,
-      createdBy: swKim._id,
+  for (const m of MOCK_ITEMS) {
+    const layout = seedXY(m.phase, m.row, NW, NH);
+    await DeliverableModel.create({
+      _id: DID[m.id],
+      projectId: p1._id,
+      ipId: IPID[m.ip],
+      phaseKey: m.phase,
+      name: m.name,
+      docType: m.type,
+      network: m.net,
+      series: m.series ? DID[m.series] : null,
+      seriesIdx: m.seriesIdx ?? 1,
+      seriesTotal: m.seriesTotal ?? 1,
+      recvDept: m.recvDept ?? null,
+      recvContact: m.recvContact ? U[m.recvContact] : null,
+      layout,
+      versions: m.versions.map(([major, minor, kind, by, when, note, file]) => ({
+        major, minor, kind,
+        fileName: file,
+        storageKey: m.net === 'OA' ? `mock/${file}` : null,
+        hpcPath: m.net === 'HPC' ? file : null,
+        note,
+        createdBy: U[by],
+        createdAt: at(when),
+      })),
+      createdBy: U[m.versions[0]?.[3] ?? 'u1'],
     });
   }
 
-  // ADC_TOP (10개)
-  const adcPlan: [string, string, string, 'OA' | 'HPC', number][] = [
-    ['KO', 'ADC Spec 정의서', 'word', 'OA', 2],
-    ['ML1', 'ADC Behavior 모델', 'path', 'HPC', 1],
-    ['ML2', 'ADC Schematic 리뷰본', 'word', 'OA', 2],
-    ['ML2', 'Column ADC 시뮬 결과', 'excel', 'OA', 2],
-    ['ML2', 'Column ADC 재추출 파일', 'path', 'HPC', 1],
-    ['ML3', 'ADC Post-layout 시뮬', 'excel', 'OA', 2],
-    ['MDR', 'ADC MDR 자료', 'ppt', 'OA', 1],
-    ['ML4', 'ADC Noise 분석 결과', 'excel', 'OA', 1],
-    ['FDR', 'ADC FDR 자료', 'ppt', 'OA', 1],
-    ['MTO', 'ADC 최종 GDS 경로', 'path', 'HPC', 1],
-  ];
-  for (const [phaseKey, name, docType, network, verCount] of adcPlan) {
-    const versions: DeliverableVersion[] = [];
-    for (let i = verCount; i >= 1; i--) {
-      versions.push(
-        i === verCount && verCount > 1
-          ? minorVersion(1, 0, `${name}_v1.0.${docType}`, jmPark._id, i * 4)
-          : minorVersion(0, i, `${name}_draft.${docType}`, jmPark._id, i * 4),
-      );
-    }
-    versions.reverse();
-    rows.push({
-      ipId: adcTop._id,
-      projectId: cisA7._id,
-      phaseKey,
-      name,
-      docType,
-      network,
-      versions,
-      recvDept: name.includes('시뮬') || name.includes('재추출') ? 'aps' : undefined,
-      recvContact: name.includes('시뮬') || name.includes('재추출') ? hnJung._id : undefined,
-      createdBy: jmPark._id,
+  /* ── Memos ── */
+  for (const n of MOCK_NOTES) {
+    await MemoModel.create({
+      ipId: IPID[n.ip],
+      phaseKey: n.phase,
+      text: n.text,
+      layout: seedXY(n.phase, n.row, MW, MH),
+      createdBy: U.u1,
     });
   }
 
-  // LDO_REG (9개)
-  const ldoPlan: [string, string, string, 'OA' | 'HPC', number][] = [
-    ['KO', 'LDO Spec 정의서', 'word', 'OA', 1],
-    ['ML1', 'LDO Behavior 모델', 'path', 'HPC', 1],
-    ['ML2', 'LDO Schematic 리뷰본', 'word', 'OA', 2],
-    ['ML2', 'LDO 안정성 시뮬 결과', 'excel', 'OA', 2],
-    ['ML3', 'LDO Post-layout 시뮬', 'excel', 'OA', 1],
-    ['MDR', 'LDO MDR 자료', 'ppt', 'OA', 1],
-    ['ML4', 'LDO PSRR 분석 결과', 'excel', 'OA', 1],
-    ['FDR', 'LDO FDR 자료', 'ppt', 'OA', 1],
-    ['MTO', 'LDO 최종 GDS 경로', 'path', 'HPC', 1],
-  ];
-  for (const [phaseKey, name, docType, network, verCount] of ldoPlan) {
-    const versions: DeliverableVersion[] = [];
-    for (let i = verCount; i >= 1; i--) {
-      versions.push(
-        i === verCount && verCount > 1
-          ? minorVersion(1, 0, `${name}_v1.0.${docType}`, dhLee._id, i * 6)
-          : minorVersion(0, i, `${name}_draft.${docType}`, jmPark._id, i * 6),
-      );
-    }
-    versions.reverse();
-    rows.push({
-      ipId: ldoReg._id,
-      projectId: cisB2._id,
-      phaseKey,
-      name,
-      docType,
-      network,
-      versions,
-      recvDept: name.includes('시뮬') ? 'pte' : undefined,
-      recvContact: name.includes('시뮬') ? msOh._id : undefined,
-      createdBy: jmPark._id,
-    });
-  }
+  /* ── Edges ── */
+  await EdgeModel.insertMany(
+    MOCK_EDGES.filter((e) => DID[e.from] && DID[e.to]).map((e) => {
+      const ipKey = MOCK_ITEMS.find((m) => m.id === e.from)!.ip;
+      return {
+        ipId: IPID[ipKey],
+        fromId: DID[e.from],
+        toId: DID[e.to],
+        bidirectional: false, // 목업과 동일하게 역방향 쌍으로 양방향을 표현한다
+        auto: e.auto ?? false,
+      };
+    }),
+  );
 
-  // 레인 안에서 겹치지 않도록 phase별로 x를 지그재그 배치 (Auto Fit 이전 상태를 흉내)
-  const laneCounter = new Map<string, number>();
-  const created: InstanceType<typeof DeliverableModel>[] = [];
-  for (const row of rows) {
-    const laneKey = `${row.ipId.toString()}:${row.phaseKey}`;
-    const idx = laneCounter.get(laneKey) ?? 0;
-    laneCounter.set(laneKey, idx + 1);
-    const d = await DeliverableModel.create({
-      projectId: row.projectId,
-      ipId: row.ipId,
-      phaseKey: row.phaseKey,
-      name: row.name,
-      docType: row.docType,
-      network: row.network,
-      series: null,
-      seriesIdx: 1,
-      seriesTotal: 1,
-      recvDept: row.recvDept ?? null,
-      recvContact: row.recvContact ?? null,
-      layout: { x: 24 + (idx % 2) * 88, y: 40 + Math.floor(idx / 2) * 110, w: 160, h: 82 },
-      versions: row.versions,
-      createdBy: row.createdBy,
-    });
-    created.push(d);
-  }
-
-  // --- Series 예시: PLL_MAIN의 "Corner 재검증 결과"를 ML2/ML3/ML4에 걸쳐 반복 릴리스 (설계서 3.6) ---
-  const cornerOrigin = created.find((d) => d.name === 'Corner 재검증 결과')!;
-  cornerOrigin.phaseKey = 'ML2';
-  cornerOrigin.seriesTotal = 3;
-  cornerOrigin.seriesIdx = 1;
-  await cornerOrigin.save();
-
-  const cornerMl3 = await DeliverableModel.create({
-    projectId: cisA7._id,
-    ipId: pllMain._id,
-    phaseKey: 'ML3',
-    name: cornerOrigin.name,
-    docType: cornerOrigin.docType,
-    network: cornerOrigin.network,
-    series: cornerOrigin._id,
-    seriesIdx: 2,
-    seriesTotal: 3,
-    recvDept: null,
-    recvContact: null,
-    layout: { x: 24, y: 260, w: 160, h: 82 },
-    versions: [minorVersion(1, 0, 'corner_ml3_v1.0.xlsx', swKim._id, 10)],
-    createdBy: swKim._id,
-  });
-  const cornerMl4 = await DeliverableModel.create({
-    projectId: cisA7._id,
-    ipId: pllMain._id,
-    phaseKey: 'ML4',
-    name: cornerOrigin.name,
-    docType: cornerOrigin.docType,
-    network: cornerOrigin.network,
-    series: cornerOrigin._id,
-    seriesIdx: 3,
-    seriesTotal: 3,
-    recvDept: null,
-    recvContact: null,
-    layout: { x: 24, y: 260, w: 160, h: 82 },
-    versions: [],
-    createdBy: swKim._id,
-  });
-
-  // --- Edges ---
-  const byName = (ipId: Types.ObjectId, name: string) =>
-    created.find((d) => d.ipId.toString() === ipId.toString() && d.name === name)!;
-
-  await EdgeModel.insertMany([
-    // PLL_MAIN: 단방향 순차 흐름
-    {
-      ipId: pllMain._id,
-      fromId: byName(pllMain._id, 'Spec 정의서')._id,
-      toId: byName(pllMain._id, 'Behavior 모델')._id,
-      bidirectional: false,
-      auto: false,
-    },
-    {
-      ipId: pllMain._id,
-      fromId: byName(pllMain._id, 'Schematic 리뷰본')._id,
-      toId: byName(pllMain._id, 'Pre-layout 시뮬 결과')._id,
-      bidirectional: false,
-      auto: false,
-    },
-    // 양방향: 시뮬 결과 <-> 재추출 성격의 관계를 흉내 (Post-layout 결과가 Layout 경로를 참조/갱신)
-    {
-      ipId: pllMain._id,
-      fromId: byName(pllMain._id, 'Post-layout 시뮬 결과')._id,
-      toId: byName(pllMain._id, 'Layout 파일 경로')._id,
-      bidirectional: true,
-      auto: false,
-    },
-    // series 자동 연결 체인
-    { ipId: pllMain._id, fromId: cornerOrigin._id, toId: cornerMl3._id, bidirectional: false, auto: true },
-    { ipId: pllMain._id, fromId: cornerMl3._id, toId: cornerMl4._id, bidirectional: false, auto: true },
-
-    // ADC_TOP
-    {
-      ipId: adcTop._id,
-      fromId: byName(adcTop._id, 'ADC Spec 정의서')._id,
-      toId: byName(adcTop._id, 'ADC Behavior 모델')._id,
-      bidirectional: false,
-      auto: false,
-    },
-    {
-      ipId: adcTop._id,
-      fromId: byName(adcTop._id, 'Column ADC 시뮬 결과')._id,
-      toId: byName(adcTop._id, 'Column ADC 재추출 파일')._id,
-      bidirectional: true,
-      auto: false,
-    },
-
-    // LDO_REG
-    {
-      ipId: ldoReg._id,
-      fromId: byName(ldoReg._id, 'LDO Spec 정의서')._id,
-      toId: byName(ldoReg._id, 'LDO Behavior 모델')._id,
-      bidirectional: false,
-      auto: false,
-    },
-  ]);
-
-  // --- Memos (Edit 권한자 전용) ---
-  await MemoModel.insertMany([
-    {
-      ipId: pllMain._id,
-      phaseKey: 'ML2',
-      text: '디지털팀 CDC 검토 회신 후 착수',
-      layout: { x: 220, y: 40, w: 160, h: 68 },
-      createdBy: swKim._id,
-    },
-    {
-      ipId: adcTop._id,
-      phaseKey: 'ML3',
-      text: 'APS팀 노이즈 목표치 재확인 필요',
-      layout: { x: 220, y: 40, w: 160, h: 68 },
-      createdBy: jmPark._id,
-    },
-  ]);
-
-  // --- HLD Releases (PLL_MAIN 기준 2건) ---
-  const pllDeliverables = created.filter((d) => d.ipId.toString() === pllMain._id.toString());
-  const itemsV1: Record<string, unknown> = {};
-  for (const d of pllDeliverables) {
-    const released = d.versions.find((v) => v.kind === 'major');
-    if (released) {
-      itemsV1[d._id.toString()] = {
-        version: `${released.major}.${released.minor}`,
-        file: released.fileName,
-        at: released.createdAt.toISOString(),
-        comment: released.note ?? '',
+  /* ── HLD Releases ── */
+  for (const h of MOCK_HLDS) {
+    const items: Record<string, unknown> = {};
+    for (const [mockId, rec] of Object.entries(h.items)) {
+      if (!DID[mockId]) continue;
+      items[DID[mockId].toString()] = {
+        version: rec.ver,
+        file: rec.file,
+        at: rec.at,
+        comment: rec.cmt,
       };
     }
+    await HldReleaseModel.create({
+      ipId: IPID[h.ip],
+      version: h.ver,
+      date: h.date,
+      releasedBy: U[h.by],
+      note: h.note,
+      items,
+    });
   }
-  await HldReleaseModel.create({
-    ipId: pllMain._id,
-    version: '1.0',
-    date: '2026-05-20',
-    releasedBy: swKim._id,
-    note: 'ML2 완료 · Schematic 리뷰 반영',
-    items: itemsV1,
-  });
-  await HldReleaseModel.create({
-    ipId: pllMain._id,
-    version: '2.0',
-    date: '2026-07-25',
-    releasedBy: swKim._id,
-    note: 'MDR 진입 · Post-layout 결과 반영',
-    items: itemsV1,
-  });
 
   // eslint-disable-next-line no-console
-  console.log(`Seed 완료: users=9, projects=2, ips=3, deliverables=${created.length + 2}, hldReleases=2`);
+  console.log(
+    `Seed 완료(목업 v15 기준): users=${MOCK_USERS.length}, projects=2, ips=3, ` +
+      `deliverables=${MOCK_ITEMS.length}, memos=${MOCK_NOTES.length}, edges=${MOCK_EDGES.length}, hlds=${MOCK_HLDS.length}`,
+  );
 }

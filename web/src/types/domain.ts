@@ -6,6 +6,8 @@ export interface UserDto {
   name: string;
   email: string;
   department: DepartmentId;
+  /** 아바타 배경색 (목업 USERS[].color) */
+  color: string;
 }
 
 export interface PhaseRef {
@@ -51,21 +53,19 @@ export interface Layout {
 
 export type VersionKind = 'major' | 'minor';
 
+/** BE가 목업 MV() 모양으로 내려주는 버전 (권한 필터링 완료 — 설계서 6.1) */
 export interface DeliverableVersionDto {
   major: number;
   minor: number;
   kind: VersionKind;
-  fileName: string;
-  storageKey: string | null;
-  hpcPath: string | null;
+  file: string;
   note: string;
-  createdBy: string;
-  createdAt: string;
+  by: string;
+  at: string;
 }
 
 export interface DeliverableDto {
   id: string;
-  _id: string;
   projectId: string;
   ipId: string;
   phaseKey: string;
@@ -78,13 +78,11 @@ export interface DeliverableDto {
   layout: Layout;
   recvDept: string | null;
   recvContact: string | null;
+  /** 권한에 맞게 이미 필터링된 버전 목록 */
+  versions: DeliverableVersionDto[];
   releasedVersion: DeliverableVersionDto | null;
-  /** Edit 권한자에게만 채워진다 (설계서 6.1). */
   workingVersion: DeliverableVersionDto | null;
   canEdit: boolean;
-  createdBy: string;
-  createdAt: string;
-  updatedAt: string;
 }
 
 export interface MemoDto {

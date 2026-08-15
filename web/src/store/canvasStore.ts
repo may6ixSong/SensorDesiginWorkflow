@@ -1,151 +1,173 @@
 import { create } from 'zustand';
-import { DeliverableDto, EdgeDto, Layout, MemoDto } from '@/types/domain';
-import { ZOOM_MAX, ZOOM_MIN } from '@/lib/layoutConstants';
-
-export interface DraftDeliverable {
-  id: string;
-  layout: Layout;
-  phaseKey: string;
-}
-
-export interface DraftMemo {
-  id: string;
-  phaseKey: string;
-  text: string;
-  layout: Layout;
-}
-
-export interface DraftEdge {
-  id: string;
-  fromId: string;
-  toId: string;
-  bidirectional: boolean;
-  auto: boolean;
-}
-
-interface EditDraft {
-  deliverables: DraftDeliverable[];
-  memos: DraftMemo[];
-  edges: DraftEdge[];
-}
-
-interface HighlightState {
-  nodeIds: Set<string>;
-  edgeIds: Set<string>;
-}
+import { CanvasEdge, CanvasMemo, CanvasNode } from '@/lib/canvasModel';
+import { ZOOM_MAX, ZOOM_MIN } from '@/lib/constants';
 
 /**
- * 클라이언트 전용 상태 (줌/팬, 편집모드, 선택/하이라이트) - 서버로 보내지 않는다 (설계서 7.1).
- * 편집 진입 시 draft/editSnapshot에 서버 상태 스냅샷을 복제해두고, 취소 시 draft를
- * editSnapshot으로 되돌려 API 호출 없이 종료한다. 저장 시에만 draft를 PUT /canvas로 보낸다.
+ * 클라이언트 전용 상태 (목업의 VP + S). 서버로 보내지 않는다 (설계서 7.1).
+ * 편집 진입 시 nodes/memos/edges/phasePW를 스냅샷으로 떠두고, 취소하면 그대로 복원한다.
  */
-interface CanvasState {
-  zoom: number;
-  panX: number;
-  isEditing: boolean;
-  selectedBlockId: string | null;
-  highlight: HighlightState | null;
-  laneWidthOverrides: Record<string, number>;
-  draft: EditDraft | null;
-  editSnapshot: EditDraft | null;
-  /** AppShell의 "수신부서 시점 토글" - 선택된 부서가 recvDept인 산출물만 강조한다 (설계서 7.1 컴포넌트 트리). */
-  recvDeptFocus: string | null;
-  setRecvDeptFocus: (dept: string | null) => void;
-
-  setZoom: (zoom: number) => void;
-  setPan: (panX: number) => void;
-  clampZoom: (minZoom: number) => void;
-
-  enterEditMode: (deliverables: DeliverableDto[], memos: MemoDto[], edges: EdgeDto[]) => void;
-  cancelEdit: () => void;
-  exitEditMode: () => void;
-
-  updateDraftLayout: (id: string, layout: Layout, phaseKey: string) => void;
-  addDraftMemo: (memo: DraftMemo) => void;
-  updateDraftMemo: (id: string, patch: Partial<Omit<DraftMemo, 'id'>>) => void;
-  removeDraftMemo: (id: string) => void;
-  addDraftEdge: (edge: DraftEdge) => void;
-  removeDraftEdge: (id: string) => void;
-
-  setLaneWidth: (phaseKey: string, width: number) => void;
-
-  select: (blockId: string | null) => void;
-  setHighlight: (highlight: HighlightState | null) => void;
+export interface CanvasSnapshot {
+  nodes: CanvasNode[];
+  memos: CanvasMemo[];
+  edges: CanvasEdge[];
+  phasePW: Record<string, number>;
 }
 
+interface CanvasState {
+  /* viewport — 가로만 스케일 */
+  z: number;
+  x: number;
+  /* 작업 데이터 */
+  nodes: CanvasNode[];
+  memos: CanvasMemo[];
+  edges: CanvasEdge[];
+  phasePW: Record<string, number>;
+  /* 현재 로드된 IP — 서버 데이터 동기화 판단용 */
+  loadedIpId: string | null;
+  /* 상호작용 */
+  edit: boolean;
+  recv: boolean;
+  sel: string | null;
+  hlSet: Set<string> | null;
+  link: string | null;
+  linkPos: { x: number; y: number } | null;
+  flashBnd: number | null;
+  snapshot: CanvasSnapshot | null;
+  /* dialog */
+  openId: string | null;
+  tab: 'overview' | 'versions' | 'recv';
+  noteDlg: string | null;
+  addDlg: boolean;
+  hldDlg: boolean;
+  hldSel: string | null;
+  hldBack: boolean;
+  phInfo: string | null;
+  ownerDlg: boolean;
+
+  setVP: (z: number, x: number) => void;
+  setPan: (x: number) => void;
+  hydrate: (ipId: string, d: { nodes: CanvasNode[]; memos: CanvasMemo[]; edges: CanvasEdge[] }) => void;
+  setNodes: (nodes: CanvasNode[]) => void;
+  setMemos: (memos: CanvasMemo[]) => void;
+  setEdges: (edges: CanvasEdge[]) => void;
+  setPhasePW: (pw: Record<string, number>) => void;
+  bumpBlocks: () => void;
+
+  enterEdit: () => void;
+  exitEdit: () => void;
+  cancelEdit: () => void;
+
+  setRecv: (v: boolean) => void;
+  select: (id: string | null, hl: Set<string> | null) => void;
+  setLink: (id: string | null) => void;
+  setLinkPos: (p: { x: number; y: number } | null) => void;
+  flash: (bnd: number | null) => void;
+
+  openDeliverable: (id: string | null, tab?: CanvasState['tab']) => void;
+  setTab: (t: CanvasState['tab']) => void;
+  setNoteDlg: (id: string | null) => void;
+  setAddDlg: (v: boolean) => void;
+  setHldDlg: (v: boolean, sel?: string | null) => void;
+  setHldSel: (id: string | null) => void;
+  setHldBack: (v: boolean) => void;
+  setPhInfo: (id: string | null) => void;
+  setOwnerDlg: (v: boolean) => void;
+  /** 블록 재렌더 트리거용 카운터 (드래그 커밋 후 등) */
+  rev: number;
+}
+
+const clone = <T,>(v: T): T => JSON.parse(JSON.stringify(v));
+
 export const useCanvasStore = create<CanvasState>((set, get) => ({
-  zoom: 1,
-  panX: 0,
-  isEditing: false,
-  selectedBlockId: null,
-  highlight: null,
-  laneWidthOverrides: {},
-  draft: null,
-  editSnapshot: null,
-  recvDeptFocus: null,
-  setRecvDeptFocus: (dept) => set({ recvDeptFocus: dept }),
+  z: 1,
+  x: 0,
+  nodes: [],
+  memos: [],
+  edges: [],
+  phasePW: {},
+  loadedIpId: null,
+  edit: false,
+  recv: false,
+  sel: null,
+  hlSet: null,
+  link: null,
+  linkPos: null,
+  flashBnd: null,
+  snapshot: null,
+  openId: null,
+  tab: 'overview',
+  noteDlg: null,
+  addDlg: false,
+  hldDlg: false,
+  hldSel: null,
+  hldBack: false,
+  phInfo: null,
+  ownerDlg: false,
+  rev: 0,
 
-  setZoom: (zoom) => set({ zoom: Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoom)) }),
-  setPan: (panX) => set({ panX }),
-  clampZoom: (minZoom) => set((s) => ({ zoom: Math.max(minZoom, s.zoom) })),
+  setVP: (z, x) => set({ z: Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z)), x }),
+  setPan: (x) => set({ x }),
 
-  enterEditMode: (deliverables, memos, edges) => {
-    const draft: EditDraft = {
-      deliverables: deliverables.map((d) => ({ id: d.id, layout: { ...d.layout }, phaseKey: d.phaseKey })),
-      memos: memos.map((m) => ({ id: m._id, phaseKey: m.phaseKey, text: m.text, layout: { ...m.layout } })),
-      edges: edges.map((e) => ({
-        id: e._id,
-        fromId: e.fromId,
-        toId: e.toId,
-        bidirectional: e.bidirectional,
-        auto: e.auto,
-      })),
-    };
+  hydrate: (ipId, d) =>
+    set((s) => ({
+      loadedIpId: ipId,
+      nodes: d.nodes,
+      memos: d.memos,
+      edges: d.edges,
+      // IP가 바뀌면 레인 폭/선택/뷰포트 초기화
+      phasePW: s.loadedIpId === ipId ? s.phasePW : {},
+      sel: s.loadedIpId === ipId ? s.sel : null,
+      hlSet: s.loadedIpId === ipId ? s.hlSet : null,
+      x: s.loadedIpId === ipId ? s.x : 0,
+      rev: s.rev + 1,
+    })),
+
+  setNodes: (nodes) => set((s) => ({ nodes, rev: s.rev + 1 })),
+  setMemos: (memos) => set((s) => ({ memos, rev: s.rev + 1 })),
+  setEdges: (edges) => set((s) => ({ edges, rev: s.rev + 1 })),
+  setPhasePW: (phasePW) => set((s) => ({ phasePW, rev: s.rev + 1 })),
+  bumpBlocks: () => set((s) => ({ rev: s.rev + 1 })),
+
+  enterEdit: () => {
+    const s = get();
     set({
-      isEditing: true,
-      draft,
-      editSnapshot: JSON.parse(JSON.stringify(draft)),
-      selectedBlockId: null,
-      highlight: null,
+      edit: true,
+      snapshot: clone({ nodes: s.nodes, memos: s.memos, edges: s.edges, phasePW: s.phasePW }),
+      link: null,
+      sel: null,
+      hlSet: null,
     });
   },
-
+  exitEdit: () => set({ edit: false, snapshot: null, link: null, sel: null, hlSet: null }),
   cancelEdit: () => {
-    const snapshot = get().editSnapshot;
-    set({ isEditing: false, draft: snapshot, editSnapshot: null });
+    const snap = get().snapshot;
+    set((s) => ({
+      edit: false,
+      snapshot: null,
+      link: null,
+      sel: null,
+      hlSet: null,
+      nodes: snap ? snap.nodes : s.nodes,
+      memos: snap ? snap.memos : s.memos,
+      edges: snap ? snap.edges : s.edges,
+      phasePW: snap ? snap.phasePW : s.phasePW,
+      rev: s.rev + 1,
+    }));
   },
 
-  exitEditMode: () => set({ isEditing: false, draft: null, editSnapshot: null }),
+  setRecv: (v) => set({ recv: v, edit: false }),
+  select: (id, hl) => set({ sel: id, hlSet: hl }),
+  setLink: (id) => set({ link: id, linkPos: null }),
+  setLinkPos: (p) => set({ linkPos: p }),
+  flash: (bnd) => set({ flashBnd: bnd }),
 
-  updateDraftLayout: (id, layout, phaseKey) =>
-    set((s) => {
-      if (!s.draft) return s;
-      const deliverables = s.draft.deliverables.map((d) => (d.id === id ? { ...d, layout, phaseKey } : d));
-      return { draft: { ...s.draft, deliverables } };
-    }),
-
-  addDraftMemo: (memo) =>
-    set((s) => (s.draft ? { draft: { ...s.draft, memos: [...s.draft.memos, memo] } } : s)),
-
-  updateDraftMemo: (id, patch) =>
-    set((s) => {
-      if (!s.draft) return s;
-      const memos = s.draft.memos.map((m) => (m.id === id ? { ...m, ...patch } : m));
-      return { draft: { ...s.draft, memos } };
-    }),
-
-  removeDraftMemo: (id) =>
-    set((s) => (s.draft ? { draft: { ...s.draft, memos: s.draft.memos.filter((m) => m.id !== id) } } : s)),
-
-  addDraftEdge: (edge) =>
-    set((s) => (s.draft ? { draft: { ...s.draft, edges: [...s.draft.edges, edge] } } : s)),
-
-  removeDraftEdge: (id) =>
-    set((s) => (s.draft ? { draft: { ...s.draft, edges: s.draft.edges.filter((e) => e.id !== id) } } : s)),
-
-  setLaneWidth: (phaseKey, width) =>
-    set((s) => ({ laneWidthOverrides: { ...s.laneWidthOverrides, [phaseKey]: width } })),
-
-  select: (blockId) => set({ selectedBlockId: blockId }),
-  setHighlight: (highlight) => set({ highlight }),
+  openDeliverable: (id, tab) => set({ openId: id, tab: tab ?? 'overview' }),
+  setTab: (t) => set({ tab: t }),
+  setNoteDlg: (id) => set({ noteDlg: id }),
+  setAddDlg: (v) => set({ addDlg: v }),
+  setHldDlg: (v, sel) => set({ hldDlg: v, hldSel: sel === undefined ? null : sel }),
+  setHldSel: (id) => set({ hldSel: id }),
+  setHldBack: (v) => set({ hldBack: v }),
+  setPhInfo: (id) => set({ phInfo: id }),
+  setOwnerDlg: (v) => set({ ownerDlg: v }),
 }));

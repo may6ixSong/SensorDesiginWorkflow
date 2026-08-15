@@ -1,57 +1,57 @@
 import { DeliverableDocument, DeliverableVersion } from '../schemas/deliverable.schema';
 import { IpDocument } from '../../ips/schemas/ip.schema';
 import { UserDocument } from '../../users/schemas/user.schema';
-import { pick } from '../../common/utils/pick';
-
-const VERSION_FIELDS = [
-  'major',
-  'minor',
-  'kind',
-  'fileName',
-  'storageKey',
-  'hpcPath',
-  'note',
-  'createdBy',
-  'createdAt',
-] as const;
 
 function isEditor(ip: IpDocument, me: UserDocument): boolean {
   const meId = me._id.toString();
   return ip.owners.some((o) => o.toString() === meId);
 }
 
+/** 목업의 MV(major,minor,kind,by,at,note,file) 형태로 내려준다. */
+function toVersionDto(v: DeliverableVersion) {
+  return {
+    major: v.major,
+    minor: v.minor,
+    kind: v.kind,
+    file: v.hpcPath ?? v.fileName ?? '',
+    note: v.note ?? '',
+    by: v.createdBy?.toString() ?? '',
+    at: v.createdAt instanceof Date ? v.createdAt.toISOString() : String(v.createdAt),
+  };
+}
+
 /**
  * 산출물 응답의 단일 통로 (설계서 6.1). 컨트롤러는 이 함수를 거치지 않은
- * 엔티티를 절대 직접 반환하지 않는다. Edit 권한자만 작업중(minor) 버전을 본다.
+ * 엔티티를 절대 직접 반환하지 않는다.
+ *
+ * versions 배열 자체를 권한에 맞게 필터링해서 내려준다 - Edit 권한자는 전체,
+ * 그 외에는 Released(major)만. FE는 이 배열로 목업의 latA()/latR()/hasW()를
+ * 그대로 계산하므로, 권한 없는 사용자에게는 작업중 버전이 존재조차 하지 않는다.
  */
 export function toDeliverableDto(d: DeliverableDocument, ip: IpDocument, me: UserDocument) {
   const isEdit = isEditor(ip, me);
-  const versions = d.versions ?? [];
-  const latest = versions[0];
-  const released = versions.find((v) => v.kind === 'major');
+  const all = d.versions ?? [];
+  const visible = isEdit ? all : all.filter((v) => v.kind === 'major');
+  const latest = visible[0] ?? null;
+  const released = visible.find((v) => v.kind === 'major') ?? null;
 
   return {
-    ...pick(d.toObject(), [
-      '_id',
-      'projectId',
-      'ipId',
-      'phaseKey',
-      'name',
-      'docType',
-      'network',
-      'series',
-      'seriesIdx',
-      'seriesTotal',
-      'layout',
-      'recvDept',
-      'recvContact',
-      'createdBy',
-      'createdAt',
-      'updatedAt',
-    ]),
     id: d._id.toString(),
-    releasedVersion: released ? pick(released as DeliverableVersion, [...VERSION_FIELDS]) : null,
-    workingVersion: isEdit && latest?.kind === 'minor' ? pick(latest, [...VERSION_FIELDS]) : null,
+    projectId: d.projectId.toString(),
+    ipId: d.ipId.toString(),
+    phaseKey: d.phaseKey,
+    name: d.name,
+    docType: d.docType,
+    network: d.network,
+    series: d.series ? d.series.toString() : null,
+    seriesIdx: d.seriesIdx,
+    seriesTotal: d.seriesTotal,
+    layout: { x: d.layout.x, y: d.layout.y, w: d.layout.w, h: d.layout.h },
+    recvDept: d.recvDept ?? null,
+    recvContact: d.recvContact ? d.recvContact.toString() : null,
+    versions: visible.map(toVersionDto),
+    releasedVersion: released ? toVersionDto(released) : null,
+    workingVersion: isEdit && latest?.kind === 'minor' ? toVersionDto(latest) : null,
     canEdit: isEdit,
   };
 }
@@ -60,5 +60,5 @@ export function toDeliverableDto(d: DeliverableDocument, ip: IpDocument, me: Use
 export function toVisibleVersions(d: DeliverableDocument, ip: IpDocument, me: UserDocument) {
   const isEdit = isEditor(ip, me);
   const versions = isEdit ? d.versions : d.versions.filter((v) => v.kind === 'major');
-  return versions.map((v) => pick(v, [...VERSION_FIELDS]));
+  return versions.map(toVersionDto);
 }

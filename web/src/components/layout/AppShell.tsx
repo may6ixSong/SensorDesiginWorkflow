@@ -1,11 +1,15 @@
 import { ReactNode } from 'react';
-import { AppBar, Avatar, Box, MenuItem, Select, Stack, Toolbar, Typography } from '@mui/material';
-import { ProjectDto, IpDto } from '@/types/domain';
+import { Box } from '@mui/material';
+import { IpDto, ProjectDto, UserDto } from '@/types/domain';
 import { useAuthStore } from '@/store/authStore';
-import { useSwitchableUsers, useDevLogin } from '@/api/hooks/useAuth';
 import { useCanvasStore } from '@/store/canvasStore';
-import { DEPARTMENTS } from '@/shared/constants/departments';
-import { tokens } from '@/theme/theme';
+import { useDevLogin } from '@/api/hooks/useAuth';
+import { departmentName } from '@/shared/constants/departments';
+import { ArborMark, Icon } from '@/components/common/Icon';
+import { UserAvatar } from '@/components/common/Avatar';
+import { ArborButton } from '@/components/common/ArborButton';
+import { SelectBox } from './SelectBox';
+import { FONT_DISPLAY, FONT_MONO, T } from '@/theme/tokens';
 
 interface AppShellProps {
   projects: ProjectDto[];
@@ -14,81 +18,106 @@ interface AppShellProps {
   ips: IpDto[];
   ipId: string | undefined;
   onChangeIp: (id: string) => void;
+  users: UserDto[];
+  canToggleRecv: boolean;
   children: ReactNode;
 }
 
-/** 상단바: 과제/IP select, 사용자 스위처, 수신부서 시점 토글 (설계서 7.1 컴포넌트 트리, 1.3). */
-export function AppShell({ projects, projectId, onChangeProject, ips, ipId, onChangeIp, children }: AppShellProps) {
-  const user = useAuthStore((s) => s.user);
-  const { data: switchableUsers } = useSwitchableUsers();
+/**
+ * 목업 .tb 상단바 — 로고 + ARBOR 워드마크 + 과제/IP select + 수신부서 시점 + 사용자 배지.
+ * (설계서 7.1 컴포넌트 트리의 AppShell)
+ */
+export function AppShell({
+  projects, projectId, onChangeProject,
+  ips, ipId, onChangeIp,
+  users, canToggleRecv, children,
+}: AppShellProps) {
+  const me = useAuthStore((s) => s.user);
   const devLogin = useDevLogin();
-  const recvDeptFocus = useCanvasStore((s) => s.recvDeptFocus);
-  const setRecvDeptFocus = useCanvasStore((s) => s.setRecvDeptFocus);
+  const recv = useCanvasStore((s) => s.recv);
+  const setRecv = useCanvasStore((s) => s.setRecv);
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
-      <AppBar position="static" color="inherit" elevation={0} sx={{ borderBottom: `1px solid ${tokens.border}` }}>
-        <Toolbar variant="dense" sx={{ gap: 2 }}>
-          <Typography variant="subtitle1" fontWeight={800} color="primary.main" sx={{ mr: 1 }}>
-            ARBOR
-          </Typography>
-
-          <Select size="small" value={projectId ?? ''} onChange={(e) => onChangeProject(e.target.value)} sx={{ minWidth: 160 }}>
-            {projects.map((p) => (
-              <MenuItem key={p._id} value={p._id}>
-                {p.code} · {p.name}
-              </MenuItem>
-            ))}
-          </Select>
-
-          <Select size="small" value={ipId ?? ''} onChange={(e) => onChangeIp(e.target.value)} sx={{ minWidth: 140 }} disabled={!ips.length}>
-            {ips.map((ip) => (
-              <MenuItem key={ip.id} value={ip.id}>
-                {ip.name}
-              </MenuItem>
-            ))}
-          </Select>
-
-          <Select
-            size="small"
-            value={recvDeptFocus ?? ''}
-            displayEmpty
-            onChange={(e) => setRecvDeptFocus(e.target.value || null)}
-            sx={{ minWidth: 160 }}
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
+      <Box
+        sx={{
+          height: 54,
+          flex: '0 0 54px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          px: '18px',
+          borderBottom: `1px solid ${T.ln}`,
+          background: T.sf,
+          zIndex: 50,
+          boxShadow: T.ss,
+        }}
+      >
+        <ArborMark />
+        <Box sx={{ fontSize: 15, fontWeight: 800, fontFamily: FONT_DISPLAY, lineHeight: 1.05 }}>
+          ARBOR
+          <Box
+            component="small"
+            sx={{
+              display: 'block',
+              fontSize: 9,
+              letterSpacing: '.18em',
+              color: T.dm2,
+              fontFamily: FONT_MONO,
+              mt: '2px',
+              fontWeight: 400,
+            }}
           >
-            <MenuItem value="">수신부서 시점: 전체</MenuItem>
-            {DEPARTMENTS.filter((d) => d.id !== 'analog').map((d) => (
-              <MenuItem key={d.id} value={d.id}>
-                수신부서: {d.name}
-              </MenuItem>
-            ))}
-          </Select>
+            CIS DELIVERABLE CONTROL
+          </Box>
+        </Box>
 
-          <Box sx={{ flex: 1 }} />
+        <Box sx={{ width: '1px', height: 22, background: T.ln }} />
 
-          <Stack direction="row" spacing={1} alignItems="center">
-            <Avatar sx={{ width: 28, height: 28, fontSize: 13 }}>{user?.name?.slice(0, 1) ?? '?'}</Avatar>
-            <Select
-              size="small"
-              value={user?.id ?? ''}
-              displayEmpty
-              onChange={(e) => devLogin.mutate(e.target.value)}
-              sx={{ minWidth: 160 }}
-            >
-              <MenuItem value="" disabled>
-                사용자 전환 (SSO 대체)
-              </MenuItem>
-              {(switchableUsers ?? []).map((u) => (
-                <MenuItem key={u.id} value={u.id}>
-                  {u.name} · {u.department}
-                </MenuItem>
-              ))}
-            </Select>
-          </Stack>
-        </Toolbar>
-      </AppBar>
+        <SelectBox
+          label="과제"
+          value={projectId ?? ''}
+          onChange={onChangeProject}
+          options={projects.map((p) => ({ value: p._id, label: `${p.code} · ${p.name}` }))}
+        />
+        <SelectBox
+          label="IP"
+          value={ipId ?? ''}
+          onChange={onChangeIp}
+          minWidth={110}
+          disabled={!ips.length}
+          options={
+            ips.length
+              ? ips.map((i) => ({ value: i.id, label: i.name }))
+              : [{ value: '', label: '권한 없음' }]
+          }
+        />
 
-      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>{children}</Box>
+        <Box sx={{ flex: 1 }} />
+
+        {canToggleRecv && (
+          <ArborButton variant={recv ? 'on' : 'default'} onClick={() => setRecv(!recv)}>
+            <Icon name="eye" /> 수신 부서 시점
+          </ArborButton>
+        )}
+
+        <SelectBox
+          padLeft={6}
+          value={me?.id ?? ''}
+          width={158}
+          onChange={(id) => devLogin.mutate(id)}
+          options={users.map((u) => ({
+            value: u.id,
+            label: `${u.name} · ${departmentName(u.department)}`,
+          }))}
+        >
+          <UserAvatar user={me} />
+        </SelectBox>
+      </Box>
+
+      <Box component="main" sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        {children}
+      </Box>
     </Box>
   );
 }

@@ -14,14 +14,17 @@ export class IpsService {
     private readonly audit: AuditService,
   ) {}
 
-  /** 접근 가능한(edit 또는 view) IP만 반환 (설계서 5.1). */
+  /**
+   * 접근 가능한(edit 또는 view) IP만 반환 (설계서 5.1).
+   * 정렬하지 않고 등록 순서를 유지한다 — 목업의 IPS 배열 순서(PLL_MAIN, LDO_CORE, ADC_RAMP)가
+   * 곧 화면상의 IP select 순서이자 기본 선택 IP다.
+   */
   async listAccessibleForProject(projectId: string, userId: string) {
     return this.model
       .find({
         projectId,
         $or: [{ owners: userId }, { 'viewGrants.userId': userId }],
       })
-      .sort({ name: 1 })
       .exec();
   }
 

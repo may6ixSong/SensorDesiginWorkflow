@@ -1,84 +1,70 @@
-import { useState } from 'react';
-import { Box, IconButton, Stack, TextField, Typography } from '@mui/material';
-import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
-import CloseIcon from '@mui/icons-material/Close';
-import { Layout } from '@/types/domain';
-import { DraftMemo } from '@/store/canvasStore';
-import { LaneGeom } from '@/lib/laneGeometry';
-import { tokens } from '@/theme/theme';
-import { useBlockDrag } from './useBlockDrag';
+import { Box } from '@mui/material';
+import { CanvasMemo } from '@/lib/canvasModel';
+import { FONT_MONO, T } from '@/theme/tokens';
 
-interface MemoBlockProps {
-  memo: DraftMemo;
-  lanes: LaneGeom[];
-  zoom: number;
-  isEditing: boolean;
-  onCommitLayout: (id: string, layout: Layout, phaseKey: string) => void;
-  onBoundaryFlash: (laneKey: string) => void;
-  onChangeText: (id: string, text: string) => void;
-  onDelete: (id: string) => void;
+interface Props {
+  n: CanvasMemo;
+  edit: boolean;
+  isSel: boolean;
+  onHl: boolean;
+  hasHl: boolean;
+  onGripDown: (id: string, e: React.PointerEvent) => void;
+  registerRef: (id: string, el: HTMLDivElement | null) => void;
+  onPointerDown: (e: React.PointerEvent) => void;
+  onPointerMove: (e: React.PointerEvent) => void;
+  onPointerUp: (e: React.PointerEvent) => void;
 }
 
-/** 버전 관리 대상이 아닌 설명용 블록. Edit 권한자에게만 노출된다 (설계서 4.7, 6.3). */
-export function MemoBlock({ memo, lanes, zoom, isEditing, onCommitLayout, onBoundaryFlash, onChangeText, onDelete }: MemoBlockProps) {
-  const [editingText, setEditingText] = useState(false);
-  const { elRef, onPointerDown, onPointerMove, onPointerUp } = useBlockDrag({
-    layout: memo.layout,
-    phaseKey: memo.phaseKey,
-    lanes,
-    zoom,
-    enabled: isEditing,
-    onCommit: (l, phaseKey) => onCommitLayout(memo.id, l, phaseKey),
-    onBoundaryFlash,
-  });
-
+/** 목업 memoH() — 버전 관리 없는 메모 블록 */
+export function MemoBlock({
+  n, edit, isSel, onHl, hasHl, onGripDown, registerRef,
+  onPointerDown, onPointerMove, onPointerUp,
+}: Props) {
   return (
     <Box
-      ref={elRef}
+      ref={(el: HTMLDivElement | null) => registerRef(n.id, el)}
+      data-bid={n.id}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
+      style={{ left: n.x, top: n.y, width: n.w, height: n.h }}
       sx={{
         position: 'absolute',
-        left: memo.layout.x,
-        top: memo.layout.y,
-        width: memo.layout.w,
-        height: memo.layout.h,
-        cursor: isEditing ? 'grab' : 'default',
+        borderRadius: '10px',
+        padding: '10px 11px',
+        background: 'repeating-linear-gradient(135deg,#fbfaf3 0 9px,#f5f3e8 9px 18px)',
+        border: `1px dashed ${isSel ? T.tl : T.ln3}`,
+        boxShadow: isSel ? `0 0 0 3px ${T.tl2}, ${T.sm}` : T.sm,
+        color: T.dm,
+        fontSize: 12,
+        lineHeight: 1.5,
+        cursor: edit ? 'grab' : 'default',
         touchAction: 'none',
-        borderRadius: 1.5,
-        border: `1px dashed ${tokens.textMuted}`,
-        bgcolor: tokens.surfaceAlt,
-        p: 1,
-        zIndex: 1,
+        overflow: 'hidden',
+        outline: onHl && hasHl ? `2px solid ${T.vi}` : 'none',
+        outlineOffset: onHl && hasHl ? '2px' : 0,
       }}
     >
-      {editingText ? (
-        <TextField
-          autoFocus
-          multiline
-          size="small"
-          fullWidth
-          value={memo.text}
-          onChange={(e) => onChangeText(memo.id, e.target.value)}
-          onBlur={() => setEditingText(false)}
-          sx={{ '& .MuiInputBase-root': { fontSize: 12 } }}
+      <Box component="span" sx={{ fontFamily: FONT_MONO, fontSize: 8, letterSpacing: '.12em', color: T.dm2, display: 'block', mb: '5px' }}>
+        MEMO · 버전 관리 없음
+      </Box>
+      <Box sx={{ overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>
+        {n.text}
+      </Box>
+      {edit && (
+        <Box
+          data-grip={n.id}
+          onPointerDown={(e) => onGripDown(n.id, e)}
+          sx={{
+            position: 'absolute', right: 0, bottom: 0, width: 16, height: 16,
+            cursor: 'nwse-resize', zIndex: 5, touchAction: 'none',
+            '&::after': {
+              content: '""', position: 'absolute', right: 3, bottom: 3, width: 8, height: 8,
+              borderRight: `2px solid ${T.ln3}`, borderBottom: `2px solid ${T.ln3}`,
+            },
+            '&:hover::after': { borderColor: T.tl },
+          }}
         />
-      ) : (
-        <Typography variant="caption" sx={{ display: 'block', overflow: 'hidden', height: '100%' }}>
-          {memo.text}
-        </Typography>
-      )}
-
-      {isEditing && (
-        <Stack direction="row" spacing={0.25} sx={{ position: 'absolute', top: -12, right: -8 }}>
-          <IconButton size="small" onClick={() => setEditingText(true)} sx={{ bgcolor: tokens.surface, p: 0.25 }}>
-            <EditOutlinedIcon sx={{ fontSize: 12 }} />
-          </IconButton>
-          <IconButton size="small" onClick={() => onDelete(memo.id)} sx={{ bgcolor: tokens.surface, p: 0.25 }}>
-            <CloseIcon sx={{ fontSize: 12 }} />
-          </IconButton>
-        </Stack>
       )}
     </Box>
   );

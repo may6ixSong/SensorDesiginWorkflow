@@ -1,271 +1,548 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Box } from '@mui/material';
-import { DeliverableDto, EdgeDto, IpDto, Layout, MemoDto, PhaseRef } from '@/types/domain';
+import { IpDto, PhaseRef, UserDto } from '@/types/domain';
 import { useCanvasStore } from '@/store/canvasStore';
-import { computeLaneGeometry, laneForX, totalCanvasWidth, todayX } from '@/lib/laneGeometry';
-import { computeAutoFit } from '@/lib/autoFit';
-import { computeFlowHighlight } from '@/lib/flowHighlight';
-import { ZOOM_STEP, LANE_TOP_PAD, LANE_MIN_HEIGHT, NW, MEMO_NH } from '@/lib/layoutConstants';
-import { usePutCanvas } from '@/api/hooks/useCanvas';
-import { PhaseLanes } from './PhaseLanes';
+import { toast } from '@/store/toastStore';
+import {
+  CanvasEdge, CanvasMemo, CanvasNode, connectedSet, laneG, getPW, phaseAtX,
+  laneOverflow, reflowLane, resizePhase, wallAdj, todayX, autoFit as computeAutoFit,
+} from '@/lib/canvasModel';
+import {
+  CANVAS_TAIL, CH, MAXH, MAXW, MINH, MINW, PAD, ZOOM_MAX, ZOOM_MIN, ZOOM_STEP, snp,
+} from '@/lib/constants';
+import { FONT_MONO, T } from '@/theme/tokens';
+import { PhaseStepper } from './PhaseStepper';
 import { EdgeLayer } from './EdgeLayer';
-import { BlockLayer } from './BlockLayer';
-import { FloatingToolbox } from './FloatingToolbox';
-import { TodayLine } from './TodayLine';
+import { DeliverableNode } from './DeliverableNode';
+import { MemoBlock } from './MemoBlock';
+import { Toolbox } from './Toolbox';
 import { Legend } from './Legend';
 
-interface CanvasProps {
+interface Props {
   ip: IpDto;
   phases: PhaseRef[];
-  deliverables: DeliverableDto[];
-  memos: MemoDto[];
-  edges: EdgeDto[];
-  onOpenDetail: (deliverableId: string) => void;
-  onRequestAddDeliverable: (phaseKey: string) => void;
+  usersById: Map<string, UserDto>;
+  canEdit: boolean;
+  onSaveLayout: () => void;
 }
 
+type Blk = CanvasNode | CanvasMemo;
+
 /**
- * 보드 화면의 캔버스. 줌/팬, 자유 배치 드래그, Phase 벽 저항, Auto Fit,
- * flow 방향별 하이라이트, 편집 세션(진입→draft 편집→저장/취소)을 모두 여기서 조율한다 (설계서 3.7~3.9, 7.1).
+ * 보드 캔버스 — 목업 render()/bindAll()의 이벤트 전체를 이식했다.
+ * 줌/팬, 자유 드래그 + Phase 벽 저항, grip 리사이즈, pin 연결, Phase 레인 폭 조절,
+ * flow 하이라이트, Auto Fit 이 모두 여기서 완결된다 (설계서 3.7~3.9, 7.1).
  */
-export function Canvas({ ip, phases, deliverables, memos, edges, onOpenDetail, onRequestAddDeliverable }: CanvasProps) {
-  const viewportRef = useRef<HTMLDivElement>(null);
-  const [flashedLaneKey, setFlashedLaneKey] = useState<string | null>(null);
-  const flashTimer = useRef<ReturnType<typeof setTimeout>>();
+export function Canvas({ ip, phases, usersById, canEdit, onSaveLayout }: Props) {
+  const vpRef = useRef<HTMLDivElement>(null);
+  const cvRef = useRef<HTMLDivElement>(null);
+  const elRefs = useRef(new Map<string, HTMLDivElement>());
 
-  const zoom = useCanvasStore((s) => s.zoom);
-  const panX = useCanvasStore((s) => s.panX);
-  const isEditing = useCanvasStore((s) => s.isEditing);
-  const selectedBlockId = useCanvasStore((s) => s.selectedBlockId);
-  const highlight = useCanvasStore((s) => s.highlight);
-  const laneWidthOverrides = useCanvasStore((s) => s.laneWidthOverrides);
-  const draft = useCanvasStore((s) => s.draft);
-  const recvDeptFocus = useCanvasStore((s) => s.recvDeptFocus);
+  const z = useCanvasStore((s) => s.z);
+  const panX = useCanvasStore((s) => s.x);
+  const nodes = useCanvasStore((s) => s.nodes);
+  const memos = useCanvasStore((s) => s.memos);
+  const edges = useCanvasStore((s) => s.edges);
+  const phasePW = useCanvasStore((s) => s.phasePW);
+  const edit = useCanvasStore((s) => s.edit);
+  const sel = useCanvasStore((s) => s.sel);
+  const hlSet = useCanvasStore((s) => s.hlSet);
+  const link = useCanvasStore((s) => s.link);
+  const linkPos = useCanvasStore((s) => s.linkPos);
+  const rev = useCanvasStore((s) => s.rev);
 
-  const setZoom = useCanvasStore((s) => s.setZoom);
-  const setPan = useCanvasStore((s) => s.setPan);
-  const clampZoom = useCanvasStore((s) => s.clampZoom);
-  const enterEditMode = useCanvasStore((s) => s.enterEditMode);
-  const cancelEdit = useCanvasStore((s) => s.cancelEdit);
-  const exitEditMode = useCanvasStore((s) => s.exitEditMode);
-  const updateDraftLayout = useCanvasStore((s) => s.updateDraftLayout);
-  const addDraftMemo = useCanvasStore((s) => s.addDraftMemo);
-  const updateDraftMemo = useCanvasStore((s) => s.updateDraftMemo);
-  const removeDraftMemo = useCanvasStore((s) => s.removeDraftMemo);
-  const setLaneWidth = useCanvasStore((s) => s.setLaneWidth);
-  const select = useCanvasStore((s) => s.select);
-  const setHighlight = useCanvasStore((s) => s.setHighlight);
+  const st = useCanvasStore;
 
-  const putCanvas = usePutCanvas(ip.id);
+  /* ── geometry ── */
+  const { lanes, total } = useMemo(() => laneG(phases, phasePW), [phases, phasePW]);
+  const W = total + CANVAS_TAIL;
+  const lowest = useMemo(
+    () => [...nodes, ...memos].reduce((m, b) => Math.max(m, b.y + b.h), 0),
+    [nodes, memos, rev],
+  );
+  const H = Math.max(CH, lowest + 160);
+  const tx = useMemo(() => todayX(phases, phasePW), [phases, phasePW]);
 
-  const lanes = useMemo(() => computeLaneGeometry(phases, laneWidthOverrides), [phases, laneWidthOverrides]);
-  const contentWidth = useMemo(() => totalCanvasWidth(lanes), [lanes]);
-  const contentHeight = LANE_MIN_HEIGHT;
-  const todayXPos = useMemo(() => todayX(lanes), [lanes]);
+  const allBlocks = useCallback((): Blk[] => [...st.getState().nodes, ...st.getState().memos], [st]);
 
-  // minZoom = viewport.width / canvasContentWidth (캔버스가 뷰포트보다 좁아지지 않게, 설계서 7.1)
-  useEffect(() => {
-    if (!viewportRef.current || contentWidth <= 0) return;
-    const minZoom = viewportRef.current.clientWidth / contentWidth;
-    clampZoom(minZoom);
-  }, [contentWidth, clampZoom]);
+  /* ── zoom clamp ── */
+  const minZoom = useCallback(() => {
+    const vp = vpRef.current;
+    if (!vp) return ZOOM_MIN;
+    return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, vp.clientWidth / W));
+  }, [W]);
 
-  const draftLayouts = useMemo(() => {
-    if (!draft) return null;
-    const map = new Map<string, { layout: Layout; phaseKey: string }>();
-    for (const d of draft.deliverables) map.set(d.id, { layout: d.layout, phaseKey: d.phaseKey });
-    return map;
-  }, [draft]);
-
-  const layoutsById = useMemo(() => {
-    const map = new Map<string, Layout>();
-    for (const d of deliverables) {
-      const override = draftLayouts?.get(d.id);
-      map.set(d.id, override?.layout ?? d.layout);
-    }
-    return map;
-  }, [deliverables, draftLayouts]);
-
-  const edgeList = useMemo(
-    () =>
-      isEditing && draft
-        ? draft.edges
-        : edges.map((e) => ({
-            id: e._id,
-            fromId: e.fromId,
-            toId: e.toId,
-            bidirectional: e.bidirectional,
-            auto: e.auto,
-          })),
-    [isEditing, draft, edges],
+  const clampVP = useCallback(
+    (nz: number, nx: number) => {
+      const vp = vpRef.current;
+      const mz = minZoom();
+      const zz = Math.max(mz, Math.min(ZOOM_MAX, nz));
+      if (!vp) return { z: zz, x: nx };
+      const scaledW = W * zz;
+      const xx = Math.min(0, Math.max(vp.clientWidth - scaledW, nx));
+      return { z: zz, x: xx };
+    },
+    [minZoom, W],
   );
 
-  const flashBoundary = (laneKey: string) => {
-    setFlashedLaneKey(laneKey);
-    if (flashTimer.current) clearTimeout(flashTimer.current);
-    flashTimer.current = setTimeout(() => setFlashedLaneKey(null), 350);
+  // 최초/리사이즈 시 캔버스가 뷰포트보다 좁아지지 않게 (설계서 7.1)
+  useEffect(() => {
+    const fit = () => {
+      const s = st.getState();
+      const { z: nz, x: nx } = clampVP(Math.max(s.z, minZoom()), s.x);
+      s.setVP(nz, nx);
+    };
+    fit();
+    window.addEventListener('resize', fit);
+    return () => window.removeEventListener('resize', fit);
+  }, [clampVP, minZoom, st, ip.id]);
+
+  const cvPt = (e: { clientX: number; clientY: number }) => {
+    const cv = cvRef.current!;
+    const r = cv.getBoundingClientRect();
+    return { x: (e.clientX - r.left) / st.getState().z, y: e.clientY - r.top };
   };
 
-  const handleCommitLayout = (id: string, layout: Layout, phaseKey: string) => {
-    updateDraftLayout(id, layout, phaseKey);
-  };
-
-  // --- Zoom (휠, 조회 모드 전용) / Pan (트랙패드 가로 스크롤은 모드 무관) - 설계서 7.1 ---
-  const onWheel = (e: React.WheelEvent) => {
-    if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+  /* ── WHEEL ZOOM — 조회 모드에서만 (설계서 7.1) ── */
+  useEffect(() => {
+    const vp = vpRef.current;
+    if (!vp) return;
+    const onWheel = (e: WheelEvent) => {
+      const s = st.getState();
+      if (s.edit) return; // 편집 중 줌 금지
+      if (e.shiftKey) return; // shift+휠 → 세로 스크롤
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return; // 횡 휠 무시
       e.preventDefault();
-      setPan(panX - e.deltaX);
-      return;
-    }
-    if (isEditing) return; // 편집 모드에서는 팬만 가능(실수 방지)
+      const r = vp.getBoundingClientRect();
+      const mx = e.clientX - r.left;
+      const dz = e.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP;
+      const nz = Math.min(ZOOM_MAX, Math.max(minZoom(), s.z + dz));
+      const nx = mx - (mx - s.x) * (nz / s.z);
+      const c = clampVP(nz, nx);
+      s.setVP(c.z, c.x);
+    };
+    vp.addEventListener('wheel', onWheel, { passive: false });
+    return () => vp.removeEventListener('wheel', onWheel);
+  }, [clampVP, minZoom, st]);
+
+  /* ── PAN — 빈 캔버스 좌드래그 / 휠 버튼 ── */
+  const panRef = useRef<{ startX: number; pid: number } | null>(null);
+  const onVpPointerDown = (e: React.PointerEvent) => {
+    if (dragRef.current || phResizeRef.current) return;
+    const target = e.target as HTMLElement;
+    const isMiddle = e.button === 1;
+    const isEmptyLeft =
+      e.button === 0 &&
+      (target === vpRef.current ||
+        target === cvRef.current ||
+        target.dataset.lane !== undefined ||
+        target.tagName.toLowerCase() === 'svg');
+    if (!isMiddle && !isEmptyLeft) return;
     e.preventDefault();
-    setZoom(zoom + (e.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP));
+    panRef.current = { startX: e.clientX - st.getState().x, pid: e.pointerId };
+    vpRef.current?.setPointerCapture(e.pointerId);
+    if (vpRef.current) vpRef.current.style.cursor = 'grabbing';
+  };
+  const onVpPointerMove = (e: React.PointerEvent) => {
+    const s = st.getState();
+    if (s.link) s.setLinkPos(cvPt(e));
+    const p = panRef.current;
+    if (!p || p.pid !== e.pointerId) return;
+    const c = clampVP(s.z, e.clientX - p.startX);
+    s.setVP(c.z, c.x);
+  };
+  const endPan = (e: React.PointerEvent) => {
+    if (!panRef.current || panRef.current.pid !== e.pointerId) return;
+    panRef.current = null;
+    if (vpRef.current) vpRef.current.style.cursor = '';
   };
 
-  // --- 배경 클릭 팬 + 하이라이트 해제 ---
-  const panSession = useRef<{ startX: number; startPan: number } | null>(null);
-  const onBackgroundPointerDown = (e: React.PointerEvent) => {
-    if (e.target !== e.currentTarget) return;
-    (e.currentTarget as Element).setPointerCapture(e.pointerId);
-    panSession.current = { startX: e.clientX, startPan: panX };
-  };
-  const onBackgroundPointerMove = (e: React.PointerEvent) => {
-    if (!panSession.current) return;
-    setPan(panSession.current.startPan + (e.clientX - panSession.current.startX));
-  };
-  const onBackgroundPointerUp = () => {
-    panSession.current = null;
-  };
-  const onBackgroundClick = (e: React.MouseEvent) => {
-    if (e.target !== e.currentTarget) return;
-    select(null);
-    setHighlight(null);
+  /* ── 배경 클릭 → 선택/연결 해제 ── */
+  const onVpClick = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('[data-bid]') || target.closest('button')) return;
+    const s = st.getState();
+    if (s.link) s.setLink(null);
+    else if (s.sel || s.hlSet) s.select(null, null);
   };
 
-  // --- Flow 하이라이트 (조회 모드에서 블록 클릭, 설계서 3.9) ---
-  const handleSelect = (id: string) => {
-    if (selectedBlockId === id) {
-      select(null);
-      setHighlight(null);
+  /* ── BLOCK DRAG (목업 pointerdown/move/up + accX 벽 저항) ── */
+  const dragRef = useRef<{
+    id: string; el: HTMLDivElement; dx: number; dy: number; moved: boolean; accX: number;
+  } | null>(null);
+
+  const findBlk = (id: string): Blk | undefined =>
+    st.getState().nodes.find((n) => n.id === id) ?? st.getState().memos.find((m) => m.id === id);
+
+  const onBlockPointerDown = (id: string) => (e: React.PointerEvent) => {
+    const s = st.getState();
+    if (!s.edit || !canEdit) return;
+    const t = e.target as HTMLElement;
+    if (t.dataset.pin !== undefined || t.dataset.grip !== undefined) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const b = findBlk(id);
+    const el = elRefs.current.get(id);
+    if (!b || !el) return;
+    const p = cvPt(e);
+    dragRef.current = { id, el, dx: p.x - b.x, dy: p.y - b.y, moved: false, accX: 0 };
+    el.style.transition = 'none';
+    el.style.zIndex = '30';
+    el.style.cursor = 'grabbing';
+    el.setPointerCapture(e.pointerId);
+  };
+
+  const onBlockPointerMove = (id: string) => (e: React.PointerEvent) => {
+    const D = dragRef.current;
+    if (!D || D.id !== id) return;
+    const s = st.getState();
+    const b = findBlk(id);
+    if (!b) return;
+    const p = cvPt(e);
+    const rawX = Math.max(PAD, Math.min(W - b.w - PAD, p.x - D.dx));
+    const rawY = Math.max(PAD, Math.min(H - b.h - PAD, p.y - D.dy));
+    D.accX += rawX - b.x;
+    const adj = wallAdj(phases, s.phasePW, b.x, b.w, rawX, D.accX);
+    const nx = snp(adj.x);
+    if (nx !== snp(rawX)) D.accX = 0;
+    if (adj.crossed !== null) s.flash(adj.crossed);
+    const ny = snp(rawY);
+    D.moved = true;
+    b.x = nx;
+    b.y = ny;
+    // 위치는 style prop으로 렌더되므로 상태만 갱신하면 블록과 엣지가 함께 따라온다.
+    s.bumpBlocks();
+  };
+
+  const onBlockPointerUp = (id: string) => (e: React.PointerEvent) => {
+    const D = dragRef.current;
+    if (!D || D.id !== id) return;
+    const s = st.getState();
+    D.el.style.cursor = '';
+    D.el.style.zIndex = '';
+    D.el.style.transition = '';
+    try { D.el.releasePointerCapture(e.pointerId); } catch { /* 이미 해제됨 */ }
+    const moved = D.moved;
+    dragRef.current = null;
+    s.flash(null);
+
+    const b = findBlk(id);
+    if (!b) return;
+
+    if (moved) {
+      // 놓인 위치의 Phase 레인으로 소속 변경 (설계서 3.7)
+      const cx = b.x + b.w / 2;
+      const np = phaseAtX(phases, s.phasePW, cx);
+      if (np && np !== b.phase) {
+        b.phase = np;
+        const blocks = allBlocks();
+        if (laneOverflow(blocks, phases, s.phasePW, np)) reflowLane(blocks, phases, s.phasePW, np);
+        toast(`${(phases.find((p) => p.key === np) || { key: '' }).key} 구간으로 옮겼습니다`);
+      }
+      s.bumpBlocks();
       return;
     }
-    select(id);
-    setHighlight(computeFlowHighlight(id, edges));
+
+    // 이동 없이 클릭한 경우 (편집 모드)
+    if (s.link && s.link !== id && st.getState().nodes.some((n) => n.id === id)) {
+      if (!s.edges.some((x) => x.from === s.link && x.to === id)) {
+        s.setEdges([
+          ...s.edges,
+          { id: `tmp-${Date.now()}`, from: s.link!, to: id, auto: false, bidirectional: false },
+        ]);
+      }
+      s.setLink(null);
+      toast('연결했습니다');
+      return;
+    }
+    if (st.getState().memos.some((m) => m.id === id)) {
+      s.setNoteDlg(id);
+      return;
+    }
+    s.select(s.sel === id ? null : id, null);
   };
 
-  // --- 편집 세션 ---
-  const handleEnterEdit = () => enterEditMode(deliverables, memos, edges);
-  const handleCancel = () => cancelEdit();
-  const handleSave = () => {
-    if (!draft) return;
-    putCanvas.mutate(
-      { deliverables: draft.deliverables, memos: draft.memos, edges: draft.edges },
-      { onSuccess: () => exitEditMode() },
-    );
+  /* ── VIEW 모드 클릭 → 선택 + flow 하이라이트 (설계서 3.9) ── */
+  const onBlockClick = (id: string) => (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const s = st.getState();
+    if (s.edit) return;
+    if (s.sel === id) s.select(null, null);
+    else s.select(id, connectedSet(id, s.edges));
   };
 
-  const handleAddMemo = () => {
-    if (!draft) return;
-    const lane = lanes[0];
-    if (!lane) return;
-    addDraftMemo({
-      id: `tmp-memo-${Date.now()}`,
-      phaseKey: lane.key,
-      text: '새 메모',
-      layout: { x: lane.x + 24, y: LANE_TOP_PAD, w: NW, h: MEMO_NH },
-    });
+  /* ── GRIP RESIZE ── */
+  const gripRef = useRef<{ id: string; ox: number; oy: number; pid: number } | null>(null);
+  const onGripDown = (id: string, e: React.PointerEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const b = findBlk(id);
+    if (!b) return;
+    const p = cvPt(e);
+    gripRef.current = { id, ox: p.x - b.w, oy: p.y - b.h, pid: e.pointerId };
+    (e.target as Element).setPointerCapture(e.pointerId);
+    const move = (ev: PointerEvent) => {
+      const g = gripRef.current;
+      if (!g) return;
+      const q = cvPt(ev);
+      const nb = findBlk(g.id);
+      if (!nb) return;
+      const nw = snp(Math.max(MINW, Math.min(MAXW, q.x - g.ox)));
+      const nh = snp(Math.max(MINH, Math.min(MAXH, q.y - g.oy)));
+      if (nw === nb.w && nh === nb.h) return;
+      nb.w = nw;
+      nb.h = nh;
+      st.getState().bumpBlocks();
+    };
+    const up = () => {
+      gripRef.current = null;
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      st.getState().bumpBlocks();
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
   };
 
-  const handleAddDeliverable = () => {
-    const lane = laneForX(lanes, panX * -1 + 40) ?? lanes[0];
-    onRequestAddDeliverable(lane?.key ?? phases[0]?.key ?? '');
+  /* ── PHASE RESIZE (스텝퍼 / 레인 양쪽 핸들) ── */
+  const phResizeRef = useRef<{ pid: string; startX: number; startW: number } | null>(null);
+  const onPhResizeStart = (phaseKey: string, e: React.PointerEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const s = st.getState();
+    phResizeRef.current = { pid: phaseKey, startX: e.clientX, startW: getPW(s.phasePW, phaseKey) };
+    const move = (ev: PointerEvent) => {
+      const r = phResizeRef.current;
+      if (!r) return;
+      const cur = st.getState();
+      const dx = (ev.clientX - r.startX) / cur.z;
+      const blocks = allBlocks();
+      const next = resizePhase(blocks, phases, cur.phasePW, r.pid, r.startW + dx);
+      cur.setPhasePW(next);
+    };
+    const up = () => {
+      phResizeRef.current = null;
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      st.getState().bumpBlocks();
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
   };
 
-  const handleAutoFit = () => {
-    if (!draft) return;
-    const blocks = draft.deliverables.map((d) => ({ id: d.id, phaseKey: d.phaseKey, layout: d.layout }));
-    const result = computeAutoFit(blocks, draft.edges, lanes);
-    for (const [id, layout] of result) {
-      const original = draft.deliverables.find((d) => d.id === id);
-      updateDraftLayout(id, layout, original?.phaseKey ?? phases[0]?.key ?? '');
+  /* ── pin 클릭 → 연결 시작/취소 ── */
+  const onPinClick = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const s = st.getState();
+    s.setLink(s.link === id ? null : id);
+  };
+
+  /* ── 툴박스 액션 ── */
+  const handleToggleEdit = () => {
+    const s = st.getState();
+    if (!s.edit) s.enterEdit();
+    else {
+      onSaveLayout();
+      s.exitEdit();
     }
   };
+  const handleCancel = () => {
+    st.getState().cancelEdit();
+    toast('변경을 취소했습니다');
+  };
+  const handleAutoFit = () => {
+    const s = st.getState();
+    const { positions, phasePW: nextPW } = computeAutoFit(s.nodes, s.edges, phases);
+    s.nodes.forEach((n) => {
+      const p = positions[n.id];
+      if (p) {
+        n.x = p.x;
+        n.y = p.y;
+      }
+    });
+    s.setPhasePW(nextPW);
+    toast('재배치했습니다');
+  };
+  const handleAddNote = () => {
+    const s = st.getState();
+    const g = lanes[phases[0].key] ?? { x: 0 };
+    s.setMemos([
+      ...s.memos,
+      {
+        id: `tmp-note-${Date.now()}`,
+        ip: ip.id,
+        phase: phases[0].key,
+        text: '새 메모',
+        x: snp(g.x + 46),
+        y: 40 + 3 * 150,
+        w: 160,
+        h: 68,
+      },
+    ]);
+    toast('메모를 추가했습니다');
+  };
+
+  const registerRef = useCallback((id: string, el: HTMLDivElement | null) => {
+    if (el) elRefs.current.set(id, el);
+    else elRefs.current.delete(id);
+  }, []);
+
+  const flashBnd = useCanvasStore((s) => s.flashBnd);
 
   return (
-    <Box
-      ref={viewportRef}
-      onWheel={onWheel}
-      onPointerDown={onBackgroundPointerDown}
-      onPointerMove={onBackgroundPointerMove}
-      onPointerUp={onBackgroundPointerUp}
-      onClick={onBackgroundClick}
-      sx={{
-        position: 'relative',
-        flex: 1,
-        overflowY: 'auto',
-        overflowX: 'hidden',
-        bgcolor: 'background.default',
-      }}
-    >
+    <>
+      <PhaseStepper
+        phases={phases}
+        phasePW={phasePW}
+        nodes={nodes}
+        z={z}
+        panX={panX}
+        edit={edit}
+        onPhaseClick={(k) => st.getState().setPhInfo(k)}
+        onResizeStart={onPhResizeStart}
+      />
+
       <Box
+        ref={vpRef}
+        onPointerDown={onVpPointerDown}
+        onPointerMove={onVpPointerMove}
+        onPointerUp={endPan}
+        onPointerCancel={endPan}
+        onClick={onVpClick}
         sx={{
-          position: 'relative',
-          width: contentWidth,
-          height: contentHeight,
-          transform: `translateX(${panX}px) scaleX(${zoom})`,
-          transformOrigin: '0 0',
+          flex: 1, overflowX: 'hidden', overflowY: 'auto', position: 'relative',
+          background: T.bg,
+          ...(edit ? { outline: `2px solid ${T.tl3}`, outlineOffset: '-2px' } : {}),
         }}
       >
-        <PhaseLanes
-          lanes={lanes}
-          phases={phases}
-          height={contentHeight}
-          zoom={zoom}
-          isEditing={isEditing}
-          flashedLaneKey={flashedLaneKey}
-          onResizeLane={setLaneWidth}
-        />
-        <EdgeLayer
-          edges={edgeList}
-          layoutsById={layoutsById}
-          width={contentWidth}
-          height={contentHeight}
-          isEditing={isEditing}
-          highlightedEdgeIds={highlight?.edgeIds ?? null}
-        />
-        <BlockLayer
-          deliverables={deliverables}
-          draftLayouts={draftLayouts}
-          memos={draft?.memos ?? []}
-          ipColor={ip.color}
-          lanes={lanes}
-          zoom={zoom}
-          isEditing={isEditing}
-          selectedBlockId={selectedBlockId}
-          highlightedNodeIds={highlight?.nodeIds ?? null}
-          recvDeptFocus={recvDeptFocus}
-          onCommitLayout={handleCommitLayout}
-          onBoundaryFlash={flashBoundary}
-          onSelect={handleSelect}
-          onOpenDetail={onOpenDetail}
-          onMemoChangeText={(id, text) => updateDraftMemo(id, { text })}
-          onMemoDelete={removeDraftMemo}
-        />
-        <TodayLine x={todayXPos} height={contentHeight} />
-      </Box>
+        <Box
+          ref={cvRef}
+          sx={{
+            position: 'relative',
+            width: W,
+            height: H,
+            transformOrigin: '0 0',
+            willChange: 'transform',
+            transform: `translateX(${panX}px) scaleX(${z})`,
+            background: T.sf,
+            ...(edit
+              ? {
+                  backgroundImage: `radial-gradient(circle,${T.ln} 1px,transparent 1px)`,
+                  backgroundSize: '20px 20px',
+                }
+              : {}),
+          }}
+        >
+          {/* Phase 레인 */}
+          {phases.map((p) => {
+            const g = lanes[p.key];
+            const isFlash = flashBnd !== null && Math.abs(g.x + g.w - flashBnd) < 4;
+            return (
+              <Box
+                key={p.key}
+                data-lane={p.key}
+                sx={{
+                  position: 'absolute', top: 0, bottom: 0, left: g.x, width: g.w,
+                  borderRight: `2px dashed ${isFlash ? T.tl : T.ln2}`,
+                  transition: 'border-color .2s',
+                  pointerEvents: 'none',
+                }}
+              >
+                <Box component="span" sx={{ position: 'absolute', top: 10, left: 10, fontFamily: FONT_MONO, fontSize: 10, letterSpacing: '.1em', color: T.dm2 }}>
+                  {p.key}
+                </Box>
+                <Box component="span" sx={{ position: 'absolute', bottom: 10, left: 10, fontSize: 10, color: T.ln3 }}>
+                  {p.label}
+                </Box>
+                {edit && (
+                  <Box
+                    onPointerDown={(e) => onPhResizeStart(p.key, e)}
+                    sx={{
+                      position: 'absolute', right: -5, top: 0, bottom: 0, width: 10,
+                      cursor: 'col-resize', zIndex: 6, pointerEvents: 'all',
+                      '&:hover': { background: 'rgba(12,154,131,.15)' },
+                    }}
+                  />
+                )}
+              </Box>
+            );
+          })}
 
-      <FloatingToolbox
-        canEdit={ip.myAccess === 'edit'}
-        isEditing={isEditing}
-        isSaving={putCanvas.isPending}
-        onEnterEdit={handleEnterEdit}
-        onSave={handleSave}
-        onCancel={handleCancel}
-        onAddDeliverable={handleAddDeliverable}
-        onAddMemo={handleAddMemo}
-        onAutoFit={handleAutoFit}
-      />
-      <Legend />
-    </Box>
+          {/* today 세로선 — 블록 뒤에 깔림 */}
+          {!edit && tx !== null && (
+            <Box sx={{ position: 'absolute', top: 0, bottom: 0, left: tx, width: '1.5px', background: T.rd, opacity: 0.55, zIndex: 0, pointerEvents: 'none' }} />
+          )}
+
+          <EdgeLayer
+            nodes={nodes}
+            edges={edges}
+            width={W}
+            height={H}
+            edit={edit}
+            canEdit={canEdit}
+            hlSet={hlSet}
+            link={link}
+            linkPos={linkPos}
+            onDeleteEdge={(id) => {
+              const s = st.getState();
+              s.setEdges(s.edges.filter((x) => x.id !== id));
+              toast('연결을 지웠습니다');
+            }}
+          />
+
+          {/* 메모는 편집 권한자에게만 (설계서 6.3) */}
+          {memos.map((n) => (
+            <MemoBlock
+              key={n.id}
+              n={n}
+              edit={edit}
+              isSel={sel === n.id}
+              onHl={!!hlSet && hlSet.has(n.id)}
+              hasHl={!!hlSet}
+              onGripDown={onGripDown}
+              registerRef={registerRef}
+              onPointerDown={onBlockPointerDown(n.id)}
+              onPointerMove={onBlockPointerMove(n.id)}
+              onPointerUp={onBlockPointerUp(n.id)}
+            />
+          ))}
+
+          {nodes.map((d) => (
+            <DeliverableNode
+              key={d.id}
+              d={d}
+              phase={phases.find((p) => p.key === d.phase)}
+              usersById={usersById}
+              edit={edit}
+              canEdit={canEdit}
+              isSel={sel === d.id}
+              onHl={!!hlSet && hlSet.has(d.id)}
+              hasHl={!!hlSet}
+              dimLink={!!link && link !== d.id}
+              linkActive={link === d.id}
+              onOpen={(id) => st.getState().openDeliverable(id)}
+              onPinClick={onPinClick}
+              onGripDown={onGripDown}
+              registerRef={registerRef}
+              onPointerDown={onBlockPointerDown(d.id)}
+              onPointerMove={onBlockPointerMove(d.id)}
+              onPointerUp={onBlockPointerUp(d.id)}
+              onClick={onBlockClick(d.id)}
+            />
+          ))}
+        </Box>
+
+        <Legend />
+        <Toolbox
+          canEdit={canEdit}
+          edit={edit}
+          onToggleEdit={handleToggleEdit}
+          onCancel={handleCancel}
+          onAdd={() => st.getState().setAddDlg(true)}
+          onNote={handleAddNote}
+          onAutoFit={handleAutoFit}
+        />
+      </Box>
+    </>
   );
 }

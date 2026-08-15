@@ -1,52 +1,79 @@
 import { createTheme } from '@mui/material/styles';
+import { FONT_MONO, FONT_SANS, T } from './tokens';
 
-/**
- * 색상 토큰. 원래 정본은 목업(analog-dashboard-v15.html)의 CSS 변수여야 하지만
- * 이번 세션에는 목업 파일이 첨부되지 않아, 설계서(§1.2 Light 테마 전제)에 맞춰
- * 합리적인 기본값으로 새로 정의했다. 실제 목업 파일을 받으면 이 파일의 값만 교체하면 된다.
- */
-export const tokens = {
-  bg: '#f5f7fa',
-  surface: '#ffffff',
-  surfaceAlt: '#eef1f6',
-  border: '#dde3ec',
-  text: '#1b2430',
-  textMuted: '#6b7686',
-  primary: '#0c9a83',
-  primaryDark: '#087a68',
-  today: '#fff3cd',
-  todayBorder: '#e8b93b',
-  laneAlt: '#fbfcfe',
-  edgeDefault: '#9aa5b1',
-  edgeHighlight: '#0c9a83',
-  edgeBidirectional: '#e07a1f',
-  networkOA: '#2f6fed',
-  networkHPC: '#7a4fd6',
-  danger: '#d33f3f',
-};
+export { T, FONT_MONO, FONT_SANS } from './tokens';
+/** 하위호환 별칭 - 기존 코드가 참조하던 이름. */
+export const tokens = T;
 
 export const theme = createTheme({
   palette: {
     mode: 'light',
-    primary: { main: tokens.primary, dark: tokens.primaryDark },
-    background: { default: tokens.bg, paper: tokens.surface },
-    text: { primary: tokens.text, secondary: tokens.textMuted },
-    error: { main: tokens.danger },
+    primary: { main: T.tl, dark: '#0bab90', light: T.tl2, contrastText: '#fff' },
+    secondary: { main: T.vi },
+    error: { main: T.rd },
+    warning: { main: T.am },
+    info: { main: T.bl },
+    background: { default: T.bg, paper: T.sf },
+    text: { primary: T.tx, secondary: T.dm, disabled: T.dm2 },
+    divider: T.ln,
   },
   shape: { borderRadius: 8 },
   typography: {
-    fontFamily: [
-      'Pretendard',
-      '-apple-system',
-      'BlinkMacSystemFont',
-      '"Segoe UI"',
-      'Roboto',
-      'sans-serif',
-    ].join(','),
-    fontSize: 13,
+    fontFamily: FONT_SANS,
+    fontSize: 14,
+    button: { textTransform: 'none', fontWeight: 500 },
   },
   components: {
-    MuiButton: { defaultProps: { disableElevation: true } },
+    MuiCssBaseline: {
+      styleOverrides: {
+        'html,body,#root': { height: '100%' },
+        body: {
+          background: T.bg,
+          color: T.tx,
+          fontSize: 14,
+          WebkitFontSmoothing: 'antialiased',
+          userSelect: 'none',
+          overflow: 'hidden',
+        },
+        '::-webkit-scrollbar': { width: 7, height: 7 },
+        '::-webkit-scrollbar-thumb': { background: T.ln2, borderRadius: 7 },
+        // 하이라이트된 flow 선의 흐르는 점선 (목업 @keyframes flowdash)
+        '@keyframes flowdash': { '0%': { strokeDashoffset: 18 }, to: { strokeDashoffset: 0 } },
+        // 상세 버튼 등장 (목업 @keyframes pop)
+        '@keyframes arborPop': {
+          from: { opacity: 0, transform: 'translateX(-50%) translateY(4px)' },
+          to: { opacity: 1, transform: 'translateX(-50%) translateY(0)' },
+        },
+        'input,select,textarea': { fontFamily: FONT_SANS },
+      },
+    },
+    MuiButton: { defaultProps: { disableElevation: true, disableRipple: true } },
     MuiPaper: { styleOverrides: { root: { backgroundImage: 'none' } } },
+    MuiDialog: {
+      styleOverrides: {
+        paper: {
+          border: `1px solid ${T.ln2}`,
+          borderRadius: 14,
+          boxShadow: '0 28px 60px rgba(20,32,47,.27)',
+        },
+      },
+    },
+    MuiBackdrop: {
+      styleOverrides: {
+        root: { background: 'rgba(20,32,47,.35)', backdropFilter: 'blur(2px)' },
+      },
+    },
+    MuiTooltip: {
+      styleOverrides: {
+        tooltip: {
+          background: T.tx,
+          fontSize: 11.5,
+          padding: '4px 9px',
+          borderRadius: 6,
+          boxShadow: T.sm,
+        },
+        arrow: { color: T.tx },
+      },
+    },
   },
 });

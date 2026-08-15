@@ -18,6 +18,10 @@ export class User {
   @Prop({ type: String, required: true })
   department: DepartmentId;
 
+  /** 아바타 배경색 (목업 USERS[].color). */
+  @Prop({ default: '#5c6d84' })
+  color: string;
+
   @Prop({ default: true })
   isActive: boolean;
 
