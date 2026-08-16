@@ -32,7 +32,7 @@ export function MemoBlock({
         position: 'absolute',
         borderRadius: '10px',
         padding: '10px 11px',
-        background: 'repeating-linear-gradient(135deg,#fbfaf3 0 9px,#f5f3e8 9px 18px)',
+        background: `repeating-linear-gradient(135deg,${T.memoA} 0 9px,${T.memoB} 9px 18px)`,
         border: `1px dashed ${isSel ? T.tl : T.ln3}`,
         boxShadow: isSel ? `0 0 0 3px ${T.tl2}, ${T.sm}` : T.sm,
         color: T.dm,
@@ -46,7 +46,7 @@ export function MemoBlock({
       }}
     >
       <Box component="span" sx={{ fontFamily: FONT_MONO, fontSize: 8, letterSpacing: '.12em', color: T.dm2, display: 'block', mb: '5px' }}>
-        MEMO · 버전 관리 없음
+        MEMO · No version history
       </Box>
       <Box sx={{ overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>
         {n.text}

@@ -4,8 +4,8 @@ import { T } from '@/theme/tokens';
 /** 목업 우하단 범례 — 미제출 / 작업중 / Released */
 export function Legend() {
   const items = [
-    { c: T.dm2, l: '미제출' },
-    { c: T.am, l: '작업중' },
+    { c: T.dm2, l: 'Not submitted' },
+    { c: T.am, l: 'In progress' },
     { c: T.tl, l: 'Released' },
   ];
   return (

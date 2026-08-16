@@ -1,15 +1,105 @@
 <!doctype html>
-<html lang="ko">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ACRO · CIS 산출물 관리</title>
+    <title>ACRO · CIS Deliverable Control</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
+    <style>
+      :root {
+        --acro-bg: #eceff5;
+        --acro-sf: #ffffff;
+        --acro-sf2: #f6f8fc;
+        --acro-sf3: #eef2f8;
+        --acro-ln: #dde4ee;
+        --acro-ln2: #c4cfe0;
+        --acro-ln3: #aab8cc;
+        --acro-tx: #14202f;
+        --acro-dm: #5c6d84;
+        --acro-dm2: #8b99ab;
+        --acro-tl: #0c9a83;
+        --acro-tl2: #e0f5f0;
+        --acro-tl3: #8ad9c9;
+        --acro-tl-hover: #0bab90;
+        --acro-am: #ac6f08;
+        --acro-am2: #fdf0da;
+        --acro-am3: #e8c184;
+        --acro-vi: #5849cf;
+        --acro-vi2: #ece9fd;
+        --acro-vi3: #b8afef;
+        --acro-hp: #bc4f1a;
+        --acro-hp2: #fceadf;
+        --acro-hp3: #eaa87c;
+        --acro-bl: #2563c9;
+        --acro-rd: #c8352c;
+        --acro-shadow-ss: 0 1px 2px rgba(20, 32, 47, 0.06);
+        --acro-shadow-sm: 0 4px 10px rgba(20, 32, 47, 0.08), 0 1px 3px rgba(20, 32, 47, 0.05);
+        --acro-shadow-sl: 0 16px 34px rgba(20, 32, 47, 0.15), 0 4px 10px rgba(20, 32, 47, 0.08);
+        --acro-shadow-dialog: 0 28px 60px rgba(20, 32, 47, 0.27);
+        --acro-backdrop: rgba(20, 32, 47, 0.35);
+        --acro-memo-a: #fbfaf3;
+        --acro-memo-b: #f5f3e8;
+        --acro-hld-changed: #fff8e6;
+        --acro-hld-changed-hover: #fff3d6;
+      }
+      html[data-theme='dark'] {
+        --acro-bg: #0b0e15;
+        --acro-sf: #141924;
+        --acro-sf2: #171d2a;
+        --acro-sf3: #1c2330;
+        --acro-ln: #262f3f;
+        --acro-ln2: #333e52;
+        --acro-ln3: #4a5872;
+        --acro-tx: #eef2f8;
+        --acro-dm: #9aa7bd;
+        --acro-dm2: #6b7891;
+        --acro-tl: #2ee6c5;
+        --acro-tl2: #123a34;
+        --acro-tl3: #1f5c50;
+        --acro-tl-hover: #23c9ac;
+        --acro-am: #f0b84e;
+        --acro-am2: #3a2c12;
+        --acro-am3: #6b4f1e;
+        --acro-vi: #9a8bff;
+        --acro-vi2: #241f3f;
+        --acro-vi3: #453a72;
+        --acro-hp: #ff9152;
+        --acro-hp2: #3a2515;
+        --acro-hp3: #6b4020;
+        --acro-bl: #6ea1ff;
+        --acro-rd: #ff6b62;
+        --acro-shadow-ss: 0 1px 2px rgba(0, 0, 0, 0.45);
+        --acro-shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.35);
+        --acro-shadow-sl: 0 20px 40px rgba(0, 0, 0, 0.6), 0 6px 14px rgba(0, 0, 0, 0.4);
+        --acro-shadow-dialog: 0 30px 70px rgba(0, 0, 0, 0.65);
+        --acro-backdrop: rgba(0, 0, 0, 0.55);
+        --acro-memo-a: #262a1e;
+        --acro-memo-b: #2c3123;
+        --acro-hld-changed: #362c12;
+        --acro-hld-changed-hover: #3f331a;
+      }
+      html,
+      body {
+        background: var(--acro-bg);
+      }
+    </style>
+    <script>
+      // Set data-theme before first paint so there is no light->dark flash on load.
+      (function () {
+        try {
+          if (localStorage.getItem('acro-theme-mode') === 'dark') {
+            document.documentElement.setAttribute('data-theme', 'dark');
+          }
+        } catch (e) {
+          /* localStorage unavailable (private mode etc.) — default to light */
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

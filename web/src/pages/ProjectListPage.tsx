@@ -11,19 +11,19 @@ import { Icon } from '@/components/common/Icon';
 import { FONT_DISPLAY, FONT_MONO, T } from '@/theme/tokens';
 
 type View = 'grid' | 'list';
-const FILTERS = ['전체', '진행중', '보관'] as const;
+const FILTERS = ['All', 'Active', 'Archived'] as const;
 
 export function ProjectListPage() {
   const { data: projects } = useProjects();
   const { data: users } = useUsers();
   const [q, setQ] = useState('');
-  const [filter, setFilter] = useState<(typeof FILTERS)[number]>('전체');
+  const [filter, setFilter] = useState<(typeof FILTERS)[number]>('All');
   const [view, setView] = useState<View>('grid');
 
   // 목업 단계 — 프로젝트 카드는 한 개만 노출한다.
   const list = useMemo(() => {
     const one = (projects ?? []).slice(0, 1);
-    if (filter === '보관') return [];
+    if (filter === 'Archived') return [];
     return one.filter((p) => `${p.code} ${p.name}`.toLowerCase().includes(q.trim().toLowerCase()));
   }, [projects, q, filter]);
 
@@ -34,15 +34,15 @@ export function ProjectListPage() {
           <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: '14px', mb: '22px' }}>
             <Box>
               <Box sx={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 800, letterSpacing: '-.02em' }}>
-                프로젝트
+                Projects
               </Box>
               <Box sx={{ fontSize: 12, color: T.dm, mt: '5px' }}>
-                담당 중인 CIS 과제와 산출물 보드
+                Programs and deliverable boards you own
               </Box>
             </Box>
             <Box sx={{ flex: 1 }} />
             <AcroButton variant="primary">
-              <Icon name="plus" /> 새 프로젝트
+              <Icon name="plus" /> New Project
             </AcroButton>
           </Box>
 
@@ -68,7 +68,7 @@ export function ProjectListPage() {
                 component="input"
                 value={q}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQ(e.target.value)}
-                placeholder="프로젝트 검색"
+                placeholder="Search projects"
                 sx={{
                   border: 'none', outline: 'none', background: 'transparent',
                   fontFamily: 'inherit', fontSize: 12.5, flex: 1, color: T.tx,
@@ -123,8 +123,8 @@ export function ProjectListPage() {
                 padding: '58px 20px', textAlign: 'center',
               }}
             >
-              <Box sx={{ fontSize: 14, fontWeight: 600, mb: '6px' }}>조건에 맞는 프로젝트가 없습니다</Box>
-              <Box sx={{ fontSize: 12, color: T.dm }}>검색어나 필터를 바꿔보세요.</Box>
+              <Box sx={{ fontSize: 14, fontWeight: 600, mb: '6px' }}>No projects match your filters</Box>
+              <Box sx={{ fontSize: 12, color: T.dm }}>Try a different search term or filter.</Box>
             </Box>
           ) : (
             <Box
@@ -149,7 +149,7 @@ export function ProjectListPage() {
                 }}
               >
                 <Icon name="plus" size={18} />
-                새 프로젝트 만들기
+                Create a new project
               </Box>
             </Box>
           )}
@@ -169,7 +169,7 @@ function progressOf(p: ProjectDto) {
   const s = new Date(ph[0].start).getTime();
   const e = new Date(ph[ph.length - 1].end).getTime();
   const pct = Math.round((Math.min(1, Math.max(0, (now - s) / (e - s || 1)))) * 100);
-  return { pct, current: current?.key ?? (done >= ph.length ? '완료' : ph[0].key), done, total: ph.length };
+  return { pct, current: current?.key ?? (done >= ph.length ? 'Done' : ph[0].key), done, total: ph.length };
 }
 
 function ProjectCard({ project, view }: { project: ProjectDto; view: View }) {
@@ -227,7 +227,7 @@ function ProjectCard({ project, view }: { project: ProjectDto; view: View }) {
           {project.name}
         </Box>
         <Box sx={{ fontSize: 11.5, color: T.dm, mt: '4px' }}>
-          {project.domain} · IP {ips?.length ?? 0}개
+          {project.domain} · {ips?.length ?? 0} IPs
         </Box>
       </Box>
 
@@ -239,7 +239,7 @@ function ProjectCard({ project, view }: { project: ProjectDto; view: View }) {
           <Box sx={{ flex: 1 }} />
           <Box sx={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 600, color: T.tl }}>{pct}%</Box>
           <Box sx={{ fontSize: 10, color: T.dm2 }}>
-            {done}/{total} 구간
+            {done}/{total} phases
           </Box>
         </Box>
         <Box sx={{ height: 6, borderRadius: 999, background: T.sf3, overflow: 'hidden' }}>
@@ -304,7 +304,7 @@ function ProjectCard({ project, view }: { project: ProjectDto; view: View }) {
             fontSize: 11.5, fontWeight: 600, color: T.tl,
           }}
         >
-          보드 열기 <Icon name="expand" />
+          Open board <Icon name="expand" />
         </Box>
       </Box>
     </Box>

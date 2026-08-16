@@ -9,11 +9,12 @@ import { departmentName } from '@/shared/constants/departments';
 import { AcroMark, Icon } from '@/components/common/Icon';
 import { UserAvatar } from '@/components/common/Avatar';
 import { AcroButton } from '@/components/common/AcroButton';
+import { ThemeToggle } from '@/components/common/ThemeToggle';
 import { SelectBox } from './SelectBox';
 import { FONT_DISPLAY, FONT_MONO, T } from '@/theme/tokens';
 
 interface AppShellProps {
-  /** 과제/IP 셀렉트는 보드(/details)에서만 쓰인다. 넘기지 않으면 숨는다. */
+  /** Project/IP selects only appear on the board (/details). Omit to hide them. */
   projects?: ProjectDto[];
   projectId?: string;
   onChangeProject?: (id: string) => void;
@@ -25,11 +26,7 @@ interface AppShellProps {
   children: ReactNode;
 }
 
-const NAV = [
-  { to: '/', label: '홈' },
-  { to: '/projects', label: '프로젝트' },
-  { to: '/details', label: '보드' },
-];
+const NAV = [{ to: '/projects', label: 'Projects' }];
 
 /**
  * 목업 .tb 상단바 — 로고 + ACRO 워드마크 + 페이지 네비 + (보드에서만) 과제/IP select
@@ -120,7 +117,7 @@ export function AppShell({
           <>
             <Box sx={{ width: '1px', height: 22, background: T.ln }} />
             <SelectBox
-              label="과제"
+              label="Program"
               value={projectId ?? ''}
               onChange={onChangeProject!}
               options={(projects ?? []).map((p) => ({ value: p._id, label: `${p.code} · ${p.name}` }))}
@@ -134,7 +131,7 @@ export function AppShell({
               options={
                 ips?.length
                   ? ips.map((i) => ({ value: i.id, label: i.name }))
-                  : [{ value: '', label: '권한 없음' }]
+                  : [{ value: '', label: 'No access' }]
               }
             />
           </>
@@ -144,9 +141,11 @@ export function AppShell({
 
         {canToggleRecv && (
           <AcroButton variant={recv ? 'on' : 'default'} onClick={() => setRecv(!recv)}>
-            <Icon name="eye" /> 수신 부서 시점
+            <Icon name="eye" /> Recipient-dept view
           </AcroButton>
         )}
+
+        <ThemeToggle />
 
         <SelectBox
           padLeft={6}

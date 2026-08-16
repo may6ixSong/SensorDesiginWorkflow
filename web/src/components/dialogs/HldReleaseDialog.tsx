@@ -46,7 +46,7 @@ export function HldReleaseDialog({
           </>
         }
       >
-        <Card sx={{ color: T.dm2, fontSize: 12.5 }}>HLD Release 없음</Card>
+        <Card sx={{ color: T.dm2, fontSize: 12.5 }}>No HLD releases yet</Card>
       </ModalShell>
     );
   }
@@ -82,7 +82,7 @@ export function HldReleaseDialog({
             </Box>
           </Box>
           <SelectBox
-            label="버전"
+            label="Version"
             value={cur._id}
             onChange={onSelect}
             options={sorted.map((h) => ({ value: h._id, label: `HLD ${h.version} · ${h.date}` }))}
@@ -140,8 +140,8 @@ export function HldReleaseDialog({
                   sx={{
                     borderBottom: `1px solid ${T.ln}`,
                     cursor: 'pointer',
-                    ...(changed ? { background: '#fff8e6', boxShadow: `inset 3px 0 0 ${T.am3}` } : {}),
-                    '&:hover': { background: changed ? '#fff3d6' : T.sf2 },
+                    ...(changed ? { background: T.hldChanged, boxShadow: `inset 3px 0 0 ${T.am3}` } : {}),
+                    '&:hover': { background: changed ? T.hldChangedHover : T.sf2 },
                   }}
                 >
                   <Box component="td" sx={{ padding: '9px 12px' }}>

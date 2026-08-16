@@ -47,32 +47,32 @@ export function IpPermissionDialog({
       header={
         <>
           <Ey>{ip.name}</Ey>
-          <Box sx={{ fontSize: 17, fontWeight: 700, mt: '2px' }}>담당자 · 권한</Box>
+          <Box sx={{ fontSize: 17, fontWeight: 700, mt: '2px' }}>Owners & Permissions</Box>
         </>
       }
     >
       <Card sx={{ mb: '12px' }}>
-        <Ey sx={{ mb: '9px' }}>대표 담당자</Ey>
+        <Ey sx={{ mb: '9px' }}>Primary Owner</Ey>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: '9px' }}>
           <UserAvatar user={primary} size={30} />
           <Box>
             <Box sx={{ fontSize: 14, fontWeight: 600 }}>{primary?.name ?? '—'}</Box>
             <Box sx={{ fontSize: 11, color: T.dm2 }}>
-              {primary ? departmentName(primary.department) : ''} · 이 IP workflow를 최초 구성
+              {primary ? departmentName(primary.department) : ''} · set up this IP workflow initially
             </Box>
           </Box>
         </Box>
       </Card>
 
       <Card sx={{ mb: '12px' }}>
-        <Ey sx={{ mb: '9px' }}>수정 권한(Edit) — Analog 부서만 가능</Ey>
+        <Ey sx={{ mb: '9px' }}>Edit access — Analog department only</Ey>
         {ip.owners.map((o, i) => (
           <Box key={o.id} sx={{ display: 'flex', alignItems: 'center', gap: '9px', padding: '7px 0', borderBottom: `1px solid ${T.ln}` }}>
             <UserAvatar user={o} size={26} />
             <Box sx={{ flex: 1 }}>
               <Box sx={{ fontSize: 13, fontWeight: 500, display: 'flex', alignItems: 'center', gap: '6px' }}>
                 {o.name}
-                {i === 0 && <Chip tone="s" sx={{ padding: '1px 6px', fontSize: 10 }}>대표</Chip>}
+                {i === 0 && <Chip tone="s" sx={{ padding: '1px 6px', fontSize: 10 }}>Primary</Chip>}
               </Box>
               <Box sx={{ fontSize: 11, color: T.dm2 }}>{departmentName(o.department)}</Box>
             </Box>
@@ -85,7 +85,7 @@ export function IpPermissionDialog({
         ))}
         {own && (
           <Row sx={{ mt: '10px' }}>
-            <Field label="Analog 부서원 추가" sx={{ flex: 1, mb: 0 }}>
+            <Field label="Add Analog member" sx={{ flex: 1, mb: 0 }}>
               <SelectInput
                 value={ownerSel || analogCandidates[0]?.id || ''}
                 onChange={setOwnerSel}
@@ -93,7 +93,7 @@ export function IpPermissionDialog({
                 options={
                   analogCandidates.length
                     ? analogCandidates.map((u) => ({ value: u.id, label: u.name }))
-                    : [{ value: '', label: '추가 가능한 인원 없음' }]
+                    : [{ value: '', label: 'No eligible members' }]
                 }
               />
             </Field>
@@ -105,7 +105,7 @@ export function IpPermissionDialog({
                   if (u) onAddOwner(u);
                 }}
               >
-                <Icon name="plus" /> 추가
+                <Icon name="plus" /> Add
               </AcroButton>
             </Box>
           </Row>
@@ -113,14 +113,14 @@ export function IpPermissionDialog({
       </Card>
 
       <Card>
-        <Ey sx={{ mb: '9px' }}>열람 권한(View) — 전체 부서 가능</Ey>
+        <Ey sx={{ mb: '9px' }}>View access — any department</Ey>
         {ip.viewGrants.length ? (
           ip.viewGrants.map((g) => (
             <Box key={g.user.id} sx={{ display: 'flex', alignItems: 'center', gap: '9px', padding: '7px 0', borderBottom: `1px solid ${T.ln}` }}>
               <UserAvatar user={g.user} size={26} />
               <Box sx={{ flex: 1 }}>
                 <Box sx={{ fontSize: 13, fontWeight: 500 }}>{g.user.name}</Box>
-                <Box sx={{ fontSize: 11, color: T.dm2 }}>포지션: {departmentName(g.department)}</Box>
+                <Box sx={{ fontSize: 11, color: T.dm2 }}>Position: {departmentName(g.department)}</Box>
               </Box>
               {own && (
                 <AcroButton variant="ghost" onClick={() => onRemoveViewGrant(g.user.id)}>
@@ -130,12 +130,12 @@ export function IpPermissionDialog({
             </Box>
           ))
         ) : (
-          <Box sx={{ fontSize: 12.5, color: T.dm2 }}>열람 권한을 받은 사용자가 없습니다.</Box>
+          <Box sx={{ fontSize: 12.5, color: T.dm2 }}>No one has view access yet.</Box>
         )}
         {own && (
           <>
             <Row sx={{ mt: '10px' }}>
-              <Field label="대상" sx={{ flex: 1, mb: 0 }}>
+              <Field label="Target" sx={{ flex: 1, mb: 0 }}>
                 <SelectInput
                   value={viewUser || viewCandidates[0]?.id || ''}
                   onChange={setViewUser}
@@ -143,11 +143,11 @@ export function IpPermissionDialog({
                   options={
                     viewCandidates.length
                       ? viewCandidates.map((u) => ({ value: u.id, label: u.name }))
-                      : [{ value: '', label: '추가 가능한 인원 없음' }]
+                      : [{ value: '', label: 'No eligible members' }]
                   }
                 />
               </Field>
-              <Field label="포지션(부서)" sx={{ width: 150, mb: 0 }}>
+              <Field label="Position (dept)" sx={{ width: 150, mb: 0 }}>
                 <SelectInput
                   value={viewDept}
                   onChange={setViewDept}
@@ -162,12 +162,12 @@ export function IpPermissionDialog({
                     if (u) onAddViewGrant(u, viewDept);
                   }}
                 >
-                  <Icon name="plus" /> 추가
+                  <Icon name="plus" /> Add
                 </AcroButton>
               </Box>
             </Row>
             <Box sx={{ fontSize: 11, color: T.dm2, mt: '8px' }}>
-              여기서 지정한 포지션이 산출물의 "전달 받을 부서" 목록과 매핑됩니다.
+              The position set here maps to the deliverable's "recipient department" list.
             </Box>
           </>
         )}

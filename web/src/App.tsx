@@ -33,11 +33,11 @@ function LoginGate({ children }: { children: React.ReactNode }) {
   if (token) return <>{children}</>;
 
   const failureMessage = usersError
-    ? `사용자 목록을 불러오지 못했습니다: ${(usersErrorObj as any)?.message ?? '알 수 없는 오류'}`
+    ? `Failed to load user list: ${(usersErrorObj as any)?.message ?? 'Unknown error'}`
     : devLogin.isError
-      ? `자동 로그인에 실패했습니다: ${(devLogin.error as any)?.message ?? '알 수 없는 오류'}`
+      ? `Automatic sign-in failed: ${(devLogin.error as any)?.message ?? 'Unknown error'}`
       : !usersError && users !== undefined && users.length === 0
-        ? '시드된 사용자가 없습니다. api/에서 npm run seed를 실행하세요.'
+        ? 'No seeded users found. Run `npm run seed` in api/.'
         : null;
 
   if (failureMessage) {
@@ -47,7 +47,7 @@ function LoginGate({ children }: { children: React.ReactNode }) {
           {failureMessage}
         </Alert>
         <Typography variant="caption" color="text.secondary">
-          API 서버(npm run start:dev)가 실행 중인지, web/.env의 VITE_API_BASE_URL이 맞는지 확인하세요.
+          Check that the API server (npm run start:dev) is running and web/.env's VITE_API_BASE_URL is correct.
         </Typography>
         <Button
           variant="outlined"
@@ -57,7 +57,7 @@ function LoginGate({ children }: { children: React.ReactNode }) {
             refetchUsers();
           }}
         >
-          다시 시도
+          Retry
         </Button>
       </Stack>
     );

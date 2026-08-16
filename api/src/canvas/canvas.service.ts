@@ -32,12 +32,12 @@ export class CanvasService {
     this.assertValidLayouts(dto);
     for (const d of dto.deliverables) {
       if (!validPhaseKeys.has(d.phaseKey)) {
-        throw new BadRequestException(`알 수 없는 Phase입니다: ${d.phaseKey}`);
+        throw new BadRequestException(`Unknown phase: ${d.phaseKey}`);
       }
     }
     for (const m of dto.memos) {
       if (!validPhaseKeys.has(m.phaseKey)) {
-        throw new BadRequestException(`알 수 없는 Phase입니다: ${m.phaseKey}`);
+        throw new BadRequestException(`Unknown phase: ${m.phaseKey}`);
       }
     }
 
@@ -82,11 +82,11 @@ export class CanvasService {
     const isValid = (l: { x: number; y: number; w: number; h: number }) =>
       l && l.x >= 0 && l.y >= 0 && l.w > 0 && l.h > 0;
     for (const d of dto.deliverables) {
-      if (!isValid(d.layout)) throw new BadRequestException(`유효하지 않은 좌표입니다: ${d.id}`);
+      if (!isValid(d.layout)) throw new BadRequestException(`Invalid coordinates: ${d.id}`);
     }
     for (const m of dto.memos) {
-      if (!isValid(m.layout)) throw new BadRequestException('메모 좌표가 유효하지 않습니다.');
-      if (!m.text || m.text.length > 2000) throw new BadRequestException('메모 텍스트 길이가 올바르지 않습니다.');
+      if (!isValid(m.layout)) throw new BadRequestException('Memo coordinates are invalid.');
+      if (!m.text || m.text.length > 2000) throw new BadRequestException('Memo text length is invalid.');
     }
   }
 }

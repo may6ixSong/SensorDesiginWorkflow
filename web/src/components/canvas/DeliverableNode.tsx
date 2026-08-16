@@ -89,7 +89,7 @@ export function DeliverableNode({
             },
           }}
         >
-          <Icon name="expand" /> 상세
+          <Icon name="expand" /> Details
         </Box>
       )}
 
@@ -159,7 +159,7 @@ export function DeliverableNode({
         {d.seriesTotal > 1 && (
           <Box
             component="span"
-            title={`Release 일정 ${d.seriesIdx}/${d.seriesTotal}`}
+            title={`Release schedule ${d.seriesIdx}/${d.seriesTotal}`}
             sx={{
               fontFamily: FONT_MONO, fontSize: 9, fontWeight: 600, padding: '1px 5px',
               borderRadius: '9px', background: T.vi2, color: T.vi, border: `1px solid ${T.vi3}`,
@@ -178,7 +178,7 @@ export function DeliverableNode({
         }}
       >
         {phase ? phase.key : '-'} · {last ? usersById.get(last.by)?.name ?? '—' : '—'} ·{' '}
-        {last ? fmtAt(last.at).slice(5, 16) : '업데이트 없음'}
+        {last ? fmtAt(last.at).slice(5, 16) : 'No updates'}
       </Box>
 
       {!compact && (
@@ -187,9 +187,9 @@ export function DeliverableNode({
           {rel ? (
             <Chip c={T.tl} bg={T.tl2} bd={T.tl3}>{vstr(rel)}</Chip>
           ) : (
-            <Chip c={T.dm2} bg={T.sf2} bd={T.ln}>릴리스 없음</Chip>
+            <Chip c={T.dm2} bg={T.sf2} bd={T.ln}>No release</Chip>
           )}
-          {canEdit && work && <Chip c={T.am} bg={T.am2} bd={T.am3}>작업중 {vstr(work)}</Chip>}
+          {canEdit && work && <Chip c={T.am} bg={T.am2} bd={T.am3}>In progress {vstr(work)}</Chip>}
           {d.recvDept && <Chip c={T.dm2} bg={T.sf2} bd={T.ln}>{departmentName(d.recvDept)}</Chip>}
         </Box>
       )}

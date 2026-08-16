@@ -18,7 +18,7 @@ export class UsersController {
   async list(@Query('department') department?: string) {
     if (department) {
       if (!isValidDepartment(department)) {
-        throw new BadRequestException('알 수 없는 부서입니다.');
+        throw new BadRequestException('Unknown department.');
       }
       const users = await this.users.findByDepartment(department);
       return { data: users.map(toUserDto) };

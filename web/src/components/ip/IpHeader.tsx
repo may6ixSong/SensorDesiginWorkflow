@@ -3,6 +3,7 @@ import { IpDto } from '@/types/domain';
 import { AcroButton } from '@/components/common/AcroButton';
 import { Icon } from '@/components/common/Icon';
 import { T } from '@/theme/tokens';
+import { initials } from '@/components/common/Avatar';
 
 interface IpHeaderProps {
   ip: IpDto;
@@ -38,17 +39,17 @@ export function IpHeader({ ip, recv, onOpenPermissions, onOpenHld }: IpHeaderPro
       </Box>
 
       <Chip
-        label={ip.myAccess === 'edit' ? 'Edit 권한' : 'View 권한'}
+        label={ip.myAccess === 'edit' ? 'Edit access' : 'View access'}
         size="small"
         color={ip.myAccess === 'edit' ? 'primary' : 'default'}
         variant="outlined"
       />
       {recv && (
-        <Chip label="수신 부서 시점" size="small" variant="outlined"
+        <Chip label="Recipient-dept view" size="small" variant="outlined"
           sx={{ color: T.vi, borderColor: T.vi3, background: T.vi2 }} />
       )}
 
-      <Tooltip title="담당자 / 권한 관리">
+      <Tooltip title="Manage owners / permissions">
         <Stack
           direction="row"
           spacing={1}
@@ -59,12 +60,12 @@ export function IpHeader({ ip, recv, onOpenPermissions, onOpenHld }: IpHeaderPro
           <AvatarGroup max={4} sx={{ '& .MuiAvatar-root': { width: 24, height: 24, fontSize: 11 } }}>
             {ip.owners.map((o) => (
               <Avatar key={o.id} sx={{ bgcolor: o.color }}>
-                {o.name.slice(1, 2) || o.name.slice(0, 1)}
+                {initials(o.name)}
               </Avatar>
             ))}
           </AvatarGroup>
           <Typography variant="caption">
-            {repOwner?.name ?? '담당자 없음'} 외 {extra}명
+            {repOwner?.name ?? 'No owner'} +{extra} more
           </Typography>
         </Stack>
       </Tooltip>

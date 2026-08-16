@@ -19,7 +19,7 @@ export class ProjectsService {
 
   async findByIdOrThrow(id: string) {
     const project = await this.model.findById(id).exec();
-    if (!project) throw new NotFoundException('과제를 찾을 수 없습니다.');
+    if (!project) throw new NotFoundException('Program not found.');
     return project;
   }
 

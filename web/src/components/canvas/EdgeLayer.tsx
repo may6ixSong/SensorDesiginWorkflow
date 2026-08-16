@@ -39,7 +39,7 @@ export function EdgeLayer({
       seen.add(key);
     }
 
-    const blocked = !bi && !latR(a) && stOf(b).lb !== '미제출';
+    const blocked = !bi && !latR(a) && stOf(b).lb !== 'Not submitted';
     const on = !!hlSet && hlSet.has(e.from) && hlSet.has(e.to);
     const col = on ? '#0c9a83' : blocked ? '#ac6f08' : '#8b99ab';
     const mk = on ? 'ahl' : blocked ? 'ahb' : 'ah';
@@ -102,7 +102,7 @@ export function EdgeLayer({
             onDeleteEdge(e.id);
           }}
         >
-          <title>클릭하면 연결 삭제</title>
+          <title>Click to remove this link</title>
         </path>,
       );
     }

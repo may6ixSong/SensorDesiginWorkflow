@@ -318,8 +318,8 @@ export const hasW = (d: CanvasNode) => {
 
 export interface StatusStyle { lb: string; c: string; bg: string; bd: string }
 export function stOf(d: CanvasNode): StatusStyle {
-  if (!d.versions.length) return { lb: '미제출', c: T.dm2, bg: T.sf2, bd: T.ln };
-  if (hasW(d)) return { lb: '작업중', c: T.am, bg: T.am2, bd: T.am3 };
+  if (!d.versions.length) return { lb: 'Not submitted', c: T.dm2, bg: T.sf2, bd: T.ln };
+  if (hasW(d)) return { lb: 'In progress', c: T.am, bg: T.am2, bd: T.am3 };
   return { lb: 'Released', c: T.tl, bg: T.tl2, bd: T.tl3 };
 }
 

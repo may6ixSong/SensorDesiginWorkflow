@@ -120,8 +120,8 @@ export function BoardPage() {
         })),
       },
       {
-        onSuccess: () => toast('배치를 저장했습니다'),
-        onError: () => toast('저장에 실패했습니다'),
+        onSuccess: () => toast('Layout saved'),
+        onError: () => toast('Save failed'),
       },
     );
   };
@@ -149,10 +149,10 @@ export function BoardPage() {
         <Box sx={{ flex: 1, display: 'grid', placeItems: 'center', padding: '40px' }}>
           <Box sx={{ textAlign: 'center', maxWidth: 420 }}>
             <Typography sx={{ fontSize: 20, fontWeight: 700, mb: '10px' }}>
-              열람할 수 있는 IP가 없습니다
+              No viewable IP
             </Typography>
             <Typography sx={{ fontSize: 13, color: T.dm, lineHeight: 1.8 }}>
-              {me?.name}님은 이 과제의 Analog IP에 대한 권한이 없습니다.
+              {me?.name} has no access to this program's Analog IPs.
             </Typography>
           </Box>
         </Box>
@@ -191,14 +191,14 @@ export function BoardPage() {
                       if (before !== after) {
                         updateSchedule.mutate(
                           { id: sid, phaseKeys },
-                          { onSuccess: () => toast(`Release 일정 ${phaseKeys.length}개 구간`) },
+                          { onSuccess: () => toast(`Release schedule: ${phaseKeys.length} phase(s)`) },
                         );
                       } else {
-                        toast('저장했습니다');
+                        toast('Saved');
                       }
                       closeDeliverable();
                     },
-                    onError: () => toast('저장에 실패했습니다'),
+                    onError: () => toast('Save failed'),
                   },
                 );
               }}
@@ -215,24 +215,24 @@ export function BoardPage() {
                       if (net !== openNode.net || type !== openNode.type) {
                         updateDeliverable.mutate({ id: openNode.id, network: net, docType: type });
                       }
-                      toast('작업본을 올렸습니다');
+                      toast('Working copy uploaded');
                     },
-                    onError: () => toast('업로드에 실패했습니다'),
+                    onError: () => toast('Upload failed'),
                   },
                 );
               }}
               onRelease={() =>
                 release.mutate(
                   { id: openNode.id },
-                  { onSuccess: () => toast('Release 했습니다'), onError: () => toast('Release에 실패했습니다') },
+                  { onSuccess: () => toast('Released'), onError: () => toast('Release failed') },
                 )
               }
               onSaveRecv={({ recvDept, recvContact }) =>
                 updateRecv.mutate(
                   { id: openNode.id, recvDept, recvContact },
                   {
-                    onSuccess: () => toast('전달 정보를 저장했습니다'),
-                    onError: () => toast('전달 부서 저장에 실패했습니다'),
+                    onSuccess: () => toast('Handoff info saved'),
+                    onError: () => toast('Failed to save recipient department'),
                   },
                 )
               }
@@ -243,13 +243,13 @@ export function BoardPage() {
                     ...s.edges,
                     { id: `tmp-${Date.now()}`, from: openNode.id, to: toId, auto: false, bidirectional: false },
                   ]);
-                  toast('연결했습니다 — 편집 저장 시 반영됩니다');
+                  toast('Linked — applies once you save the layout');
                 }
               }}
               onUnlink={(edgeId) => {
                 const s = st.getState();
                 s.setEdges(s.edges.filter((e) => e.id !== edgeId));
-                toast('연결을 해제했습니다 — 편집 저장 시 반영됩니다');
+                toast('Unlinked — applies once you save the layout');
               }}
             />
           )}
@@ -294,14 +294,14 @@ export function BoardPage() {
               onClose={() => st.getState().setOwnerDlg(false)}
               onAddOwner={(id) =>
                 addOwner.mutate(id, {
-                  onSuccess: () => toast('수정 권한을 추가했습니다'),
+                  onSuccess: () => toast('Edit access added'),
                   onError: (e: any) =>
-                    toast(e?.response?.data?.message ?? '추가에 실패했습니다'),
+                    toast(e?.response?.data?.message ?? 'Failed to add'),
                 })
               }
               onRemoveOwner={(id) => removeOwner.mutate(id)}
               onAddViewGrant={(userId, department) =>
-                addViewGrant.mutate({ userId, department }, { onSuccess: () => toast('열람 권한을 추가했습니다') })
+                addViewGrant.mutate({ userId, department }, { onSuccess: () => toast('View access added') })
               }
               onRemoveViewGrant={(id) => removeViewGrant.mutate(id)}
             />
@@ -316,9 +316,9 @@ export function BoardPage() {
                 createDeliverable.mutate(p, {
                   onSuccess: () => {
                     st.getState().setAddDlg(false);
-                    toast('산출물을 추가했습니다');
+                    toast('Deliverable added');
                   },
-                  onError: () => toast('추가에 실패했습니다'),
+                  onError: () => toast('Failed to add'),
                 })
               }
             />
@@ -332,13 +332,13 @@ export function BoardPage() {
                 const s = st.getState();
                 s.setMemos(s.memos.map((m) => (m.id === noteDlg ? { ...m, text } : m)));
                 s.setNoteDlg(null);
-                toast('메모 저장');
+                toast('Memo saved');
               }}
               onDelete={() => {
                 const s = st.getState();
                 s.setMemos(s.memos.filter((m) => m.id !== noteDlg));
                 s.setNoteDlg(null);
-                toast('메모 삭제');
+                toast('Memo deleted');
               }}
             />
           )}

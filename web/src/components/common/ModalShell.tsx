@@ -40,7 +40,7 @@ export function ModalShell({ open, onClose, width = 640, header, belowHeader, ch
       <Box sx={{ padding: '15px 20px 0', flex: '0 0 auto' }}>
         <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
           <Box sx={{ flex: 1, minWidth: 0 }}>{header}</Box>
-          <AcroButton variant="ghost" onClick={onClose} aria-label="닫기">
+          <AcroButton variant="ghost" onClick={onClose} aria-label="Close">
             <Icon name="x" />
           </AcroButton>
         </Box>

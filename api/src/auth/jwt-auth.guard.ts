@@ -23,19 +23,19 @@ export class JwtAuthGuard implements CanActivate {
     const req = ctx.switchToHttp().getRequest();
     const header: string | undefined = req.headers?.authorization;
     if (!header?.startsWith('Bearer ')) {
-      throw new UnauthorizedException('인증 토큰이 없습니다.');
+      throw new UnauthorizedException('No authentication token provided.');
     }
     const token = header.slice('Bearer '.length);
     try {
       const payload = await this.jwt.verifyAsync<{ sub: string }>(token);
       const user = await this.users.findByIdOrNull(payload.sub);
       if (!user || !user.isActive) {
-        throw new UnauthorizedException('사용자를 찾을 수 없거나 비활성 상태입니다.');
+        throw new UnauthorizedException('User not found or inactive.');
       }
       req.user = user;
       return true;
     } catch {
-      throw new UnauthorizedException('유효하지 않은 토큰입니다.');
+      throw new UnauthorizedException('Invalid token.');
     }
   }
 }

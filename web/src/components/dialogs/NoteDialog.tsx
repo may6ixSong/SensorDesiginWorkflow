@@ -24,19 +24,19 @@ export function NoteDialog({ text, onClose, onSave, onDelete }: Props) {
       header={
         <>
           <Ey>MEMO</Ey>
-          <Box sx={{ fontSize: 16, fontWeight: 700, mt: '2px' }}>메모 편집</Box>
+          <Box sx={{ fontSize: 16, fontWeight: 700, mt: '2px' }}>Edit Memo</Box>
         </>
       }
     >
-      <Field label="내용">
+      <Field label="Content">
         <TextArea value={v} onChange={setV} rows={4} />
       </Field>
       <Box sx={{ display: 'flex', gap: '8px' }}>
         <AcroButton variant="primary" onClick={() => onSave(v)}>
-          <Icon name="check" /> 저장
+          <Icon name="check" /> Save
         </AcroButton>
         <AcroButton onClick={onDelete} sx={{ color: T.rd }}>
-          <Icon name="trash" /> 삭제
+          <Icon name="trash" /> Delete
         </AcroButton>
       </Box>
     </ModalShell>

@@ -34,16 +34,16 @@ export function AddDeliverableDialog({ ipName, phases, onClose, onCreate }: Prop
       header={
         <>
           <Ey>{ipName}</Ey>
-          <Box sx={{ fontSize: 16, fontWeight: 700, mt: '2px' }}>산출물 추가</Box>
+          <Box sx={{ fontSize: 16, fontWeight: 700, mt: '2px' }}>Add Deliverable</Box>
         </>
       }
     >
-      <Field label="이름">
+      <Field label="Name">
         <TextInput
           value={name}
           onChange={(v) => { setName(v); setErr(false); }}
           error={err}
-          placeholder="예: Startup 시퀀스 검증 결과"
+          placeholder="e.g. Startup Sequence Verification Results"
         />
       </Field>
       <Row>
@@ -54,24 +54,24 @@ export function AddDeliverableDialog({ ipName, phases, onClose, onCreate }: Prop
             options={phases.map((p) => ({ value: p.key, label: `${p.key} · ${p.label}` }))}
           />
         </Field>
-        <Field label="망" sx={{ width: 90 }}>
+        <Field label="Network" sx={{ width: 90 }}>
           <SelectInput
             value={net}
             onChange={(v) => { setNet(v as 'OA' | 'HPC'); if (v === 'HPC') setType('path'); else if (type === 'path') setType('word'); }}
             options={[{ value: 'OA', label: 'OA' }, { value: 'HPC', label: 'HPC' }]}
           />
         </Field>
-        <Field label="형식" sx={{ width: 90 }}>
+        <Field label="Format" sx={{ width: 90 }}>
           <SelectInput
             value={type}
             disabled={net === 'HPC'}
             onChange={setType}
-            options={[{ value: 'word', label: 'Word' }, { value: 'excel', label: 'Excel' }, { value: 'path', label: '경로' }]}
+            options={[{ value: 'word', label: 'Word' }, { value: 'excel', label: 'Excel' }, { value: 'path', label: 'Path' }]}
           />
         </Field>
       </Row>
       <AcroButton variant="primary" onClick={submit}>
-        <Icon name="plus" /> 만들기
+        <Icon name="plus" /> Create
       </AcroButton>
     </ModalShell>
   );

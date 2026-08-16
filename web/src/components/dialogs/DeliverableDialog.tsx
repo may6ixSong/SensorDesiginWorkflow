@@ -63,13 +63,13 @@ export function DeliverableDialog({
             borderColor={d.net === 'HPC' ? T.hp3 : T.ln}
             sx={{ mt: '6px' }}
           >
-            {d.net}망
+            {d.net} network
           </Badge>
         </Box>
       }
       belowHeader={
         <Box sx={{ display: 'flex', gap: '2px', mt: '11px', borderBottom: `1px solid ${T.ln}` }}>
-          {([['overview', '개요'], ['versions', '버전 이력'], ['recv', '전달']] as const).map(([k, l]) => (
+          {([['overview', 'Overview'], ['versions', 'Version History'], ['recv', 'Handoff']] as const).map(([k, l]) => (
             <Box
               key={k}
               component="button"
@@ -160,9 +160,9 @@ function OverviewTab({
   const submitUpload = () => {
     setErr('');
     const f = file.trim();
-    if (!f) { setErr('파일명 또는 경로를 입력하세요.'); return; }
-    if (fNet === 'HPC' && !f.startsWith('/vwp/')) { setErr('HPC 경로는 /vwp/ 로 시작해야 합니다.'); return; }
-    onUpload({ file: f, note: note.trim() || '작업본 갱신', net: fNet, type: fNet === 'HPC' ? 'path' : fType });
+    if (!f) { setErr('Enter a file name or path.'); return; }
+    if (fNet === 'HPC' && !f.startsWith('/vwp/')) { setErr('HPC paths must start with /vwp/.'); return; }
+    onUpload({ file: f, note: note.trim() || 'Working copy update', net: fNet, type: fNet === 'HPC' ? 'path' : fType });
     setFile(''); setNote('');
   };
 
@@ -173,14 +173,14 @@ function OverviewTab({
     return (
       <Box key={e.id} sx={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 0', borderBottom: `1px solid ${T.ln}` }}>
         <Box component="span" sx={{ fontFamily: FONT_MONO, fontSize: 11, color: T.dm2, width: 52 }}>
-          {dir === 'out' ? '→ 다음' : '← 이전'}
+          {dir === 'out' ? '→ Next' : '← Previous'}
         </Box>
         <Box sx={{ flex: 1, fontSize: 12.5 }}>
           {other.name}
           {other.seriesTotal > 1 && <Seq>{other.seriesIdx}/{other.seriesTotal}</Seq>}
         </Box>
         <Box component="span" sx={{ fontFamily: FONT_MONO, fontSize: 10.5, color: T.dm2 }}>{op?.key ?? '—'}</Box>
-        <AcroButton variant="ghost" title="연결 해제" onClick={() => onUnlink(e.id)}>
+        <AcroButton variant="ghost" title="Unlink" onClick={() => onUnlink(e.id)}>
           <Icon name="trash" />
         </AcroButton>
       </Box>
@@ -192,12 +192,12 @@ function OverviewTab({
       {own && (
         <>
           <Card sx={{ mb: '12px' }}>
-            <Ey sx={{ mb: '9px' }}>기본 정보 수정</Ey>
+            <Ey sx={{ mb: '9px' }}>Edit basic info</Ey>
             <Row>
-              <Field label="이름" sx={{ flex: 1 }}>
+              <Field label="Name" sx={{ flex: 1 }}>
                 <TextInput value={name} onChange={(v) => { setName(v); setNameErr(false); }} error={nameErr} />
               </Field>
-              <Field label="망" sx={{ width: 100 }}>
+              <Field label="Network" sx={{ width: 100 }}>
                 <SelectInput
                   value={net}
                   onChange={(v) => { setNet(v as 'OA' | 'HPC'); if (v === 'HPC') setType('path'); else if (type === 'path') setType('word'); }}
@@ -206,16 +206,16 @@ function OverviewTab({
               </Field>
             </Row>
             <Row>
-              <Field label="형식" sx={{ flex: 1 }}>
+              <Field label="Format" sx={{ flex: 1 }}>
                 <SelectInput
                   value={type}
                   disabled={net === 'HPC'}
                   onChange={setType}
-                  options={[{ value: 'word', label: 'Word' }, { value: 'excel', label: 'Excel' }, { value: 'path', label: '경로' }]}
+                  options={[{ value: 'word', label: 'Word' }, { value: 'excel', label: 'Excel' }, { value: 'path', label: 'Path' }]}
                 />
               </Field>
             </Row>
-            <Field label="Release 일정">
+            <Field label="Release schedule">
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
                 {phases.map((p) => (
                   <Box
@@ -238,16 +238,16 @@ function OverviewTab({
               </Box>
             </Field>
             <AcroButton variant="primary" onClick={submitInfo}>
-              <Icon name="check" /> 저장
+              <Icon name="check" /> Save
             </AcroButton>
           </Card>
 
           <Card sx={{ mb: '12px' }}>
             <Ey sx={{ mb: '9px', display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <Icon name="link" /> Flow 연결
+              <Icon name="link" /> Flow links
             </Ey>
             {ins.length + outs.length === 0 ? (
-              <Box sx={{ fontSize: 12, color: T.dm2, pb: '8px' }}>연결된 산출물이 없습니다.</Box>
+              <Box sx={{ fontSize: 12, color: T.dm2, pb: '8px' }}>No linked deliverables.</Box>
             ) : (
               <>
                 {ins.map((e) => edgeRow(e, 'in'))}
@@ -255,7 +255,7 @@ function OverviewTab({
               </>
             )}
             <Row sx={{ mt: '10px' }}>
-              <Field label="다음 산출물로 연결" sx={{ flex: 1, mb: 0 }}>
+              <Field label="Link to next deliverable" sx={{ flex: 1, mb: 0 }}>
                 <SelectInput
                   value={lkTgt || linkable[0]?.id || ''}
                   onChange={setLkTgt}
@@ -266,7 +266,7 @@ function OverviewTab({
                           value: x.id,
                           label: `${x.name}${x.seriesTotal > 1 ? ` (${x.seriesIdx}/${x.seriesTotal})` : ''} · ${phases.find((p) => p.key === x.phase)?.key ?? ''}`,
                         }))
-                      : [{ value: '', label: '연결 가능한 산출물 없음' }]
+                      : [{ value: '', label: 'No linkable deliverables' }]
                   }
                 />
               </Field>
@@ -275,7 +275,7 @@ function OverviewTab({
                   disabled={!linkable.length}
                   onClick={() => { const t = lkTgt || linkable[0]?.id; if (t) onAddLink(t); }}
                 >
-                  <Icon name="plus" /> 연결
+                  <Icon name="plus" /> Link
                 </AcroButton>
               </Box>
             </Row>
@@ -285,42 +285,42 @@ function OverviewTab({
 
       <Row sx={{ mb: '12px' }}>
         <Card sx={{ flex: 1 }}>
-          <Ey>수신 부서가 보는 버전</Ey>
+          <Ey>Version the recipient dept sees</Ey>
           <Box sx={{ fontFamily: FONT_MONO, fontSize: 21, fontWeight: 600, color: T.tl, mt: '6px' }}>
             {rel ? vstr(rel) : '—'}
           </Box>
-          <Box sx={{ fontSize: 11, color: T.dm2, mt: '3px' }}>{rel ? fmtAt(rel.at) : '릴리스 이력 없음'}</Box>
+          <Box sx={{ fontSize: 11, color: T.dm2, mt: '3px' }}>{rel ? fmtAt(rel.at) : 'No release history'}</Box>
         </Card>
         <Card sx={{ flex: 1, opacity: own ? 1 : 0.5 }}>
-          <Ey>작성 측 작업본</Ey>
+          <Ey>Author's working copy</Ey>
           <Box sx={{ fontFamily: FONT_MONO, fontSize: 21, fontWeight: 600, color: T.am, mt: '6px', display: 'flex', alignItems: 'center' }}>
-            {own ? (work ? vstr(work) : '없음') : <Icon name="lock" />}
+            {own ? (work ? vstr(work) : 'None') : <Icon name="lock" />}
           </Box>
           <Box sx={{ fontSize: 11, color: T.dm2, mt: '3px' }}>
-            {own ? (work ? fmtAt(work.at) : '릴리스 이후 변경 없음') : 'IP 담당자만 열람'}
+            {own ? (work ? fmtAt(work.at) : 'No changes since release') : 'IP owners only'}
           </Box>
         </Card>
       </Row>
 
       <Card sx={{ mb: '12px' }}>
-        <Ey sx={{ mb: '7px' }}>{d.net === 'HPC' ? 'HPC vwp 경로' : '현재 파일'}</Ey>
+        <Ey sx={{ mb: '7px' }}>{d.net === 'HPC' ? 'HPC vwp path' : 'Current file'}</Ey>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Box component="span" sx={{ color: T.dm }}><DocIcon type={d.type} /></Box>
           <Box component="span" sx={{ fontFamily: FONT_MONO, fontSize: 12, wordBreak: 'break-all' }}>
-            {cur || '등록된 항목 없음'}
+            {cur || 'Nothing registered yet'}
           </Box>
         </Box>
         <Box sx={{ mt: '11px' }}>
           {d.net === 'HPC' ? (
             <AcroButton
               disabled={!cur}
-              onClick={() => { if (cur) { navigator.clipboard?.writeText(cur); toast('경로를 복사했습니다'); } }}
+              onClick={() => { if (cur) { navigator.clipboard?.writeText(cur); toast('Path copied'); } }}
             >
-              <Icon name="copy" /> 경로 복사
+              <Icon name="copy" /> Copy path
             </AcroButton>
           ) : (
-            <AcroButton disabled={!rel} onClick={() => toast('다운로드는 스토리지 연동 후 제공됩니다')}>
-              <Icon name="dn" /> 파일 내려받기
+            <AcroButton disabled={!rel} onClick={() => toast('Downloads will be available once storage is connected')}>
+              <Icon name="dn" /> Download file
             </AcroButton>
           )}
         </Box>
@@ -328,22 +328,22 @@ function OverviewTab({
 
       {own && (
         <Card>
-          <Ey sx={{ mb: '9px' }}>새 작업본 올리기 — minor↑</Ey>
+          <Ey sx={{ mb: '9px' }}>Upload new working copy — minor↑</Ey>
           <Row>
-            <Field label="망" sx={{ width: 95 }}>
+            <Field label="Network" sx={{ width: 95 }}>
               <SelectInput
                 value={fNet}
                 onChange={(v) => { setFNet(v as 'OA' | 'HPC'); if (v === 'HPC') setFType('path'); else if (fType === 'path') setFType('word'); }}
                 options={[{ value: 'OA', label: 'OA' }, { value: 'HPC', label: 'HPC' }]}
               />
             </Field>
-            <Field label="형식" sx={{ width: 95 }}>
+            <Field label="Format" sx={{ width: 95 }}>
               <SelectInput
                 value={fType} disabled={fNet === 'HPC'} onChange={setFType}
-                options={[{ value: 'word', label: 'Word' }, { value: 'excel', label: 'Excel' }, { value: 'path', label: '경로' }]}
+                options={[{ value: 'word', label: 'Word' }, { value: 'excel', label: 'Excel' }, { value: 'path', label: 'Path' }]}
               />
             </Field>
-            <Field label={fNet === 'HPC' ? 'HPC vwp 경로' : '파일명'} sx={{ flex: 1 }}>
+            <Field label={fNet === 'HPC' ? 'HPC vwp path' : 'File name'} sx={{ flex: 1 }}>
               <TextInput
                 value={file}
                 onChange={(v) => { setFile(v); setErr(''); }}
@@ -353,12 +353,12 @@ function OverviewTab({
             </Field>
           </Row>
           {err && <Box sx={{ fontSize: 11, color: T.rd, margin: '-5px 0 10px' }}>{err}</Box>}
-          <Field label="변경 내용">
-            <TextInput value={note} onChange={setNote} placeholder="무엇이 바뀌었는지 한 줄로" />
+          <Field label="Change notes">
+            <TextInput value={note} onChange={setNote} placeholder="One line describing what changed" />
           </Field>
           <Box sx={{ display: 'flex', gap: '8px' }}>
             <AcroButton variant="primary" onClick={submitUpload}>
-              <Icon name="up" /> 작업본 올리기
+              <Icon name="up" /> Upload working copy
             </AcroButton>
             <AcroButton
               disabled={!d.versions.length}
@@ -378,7 +378,7 @@ function OverviewTab({
 function VersionsTab({ d, usersById }: { d: CanvasNode; usersById: Map<string, UserDto> }) {
   const list = d.versions;
   if (!list.length) {
-    return <Card sx={{ color: T.dm2, fontSize: 12 }}>아직 등록된 버전이 없습니다.</Card>;
+    return <Card sx={{ color: T.dm2, fontSize: 12 }}>No versions yet.</Card>;
   }
   return (
     <Box sx={{ perspective: '1000px', padding: '4px 0' }}>
@@ -403,13 +403,13 @@ function VersionsTab({ d, usersById }: { d: CanvasNode; usersById: Map<string, U
               bg={v.kind === 'major' ? T.tl2 : T.am2}
               borderColor={v.kind === 'major' ? T.tl3 : T.am3}
             >
-              {v.kind === 'major' ? 'RELEASE' : '작업본'}
+              {v.kind === 'major' ? 'RELEASE' : 'WORKING'}
             </Badge>
-            {i === 0 && <Chip>최신</Chip>}
+            {i === 0 && <Chip>Latest</Chip>}
           </Box>
           <Box sx={{ fontSize: 12, color: T.dm, mt: '4px' }}>{v.note}</Box>
           <Box sx={{ fontFamily: FONT_MONO, fontSize: 10, color: T.dm2, mt: '4px', wordBreak: 'break-all' }}>
-            {v.file || '(없음)'} · {usersById.get(v.by)?.name ?? '—'} · {fmtAt(v.at)}
+            {v.file || '(none)'} · {usersById.get(v.by)?.name ?? '—'} · {fmtAt(v.at)}
           </Box>
         </Box>
       ))}
@@ -431,7 +431,7 @@ function RecvTab({
   if (!own) {
     return (
       <Card>
-        <Ey sx={{ mb: '9px' }}>전달 받는 부서</Ey>
+        <Ey sx={{ mb: '9px' }}>Recipient department</Ey>
         {d.recvDept ? (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: '9px', padding: '9px 0' }}>
             <Badge color={T.dm} bg={T.sf2} borderColor={T.ln}>{departmentName(d.recvDept)}</Badge>
@@ -443,7 +443,7 @@ function RecvTab({
             )}
           </Box>
         ) : (
-          <Box sx={{ fontSize: 12.5, color: T.dm2 }}>지정된 전달 부서가 없습니다.</Box>
+          <Box sx={{ fontSize: 12.5, color: T.dm2 }}>No recipient department set.</Box>
         )}
       </Card>
     );
@@ -454,30 +454,30 @@ function RecvTab({
 
   return (
     <Card>
-      <Ey sx={{ mb: '9px' }}>전달 받는 부서</Ey>
+      <Ey sx={{ mb: '9px' }}>Recipient department</Ey>
       <Row>
-        <Field label="부서" sx={{ flex: 1, mb: 0 }}>
+        <Field label="Department" sx={{ flex: 1, mb: 0 }}>
           <SelectInput
             value={dept}
             onChange={(v) => { setDept(v); setContact(''); }}
-            options={[{ value: '', label: '지정 안 함' }, ...RECEIVABLE_DEPARTMENTS.map((dp) => ({ value: dp.id, label: dp.name }))]}
+            options={[{ value: '', label: 'Not set' }, ...RECEIVABLE_DEPARTMENTS.map((dp) => ({ value: dp.id, label: dp.name }))]}
           />
         </Field>
       </Row>
       <Row sx={{ mt: '11px' }}>
-        <Field label="개별 담당자" sx={{ flex: 1, mb: 0 }}>
+        <Field label="Individual contact" sx={{ flex: 1, mb: 0 }}>
           <SelectInput
             value={contact}
             onChange={setContact}
             options={[
-              { value: '', label: '지정 안 함' },
+              { value: '', label: 'Not set' },
               ...contacts.map((u) => ({ value: u.id, label: `${u.name} · ${departmentName(u.department)}` })),
             ]}
           />
         </Field>
       </Row>
       <AcroButton variant="primary" sx={{ mt: '11px' }} onClick={() => onSave({ recvDept: dept || null, recvContact: contact || null })}>
-        <Icon name="check" /> 저장
+        <Icon name="check" /> Save
       </AcroButton>
     </Card>
   );

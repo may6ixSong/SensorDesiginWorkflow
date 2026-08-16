@@ -258,7 +258,7 @@ export function Canvas({ ip, phases, usersById, canEdit, onSaveLayout }: Props) 
         b.phase = np;
         const blocks = allBlocks();
         if (laneOverflow(blocks, phases, s.phasePW, np)) reflowLane(blocks, phases, s.phasePW, np);
-        toast(`${(phases.find((p) => p.key === np) || { key: '' }).key} 구간으로 옮겼습니다`);
+        toast(`Moved to ${(phases.find((p) => p.key === np) || { key: '' }).key}`);
       }
       s.bumpBlocks();
       return;
@@ -273,7 +273,7 @@ export function Canvas({ ip, phases, usersById, canEdit, onSaveLayout }: Props) 
         ]);
       }
       s.setLink(null);
-      toast('연결했습니다');
+      toast('Linked');
       return;
     }
     if (st.getState().memos.some((m) => m.id === id)) {
@@ -369,7 +369,7 @@ export function Canvas({ ip, phases, usersById, canEdit, onSaveLayout }: Props) 
   };
   const handleCancel = () => {
     st.getState().cancelEdit();
-    toast('변경을 취소했습니다');
+    toast('Changes cancelled');
   };
   const handleAutoFit = () => {
     const s = st.getState();
@@ -382,7 +382,7 @@ export function Canvas({ ip, phases, usersById, canEdit, onSaveLayout }: Props) 
       }
     });
     s.setPhasePW(nextPW);
-    toast('재배치했습니다');
+    toast('Re-laid out');
   };
   const handleAddNote = () => {
     const s = st.getState();
@@ -393,14 +393,14 @@ export function Canvas({ ip, phases, usersById, canEdit, onSaveLayout }: Props) 
         id: `tmp-note-${Date.now()}`,
         ip: ip.id,
         phase: phases[0].key,
-        text: '새 메모',
+        text: 'New memo',
         x: snp(g.x + 46),
         y: 40 + 3 * 150,
         w: 160,
         h: 68,
       },
     ]);
-    toast('메모를 추가했습니다');
+    toast('Memo added');
   };
 
   const registerRef = useCallback((id: string, el: HTMLDivElement | null) => {
@@ -507,7 +507,7 @@ export function Canvas({ ip, phases, usersById, canEdit, onSaveLayout }: Props) 
             onDeleteEdge={(id) => {
               const s = st.getState();
               s.setEdges(s.edges.filter((x) => x.id !== id));
-              toast('연결을 지웠습니다');
+              toast('Link removed');
             }}
           />
 

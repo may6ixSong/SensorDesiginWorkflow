@@ -4,9 +4,9 @@ import { Stack, Typography } from '@mui/material';
 export function NoAccessPage() {
   return (
     <Stack alignItems="center" justifyContent="center" sx={{ height: '100vh' }} spacing={1}>
-      <Typography variant="h6">접근 권한이 없습니다</Typography>
+      <Typography variant="h6">No access</Typography>
       <Typography variant="body2" color="text.secondary">
-        이 IP에 대한 Edit 또는 View 권한이 없습니다. 관리자에게 권한을 요청하세요.
+        You don't have Edit or View access to this IP. Ask an administrator for access.
       </Typography>
     </Stack>
   );

@@ -35,7 +35,7 @@ export class IpAccessGuard implements CanActivate {
     const req = ctx.switchToHttp().getRequest();
     const me: UserDocument = req.user;
     const ip = await this.resolveIp(req);
-    if (!ip) throw new NotFoundException('IP를 찾을 수 없습니다.');
+    if (!ip) throw new NotFoundException('IP not found.');
 
     const meId = me._id.toString();
     const isOwner = ip.owners.some((o) => o.toString() === meId);
@@ -44,7 +44,7 @@ export class IpAccessGuard implements CanActivate {
 
     if (!hasAccess) {
       throw new ForbiddenException(
-        level === 'edit' ? 'Edit 권한(Analog 담당자)만 가능합니다.' : '이 IP에 대한 접근 권한이 없습니다.',
+        level === 'edit' ? 'Only Analog owners have Edit access.' : 'You do not have access to this IP.',
       );
     }
 
@@ -59,7 +59,7 @@ export class IpAccessGuard implements CanActivate {
     }
     if (params.id) {
       const deliverable = await this.deliverableModel.findById(params.id).exec();
-      if (!deliverable) throw new NotFoundException('산출물을 찾을 수 없습니다.');
+      if (!deliverable) throw new NotFoundException('Deliverable not found.');
       return this.ipModel.findById(deliverable.ipId).exec();
     }
     return null;

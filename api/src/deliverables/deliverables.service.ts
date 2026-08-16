@@ -31,7 +31,7 @@ export class DeliverablesService {
 
   async findOrThrow(id: string) {
     const d = await this.model.findById(id).exec();
-    if (!d) throw new NotFoundException('산출물을 찾을 수 없습니다.');
+    if (!d) throw new NotFoundException('Deliverable not found.');
     return d;
   }
 
@@ -78,14 +78,14 @@ export class DeliverablesService {
 
     if (dto.recvDept) {
       if (!(RECEIVABLE_DEPARTMENT_IDS as string[]).includes(dto.recvDept)) {
-        throw new BadRequestException('전달 부서는 Analog를 제외한 부서 중에서 선택해야 합니다.');
+        throw new BadRequestException('Recipient department must be a department other than Analog.');
       }
     }
 
     if (dto.recvContact) {
       const contact = await this.users.findById(dto.recvContact);
       if (!dto.recvDept || contact.department !== dto.recvDept) {
-        throw new BadRequestException('전달 담당자는 전달 부서 소속이어야 합니다.');
+        throw new BadRequestException('Recipient contact must belong to the recipient department.');
       }
     }
 
@@ -103,10 +103,10 @@ export class DeliverablesService {
   async addVersion(id: string, dto: AddVersionDto, actor: UserDocument) {
     const d = await this.findOrThrow(id);
     if (d.network === 'OA' && !dto.storageKey) {
-      throw new BadRequestException('OA 망 산출물은 storageKey가 필요합니다.');
+      throw new BadRequestException('OA-network deliverables require a storageKey.');
     }
     if (d.network === 'HPC' && !dto.hpcPath) {
-      throw new BadRequestException('HPC 망 산출물은 hpcPath가 필요합니다.');
+      throw new BadRequestException('HPC-network deliverables require an hpcPath.');
     }
 
     const latest = d.versions[0];
@@ -135,7 +135,7 @@ export class DeliverablesService {
     const d = await this.findOrThrow(id);
     const latest = d.versions[0];
     if (!latest) {
-      throw new BadRequestException('릴리스할 업로드된 버전이 없습니다.');
+      throw new BadRequestException('There is no uploaded version to release.');
     }
     const major = latest.major + 1;
     const version = {
@@ -162,7 +162,7 @@ export class DeliverablesService {
   async updateSchedule(originId: string, phaseKeys: string[], actor: UserDocument) {
     const origin = await this.findOrThrow(originId);
     if (origin.series) {
-      throw new BadRequestException('회차 인스턴스가 아닌 원본 산출물에서만 일정을 설정할 수 있습니다.');
+      throw new BadRequestException('The release schedule can only be set on the original deliverable, not a series instance.');
     }
 
     const existing = await this.model.find({ series: origin._id }).sort({ seriesIdx: 1 }).exec();

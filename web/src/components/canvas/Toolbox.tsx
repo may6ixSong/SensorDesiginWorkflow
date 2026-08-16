@@ -24,7 +24,7 @@ export function Toolbox({ canEdit, edit, onToggleEdit, onCancel, onAdd, onNote, 
     >
       <Group>
         <TbBtn
-          title={edit ? '편집 끝내기' : '배치 편집 시작'}
+          title={edit ? 'Finish editing' : 'Start layout edit'}
           icon={edit ? 'check' : 'edit'}
           on={edit}
           onClick={onToggleEdit}
@@ -33,12 +33,12 @@ export function Toolbox({ canEdit, edit, onToggleEdit, onCancel, onAdd, onNote, 
       {edit && (
         <>
           <Group>
-            <TbBtn title="변경 취소" icon="undo" danger onClick={onCancel} />
+            <TbBtn title="Cancel changes" icon="undo" danger onClick={onCancel} />
           </Group>
           <Group>
-            <TbBtn title="산출물 추가" icon="plus" onClick={onAdd} />
+            <TbBtn title="Add deliverable" icon="plus" onClick={onAdd} />
             <Sep />
-            <TbBtn title="메모 추가" icon="note" onClick={onNote} />
+            <TbBtn title="Add memo" icon="note" onClick={onNote} />
             <Sep />
             <TbBtn title="Auto Fit" icon="fit" onClick={onAutoFit} />
           </Group>

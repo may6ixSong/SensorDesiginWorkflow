@@ -18,7 +18,7 @@ export class UsersService {
 
   async findById(id: string | Types.ObjectId) {
     const user = await this.model.findById(id).exec();
-    if (!user) throw new NotFoundException('사용자를 찾을 수 없습니다.');
+    if (!user) throw new NotFoundException('User not found.');
     return user;
   }
 

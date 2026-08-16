@@ -17,7 +17,7 @@ export class AuthService {
 
   async devLogin(userId: string) {
     const user = await this.users.findById(userId);
-    if (!user.isActive) throw new UnauthorizedException('비활성 사용자입니다.');
+    if (!user.isActive) throw new UnauthorizedException('This user is inactive.');
     const accessToken = await this.jwt.signAsync({ sub: user._id.toString() });
     return { accessToken, user: toUserDto(user) };
   }

@@ -70,14 +70,14 @@ type MockUserKey = 'u1' | 'u2' | 'u3' | 'u4' | 'u5' | 'u6' | 'u7' | 'u8';
 
 /* ── 목업 USERS ── */
 const MOCK_USERS: { key: MockUserKey; empNo: string; name: string; dept: string; color: string }[] = [
-  { key: 'u1', empNo: '20180114', name: '김선우', dept: 'analog', color: '#0c9a83' },
-  { key: 'u2', empNo: '20190233', name: '박지훈', dept: 'analog', color: '#5849cf' },
-  { key: 'u3', empNo: '20200591', name: '이수민', dept: 'digital', color: '#2563c9' },
-  { key: 'u4', empNo: '20170842', name: '정하윤', dept: 'solution', color: '#ac6f08' },
-  { key: 'u5', empNo: '20210377', name: '최다인', dept: 'pte', color: '#c8352c' },
-  { key: 'u6', empNo: '20160925', name: '오세훈', dept: 'analog', color: '#3aa66b' },
-  { key: 'u7', empNo: '20220148', name: '한지연', dept: 'aps', color: '#b3521e' },
-  { key: 'u8', empNo: '20150663', name: '류다현', dept: 'pipd', color: '#7a4fbf' },
+  { key: 'u1', empNo: '20180114', name: 'Sunwoo Kim', dept: 'analog', color: '#0c9a83' },
+  { key: 'u2', empNo: '20190233', name: 'Jihoon Park', dept: 'analog', color: '#5849cf' },
+  { key: 'u3', empNo: '20200591', name: 'Sumin Lee', dept: 'digital', color: '#2563c9' },
+  { key: 'u4', empNo: '20170842', name: 'Hayoon Jung', dept: 'solution', color: '#ac6f08' },
+  { key: 'u5', empNo: '20210377', name: 'Dain Choi', dept: 'pte', color: '#c8352c' },
+  { key: 'u6', empNo: '20160925', name: 'Sehun Oh', dept: 'analog', color: '#3aa66b' },
+  { key: 'u7', empNo: '20220148', name: 'Jiyeon Han', dept: 'aps', color: '#b3521e' },
+  { key: 'u8', empNo: '20150663', name: 'Dahyun Ryu', dept: 'pipd', color: '#7a4fbf' },
 ];
 
 /* ── 목업 ITEMS (versions: [major,minor,kind,by,at,note,file]) ── */
@@ -99,78 +99,78 @@ interface MockItem {
 }
 
 const MOCK_ITEMS: MockItem[] = [
-  { id:'d01', ip:'ip1', phase:'KO', row:0, name:'PLL 요구사양 접수서', type:'word', net:'OA', recvDept:'digital', recvContact:'u3',
-    versions:[[1,0,'major','u1','2026-01-09 10:20','초판','PLL_req_v1.0.docx']] },
-  { id:'d02', ip:'ip1', phase:'ML1', row:0, name:'PLL 아키텍처 검토서', type:'word', net:'OA',
-    versions:[[1,0,'major','u1','2026-02-18 16:05','초판','PLL_arch_v1.0.docx']] },
-  { id:'d03', ip:'ip1', phase:'AR', row:0, name:'AR 리뷰 패키지', type:'word', net:'OA', recvDept:'digital', recvContact:'u3',
+  { id:'d01', ip:'ip1', phase:'KO', row:0, name:'PLL Requirements Intake', type:'word', net:'OA', recvDept:'digital', recvContact:'u3',
+    versions:[[1,0,'major','u1','2026-01-09 10:20','Initial draft','PLL_req_v1.0.docx']] },
+  { id:'d02', ip:'ip1', phase:'ML1', row:0, name:'PLL Architecture Review', type:'word', net:'OA',
+    versions:[[1,0,'major','u1','2026-02-18 16:05','Initial draft','PLL_arch_v1.0.docx']] },
+  { id:'d03', ip:'ip1', phase:'AR', row:0, name:'AR Review Package', type:'word', net:'OA', recvDept:'digital', recvContact:'u3',
     versions:[
-      [2,1,'minor','u1','2026-04-02 09:30','액션아이템 추가','PLL_AR_v2.1.docx'],
-      [2,0,'major','u1','2026-03-18 14:00','2차 릴리스','PLL_AR_v2.0.docx'],
-      [1,0,'major','u1','2026-03-12 11:20','초판','PLL_AR_v1.0.docx'],
+      [2,1,'minor','u1','2026-04-02 09:30','Added action items','PLL_AR_v2.1.docx'],
+      [2,0,'major','u1','2026-03-18 14:00','2nd release','PLL_AR_v2.0.docx'],
+      [1,0,'major','u1','2026-03-12 11:20','Initial draft','PLL_AR_v1.0.docx'],
     ] },
-  { id:'d04', ip:'ip1', phase:'ML2', row:0, name:'회로 설계 문서', type:'word', net:'OA',
-    versions:[[1,0,'major','u1','2026-04-22 17:40','1차 릴리스','PLL_ckt_design_v1.0.docx']] },
-  { id:'d05', ip:'ip1', phase:'ML2', row:1, name:'Loop Filter 계산서', type:'excel', net:'OA',
-    versions:[[1,0,'major','u1','2026-04-21 13:10','1차','PLL_loopfilter_v1.0.xlsx']] },
-  { id:'d06', ip:'ip1', phase:'ML3', row:0, name:'Pre-layout 시뮬 결과', type:'excel', net:'OA', recvDept:'pte', recvContact:'u5',
+  { id:'d04', ip:'ip1', phase:'ML2', row:0, name:'Circuit Design Document', type:'word', net:'OA',
+    versions:[[1,0,'major','u1','2026-04-22 17:40','1st release','PLL_ckt_design_v1.0.docx']] },
+  { id:'d05', ip:'ip1', phase:'ML2', row:1, name:'Loop Filter Calculation Sheet', type:'excel', net:'OA',
+    versions:[[1,0,'major','u1','2026-04-21 13:10','1st release','PLL_loopfilter_v1.0.xlsx']] },
+  { id:'d06', ip:'ip1', phase:'ML3', row:0, name:'Pre-layout Simulation Results', type:'excel', net:'OA', recvDept:'pte', recvContact:'u5',
     versions:[
       [1,2,'minor','u1','2026-06-08 21:15','SS/FF corner','PLL_prelay_sim_v1.2.xlsx'],
-      [1,0,'major','u1','2026-06-03 10:40','1차','PLL_prelay_sim_v1.0.xlsx'],
+      [1,0,'major','u1','2026-06-03 10:40','1st release','PLL_prelay_sim_v1.0.xlsx'],
     ] },
   { id:'d07', ip:'ip1', phase:'ML3', row:1, name:'Netlist / PEX', type:'path', net:'HPC',
-    versions:[[1,0,'major','u1','2026-06-04 19:55','RC 추출','/vwp/cis_a7/pll_main/pex/r1']] },
-  { id:'d08', ip:'ip1', phase:'MDR', row:0, name:'설계 리뷰 패키지', type:'word', net:'OA',
+    versions:[[1,0,'major','u1','2026-06-04 19:55','RC extraction','/vwp/cis_a7/pll_main/pex/r1']] },
+  { id:'d08', ip:'ip1', phase:'MDR', row:0, name:'Design Review Package', type:'word', net:'OA',
     series:'d08', seriesIdx:1, seriesTotal:3, recvDept:'digital', recvContact:'u3',
-    versions:[[1,0,'major','u1','2026-07-02 14:10','MDR 시점 릴리스','PLL_review_v1.0.docx']] },
-  { id:'d08_ML4', ip:'ip1', phase:'ML4', row:1, name:'설계 리뷰 패키지', type:'word', net:'OA',
+    versions:[[1,0,'major','u1','2026-07-02 14:10','Released at MDR','PLL_review_v1.0.docx']] },
+  { id:'d08_ML4', ip:'ip1', phase:'ML4', row:1, name:'Design Review Package', type:'word', net:'OA',
     series:'d08', seriesIdx:2, seriesTotal:3, recvDept:'digital', recvContact:'u3',
-    versions:[[1,2,'minor','u1','2026-08-06 18:22','ML4 지적사항 반영중','PLL_review_v1.2.docx']] },
-  { id:'d08_FDR', ip:'ip1', phase:'FDR', row:1, name:'설계 리뷰 패키지', type:'word', net:'OA',
+    versions:[[1,2,'minor','u1','2026-08-06 18:22','Addressing ML4 review comments','PLL_review_v1.2.docx']] },
+  { id:'d08_FDR', ip:'ip1', phase:'FDR', row:1, name:'Design Review Package', type:'word', net:'OA',
     series:'d08', seriesIdx:3, seriesTotal:3, recvDept:'digital', recvContact:'u3', versions:[] },
-  { id:'d09', ip:'ip1', phase:'ML4', row:0, name:'Post-layout 시뮬 결과', type:'excel', net:'OA', versions:[] },
+  { id:'d09', ip:'ip1', phase:'ML4', row:0, name:'Post-layout Simulation Results', type:'excel', net:'OA', versions:[] },
   { id:'d10', ip:'ip1', phase:'ML4', row:1, name:'Layout DB', type:'path', net:'HPC', versions:[] },
-  { id:'d11', ip:'ip1', phase:'FDR', row:0, name:'FDR 체크리스트', type:'word', net:'OA', recvDept:'digital', recvContact:'u3', versions:[] },
-  { id:'d12', ip:'ip1', phase:'MTO', row:0, name:'MTO 서명 시트', type:'excel', net:'OA', recvDept:'pte', recvContact:'u5', versions:[] },
-  { id:'d13', ip:'ip1', phase:'FABOUT', row:0, name:'Fab out 특성 평가 계획', type:'word', net:'OA', versions:[] },
+  { id:'d11', ip:'ip1', phase:'FDR', row:0, name:'FDR Checklist', type:'word', net:'OA', recvDept:'digital', recvContact:'u3', versions:[] },
+  { id:'d12', ip:'ip1', phase:'MTO', row:0, name:'MTO Sign-off Sheet', type:'excel', net:'OA', recvDept:'pte', recvContact:'u5', versions:[] },
+  { id:'d13', ip:'ip1', phase:'FABOUT', row:0, name:'Fab-out Characterization Plan', type:'word', net:'OA', versions:[] },
 
-  { id:'e01', ip:'ip2', phase:'KO', row:0, name:'LDO 요구사양 접수서', type:'word', net:'OA', recvDept:'solution', recvContact:'u4',
-    versions:[[1,0,'major','u1','2026-01-10 09:40','초판','LDO_req_v1.0.docx']] },
-  { id:'e02', ip:'ip2', phase:'ML1', row:0, name:'전원 트리 검토서', type:'word', net:'OA',
-    versions:[[1,0,'major','u1','2026-02-19 15:10','초판','LDO_powertree_v1.0.docx']] },
-  { id:'e03', ip:'ip2', phase:'AR', row:0, name:'AR 리뷰 패키지', type:'word', net:'OA',
-    versions:[[1,0,'major','u1','2026-03-17 11:35','1차','LDO_AR_v1.0.docx']] },
-  { id:'e04', ip:'ip2', phase:'ML3', row:0, name:'Load/Line Regulation 시뮬', type:'excel', net:'OA',
-    versions:[[1,2,'minor','u1','2026-08-09 17:31','부하 스텝 추가','LDO_reg_v1.2.xlsx']] },
-  { id:'e05', ip:'ip2', phase:'ML3', row:1, name:'Startup 시퀀스 파형', type:'path', net:'HPC',
-    versions:[[1,0,'major','u1','2026-06-10 22:05','트랜지언트','/vwp/cis_a7/ldo_core/tran/startup']] },
-  { id:'e06', ip:'ip2', phase:'MDR', row:0, name:'MDR 리뷰 패키지', type:'word', net:'OA', versions:[] },
-  { id:'e07', ip:'ip2', phase:'ML4', row:0, name:'Post-layout 재검증', type:'excel', net:'OA', versions:[] },
-  { id:'e08', ip:'ip2', phase:'FDR', row:0, name:'신뢰성 검토서', type:'word', net:'OA', recvDept:'solution', recvContact:'u4', versions:[] },
-  { id:'e09', ip:'ip2', phase:'FABOUT', row:0, name:'양산 이관 패키지', type:'word', net:'OA', recvDept:'solution', recvContact:'u4', versions:[] },
+  { id:'e01', ip:'ip2', phase:'KO', row:0, name:'LDO Requirements Intake', type:'word', net:'OA', recvDept:'solution', recvContact:'u4',
+    versions:[[1,0,'major','u1','2026-01-10 09:40','Initial draft','LDO_req_v1.0.docx']] },
+  { id:'e02', ip:'ip2', phase:'ML1', row:0, name:'Power Tree Review', type:'word', net:'OA',
+    versions:[[1,0,'major','u1','2026-02-19 15:10','Initial draft','LDO_powertree_v1.0.docx']] },
+  { id:'e03', ip:'ip2', phase:'AR', row:0, name:'AR Review Package', type:'word', net:'OA',
+    versions:[[1,0,'major','u1','2026-03-17 11:35','1st release','LDO_AR_v1.0.docx']] },
+  { id:'e04', ip:'ip2', phase:'ML3', row:0, name:'Load/Line Regulation Simulation', type:'excel', net:'OA',
+    versions:[[1,2,'minor','u1','2026-08-09 17:31','Added load step','LDO_reg_v1.2.xlsx']] },
+  { id:'e05', ip:'ip2', phase:'ML3', row:1, name:'Startup Sequence Waveform', type:'path', net:'HPC',
+    versions:[[1,0,'major','u1','2026-06-10 22:05','Transient','/vwp/cis_a7/ldo_core/tran/startup']] },
+  { id:'e06', ip:'ip2', phase:'MDR', row:0, name:'MDR Review Package', type:'word', net:'OA', versions:[] },
+  { id:'e07', ip:'ip2', phase:'ML4', row:0, name:'Post-layout Re-verification', type:'excel', net:'OA', versions:[] },
+  { id:'e08', ip:'ip2', phase:'FDR', row:0, name:'Reliability Review', type:'word', net:'OA', recvDept:'solution', recvContact:'u4', versions:[] },
+  { id:'e09', ip:'ip2', phase:'FABOUT', row:0, name:'Mass Production Handover Package', type:'word', net:'OA', recvDept:'solution', recvContact:'u4', versions:[] },
 
-  { id:'f01', ip:'ip3', phase:'KO', row:0, name:'ADC 요구사양 접수서', type:'word', net:'OA', recvDept:'pte', recvContact:'u5',
-    versions:[[1,0,'major','u2','2026-01-08 13:50','초판','ADC_req_v1.0.docx']] },
-  { id:'f02', ip:'ip3', phase:'AR', row:0, name:'아키텍처 리뷰 자료', type:'word', net:'OA',
-    versions:[[2,0,'major','u2','2026-03-19 16:30','Ramp 확정','ADC_arch_v2.0.docx']] },
-  { id:'f03', ip:'ip3', phase:'ML2', row:0, name:'INL/DNL 시뮬 결과', type:'excel', net:'OA',
-    versions:[[2,0,'major','u2','2026-04-23 09:44','2차','ADC_inl_dnl_v2.0.xlsx']] },
-  { id:'f04', ip:'ip3', phase:'ML3', row:0, name:'Noise 분석 리포트', type:'excel', net:'OA',
+  { id:'f01', ip:'ip3', phase:'KO', row:0, name:'ADC Requirements Intake', type:'word', net:'OA', recvDept:'pte', recvContact:'u5',
+    versions:[[1,0,'major','u2','2026-01-08 13:50','Initial draft','ADC_req_v1.0.docx']] },
+  { id:'f02', ip:'ip3', phase:'AR', row:0, name:'Architecture Review Material', type:'word', net:'OA',
+    versions:[[2,0,'major','u2','2026-03-19 16:30','Ramp finalized','ADC_arch_v2.0.docx']] },
+  { id:'f03', ip:'ip3', phase:'ML2', row:0, name:'INL/DNL Simulation Results', type:'excel', net:'OA',
+    versions:[[2,0,'major','u2','2026-04-23 09:44','2nd release','ADC_inl_dnl_v2.0.xlsx']] },
+  { id:'f04', ip:'ip3', phase:'ML3', row:0, name:'Noise Analysis Report', type:'excel', net:'OA',
     versions:[[1,1,'minor','u2','2026-08-10 11:02','kTC noise','ADC_noise_v1.1.xlsx']] },
   { id:'f05', ip:'ip3', phase:'ML3', row:1, name:'Column Layout DB', type:'path', net:'HPC',
-    versions:[[1,0,'major','u2','2026-06-05 20:40','레이아웃 프리즈','/vwp/cis_a7/adc_ramp/layout/r1']] },
-  { id:'f06', ip:'ip3', phase:'MDR', row:0, name:'MDR 리뷰 패키지', type:'word', net:'OA', versions:[] },
-  { id:'f07', ip:'ip3', phase:'ML4', row:0, name:'Post-layout 재검증', type:'excel', net:'OA', versions:[] },
-  { id:'f08', ip:'ip3', phase:'FDR', row:0, name:'FDR 체크리스트', type:'word', net:'OA', recvDept:'pte', recvContact:'u5', versions:[] },
-  { id:'f09', ip:'ip3', phase:'MTO', row:0, name:'MTO 서명 시트', type:'excel', net:'OA', versions:[] },
+    versions:[[1,0,'major','u2','2026-06-05 20:40','Layout freeze','/vwp/cis_a7/adc_ramp/layout/r1']] },
+  { id:'f06', ip:'ip3', phase:'MDR', row:0, name:'MDR Review Package', type:'word', net:'OA', versions:[] },
+  { id:'f07', ip:'ip3', phase:'ML4', row:0, name:'Post-layout Re-verification', type:'excel', net:'OA', versions:[] },
+  { id:'f08', ip:'ip3', phase:'FDR', row:0, name:'FDR Checklist', type:'word', net:'OA', recvDept:'pte', recvContact:'u5', versions:[] },
+  { id:'f09', ip:'ip3', phase:'MTO', row:0, name:'MTO Sign-off Sheet', type:'excel', net:'OA', versions:[] },
 ];
 
 const MOCK_NOTES = [
-  { id:'n1', ip:'ip1', phase:'ML2', row:2, text:'디지털팀 CDC 검토 회신 후 Post-layout 착수' },
-  { id:'n2', ip:'ip1', phase:'ML4', row:2, text:'검증팀 리뷰 결과를 FDR 체크리스트에 반영' },
-  { id:'n3', ip:'ip1', phase:'FABOUT', row:1, text:'→ 제품기술팀·양산기술팀으로 최종 전달' },
-  { id:'n4', ip:'ip2', phase:'ML4', row:1, text:'MP 이관 전 신뢰성 항목(HTOL) 확인 필요' },
-  { id:'n5', ip:'ip3', phase:'ML3', row:2, text:'레이아웃 DB는 HPC망에만 존재 — 경로만 전달' },
+  { id:'n1', ip:'ip1', phase:'ML2', row:2, text:'Start post-layout once Digital team returns CDC review' },
+  { id:'n2', ip:'ip1', phase:'ML4', row:2, text:'Reflect Verification team review results in the FDR checklist' },
+  { id:'n3', ip:'ip1', phase:'FABOUT', row:1, text:'→ Final handoff to Product Engineering & MP Engineering' },
+  { id:'n4', ip:'ip2', phase:'ML4', row:1, text:'Reliability item (HTOL) must be confirmed before MP handover' },
+  { id:'n5', ip:'ip3', phase:'ML3', row:2, text:'Layout DB exists only on the HPC network — path shared only' },
 ];
 
 /** 목업 EDGES. 역방향 쌍(g7/g7r)이 곧 양방향 표현이므로 그대로 옮긴다. */
@@ -192,42 +192,42 @@ const MOCK_EDGES: { id: string; from: string; to: string; auto?: boolean }[] = [
 
 interface MockHldItem { ver: string; file: string; at: string; cmt: string }
 const MOCK_HLDS: { id:string; ip:string; ver:string; date:string; by:MockUserKey; note:string; items:Record<string,MockHldItem> }[] = [
-  { id:'hl1', ip:'ip1', ver:'1.0', date:'2026-03-20', by:'u1', note:'AR 통과 시점 1차 HLD 확정', items:{
-    d01:{ver:'1.0',file:'PLL_req_v1.0.docx',at:'2026-01-09 10:20',cmt:'초판 릴리스'},
-    d02:{ver:'1.0',file:'PLL_arch_v1.0.docx',at:'2026-02-18 16:05',cmt:'초판 릴리스'},
-    d03:{ver:'1.0',file:'PLL_AR_v1.0.docx',at:'2026-03-12 11:20',cmt:'리뷰 전 초판'},
+  { id:'hl1', ip:'ip1', ver:'1.0', date:'2026-03-20', by:'u1', note:'First HLD finalized at AR pass', items:{
+    d01:{ver:'1.0',file:'PLL_req_v1.0.docx',at:'2026-01-09 10:20',cmt:'Initial release'},
+    d02:{ver:'1.0',file:'PLL_arch_v1.0.docx',at:'2026-02-18 16:05',cmt:'Initial release'},
+    d03:{ver:'1.0',file:'PLL_AR_v1.0.docx',at:'2026-03-12 11:20',cmt:'Draft before review'},
   }},
-  { id:'hl2', ip:'ip1', ver:'2.0', date:'2026-06-12', by:'u1', note:'ML3 완료 · 회로/시뮬 결과 반영', items:{
-    d01:{ver:'1.0',file:'PLL_req_v1.0.docx',at:'2026-01-09 10:20',cmt:'초판 릴리스'},
-    d02:{ver:'1.0',file:'PLL_arch_v1.0.docx',at:'2026-02-18 16:05',cmt:'초판 릴리스'},
-    d03:{ver:'2.0',file:'PLL_AR_v2.0.docx',at:'2026-03-18 14:00',cmt:'2차 릴리스 — 아키텍처 확정'},
-    d04:{ver:'1.0',file:'PLL_ckt_design_v1.0.docx',at:'2026-04-22 17:40',cmt:'1차 릴리스'},
-    d05:{ver:'1.0',file:'PLL_loopfilter_v1.0.xlsx',at:'2026-04-21 13:10',cmt:'1차 릴리스'},
-    d06:{ver:'1.0',file:'PLL_prelay_sim_v1.0.xlsx',at:'2026-06-03 10:40',cmt:'1차 릴리스'},
-    d07:{ver:'1.0',file:'/vwp/cis_a7/pll_main/pex/r1',at:'2026-06-04 19:55',cmt:'RC 추출 완료'},
+  { id:'hl2', ip:'ip1', ver:'2.0', date:'2026-06-12', by:'u1', note:'ML3 complete · circuit/simulation results reflected', items:{
+    d01:{ver:'1.0',file:'PLL_req_v1.0.docx',at:'2026-01-09 10:20',cmt:'Initial release'},
+    d02:{ver:'1.0',file:'PLL_arch_v1.0.docx',at:'2026-02-18 16:05',cmt:'Initial release'},
+    d03:{ver:'2.0',file:'PLL_AR_v2.0.docx',at:'2026-03-18 14:00',cmt:'2nd release — architecture finalized'},
+    d04:{ver:'1.0',file:'PLL_ckt_design_v1.0.docx',at:'2026-04-22 17:40',cmt:'1st release'},
+    d05:{ver:'1.0',file:'PLL_loopfilter_v1.0.xlsx',at:'2026-04-21 13:10',cmt:'1st release'},
+    d06:{ver:'1.0',file:'PLL_prelay_sim_v1.0.xlsx',at:'2026-06-03 10:40',cmt:'1st release'},
+    d07:{ver:'1.0',file:'/vwp/cis_a7/pll_main/pex/r1',at:'2026-06-04 19:55',cmt:'RC extraction complete'},
   }},
-  { id:'hl3', ip:'ip2', ver:'1.0', date:'2026-03-25', by:'u1', note:'LDO 1차 HLD', items:{
-    e01:{ver:'1.0',file:'LDO_req_v1.0.docx',at:'2026-01-10 09:40',cmt:'초판 릴리스'},
-    e02:{ver:'1.0',file:'LDO_powertree_v1.0.docx',at:'2026-02-19 15:10',cmt:'초판 릴리스'},
-    e03:{ver:'1.0',file:'LDO_AR_v1.0.docx',at:'2026-03-17 11:35',cmt:'1차 릴리스'},
+  { id:'hl3', ip:'ip2', ver:'1.0', date:'2026-03-25', by:'u1', note:'LDO first HLD', items:{
+    e01:{ver:'1.0',file:'LDO_req_v1.0.docx',at:'2026-01-10 09:40',cmt:'Initial release'},
+    e02:{ver:'1.0',file:'LDO_powertree_v1.0.docx',at:'2026-02-19 15:10',cmt:'Initial release'},
+    e03:{ver:'1.0',file:'LDO_AR_v1.0.docx',at:'2026-03-17 11:35',cmt:'1st release'},
   }},
-  { id:'hl4', ip:'ip2', ver:'2.0', date:'2026-06-18', by:'u1', note:'Regulation·Startup 결과 추가', items:{
-    e01:{ver:'1.0',file:'LDO_req_v1.0.docx',at:'2026-01-10 09:40',cmt:'초판 릴리스'},
-    e02:{ver:'1.0',file:'LDO_powertree_v1.0.docx',at:'2026-02-19 15:10',cmt:'초판 릴리스'},
-    e03:{ver:'1.0',file:'LDO_AR_v1.0.docx',at:'2026-03-17 11:35',cmt:'1차 릴리스'},
-    e04:{ver:'1.0',file:'LDO_reg_v1.0.xlsx',at:'2026-06-02 14:20',cmt:'1차 릴리스'},
-    e05:{ver:'1.0',file:'/vwp/cis_a7/ldo_core/tran/startup',at:'2026-06-10 22:05',cmt:'트랜지언트 결과 저장'},
+  { id:'hl4', ip:'ip2', ver:'2.0', date:'2026-06-18', by:'u1', note:'Added regulation/startup results', items:{
+    e01:{ver:'1.0',file:'LDO_req_v1.0.docx',at:'2026-01-10 09:40',cmt:'Initial release'},
+    e02:{ver:'1.0',file:'LDO_powertree_v1.0.docx',at:'2026-02-19 15:10',cmt:'Initial release'},
+    e03:{ver:'1.0',file:'LDO_AR_v1.0.docx',at:'2026-03-17 11:35',cmt:'1st release'},
+    e04:{ver:'1.0',file:'LDO_reg_v1.0.xlsx',at:'2026-06-02 14:20',cmt:'1st release'},
+    e05:{ver:'1.0',file:'/vwp/cis_a7/ldo_core/tran/startup',at:'2026-06-10 22:05',cmt:'Transient results saved'},
   }},
-  { id:'hl5', ip:'ip3', ver:'1.0', date:'2026-03-25', by:'u2', note:'ADC 1차 HLD', items:{
-    f01:{ver:'1.0',file:'ADC_req_v1.0.docx',at:'2026-01-08 13:50',cmt:'초판 릴리스'},
-    f02:{ver:'1.0',file:'ADC_arch_v1.0.docx',at:'2026-03-11 10:15',cmt:'초판'},
+  { id:'hl5', ip:'ip3', ver:'1.0', date:'2026-03-25', by:'u2', note:'ADC first HLD', items:{
+    f01:{ver:'1.0',file:'ADC_req_v1.0.docx',at:'2026-01-08 13:50',cmt:'Initial release'},
+    f02:{ver:'1.0',file:'ADC_arch_v1.0.docx',at:'2026-03-11 10:15',cmt:'Initial draft'},
   }},
-  { id:'hl6', ip:'ip3', ver:'2.0', date:'2026-06-20', by:'u2', note:'Ramp 방식 확정 · 레이아웃 프리즈', items:{
-    f01:{ver:'1.0',file:'ADC_req_v1.0.docx',at:'2026-01-08 13:50',cmt:'초판 릴리스'},
-    f02:{ver:'2.0',file:'ADC_arch_v2.0.docx',at:'2026-03-19 16:30',cmt:'2차 릴리스 — Ramp 방식 확정'},
-    f03:{ver:'2.0',file:'ADC_inl_dnl_v2.0.xlsx',at:'2026-04-23 09:44',cmt:'2차 릴리스'},
-    f04:{ver:'1.0',file:'ADC_noise_v1.0.xlsx',at:'2026-06-01 17:25',cmt:'1차 릴리스'},
-    f05:{ver:'1.0',file:'/vwp/cis_a7/adc_ramp/layout/r1',at:'2026-06-05 20:40',cmt:'레이아웃 프리즈'},
+  { id:'hl6', ip:'ip3', ver:'2.0', date:'2026-06-20', by:'u2', note:'Ramp scheme finalized · layout freeze', items:{
+    f01:{ver:'1.0',file:'ADC_req_v1.0.docx',at:'2026-01-08 13:50',cmt:'Initial release'},
+    f02:{ver:'2.0',file:'ADC_arch_v2.0.docx',at:'2026-03-19 16:30',cmt:'2nd release — Ramp scheme finalized'},
+    f03:{ver:'2.0',file:'ADC_inl_dnl_v2.0.xlsx',at:'2026-04-23 09:44',cmt:'2nd release'},
+    f04:{ver:'1.0',file:'ADC_noise_v1.0.xlsx',at:'2026-06-01 17:25',cmt:'1st release'},
+    f05:{ver:'1.0',file:'/vwp/cis_a7/adc_ramp/layout/r1',at:'2026-06-05 20:40',cmt:'Layout freeze'},
   }},
 ];
 
@@ -260,15 +260,15 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
 
   /* ── Projects (Phase는 두 과제 공통) ── */
   const p1 = await ProjectModel.create({
-    code: 'CIS-A7', name: '50MP 모바일 CIS', domain: 'ANALOG', phases: COM_PH, status: 'ACTIVE',
+    code: 'CIS-A7', name: '50MP Mobile CIS', domain: 'ANALOG', phases: COM_PH, status: 'ACTIVE',
   });
   const p2 = await ProjectModel.create({
-    code: 'CIS-B3', name: '8MP 오토모티브 CIS', domain: 'ANALOG', phases: COM_PH, status: 'ACTIVE',
+    code: 'CIS-B3', name: '8MP Automotive CIS', domain: 'ANALOG', phases: COM_PH, status: 'ACTIVE',
   });
 
   /* ── IPs ── */
   const ip1 = await IpModel.create({
-    projectId: p1._id, name: 'PLL_MAIN', description: '메인 클럭 생성 PLL',
+    projectId: p1._id, name: 'PLL_MAIN', description: 'Main clock generation PLL',
     owners: [U.u1],
     viewGrants: [
       { userId: U.u3, department: 'digital', grantedAt: new Date() },
@@ -277,13 +277,13 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
     color: '#0c9a83',
   });
   const ip2 = await IpModel.create({
-    projectId: p1._id, name: 'LDO_CORE', description: '코어 전원 레귤레이터',
+    projectId: p1._id, name: 'LDO_CORE', description: 'Core power regulator',
     owners: [U.u1],
     viewGrants: [{ userId: U.u4, department: 'solution', grantedAt: new Date() }],
     color: '#5849cf',
   });
   const ip3 = await IpModel.create({
-    projectId: p1._id, name: 'ADC_RAMP', description: 'Ramp 방식 컬럼 ADC',
+    projectId: p1._id, name: 'ADC_RAMP', description: 'Ramp-type column ADC',
     owners: [U.u2],
     viewGrants: [
       { userId: U.u5, department: 'pte', grantedAt: new Date() },
@@ -375,7 +375,7 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
 
   // eslint-disable-next-line no-console
   console.log(
-    `Seed 완료(목업 v15 기준): users=${MOCK_USERS.length}, projects=2, ips=3, ` +
+    `Seed complete (mockup v15 baseline): users=${MOCK_USERS.length}, projects=2, ips=3, ` +
       `deliverables=${MOCK_ITEMS.length}, memos=${MOCK_NOTES.length}, edges=${MOCK_EDGES.length}, hlds=${MOCK_HLDS.length}`,
   );
 }

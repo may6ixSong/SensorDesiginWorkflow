@@ -23,9 +23,9 @@ export function PhaseInfoDialog({ ipName, phase: p, nodes, onClose, onOpenRow }:
   const st = new Date(p.start);
   const en = new Date(p.end);
   const state =
-    t < st ? { t: '예정', c: T.dm, b: T.sf2, d: T.ln }
-    : t > en ? { t: '완료', c: T.dm, b: T.sf2, d: T.ln }
-    : { t: '진행 중', c: T.tl, b: T.tl2, d: T.tl3 };
+    t < st ? { t: 'Upcoming', c: T.dm, b: T.sf2, d: T.ln }
+    : t > en ? { t: 'Done', c: T.dm, b: T.sf2, d: T.ln }
+    : { t: 'In progress', c: T.tl, b: T.tl2, d: T.tl3 };
   const rel = ds.filter((d) => latR(d)).length;
 
   const stat = (label: string, value: string, color?: string) => (
@@ -52,13 +52,13 @@ export function PhaseInfoDialog({ ipName, phase: p, nodes, onClose, onOpenRow }:
       }
     >
       <Row sx={{ mb: '13px' }}>
-        {stat('시작', p.start)}
-        {stat('종료', p.end)}
-        {stat('기간', `${days}일`)}
+        {stat('Start', p.start)}
+        {stat('End', p.end)}
+        {stat('Duration', `${days}d`)}
         {stat('Released', `${rel}/${ds.length}`, T.tl)}
       </Row>
       <Card>
-        <Ey sx={{ mb: '10px' }}>주요 산출물</Ey>
+        <Ey sx={{ mb: '10px' }}>Key Deliverables</Ey>
         {ds.length ? (
           ds.map((d) => {
             const s = stOf(d);
@@ -98,7 +98,7 @@ export function PhaseInfoDialog({ ipName, phase: p, nodes, onClose, onOpenRow }:
             );
           })
         ) : (
-          <Box sx={{ fontSize: 12.5, color: T.dm2 }}>산출물 없음</Box>
+          <Box sx={{ fontSize: 12.5, color: T.dm2 }}>No deliverables</Box>
         )}
       </Card>
     </ModalShell>

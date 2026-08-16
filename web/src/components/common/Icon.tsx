@@ -5,7 +5,8 @@
 export type IconName =
   | 'word' | 'excel' | 'path' | 'lock' | 'eye' | 'edit' | 'check' | 'plus' | 'x'
   | 'up' | 'dn' | 'send' | 'shield' | 'users' | 'trash' | 'note' | 'copy'
-  | 'pan' | 'grid' | 'undo' | 'expand' | 'fit' | 'hist' | 'link' | 'search' | 'list';
+  | 'pan' | 'grid' | 'undo' | 'expand' | 'fit' | 'hist' | 'link' | 'search' | 'list'
+  | 'sun' | 'moon';
 
 const P: Record<IconName, { d: string; s: number }> = {
   word: { s: 14, d: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/>' },
@@ -34,6 +35,8 @@ const P: Record<IconName, { d: string; s: number }> = {
   search: { s: 13, d: '<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>' },
   list: { s: 14, d: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>' },
   link: { s: 13, d: '<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>' },
+  sun: { s: 14, d: '<circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.6M12 18.9v2.6M4.9 4.9l1.9 1.9M17.2 17.2l1.9 1.9M2.5 12h2.6M18.9 12h2.6M4.9 19.1l1.9-1.9M17.2 6.8l1.9-1.9"/>' },
+  moon: { s: 14, d: '<path d="M20.5 14.5A8.5 8.5 0 1 1 9.5 3.5a7 7 0 0 0 11 11z"/>' },
 };
 
 export function Icon({ name, size }: { name: IconName; size?: number }) {
@@ -61,18 +64,18 @@ export function DocIcon({ type, size }: { type: string; size?: number }) {
   return <Icon name={name} size={size} />;
 }
 
-/** 상단바 ACRO 로고 (목업 .mark SVG 그대로) */
+/** 상단바 ACRO 로고 (목업 .mark SVG 그대로, 색상만 테마 변수로) */
 export function AcroMark({ size = 28 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 32 32" fill="none" aria-label="Acro" style={{ flex: '0 0 auto', display: 'block' }}>
-      <path d="M16 29V13" stroke="#0c9a83" strokeWidth="2.2" strokeLinecap="round" />
-      <path d="M16 20.5 L9.5 15M16 17 L22.5 11.5M16 24 L21.5 19.5" stroke="#0c9a83" strokeWidth="1.7" strokeLinecap="round" />
-      <circle cx="16" cy="9.5" r="4.6" fill="#e0f5f0" stroke="#0c9a83" strokeWidth="1.5" />
-      <circle cx="8.6" cy="14.2" r="3.1" fill="#e0f5f0" stroke="#0c9a83" strokeWidth="1.4" />
-      <circle cx="23.4" cy="10.6" r="2.8" fill="#e0f5f0" stroke="#0c9a83" strokeWidth="1.4" />
-      <circle cx="22.4" cy="18.8" r="2.4" fill="#e0f5f0" stroke="#0c9a83" strokeWidth="1.3" />
-      <circle cx="16" cy="9.5" r="1.5" fill="#0c9a83" />
-      <path d="M12 29h8" stroke="#0c9a83" strokeWidth="2" strokeLinecap="round" />
+      <path d="M16 29V13" stroke="var(--acro-tl)" strokeWidth="2.2" strokeLinecap="round" />
+      <path d="M16 20.5 L9.5 15M16 17 L22.5 11.5M16 24 L21.5 19.5" stroke="var(--acro-tl)" strokeWidth="1.7" strokeLinecap="round" />
+      <circle cx="16" cy="9.5" r="4.6" fill="var(--acro-tl2)" stroke="var(--acro-tl)" strokeWidth="1.5" />
+      <circle cx="8.6" cy="14.2" r="3.1" fill="var(--acro-tl2)" stroke="var(--acro-tl)" strokeWidth="1.4" />
+      <circle cx="23.4" cy="10.6" r="2.8" fill="var(--acro-tl2)" stroke="var(--acro-tl)" strokeWidth="1.4" />
+      <circle cx="22.4" cy="18.8" r="2.4" fill="var(--acro-tl2)" stroke="var(--acro-tl)" strokeWidth="1.3" />
+      <circle cx="16" cy="9.5" r="1.5" fill="var(--acro-tl)" />
+      <path d="M12 29h8" stroke="var(--acro-tl)" strokeWidth="2" strokeLinecap="round" />
     </svg>
   );
 }

@@ -2,12 +2,16 @@ import { Box } from '@mui/material';
 import { UserDto } from '@/types/domain';
 import { T } from '@/theme/tokens';
 
-/**
- * 목업 av(u,s) 그대로 — 사용자 색상 배경 + 이름의 두 번째 글자.
- * (한국 이름 기준: 김선우 → "선")
- */
+/** "Sunwoo Kim" → "SK" — first letter of up to the first two space-separated words. */
+export function initials(name: string | undefined | null): string {
+  if (!name) return '?';
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return '?';
+  return parts.slice(0, 2).map((p) => p[0]).join('').toUpperCase();
+}
+
+/** User avatar chip — background is the user's assigned color, label is their initials. */
 export function UserAvatar({ user, size = 26 }: { user?: UserDto | null; size?: number }) {
-  const label = user?.name ? user.name.slice(1, 2) || user.name.slice(0, 1) : '?';
   return (
     <Box
       component="span"
@@ -20,12 +24,12 @@ export function UserAvatar({ user, size = 26 }: { user?: UserDto | null; size?: 
         fontWeight: 700,
         color: '#fff',
         flex: '0 0 auto',
-        fontSize: size * 0.42,
+        fontSize: size * 0.38,
         background: user?.color || T.dm,
         lineHeight: 1,
       }}
     >
-      {label}
+      {initials(user?.name)}
     </Box>
   );
 }

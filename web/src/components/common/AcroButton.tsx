@@ -50,7 +50,7 @@ export const AcroButton = forwardRef<HTMLButtonElement, Props>(function AcroButt
       color: '#fff',
       border: '1px solid transparent',
       boxShadow: T.ss,
-      '&:hover:not(:disabled)': { background: '#0bab90' },
+      '&:hover:not(:disabled)': { background: T.tlHover },
     },
     ghost: {
       background: 'transparent',

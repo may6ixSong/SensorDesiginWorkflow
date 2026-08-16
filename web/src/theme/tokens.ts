@@ -1,43 +1,54 @@
 /**
- * 목업(analog-dashboard-v15.html) `:root` CSS 변수를 그대로 옮긴 디자인 토큰.
- * 값은 목업이 정본이므로 임의로 바꾸지 않는다.
+ * Design tokens. Every value is a CSS custom property reference so a single
+ * `data-theme` attribute swap (see ThemeModeContext) re-themes the whole app —
+ * no component needs to know which mode is active.
+ * Actual light/dark values live in `themeVars.ts`.
  */
 export const T = {
-  bg: '#eceff5',
-  sf: '#ffffff',
-  sf2: '#f6f8fc',
-  sf3: '#eef2f8',
+  bg: 'var(--acro-bg)',
+  sf: 'var(--acro-sf)',
+  sf2: 'var(--acro-sf2)',
+  sf3: 'var(--acro-sf3)',
 
-  ln: '#dde4ee',
-  ln2: '#c4cfe0',
-  ln3: '#aab8cc',
+  ln: 'var(--acro-ln)',
+  ln2: 'var(--acro-ln2)',
+  ln3: 'var(--acro-ln3)',
 
-  tx: '#14202f',
-  dm: '#5c6d84',
-  dm2: '#8b99ab',
+  tx: 'var(--acro-tx)',
+  dm: 'var(--acro-dm)',
+  dm2: 'var(--acro-dm2)',
 
-  tl: '#0c9a83',
-  tl2: '#e0f5f0',
-  tl3: '#8ad9c9',
+  tl: 'var(--acro-tl)',
+  tl2: 'var(--acro-tl2)',
+  tl3: 'var(--acro-tl3)',
+  tlHover: 'var(--acro-tl-hover)',
 
-  am: '#ac6f08',
-  am2: '#fdf0da',
-  am3: '#e8c184',
+  am: 'var(--acro-am)',
+  am2: 'var(--acro-am2)',
+  am3: 'var(--acro-am3)',
 
-  vi: '#5849cf',
-  vi2: '#ece9fd',
-  vi3: '#b8afef',
+  vi: 'var(--acro-vi)',
+  vi2: 'var(--acro-vi2)',
+  vi3: 'var(--acro-vi3)',
 
-  hp: '#bc4f1a',
-  hp2: '#fceadf',
-  hp3: '#eaa87c',
+  hp: 'var(--acro-hp)',
+  hp2: 'var(--acro-hp2)',
+  hp3: 'var(--acro-hp3)',
 
-  bl: '#2563c9',
-  rd: '#c8352c',
+  bl: 'var(--acro-bl)',
+  rd: 'var(--acro-rd)',
 
-  ss: '0 1px 2px rgba(20,32,47,.06)',
-  sm: '0 4px 10px rgba(20,32,47,.08),0 1px 3px rgba(20,32,47,.05)',
-  sl: '0 16px 34px rgba(20,32,47,.15),0 4px 10px rgba(20,32,47,.08)',
+  ss: 'var(--acro-shadow-ss)',
+  sm: 'var(--acro-shadow-sm)',
+  sl: 'var(--acro-shadow-sl)',
+  shadowDialog: 'var(--acro-shadow-dialog)',
+  backdrop: 'var(--acro-backdrop)',
+
+  memoA: 'var(--acro-memo-a)',
+  memoB: 'var(--acro-memo-b)',
+
+  hldChanged: 'var(--acro-hld-changed)',
+  hldChangedHover: 'var(--acro-hld-changed-hover)',
 } as const;
 
 export const FONT_SANS = "'IBM Plex Sans KR',system-ui,sans-serif";

@@ -42,13 +42,13 @@ export class IpsService {
       .populate('owners')
       .populate('viewGrants.userId')
       .exec();
-    if (!ip) throw new NotFoundException('IP를 찾을 수 없습니다.');
+    if (!ip) throw new NotFoundException('IP not found.');
     return ip;
   }
 
   async findRawOrThrow(ipId: string) {
     const ip = await this.model.findById(ipId).exec();
-    if (!ip) throw new NotFoundException('IP를 찾을 수 없습니다.');
+    if (!ip) throw new NotFoundException('IP not found.');
     return ip;
   }
 
@@ -56,7 +56,7 @@ export class IpsService {
   async addOwner(ipId: string, userId: string, actor: UserDocument) {
     const user = await this.users.findById(userId);
     if (user.department !== 'analog') {
-      throw new BadRequestException('Edit 권한은 Analog 부서 소속자만 가능합니다.');
+      throw new BadRequestException('Only Analog department members can have Edit access.');
     }
     const ip = await this.findRawOrThrow(ipId);
     if (!ip.owners.some((o) => o.toString() === userId)) {
@@ -71,7 +71,7 @@ export class IpsService {
   async removeOwner(ipId: string, userId: string, actor: UserDocument) {
     const ip = await this.findRawOrThrow(ipId);
     if (ip.owners.length > 0 && ip.owners[0].toString() === userId) {
-      throw new ForbiddenException('대표 담당자는 삭제할 수 없습니다.');
+      throw new ForbiddenException('The primary owner cannot be removed.');
     }
     ip.owners = ip.owners.filter((o) => o.toString() !== userId);
     await ip.save();
