@@ -6,6 +6,7 @@ import { AppShell } from '@/components/layout/AppShell';
 import { useThemeMode } from '@/theme/ThemeModeContext';
 import { FONT_DISPLAY, FONT_MONO } from '@/theme/tokens';
 import { HERO_SERVICES } from '@/config/heroServices';
+import { AnalogSchematic, SchematicPalette } from '@/components/home/AnalogSchematic';
 
 const LANES = ['CONCEPT', 'DESIGN', 'VERIFY', 'TAPE-OUT'];
 
@@ -67,10 +68,7 @@ interface Palette {
   ctaText: string;
   ctaShadow: string;
   ctaShadowHover: string;
-  schematicLine: string;
-  schematicActive: string;
-  schematicComp: string;
-  schematicNode: string;
+  schematic: SchematicPalette;
   connLive: string;
   connPending: string;
   badgeLiveBg: string;
@@ -86,75 +84,6 @@ function makeRng(seed: number) {
   };
 }
 
-interface SchLine { x1: number; y1: number; x2: number; y2: number; active: boolean }
-interface SchComp { cx: number; cy: number; type: 'R' | 'C'; horiz: boolean; active: boolean }
-interface SchChip { x: number; y: number; w: number; h: number }
-interface SchJunction { x: number; y: number }
-
-function useAnalogSchematic(seed = 42) {
-  return useMemo(() => {
-    const rand = makeRng(seed);
-    const COLS = 18, ROWS = 11;
-    const gx = (c: number) => 1.5 + c * (97 / (COLS - 1));
-    const gy = (r: number) => 3 + r * (94 / (ROWS - 1));
-
-    const hLines: SchLine[] = [];
-    const vLines: SchLine[] = [];
-    const comps: SchComp[] = [];
-    const chips: SchChip[] = [];
-
-    // Horizontal traces — skip mid-screen band where wordmark lives
-    for (let r = 0; r < ROWS; r++) {
-      for (let c = 0; c < COLS - 1; c++) {
-        if (rand() < 0.50) {
-          const active = rand() < 0.20;
-          const x1 = gx(c), x2 = gx(c + 1), y = gy(r);
-          hLines.push({ x1, y1: y, x2, y2: y, active });
-          if (rand() < 0.26) {
-            comps.push({ cx: (x1 + x2) / 2, cy: y, type: rand() < 0.55 ? 'R' : 'C', horiz: true, active });
-          }
-        }
-      }
-    }
-
-    // Vertical traces
-    for (let c = 0; c < COLS; c++) {
-      for (let r = 0; r < ROWS - 1; r++) {
-        if (rand() < 0.38) {
-          const active = rand() < 0.14;
-          const x = gx(c), y1 = gy(r), y2 = gy(r + 1);
-          vLines.push({ x1: x, y1, x2: x, y2, active });
-          if (rand() < 0.18) {
-            comps.push({ cx: x, cy: (y1 + y2) / 2, type: rand() < 0.6 ? 'R' : 'C', horiz: false, active });
-          }
-        }
-      }
-    }
-
-    // Chip blocks — small IC rectangles with pin stubs
-    for (let i = 0; i < 5; i++) {
-      const c = 1 + Math.floor(rand() * (COLS - 3));
-      const r = 1 + Math.floor(rand() * (ROWS - 3));
-      chips.push({ x: gx(c) - 2.4, y: gy(r) - 1.8, w: 4.8, h: 3.6 });
-    }
-
-    // Junctions at shared grid nodes
-    const hSet = new Set<string>();
-    const vSet = new Set<string>();
-    const key = (x: number, y: number) => `${Math.round(x * 10)},${Math.round(y * 10)}`;
-    hLines.forEach(l => { hSet.add(key(l.x1, l.y1)); hSet.add(key(l.x2, l.y2)); });
-    vLines.forEach(l => { vSet.add(key(l.x1, l.y1)); vSet.add(key(l.x2, l.y2)); });
-    const junctions: SchJunction[] = [];
-    hSet.forEach(k => {
-      if (vSet.has(k)) {
-        const [x, y] = k.split(',').map(n => Number(n) / 10);
-        junctions.push({ x, y });
-      }
-    });
-
-    return { hLines, vLines, comps, chips, junctions };
-  }, [seed]);
-}
 
 const PALETTE: Record<'light' | 'dark', Palette> = {
   dark: {
@@ -183,10 +112,14 @@ const PALETTE: Record<'light' | 'dark', Palette> = {
     ctaText: '#ffffff',
     ctaShadow: '0 6px 18px rgba(0,0,0,.4)',
     ctaShadowHover: '0 10px 24px rgba(0,0,0,.5)',
-    schematicLine: 'rgba(122,152,188,.14)',
-    schematicActive: 'rgba(94,185,164,.28)',
-    schematicComp: 'rgba(122,152,188,.22)',
-    schematicNode: 'rgba(152,176,206,.45)',
+    schematic: {
+      bg: '#0a0d14',
+      line: 'rgba(126,158,196,.13)',
+      rail: 'rgba(126,158,196,.19)',
+      comp: 'rgba(126,158,196,.20)',
+      node: 'rgba(150,178,210,.32)',
+      active: 'rgba(94,185,164,.34)',
+    },
     connLive: 'rgba(94,185,164,.58)',
     connPending: 'rgba(122,148,184,.17)',
     badgeLiveBg: 'rgba(94,185,164,.12)',
@@ -219,10 +152,14 @@ const PALETTE: Record<'light' | 'dark', Palette> = {
     ctaText: '#ffffff',
     ctaShadow: '0 6px 16px rgba(12,154,131,.2)',
     ctaShadowHover: '0 10px 22px rgba(12,154,131,.28)',
-    schematicLine: 'rgba(60,90,130,.11)',
-    schematicActive: 'rgba(12,154,131,.26)',
-    schematicComp: 'rgba(60,90,130,.18)',
-    schematicNode: 'rgba(60,90,130,.32)',
+    schematic: {
+      bg: '#f4f6f9',
+      line: 'rgba(46,74,110,.14)',
+      rail: 'rgba(46,74,110,.20)',
+      comp: 'rgba(46,74,110,.21)',
+      node: 'rgba(46,74,110,.34)',
+      active: 'rgba(12,154,131,.34)',
+    },
     connLive: 'rgba(12,154,131,.48)',
     connPending: 'rgba(70,96,140,.15)',
     badgeLiveBg: 'rgba(12,154,131,.1)',
@@ -231,59 +168,10 @@ const PALETTE: Record<'light' | 'dark', Palette> = {
   },
 } as const;
 
-/** Render a resistor symbol centered at (cx, cy). horiz = horizontal orientation. */
-function Resistor({ cx, cy, horiz, stroke, strokeW }: {
-  cx: number; cy: number; horiz: boolean; stroke: string; strokeW: number;
-}) {
-  const bw = 2.6, bh = 1.0, stub = 1.2;
-  if (horiz) {
-    return (
-      <g stroke={stroke} strokeWidth={strokeW} fill="none" vectorEffect="non-scaling-stroke">
-        <line x1={cx - bw / 2 - stub} y1={cy} x2={cx - bw / 2} y2={cy} />
-        <rect x={cx - bw / 2} y={cy - bh / 2} width={bw} height={bh} />
-        <line x1={cx + bw / 2} y1={cy} x2={cx + bw / 2 + stub} y2={cy} />
-      </g>
-    );
-  }
-  return (
-    <g stroke={stroke} strokeWidth={strokeW} fill="none" vectorEffect="non-scaling-stroke">
-      <line x1={cx} y1={cy - bw / 2 - stub} x2={cx} y2={cy - bw / 2} />
-      <rect x={cx - bh / 2} y={cy - bw / 2} width={bh} height={bw} />
-      <line x1={cx} y1={cy + bw / 2} x2={cx} y2={cy + bw / 2 + stub} />
-    </g>
-  );
-}
-
-/** Render a capacitor symbol centered at (cx, cy). */
-function Capacitor({ cx, cy, horiz, stroke, strokeW }: {
-  cx: number; cy: number; horiz: boolean; stroke: string; strokeW: number;
-}) {
-  const gap = 0.55, plateH = 1.4, stub = 1.2;
-  if (horiz) {
-    return (
-      <g stroke={stroke} strokeWidth={strokeW} fill="none" vectorEffect="non-scaling-stroke">
-        <line x1={cx - stub - gap} y1={cy} x2={cx - gap} y2={cy} />
-        <line x1={cx - gap} y1={cy - plateH / 2} x2={cx - gap} y2={cy + plateH / 2} />
-        <line x1={cx + gap} y1={cy - plateH / 2} x2={cx + gap} y2={cy + plateH / 2} />
-        <line x1={cx + gap} y1={cy} x2={cx + gap + stub} y2={cy} />
-      </g>
-    );
-  }
-  return (
-    <g stroke={stroke} strokeWidth={strokeW} fill="none" vectorEffect="non-scaling-stroke">
-      <line x1={cx} y1={cy - stub - gap} x2={cx} y2={cy - gap} />
-      <line x1={cx - plateH / 2} y1={cy - gap} x2={cx + plateH / 2} y2={cy - gap} />
-      <line x1={cx - plateH / 2} y1={cy + gap} x2={cx + plateH / 2} y2={cy + gap} />
-      <line x1={cx} y1={cy + gap} x2={cx} y2={cy + gap + stub} />
-    </g>
-  );
-}
-
 export function HomePage() {
   const { data: users } = useUsers();
   const { mode } = useThemeMode();
   const pal = useMemo(() => PALETTE[mode], [mode]);
-  const { hLines, vLines, comps, chips, junctions } = useAnalogSchematic(42);
 
   const [active, setActive] = useState<Set<string> | null>(null);
   const idleTimer = useRef<number>();
@@ -332,69 +220,8 @@ export function HomePage() {
           },
         }}
       >
-        {/* backmost layer — analog circuit schematic, very faint */}
-        <Box
-          component="svg"
-          viewBox="0 0 100 100"
-          preserveAspectRatio="none"
-          sx={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
-        >
-          {/* plain horizontal traces */}
-          {hLines.map((l, i) => (
-            <line
-              key={`h${i}`}
-              x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2}
-              stroke={l.active ? pal.schematicActive : pal.schematicLine}
-              strokeWidth={l.active ? 0.15 : 0.10}
-              vectorEffect="non-scaling-stroke"
-              strokeDasharray={l.active ? '1.6 1.2' : undefined}
-              style={l.active ? { animation: `flowdash ${5 + (i % 6)}s linear infinite` } : undefined}
-            />
-          ))}
-          {/* plain vertical traces */}
-          {vLines.map((l, i) => (
-            <line
-              key={`v${i}`}
-              x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2}
-              stroke={l.active ? pal.schematicActive : pal.schematicLine}
-              strokeWidth={l.active ? 0.15 : 0.10}
-              vectorEffect="non-scaling-stroke"
-              strokeDasharray={l.active ? '1.6 1.2' : undefined}
-              style={l.active ? { animation: `flowdash ${5 + (i % 4)}s linear infinite reverse` } : undefined}
-            />
-          ))}
-          {/* component symbols */}
-          {comps.map((c, i) =>
-            c.type === 'R'
-              ? <Resistor key={`c${i}`} cx={c.cx} cy={c.cy} horiz={c.horiz}
-                  stroke={c.active ? pal.schematicActive : pal.schematicComp} strokeW={0.12} />
-              : <Capacitor key={`c${i}`} cx={c.cx} cy={c.cy} horiz={c.horiz}
-                  stroke={c.active ? pal.schematicActive : pal.schematicComp} strokeW={0.12} />
-          )}
-          {/* IC chip outlines */}
-          {chips.map((ch, i) => (
-            <rect
-              key={`chip${i}`}
-              x={ch.x} y={ch.y} width={ch.w} height={ch.h}
-              fill="none"
-              stroke={pal.schematicComp}
-              strokeWidth={0.10}
-              vectorEffect="non-scaling-stroke"
-            />
-          ))}
-          {/* junction dots at wire crossings */}
-          {junctions.map((j, i) => (
-            <circle key={`j${i}`} cx={j.x} cy={j.y} r={0.22} fill={pal.schematicNode}>
-              <animate
-                attributeName="opacity"
-                values="0.3;1;0.3"
-                dur={`${4 + (i % 7) * 0.5}s`}
-                begin={`${(i % 11) * 0.3}s`}
-                repeatCount="indefinite"
-              />
-            </circle>
-          ))}
-        </Box>
+        {/* back-most layer — one connected analog circuit filling the stage */}
+        <AnalogSchematic pal={pal.schematic} />
 
         {/* aurora backdrop */}
         <Box
@@ -472,9 +299,15 @@ export function HomePage() {
             const trace = circuitTrace(svc.x, svc.y, 100 + i);
             return (
               <g key={svc.name}>
-                <path d={trace.d} fill="none" stroke={pal.schematicLine} strokeWidth={0.1} vectorEffect="non-scaling-stroke" />
+                <path
+                  d={trace.d}
+                  fill="none"
+                  stroke={pal.schematic.line}
+                  strokeWidth={0.9}
+                  vectorEffect="non-scaling-stroke"
+                />
                 {trace.vias.map((v, vi) => (
-                  <circle key={vi} cx={v.x} cy={v.y} r={0.16} fill={pal.schematicLine} />
+                  <ellipse key={vi} cx={v.x} cy={v.y} rx={0.12} ry={0.24} fill={pal.schematic.node} />
                 ))}
               </g>
             );
