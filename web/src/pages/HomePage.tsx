@@ -47,6 +47,55 @@ interface Palette {
   ctaGhostBg: string;
   ctaGhostBorder: string;
   ctaGhostShadow: string;
+  circuitLine: string;
+  circuitNode: string;
+  circuitActive: string;
+}
+
+/** Seeded PRNG (Park–Miller) so the backdrop graph is stable across re-renders. */
+function makeRng(seed: number) {
+  let s = seed;
+  return () => {
+    s = (s * 16807) % 2147483647;
+    return (s - 1) / 2147483646;
+  };
+}
+
+interface GraphNode { x: number; y: number }
+interface GraphEdge { a: GraphNode; b: GraphNode; active: boolean }
+
+/**
+ * Sparse circuit-board style constellation covering the full stage — the very
+ * back-most layer, behind the aurora. Fills the empty corners with quiet,
+ * always-on motion instead of flat dead space, without touching the existing
+ * composition (lanes/cards/wordmark) in front of it.
+ */
+function useCircuitGraph(count: number, seed = 7): { nodes: GraphNode[]; edges: GraphEdge[] } {
+  return useMemo(() => {
+    const rand = makeRng(seed);
+    const nodes: GraphNode[] = Array.from({ length: count }, () => ({
+      x: rand() * 100,
+      y: rand() * 100,
+    }));
+    const seen = new Set<string>();
+    const edges: GraphEdge[] = [];
+    nodes.forEach((n, i) => {
+      const near = nodes
+        .map((m, j) => ({ j, d: Math.hypot(n.x - m.x, n.y - m.y) }))
+        .filter((o) => o.j !== i)
+        .sort((a, b) => a.d - b.d)
+        .slice(0, 2)
+        .filter((o) => o.d < 20);
+      near.forEach((o) => {
+        const key = [Math.min(i, o.j), Math.max(i, o.j)].join('-');
+        if (!seen.has(key)) {
+          seen.add(key);
+          edges.push({ a: n, b: nodes[o.j], active: rand() < 0.3 });
+        }
+      });
+    });
+    return { nodes, edges };
+  }, [count, seed]);
 }
 
 const PALETTE: Record<'light' | 'dark', Palette> = {
@@ -77,6 +126,9 @@ const PALETTE: Record<'light' | 'dark', Palette> = {
     ctaGhostBg: 'rgba(255,255,255,.07)',
     ctaGhostBorder: 'rgba(255,255,255,.24)',
     ctaGhostShadow: '0 12px 28px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.16)',
+    circuitLine: 'rgba(140,170,255,.16)',
+    circuitNode: 'rgba(180,206,255,.5)',
+    circuitActive: 'rgba(46,230,197,.6)',
   },
   light: {
     stageBg: '#eef1f8',
@@ -105,6 +157,9 @@ const PALETTE: Record<'light' | 'dark', Palette> = {
     ctaGhostBg: 'rgba(255,255,255,.55)',
     ctaGhostBorder: 'rgba(20,32,47,.16)',
     ctaGhostShadow: '0 12px 24px rgba(30,42,70,.10), inset 0 1px 0 rgba(255,255,255,.7)',
+    circuitLine: 'rgba(60,80,140,.12)',
+    circuitNode: 'rgba(60,80,140,.35)',
+    circuitActive: 'rgba(12,154,131,.5)',
   },
 } as const;
 
@@ -117,6 +172,7 @@ export function HomePage() {
   const { data: users } = useUsers();
   const { mode } = useThemeMode();
   const pal = useMemo(() => PALETTE[mode], [mode]);
+  const { nodes: circuitNodes, edges: circuitEdges } = useCircuitGraph(46);
   const stageRef = useRef<HTMLDivElement>(null);
   const raf = useRef(0);
 
@@ -169,6 +225,37 @@ export function HomePage() {
           },
         }}
       >
+        {/* backmost layer — sparse circuit-board constellation filling the empty space */}
+        <Box
+          component="svg"
+          viewBox="0 0 100 100"
+          preserveAspectRatio="none"
+          sx={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
+        >
+          {circuitEdges.map((e, i) => (
+            <line
+              key={i}
+              x1={e.a.x} y1={e.a.y} x2={e.b.x} y2={e.b.y}
+              stroke={e.active ? pal.circuitActive : pal.circuitLine}
+              strokeWidth={e.active ? 0.16 : 0.12}
+              vectorEffect="non-scaling-stroke"
+              strokeDasharray={e.active ? '1.4 1.2' : undefined}
+              style={e.active ? { animation: `flowdash ${4 + (i % 5)}s linear infinite` } : undefined}
+            />
+          ))}
+          {circuitNodes.map((n, i) => (
+            <circle key={i} cx={n.x} cy={n.y} r={0.28} fill={pal.circuitNode}>
+              <animate
+                attributeName="opacity"
+                values="0.15;0.85;0.15"
+                dur={`${3.5 + (i % 6) * 0.6}s`}
+                begin={`${(i % 9) * 0.35}s`}
+                repeatCount="indefinite"
+              />
+            </circle>
+          ))}
+        </Box>
+
         {/* aurora backdrop */}
         <Box
           sx={{
