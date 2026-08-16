@@ -1,4 +1,4 @@
-# ACRO — 아날로그 산출물 릴리스 플랫폼
+# ACRO — Sensor(CIS) Design Work flow
 
 CIS(CMOS Image Sensor) 개발의 Analog 영역 산출물을 IP 단위 캔버스 위에서 흐름(flow)으로
 관리하고 버전·권한을 통제하는 시스템. 설계서는 [`docs/acro-design-v2.md`](docs/acro-design-v2.md)를 참고한다.
