@@ -10,6 +10,8 @@ import { AcroMark, Icon } from '@/components/common/Icon';
 import { UserAvatar } from '@/components/common/Avatar';
 import { AcroButton } from '@/components/common/AcroButton';
 import { ThemeToggle } from '@/components/common/ThemeToggle';
+import { LanguageToggle } from '@/components/common/LanguageToggle';
+import { HeaderIconButton } from '@/components/common/HeaderIconButton';
 import { SelectBox } from './SelectBox';
 import { FONT_DISPLAY, FONT_MONO, T } from '@/theme/tokens';
 
@@ -145,6 +147,8 @@ export function AppShell({
           </AcroButton>
         )}
 
+        <HeaderIconButton icon="book" label="User guide" to="/guide" />
+        <LanguageToggle />
         <ThemeToggle />
 
         <SelectBox

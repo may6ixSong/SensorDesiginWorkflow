@@ -66,8 +66,8 @@ interface Palette {
   laneBg: string;
   laneText: string;
   cardBg: string;
-  cardBorder: (c: string) => string;
-  cardShadow: (c: string) => string;
+  cardBorder: string;
+  cardShadow: string;
   cardText: string;
   cardSub: string;
   wordmarkGradient: string;
@@ -75,10 +75,10 @@ interface Palette {
   subCopy: string;
   flowStroke: string;
   pulse: string;
-  ctaGhostText: string;
-  ctaGhostBg: string;
-  ctaGhostBorder: string;
-  ctaGhostShadow: string;
+  ctaBg: string;
+  ctaText: string;
+  ctaShadow: string;
+  ctaShadowHover: string;
   circuitLine: string;
   circuitNode: string;
   circuitActive: string;
@@ -137,76 +137,74 @@ function useCircuitGraph(count: number, seed = 7): { nodes: GraphNode[]; edges: 
 
 const PALETTE: Record<'light' | 'dark', Palette> = {
   dark: {
-    stageBg: '#070b14',
+    stageBg: '#0a0d14',
     aurora:
-      'radial-gradient(48% 42% at 24% 28%, rgba(46,230,197,.42), transparent 62%),' +
-      'radial-gradient(46% 40% at 78% 64%, rgba(124,140,255,.46), transparent 64%),' +
-      'radial-gradient(38% 34% at 52% 92%, rgba(255,111,145,.30), transparent 66%)',
+      'radial-gradient(60% 50% at 28% 22%, rgba(72,112,146,.18), transparent 70%),' +
+      'radial-gradient(55% 46% at 76% 72%, rgba(62,84,124,.16), transparent 72%)',
     gridLine:
-      'linear-gradient(rgba(46,230,197,.55) 1px, transparent 1px),' +
-      'linear-gradient(90deg, rgba(124,140,255,.42) 1px, transparent 1px)',
-    gridMask: 'linear-gradient(to top, #000 2%, transparent 72%)',
-    laneBorder: 'rgba(124,140,255,.42)',
-    laneBg: 'linear-gradient(160deg, rgba(124,140,255,.20), rgba(46,230,197,.07))',
-    laneText: 'rgba(180,206,255,.75)',
-    cardBg: 'linear-gradient(150deg, rgba(31,48,78,.96), rgba(13,22,40,.92))',
-    cardBorder: (c: string) => `${c}55`,
-    cardShadow: (c: string) => `0 30px 70px rgba(0,0,0,.65), inset 0 1px 0 rgba(255,255,255,.14), 0 0 40px ${c}33`,
-    cardText: '#eaf2ff',
-    cardSub: 'rgba(180,206,255,.7)',
-    wordmarkGradient: 'linear-gradient(178deg,#ffffff 8%,#b7f5e6 42%,#7c8cff 100%)',
-    wordmarkGlow: 'drop-shadow(0 24px 46px rgba(46,230,197,.34)) drop-shadow(0 4px 0 rgba(124,140,255,.30))',
-    subCopy: 'rgba(180,206,255,.82)',
-    flowStroke: 'rgba(46,230,197,.55)',
-    pulse: '#2ee6c5',
-    ctaGhostText: '#dce7ff',
-    ctaGhostBg: 'rgba(255,255,255,.07)',
-    ctaGhostBorder: 'rgba(255,255,255,.24)',
-    ctaGhostShadow: '0 12px 28px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.16)',
-    circuitLine: 'rgba(140,170,255,.24)',
-    circuitNode: 'rgba(190,212,255,.62)',
-    circuitActive: 'rgba(46,230,197,.75)',
-    connLive: 'rgba(46,230,197,.8)',
-    connPending: 'rgba(140,160,210,.28)',
-    badgeLiveBg: 'rgba(46,230,197,.14)',
-    badgeLiveText: '#7cf2da',
-    badgePendingText: 'rgba(180,200,235,.55)',
+      'linear-gradient(rgba(126,156,190,.16) 1px, transparent 1px),' +
+      'linear-gradient(90deg, rgba(126,156,190,.13) 1px, transparent 1px)',
+    gridMask: 'linear-gradient(to top, #000 2%, transparent 66%)',
+    laneBorder: 'rgba(142,168,200,.07)',
+    laneBg: 'linear-gradient(160deg, rgba(142,168,200,.055), rgba(142,168,200,.015))',
+    laneText: 'rgba(150,172,200,.42)',
+    cardBg: 'linear-gradient(160deg, rgba(24,30,42,.97), rgba(16,21,30,.95))',
+    cardBorder: 'rgba(255,255,255,.09)',
+    cardShadow: '0 10px 28px rgba(0,0,0,.5)',
+    cardText: '#e8edf5',
+    cardSub: 'rgba(150,172,200,.58)',
+    wordmarkGradient: 'linear-gradient(180deg,#f2f6fb 0%,#a9b8cb 100%)',
+    wordmarkGlow: 'none',
+    subCopy: 'rgba(150,172,200,.62)',
+    flowStroke: 'rgba(120,158,190,.26)',
+    pulse: 'rgba(94,185,164,.7)',
+    ctaBg: '#1c9d85',
+    ctaText: '#ffffff',
+    ctaShadow: '0 6px 18px rgba(0,0,0,.4)',
+    ctaShadowHover: '0 10px 24px rgba(0,0,0,.5)',
+    circuitLine: 'rgba(122,152,188,.15)',
+    circuitNode: 'rgba(152,176,206,.38)',
+    circuitActive: 'rgba(94,185,164,.34)',
+    connLive: 'rgba(94,185,164,.58)',
+    connPending: 'rgba(122,148,184,.17)',
+    badgeLiveBg: 'rgba(94,185,164,.12)',
+    badgeLiveText: '#6fc7b0',
+    badgePendingText: 'rgba(150,172,200,.5)',
   },
   light: {
-    stageBg: '#eef1f8',
+    stageBg: '#f4f6f9',
     aurora:
-      'radial-gradient(48% 42% at 24% 28%, rgba(12,154,131,.20), transparent 62%),' +
-      'radial-gradient(46% 40% at 78% 64%, rgba(88,73,207,.20), transparent 64%),' +
-      'radial-gradient(38% 34% at 52% 92%, rgba(199,79,120,.14), transparent 66%)',
+      'radial-gradient(60% 50% at 28% 22%, rgba(92,124,158,.11), transparent 70%),' +
+      'radial-gradient(55% 46% at 76% 72%, rgba(82,104,144,.09), transparent 72%)',
     gridLine:
-      'linear-gradient(rgba(12,154,131,.30) 1px, transparent 1px),' +
-      'linear-gradient(90deg, rgba(88,73,207,.22) 1px, transparent 1px)',
-    gridMask: 'linear-gradient(to top, #000 2%, transparent 72%)',
-    laneBorder: 'rgba(88,73,207,.30)',
-    laneBg: 'linear-gradient(160deg, rgba(88,73,207,.09), rgba(12,154,131,.06))',
-    laneText: 'rgba(60,74,104,.72)',
-    cardBg: 'linear-gradient(150deg, #ffffff, #eef1f9)',
-    cardBorder: (c: string) => `${c}70`,
-    cardShadow: (c: string) => `0 24px 50px rgba(30,42,70,.16), inset 0 1px 0 rgba(255,255,255,.7), 0 0 26px ${c}2a`,
-    cardText: '#14202f',
-    cardSub: 'rgba(60,74,104,.65)',
-    wordmarkGradient: 'linear-gradient(178deg,#0f1b2b 12%,#0c9a83 58%,#5849cf 100%)',
-    wordmarkGlow: 'drop-shadow(0 18px 30px rgba(12,154,131,.20))',
-    subCopy: '#5c6d84',
-    flowStroke: 'rgba(12,154,131,.55)',
-    pulse: '#0c9a83',
-    ctaGhostText: '#14202f',
-    ctaGhostBg: 'rgba(255,255,255,.55)',
-    ctaGhostBorder: 'rgba(20,32,47,.16)',
-    ctaGhostShadow: '0 12px 24px rgba(30,42,70,.10), inset 0 1px 0 rgba(255,255,255,.7)',
-    circuitLine: 'rgba(60,80,140,.18)',
-    circuitNode: 'rgba(60,80,140,.46)',
-    circuitActive: 'rgba(12,154,131,.62)',
-    connLive: 'rgba(12,154,131,.7)',
-    connPending: 'rgba(60,80,140,.22)',
-    badgeLiveBg: 'rgba(12,154,131,.12)',
+      'linear-gradient(rgba(92,118,152,.14) 1px, transparent 1px),' +
+      'linear-gradient(90deg, rgba(92,118,152,.11) 1px, transparent 1px)',
+    gridMask: 'linear-gradient(to top, #000 2%, transparent 66%)',
+    laneBorder: 'rgba(70,96,132,.07)',
+    laneBg: 'linear-gradient(160deg, rgba(70,96,132,.045), rgba(70,96,132,.012))',
+    laneText: 'rgba(80,102,132,.48)',
+    cardBg: '#ffffff',
+    cardBorder: 'rgba(20,32,47,.10)',
+    cardShadow: '0 8px 22px rgba(30,42,70,.09), 0 1px 2px rgba(30,42,70,.06)',
+    cardText: '#101828',
+    cardSub: '#667085',
+    wordmarkGradient: 'linear-gradient(180deg,#16202e 0%,#5a687a 100%)',
+    wordmarkGlow: 'none',
+    subCopy: '#667085',
+    flowStroke: 'rgba(70,100,140,.2)',
+    pulse: 'rgba(12,154,131,.6)',
+    ctaBg: '#0c9a83',
+    ctaText: '#ffffff',
+    ctaShadow: '0 6px 16px rgba(12,154,131,.2)',
+    ctaShadowHover: '0 10px 22px rgba(12,154,131,.28)',
+    circuitLine: 'rgba(70,96,140,.13)',
+    circuitNode: 'rgba(70,96,140,.28)',
+    circuitActive: 'rgba(12,154,131,.3)',
+    connLive: 'rgba(12,154,131,.48)',
+    connPending: 'rgba(70,96,140,.15)',
+    badgeLiveBg: 'rgba(12,154,131,.1)',
     badgeLiveText: '#0a8a75',
-    badgePendingText: 'rgba(60,74,104,.55)',
+    badgePendingText: '#8b99ab',
   },
 } as const;
 
@@ -260,20 +258,16 @@ export function HomePage() {
           transition: 'background .3s',
           display: 'grid', placeItems: 'center',
           perspective: '1400px', perspectiveOrigin: '50% 45%',
-          '@keyframes acroFloat': {
-            '0%,100%': { transform: 'translateY(0)' },
-            '50%': { transform: 'translateY(-22px)' },
-          },
           '@keyframes acroDrift': {
             from: { backgroundPosition: '0 0' },
             to: { backgroundPosition: '0 -800px' },
           },
           '@keyframes acroGlow': {
-            '0%,100%': { opacity: 0.55 },
-            '50%': { opacity: 0.9 },
+            '0%,100%': { opacity: 0.75 },
+            '50%': { opacity: 1 },
           },
           '@keyframes acroRise': {
-            from: { opacity: 0, transform: 'translateY(26px)' },
+            from: { opacity: 0, transform: 'translateY(14px)' },
             to: { opacity: 1, transform: 'translateY(0)' },
           },
         }}
@@ -314,8 +308,8 @@ export function HomePage() {
           sx={{
             position: 'absolute', inset: '-30%', pointerEvents: 'none',
             background: pal.aurora,
-            filter: 'blur(14px)',
-            animation: 'acroGlow 9s ease-in-out infinite',
+            filter: 'blur(20px)',
+            animation: 'acroGlow 16s ease-in-out infinite',
             transition: 'background .3s',
           }}
         />
@@ -328,7 +322,7 @@ export function HomePage() {
             transform: 'rotateX(74deg)',
             backgroundImage: pal.gridLine,
             backgroundSize: '80px 80px',
-            animation: 'acroDrift 6s linear infinite',
+            animation: 'acroDrift 18s linear infinite',
             maskImage: pal.gridMask,
             WebkitMaskImage: pal.gridMask,
             pointerEvents: 'none',
@@ -358,7 +352,7 @@ export function HomePage() {
             />
           ))}
           {FLOW_PATHS.map((d, i) => (
-            <circle key={`p-${d}`} r={0.6} fill={pal.pulse} opacity={0}>
+            <circle key={`p-${d}`} r={0.38} fill={pal.pulse} opacity={0}>
               <animateMotion
                 dur={`${3.2 + i * 0.5}s`}
                 begin={`${i * 0.6}s`}
@@ -438,7 +432,7 @@ export function HomePage() {
             );
           })}
           {HERO_SERVICES.filter((s) => s.connected).map((svc, i) => (
-            <circle key={`p-${svc.name}`} r={0.55} fill={pal.connLive} opacity={0}>
+            <circle key={`p-${svc.name}`} r={0.38} fill={pal.connLive} opacity={0}>
               <animateMotion
                 dur={`${3 + i * 0.6}s`}
                 begin={`${i * 0.7}s`}
@@ -473,22 +467,18 @@ export function HomePage() {
             sx={{
               position: 'absolute', display: 'flex', gap: '18px',
               transform: 'translateZ(-320px)',
-              opacity: 0.5,
             }}
           >
             {LANES.map((l, i) => (
-              // placement (translateZ) and the float animation are split into two layers
-              // so they don't clobber each other's transform.
-              <Box key={l} sx={{ transform: `translateZ(${i * 26}px)`, transformStyle: 'preserve-3d' }}>
+              <Box key={l} sx={{ transform: `translateZ(${i * 22}px)`, transformStyle: 'preserve-3d' }}>
                 <Box
                   sx={{
-                    width: 190, height: 300, borderRadius: '14px',
+                    width: 190, height: 300, borderRadius: '10px',
                     border: `1px solid ${pal.laneBorder}`,
                     background: pal.laneBg,
                     display: 'flex', alignItems: 'flex-start', justifyContent: 'center', pt: '14px',
-                    fontFamily: FONT_MONO, fontSize: 10, letterSpacing: '.22em',
+                    fontFamily: FONT_MONO, fontSize: 9.5, letterSpacing: '.24em',
                     color: pal.laneText,
-                    animation: `acroFloat ${7 + i * 0.7}s ease-in-out ${i * 0.4}s infinite`,
                     transition: 'background .3s, border-color .3s, color .3s',
                   }}
                 >
@@ -513,25 +503,17 @@ export function HomePage() {
             >
               <Box
                 sx={{
-                  width: 224, padding: '15px 16px', borderRadius: '14px',
-                  animation: `acroFloat ${6.5 + svc.d}s ease-in-out ${svc.d}s infinite`,
+                  width: 224, padding: '15px 16px', borderRadius: '10px',
                   background: pal.cardBg,
-                  border: `1px solid ${pal.cardBorder(svc.color)}`,
-                  boxShadow: isBoosted
-                    ? `${pal.cardShadow(svc.color)}, 0 0 0 2px ${svc.color}`
-                    : pal.cardShadow(svc.color),
+                  border: `1px solid ${isBoosted ? svc.color : pal.cardBorder}`,
+                  boxShadow: pal.cardShadow,
                   color: pal.cardText,
-                  opacity: isDim ? 0.22 : 1,
-                  transition: 'opacity .5s ease, background .3s, border-color .3s, box-shadow .3s, color .3s',
+                  opacity: isDim ? 0.28 : 1,
+                  transition: 'opacity .5s ease, background .3s, border-color .35s, box-shadow .3s, color .3s',
                 }}
               >
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: '9px' }}>
-                  <Box
-                    sx={{
-                      width: 26, height: 3, borderRadius: 2, background: svc.color,
-                      boxShadow: `0 0 14px ${svc.color}`,
-                    }}
-                  />
+                  <Box sx={{ width: 22, height: 2, borderRadius: 1, background: svc.color }} />
                   <Box
                     sx={{
                       display: 'inline-flex', alignItems: 'center', gap: '4px',
@@ -570,8 +552,8 @@ export function HomePage() {
           <Box sx={{ position: 'relative', textAlign: 'center', transform: 'translateZ(190px)' }}>
             <Box
               sx={{
-                fontFamily: FONT_DISPLAY, fontWeight: 800,
-                fontSize: 'clamp(72px, 12vw, 178px)', lineHeight: 0.86, letterSpacing: '-.045em',
+                fontFamily: FONT_DISPLAY, fontWeight: 700,
+                fontSize: 'clamp(64px, 9.5vw, 132px)', lineHeight: 0.9, letterSpacing: '-.03em',
                 background: pal.wordmarkGradient,
                 WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
                 filter: pal.wordmarkGlow,
@@ -583,8 +565,8 @@ export function HomePage() {
             </Box>
             <Box
               sx={{
-                fontFamily: FONT_MONO, fontSize: 11, letterSpacing: '.44em',
-                color: pal.subCopy, mt: '14px', pl: '.44em',
+                fontFamily: FONT_MONO, fontSize: 10, letterSpacing: '.38em',
+                color: pal.subCopy, mt: '16px', pl: '.38em',
                 animation: 'acroRise .8s cubic-bezier(.2,.8,.3,1) .12s both',
                 transition: 'color .3s',
               }}
@@ -599,7 +581,7 @@ export function HomePage() {
                 animation: 'acroRise .8s cubic-bezier(.2,.8,.3,1) .24s both',
               }}
             >
-              <HeroLink to="/projects" primary pal={pal}>View Projects</HeroLink>
+              <HeroLink to="/projects" pal={pal}>View Projects</HeroLink>
             </Box>
           </Box>
         </Box>
@@ -608,38 +590,20 @@ export function HomePage() {
   );
 }
 
-function HeroLink({
-  to, primary, pal, children,
-}: {
-  to: string; primary?: boolean; pal: Palette; children: React.ReactNode;
-}) {
+function HeroLink({ to, pal, children }: { to: string; pal: Palette; children: React.ReactNode }) {
   return (
     <Box
       component={Link}
       to={to}
       sx={{
         display: 'inline-flex', alignItems: 'center', gap: '8px',
-        padding: '13px 28px', borderRadius: '11px',
-        fontSize: 13.5, fontWeight: 600, textDecoration: 'none',
-        transition: 'transform .22s cubic-bezier(.2,.8,.3,1), box-shadow .22s, background .3s, color .3s, border-color .3s',
-        ...(primary
-          ? {
-              color: '#04140f',
-              background: 'linear-gradient(150deg,#8ffbe2,#2ee6c5 60%,#12b7a4)',
-              boxShadow: '0 14px 34px rgba(46,230,197,.42), inset 0 1px 0 rgba(255,255,255,.65)',
-            }
-          : {
-              color: pal.ctaGhostText,
-              background: pal.ctaGhostBg,
-              border: `1px solid ${pal.ctaGhostBorder}`,
-              boxShadow: pal.ctaGhostShadow,
-            }),
-        '&:hover': {
-          transform: 'translateZ(28px) translateY(-3px)',
-          boxShadow: primary
-            ? '0 22px 48px rgba(46,230,197,.55), inset 0 1px 0 rgba(255,255,255,.7)'
-            : pal.ctaGhostShadow,
-        },
+        padding: '11px 24px', borderRadius: '8px',
+        fontSize: 13, fontWeight: 600, textDecoration: 'none',
+        color: pal.ctaText,
+        background: pal.ctaBg,
+        boxShadow: pal.ctaShadow,
+        transition: 'transform .18s ease, box-shadow .18s ease, background .3s',
+        '&:hover': { transform: 'translateY(-1px)', boxShadow: pal.ctaShadowHover },
       }}
     >
       {children}

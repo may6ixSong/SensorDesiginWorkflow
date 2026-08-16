@@ -8,6 +8,7 @@ import { HomePage } from '@/pages/HomePage';
 import { ProjectListPage } from '@/pages/ProjectListPage';
 import { BoardPage } from '@/pages/BoardPage';
 import { NoAccessPage } from '@/pages/NoAccessPage';
+import { GuidePage } from '@/pages/GuidePage';
 
 /**
  * 사내 SSO 연동 전제 (설계서 1.3). 현재 단계에서는 로그인 검사 자체를 생략하고,
@@ -79,6 +80,7 @@ export default function App() {
         <Route path="/details" element={<DetailsRedirect />} />
         <Route path="/details/:projectId" element={<DetailsRedirect />} />
         <Route path="/details/:projectId/:ipId" element={<BoardPage />} />
+        <Route path="/guide" element={<GuidePage />} />
         <Route path="/no-access" element={<NoAccessPage />} />
       </Routes>
     </LoginGate>

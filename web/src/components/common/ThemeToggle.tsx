@@ -1,26 +1,15 @@
-import { Box } from '@mui/material';
 import { useThemeMode } from '@/theme/ThemeModeContext';
-import { Icon } from './Icon';
-import { T } from '@/theme/tokens';
+import { HeaderIconButton } from './HeaderIconButton';
 
-/** Light/dark switch — sits left of the user badge in the top bar. */
+/** Light/dark switch — rightmost of the header icon buttons, next to the user badge. */
 export function ThemeToggle() {
   const { mode, toggle } = useThemeMode();
   const isDark = mode === 'dark';
   return (
-    <Box
-      component="button"
+    <HeaderIconButton
+      icon={isDark ? 'moon' : 'sun'}
+      label={isDark ? 'Switch to light theme' : 'Switch to dark theme'}
       onClick={toggle}
-      aria-label={isDark ? 'Switch to light theme' : 'Switch to dark theme'}
-      title={isDark ? 'Switch to light theme' : 'Switch to dark theme'}
-      sx={{
-        display: 'grid', placeItems: 'center', width: 32, height: 32, borderRadius: '8px',
-        background: T.sf, color: T.dm, cursor: 'pointer', border: 'none', outline: 'none',
-        transition: '.14s', flex: '0 0 auto',
-        '&:hover': { background: T.sf3, color: T.tx },
-      }}
-    >
-      <Icon name={isDark ? 'moon' : 'sun'} size={15} />
-    </Box>
+    />
   );
 }
