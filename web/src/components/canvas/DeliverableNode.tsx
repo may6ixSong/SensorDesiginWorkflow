@@ -36,7 +36,7 @@ export function DeliverableNode({
   const rel = latR(d);
   const work = hasW(d) ? latA(d) : null;
   const last = latA(d);
-  const compact = d.h < 96;
+  const compact = d.h < 120;
   const col = d.net === 'HPC' ? T.hp : d.type === 'excel' ? T.tl : T.bl;
 
   return (
@@ -96,7 +96,7 @@ export function DeliverableNode({
       <Box
         component="span"
         sx={{
-          position: 'absolute', top: 0, right: 0, fontFamily: FONT_MONO, fontSize: 8,
+          position: 'absolute', top: 0, right: 0, fontFamily: FONT_MONO, fontSize: 9.5,
           letterSpacing: '.08em', padding: '2px 7px 3px', borderBottomLeftRadius: '8px',
           background: d.net === 'HPC' ? T.hp2 : T.sf3,
           color: d.net === 'HPC' ? T.hp : T.dm,
@@ -150,7 +150,7 @@ export function DeliverableNode({
         </Box>
         <Box
           sx={{
-            fontSize: 11.5, fontWeight: 600, lineHeight: 1.35, flex: 1, overflow: 'hidden',
+            fontSize: 13, fontWeight: 600, lineHeight: 1.35, flex: 1, overflow: 'hidden',
             display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
           }}
         >
@@ -161,7 +161,7 @@ export function DeliverableNode({
             component="span"
             title={`Release schedule ${d.seriesIdx}/${d.seriesTotal}`}
             sx={{
-              fontFamily: FONT_MONO, fontSize: 9, fontWeight: 600, padding: '1px 5px',
+              fontFamily: FONT_MONO, fontSize: 10.5, fontWeight: 600, padding: '1px 5px',
               borderRadius: '9px', background: T.vi2, color: T.vi, border: `1px solid ${T.vi3}`,
               flex: '0 0 auto', mt: '1px',
             }}
@@ -173,7 +173,7 @@ export function DeliverableNode({
 
       <Box
         sx={{
-          fontSize: 9.5, color: T.dm2, margin: '6px 0', pl: '8px', fontFamily: FONT_MONO,
+          fontSize: 11, color: T.dm2, margin: '6px 0', pl: '8px', fontFamily: FONT_MONO,
           whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
         }}
       >
@@ -202,7 +202,7 @@ function Chip({ c, bg, bd, children }: { c: string; bg: string; bd: string; chil
     <Box
       component="span"
       sx={{
-        fontFamily: FONT_MONO, fontSize: 8.5, padding: '1px 4px', borderRadius: '5px',
+        fontFamily: FONT_MONO, fontSize: 10, padding: '1px 4px', borderRadius: '5px',
         border: `1px solid ${bd}`, background: bg, color: c, whiteSpace: 'nowrap',
       }}
     >
