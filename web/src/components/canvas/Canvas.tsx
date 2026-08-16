@@ -93,12 +93,11 @@ export function Canvas({ ip, phases, usersById, canEdit, onSaveLayout }: Props) 
     const vp = vpRef.current;
     if (!vp) return;
     const todayCanvas = tx ?? W / 2;
-    // "contain" 배율 — 캔버스 전체가 보이는 최대 줌
-    const fitZ = Math.max(ZOOM_MIN, Math.min(
-      vp.clientWidth / W,
-      vp.clientHeight / H,
-      ZOOM_MAX,
-    ));
+    // contain 배율(전체 보기)과 가독 최소 배율(0.75) 중 큰 쪽을 초기 줌으로 사용.
+    // canvas가 클 때는 0.75로 고정해 artifact 텍스트가 읽힐 수 있게 하고,
+    // canvas가 작을 때는 contain 배율(> 0.75)로 전체를 보여 준다.
+    const containZ = Math.min(vp.clientWidth / W, vp.clientHeight / H, ZOOM_MAX);
+    const fitZ = Math.max(ZOOM_MIN, Math.max(containZ, 0.75));
     // today가 뷰포트 수평 중앙에 오도록 panX 계산; clampVP가 수직 centering 처리
     const c = clampVP(fitZ, vp.clientWidth / 2 - todayCanvas * fitZ, 0);
     st.getState().setVP(c.z, c.x, c.y);
