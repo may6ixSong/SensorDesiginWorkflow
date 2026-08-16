@@ -58,11 +58,11 @@ export interface SchematicPalette {
 const REF_W = 2400;
 const REF_H = 1350;
 /** Routing grid pitch, in reference units. */
-const PITCH = 34;
+const PITCH = 52;
 /** Every Nth grid row carries a full-width bus. */
-const H_BUS_EVERY = 3;
+const H_BUS_EVERY = 5;
 /** Every Nth grid column carries a full-height bus. */
-const V_BUS_EVERY = 6;
+const V_BUS_EVERY = 9;
 /** Corner cut length that gives traces their chamfered PCB look. */
 const CHAMFER = 8;
 /** Uniform stroke width for every trace/outline, in reference units. */
@@ -160,7 +160,7 @@ function buildBoard(seed: number) {
   /* branch traces breaking off the horizontal buses, ending in a pad */
   busRows.forEach((r) => {
     for (let c = 1; c < cols - 1; c += 1) {
-      if (rand() < 0.62) continue;
+      if (rand() < 0.75) continue;
       const dir = rand() < 0.5 ? -1 : 1;
       const v1 = 1 + Math.floor(rand() * 2);
       const pts: Pt[] = [{ x: gx(c), y: gy(r) }, { x: gx(c), y: gy(r + dir * v1) }];
@@ -184,7 +184,7 @@ function buildBoard(seed: number) {
   /* short parallel companion traces beside a bus — the "ribbon" look */
   busRows.forEach((r) => {
     for (let n = 0; n < 2; n++) {
-      if (rand() < 0.45) continue;
+      if (rand() < 0.65) continue;
       const c0 = Math.floor(rand() * Math.max(1, cols - 7));
       const len = 3 + Math.floor(rand() * 6);
       const off = (rand() < 0.5 ? -1 : 1) * ch * 0.36;
@@ -231,13 +231,13 @@ function buildBoard(seed: number) {
   /* inline parts along the buses — real component symbols, not blank marks */
   busRows.forEach((r) => {
     for (let c = 1; c < cols - 1; c += 2) {
-      if (rand() < 0.5) continue;
+      if (rand() < 0.65) continue;
       parts.push({ kind: pickKind(), x: gx(c) + cw / 2, y: gy(r), rot: 0 });
     }
   });
   busCols.forEach((c) => {
     for (let r = 1; r < rows - 1; r += 2) {
-      if (rand() < 0.62) continue;
+      if (rand() < 0.75) continue;
       parts.push({ kind: pickKind(), x: gx(c), y: gy(r) + ch / 2, rot: 90 });
     }
   });
@@ -247,7 +247,7 @@ function buildBoard(seed: number) {
   for (let r = 0; r < rows; r++) {
     if (busRows.includes(r)) continue;
     for (let c = 1; c < cols - 1; c += 2) {
-      if (rand() < 0.82) continue;
+      if (rand() < 0.92) continue;
       const len = 1 + Math.floor(rand() * 2);
       const dir = rand() < 0.5 ? -1 : 1;
       const y2 = gy(Math.max(0, Math.min(rows - 1, r + dir * len)));
