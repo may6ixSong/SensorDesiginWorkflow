@@ -67,39 +67,55 @@ export function Canvas({ ip, phases, usersById, canEdit, onSaveLayout }: Props) 
   const allBlocks = useCallback((): Blk[] => [...st.getState().nodes, ...st.getState().memos], [st]);
 
   /* ── zoom clamp ──
-   * 최소 줌 = 캔버스가 뷰포트를 가로·세로 모두 꽉 채우는 배율. 즉 아무리 축소해도
-   * 캔버스 밖 빈 공간이 보이지 않는다. 가로/세로 중 더 큰 비율을 택한다. */
-  const minZoom = useCallback(() => {
-    const vp = vpRef.current;
-    if (!vp) return ZOOM_MIN;
-    return Math.max(ZOOM_MIN, vp.clientWidth / W, vp.clientHeight / H);
-  }, [W, H]);
+   * 최소 줌은 ZOOM_MIN 고정 하한만 둔다.
+   * canvas가 viewport보다 작을 때는 edge에 붙이지 않고 가운데에 띄운다.
+   * canvas가 viewport보다 클 때는 기존처럼 edge-clamp(스크롤 가능). */
+  const minZoom = useCallback(() => ZOOM_MIN, []);
 
   const clampVP = useCallback(
     (nz: number, nx: number, ny: number) => {
       const vp = vpRef.current;
       const mz = minZoom();
-      // 채움 배율이 ZOOM_MAX보다 커질 수 있으므로 상한도 함께 올린다.
       const zz = Math.max(mz, Math.min(Math.max(ZOOM_MAX, mz), nz));
       if (!vp) return { z: zz, x: nx, y: ny };
-      const xx = Math.min(0, Math.max(vp.clientWidth - W * zz, nx));
-      const yy = Math.min(0, Math.max(vp.clientHeight - H * zz, ny));
+      const fitW = vp.clientWidth - W * zz;
+      const fitH = vp.clientHeight - H * zz;
+      // 캔버스가 뷰포트보다 작으면 중앙 정렬; 크면 edge-clamp
+      const xx = fitW >= 0 ? fitW / 2 : Math.min(0, Math.max(fitW, nx));
+      const yy = fitH >= 0 ? fitH / 2 : Math.min(0, Math.max(fitH, ny));
       return { z: zz, x: xx, y: yy };
     },
     [minZoom, W, H],
   );
 
-  // 최초/리사이즈/캔버스 높이 변화 시 빈 공간이 생기지 않게 다시 맞춘다 (설계서 7.1)
+  // IP가 바뀔 때: today를 뷰포트 중앙에 오도록 초기 위치 설정
   useEffect(() => {
-    const fit = () => {
+    const vp = vpRef.current;
+    if (!vp) return;
+    const todayCanvas = tx ?? W / 2;
+    // "contain" 배율 — 캔버스 전체가 보이는 최대 줌
+    const fitZ = Math.max(ZOOM_MIN, Math.min(
+      vp.clientWidth / W,
+      vp.clientHeight / H,
+      ZOOM_MAX,
+    ));
+    // today가 뷰포트 수평 중앙에 오도록 panX 계산; clampVP가 수직 centering 처리
+    const c = clampVP(fitZ, vp.clientWidth / 2 - todayCanvas * fitZ, 0);
+    st.getState().setVP(c.z, c.x, c.y);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ip.id]);
+
+  // 윈도우 리사이즈 or 캔버스 크기 변화 시 현재 줌/팬을 재클램프
+  useEffect(() => {
+    const refit = () => {
       const s = st.getState();
-      const c = clampVP(Math.max(s.z, minZoom()), s.x, s.y);
+      const c = clampVP(s.z, s.x, s.y);
       s.setVP(c.z, c.x, c.y);
     };
-    fit();
-    window.addEventListener('resize', fit);
-    return () => window.removeEventListener('resize', fit);
-  }, [clampVP, minZoom, st, ip.id]);
+    refit();
+    window.addEventListener('resize', refit);
+    return () => window.removeEventListener('resize', refit);
+  }, [clampVP, st]);
 
   const cvPt = (e: { clientX: number; clientY: number }) => {
     const cv = cvRef.current!;
@@ -432,7 +448,7 @@ export function Canvas({ ip, phases, usersById, canEdit, onSaveLayout }: Props) 
         onClick={onVpClick}
         sx={{
           flex: 1, overflow: 'hidden', position: 'relative',
-          background: T.bg,
+          background: T.sf,
           ...(edit ? { outline: `2px solid ${T.tl3}`, outlineOffset: '-2px' } : {}),
         }}
       >
