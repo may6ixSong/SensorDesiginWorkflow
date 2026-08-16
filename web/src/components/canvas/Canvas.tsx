@@ -503,9 +503,7 @@ export function Canvas({ ip, phases, usersById, canEdit, onSaveLayout }: Props) 
           })}
 
           {/* today 세로선 — 블록 뒤에 깔림 */}
-          {!edit && tx !== null && (
-            <Box sx={{ position: 'absolute', top: 0, bottom: 0, left: tx, width: '1.5px', background: T.rd, opacity: 0.55, zIndex: 0, pointerEvents: 'none' }} />
-          )}
+          {/* today 세로선은 screen-space overlay로 이전 — canvas scale 영향 없음 */}
 
           <EdgeLayer
             nodes={nodes}
@@ -565,6 +563,16 @@ export function Canvas({ ip, phases, usersById, canEdit, onSaveLayout }: Props) 
             />
           ))}
         </Box>
+
+        {/* Today 세로선 — canvas scale() 밖에서 고정 1.5px 폭으로 렌더 */}
+        {!edit && tx !== null && (
+          <Box sx={{
+            position: 'absolute', top: 0, bottom: 0,
+            left: Math.round(tx * z + panX), width: '1.5px',
+            background: T.rd, opacity: 0.55,
+            pointerEvents: 'none', zIndex: 1,
+          }} />
+        )}
 
         {/* Phase 경계 점선 — canvas scale() 밖에 렌더하므로 zoom에 관계없이
             dash 패턴이 항상 동일한 픽셀 크기를 유지한다. */}
