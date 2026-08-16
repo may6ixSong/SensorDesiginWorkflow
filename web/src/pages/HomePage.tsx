@@ -85,7 +85,7 @@ function useCircuitGraph(count: number, seed = 7): { nodes: GraphNode[]; edges: 
         .filter((o) => o.j !== i)
         .sort((a, b) => a.d - b.d)
         .slice(0, 2)
-        .filter((o) => o.d < 20);
+        .filter((o) => o.d < 22);
       near.forEach((o) => {
         const key = [Math.min(i, o.j), Math.max(i, o.j)].join('-');
         if (!seen.has(key)) {
@@ -126,9 +126,9 @@ const PALETTE: Record<'light' | 'dark', Palette> = {
     ctaGhostBg: 'rgba(255,255,255,.07)',
     ctaGhostBorder: 'rgba(255,255,255,.24)',
     ctaGhostShadow: '0 12px 28px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.16)',
-    circuitLine: 'rgba(140,170,255,.16)',
-    circuitNode: 'rgba(180,206,255,.5)',
-    circuitActive: 'rgba(46,230,197,.6)',
+    circuitLine: 'rgba(140,170,255,.24)',
+    circuitNode: 'rgba(190,212,255,.62)',
+    circuitActive: 'rgba(46,230,197,.75)',
   },
   light: {
     stageBg: '#eef1f8',
@@ -157,9 +157,9 @@ const PALETTE: Record<'light' | 'dark', Palette> = {
     ctaGhostBg: 'rgba(255,255,255,.55)',
     ctaGhostBorder: 'rgba(20,32,47,.16)',
     ctaGhostShadow: '0 12px 24px rgba(30,42,70,.10), inset 0 1px 0 rgba(255,255,255,.7)',
-    circuitLine: 'rgba(60,80,140,.12)',
-    circuitNode: 'rgba(60,80,140,.35)',
-    circuitActive: 'rgba(12,154,131,.5)',
+    circuitLine: 'rgba(60,80,140,.18)',
+    circuitNode: 'rgba(60,80,140,.46)',
+    circuitActive: 'rgba(12,154,131,.62)',
   },
 } as const;
 
@@ -172,7 +172,7 @@ export function HomePage() {
   const { data: users } = useUsers();
   const { mode } = useThemeMode();
   const pal = useMemo(() => PALETTE[mode], [mode]);
-  const { nodes: circuitNodes, edges: circuitEdges } = useCircuitGraph(46);
+  const { nodes: circuitNodes, edges: circuitEdges } = useCircuitGraph(60);
   const stageRef = useRef<HTMLDivElement>(null);
   const raf = useRef(0);
 
