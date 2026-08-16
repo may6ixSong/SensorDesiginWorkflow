@@ -470,18 +470,15 @@ export function Canvas({ ip, phases, usersById, canEdit, onSaveLayout }: Props) 
               : {}),
           }}
         >
-          {/* Phase 레인 */}
+          {/* Phase 레인 — 경계선은 canvas 밖 screen-space에서 그린다 */}
           {phases.map((p) => {
             const g = lanes[p.key];
-            const isFlash = flashBnd !== null && Math.abs(g.x + g.w - flashBnd) < 4;
             return (
               <Box
                 key={p.key}
                 data-lane={p.key}
                 sx={{
                   position: 'absolute', top: 0, bottom: 0, left: g.x, width: g.w,
-                  borderRight: `2px dashed ${isFlash ? T.tl : T.ln2}`,
-                  transition: 'border-color .2s',
                   pointerEvents: 'none',
                 }}
               >
@@ -568,6 +565,27 @@ export function Canvas({ ip, phases, usersById, canEdit, onSaveLayout }: Props) 
             />
           ))}
         </Box>
+
+        {/* Phase 경계 점선 — canvas scale() 밖에 렌더하므로 zoom에 관계없이
+            dash 패턴이 항상 동일한 픽셀 크기를 유지한다. */}
+        {phases.map((p) => {
+          const g = lanes[p.key];
+          const lineX = Math.round((g.x + g.w) * z + panX);
+          const isFlash = flashBnd !== null && Math.abs(g.x + g.w - flashBnd) < 4;
+          const col = isFlash ? T.tl : T.ln2;
+          return (
+            <Box
+              key={`ph-line-${p.key}`}
+              sx={{
+                position: 'absolute', top: 0, bottom: 0,
+                left: lineX, width: 2,
+                backgroundImage: `repeating-linear-gradient(to bottom, ${col} 0, ${col} 5px, transparent 5px, transparent 10px)`,
+                pointerEvents: 'none',
+                zIndex: 1,
+              }}
+            />
+          );
+        })}
 
         <Legend />
         <Toolbox
