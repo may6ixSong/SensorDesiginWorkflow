@@ -9,12 +9,6 @@ import { HERO_SERVICES } from '@/config/heroServices';
 
 const LANES = ['CONCEPT', 'DESIGN', 'VERIFY', 'TAPE-OUT'];
 
-/**
- * Reference size the card x/y offsets in heroServices.ts are authored against,
- * used only to convert those px offsets into the flat SVG's 0–100 coordinate
- * space for the card→wordmark connector lines below. Cards themselves are
- * positioned by real CSS transforms and don't depend on this.
- */
 const HERO_REF_W = 1600;
 const HERO_REF_H = 896;
 const HUB = { x: 50, y: 45 };
@@ -30,11 +24,6 @@ function connectorPath(svcX: number, svcY: number) {
   return `M ${x} ${y} Q ${midX} ${midY}, ${HUB.x} ${HUB.y}`;
 }
 
-/**
- * Short right-angle PCB-trace stub behind a card — purely decorative, hinting
- * that the card is wired into something beneath it, independent of the
- * card→hub connector above.
- */
 function circuitTrace(svcX: number, svcY: number, seed: number) {
   const { x: px, y: py } = toPct(svcX, svcY);
   const rand = makeRng(seed);
@@ -49,7 +38,6 @@ function circuitTrace(svcX: number, svcY: number, seed: number) {
   };
 }
 
-/** Bottom anchor (x%, per-lane) each flow line starts from, converging up into the wordmark. */
 const FLOW_PATHS = [
   'M 10 92 C 25 70, 34 55, 49 40',
   'M 30 96 C 38 74, 42 58, 49.5 41',
@@ -79,9 +67,10 @@ interface Palette {
   ctaText: string;
   ctaShadow: string;
   ctaShadowHover: string;
-  circuitLine: string;
-  circuitNode: string;
-  circuitActive: string;
+  schematicLine: string;
+  schematicActive: string;
+  schematicComp: string;
+  schematicNode: string;
   connLive: string;
   connPending: string;
   badgeLiveBg: string;
@@ -89,7 +78,6 @@ interface Palette {
   badgePendingText: string;
 }
 
-/** Seeded PRNG (Park–Miller) so the backdrop graph is stable across re-renders. */
 function makeRng(seed: number) {
   let s = seed;
   return () => {
@@ -98,41 +86,74 @@ function makeRng(seed: number) {
   };
 }
 
-interface GraphNode { x: number; y: number }
-interface GraphEdge { a: GraphNode; b: GraphNode; active: boolean }
+interface SchLine { x1: number; y1: number; x2: number; y2: number; active: boolean }
+interface SchComp { cx: number; cy: number; type: 'R' | 'C'; horiz: boolean; active: boolean }
+interface SchChip { x: number; y: number; w: number; h: number }
+interface SchJunction { x: number; y: number }
 
-/**
- * Sparse circuit-board style constellation covering the full stage — the very
- * back-most layer, behind the aurora. Fills the empty corners with quiet,
- * always-on motion instead of flat dead space, without touching the existing
- * composition (lanes/cards/wordmark) in front of it.
- */
-function useCircuitGraph(count: number, seed = 7): { nodes: GraphNode[]; edges: GraphEdge[] } {
+function useAnalogSchematic(seed = 42) {
   return useMemo(() => {
     const rand = makeRng(seed);
-    const nodes: GraphNode[] = Array.from({ length: count }, () => ({
-      x: rand() * 100,
-      y: rand() * 100,
-    }));
-    const seen = new Set<string>();
-    const edges: GraphEdge[] = [];
-    nodes.forEach((n, i) => {
-      const near = nodes
-        .map((m, j) => ({ j, d: Math.hypot(n.x - m.x, n.y - m.y) }))
-        .filter((o) => o.j !== i)
-        .sort((a, b) => a.d - b.d)
-        .slice(0, 2)
-        .filter((o) => o.d < 22);
-      near.forEach((o) => {
-        const key = [Math.min(i, o.j), Math.max(i, o.j)].join('-');
-        if (!seen.has(key)) {
-          seen.add(key);
-          edges.push({ a: n, b: nodes[o.j], active: rand() < 0.3 });
+    const COLS = 18, ROWS = 11;
+    const gx = (c: number) => 1.5 + c * (97 / (COLS - 1));
+    const gy = (r: number) => 3 + r * (94 / (ROWS - 1));
+
+    const hLines: SchLine[] = [];
+    const vLines: SchLine[] = [];
+    const comps: SchComp[] = [];
+    const chips: SchChip[] = [];
+
+    // Horizontal traces — skip mid-screen band where wordmark lives
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS - 1; c++) {
+        if (rand() < 0.50) {
+          const active = rand() < 0.20;
+          const x1 = gx(c), x2 = gx(c + 1), y = gy(r);
+          hLines.push({ x1, y1: y, x2, y2: y, active });
+          if (rand() < 0.26) {
+            comps.push({ cx: (x1 + x2) / 2, cy: y, type: rand() < 0.55 ? 'R' : 'C', horiz: true, active });
+          }
         }
-      });
+      }
+    }
+
+    // Vertical traces
+    for (let c = 0; c < COLS; c++) {
+      for (let r = 0; r < ROWS - 1; r++) {
+        if (rand() < 0.38) {
+          const active = rand() < 0.14;
+          const x = gx(c), y1 = gy(r), y2 = gy(r + 1);
+          vLines.push({ x1: x, y1, x2: x, y2, active });
+          if (rand() < 0.18) {
+            comps.push({ cx: x, cy: (y1 + y2) / 2, type: rand() < 0.6 ? 'R' : 'C', horiz: false, active });
+          }
+        }
+      }
+    }
+
+    // Chip blocks — small IC rectangles with pin stubs
+    for (let i = 0; i < 5; i++) {
+      const c = 1 + Math.floor(rand() * (COLS - 3));
+      const r = 1 + Math.floor(rand() * (ROWS - 3));
+      chips.push({ x: gx(c) - 2.4, y: gy(r) - 1.8, w: 4.8, h: 3.6 });
+    }
+
+    // Junctions at shared grid nodes
+    const hSet = new Set<string>();
+    const vSet = new Set<string>();
+    const key = (x: number, y: number) => `${Math.round(x * 10)},${Math.round(y * 10)}`;
+    hLines.forEach(l => { hSet.add(key(l.x1, l.y1)); hSet.add(key(l.x2, l.y2)); });
+    vLines.forEach(l => { vSet.add(key(l.x1, l.y1)); vSet.add(key(l.x2, l.y2)); });
+    const junctions: SchJunction[] = [];
+    hSet.forEach(k => {
+      if (vSet.has(k)) {
+        const [x, y] = k.split(',').map(n => Number(n) / 10);
+        junctions.push({ x, y });
+      }
     });
-    return { nodes, edges };
-  }, [count, seed]);
+
+    return { hLines, vLines, comps, chips, junctions };
+  }, [seed]);
 }
 
 const PALETTE: Record<'light' | 'dark', Palette> = {
@@ -162,9 +183,10 @@ const PALETTE: Record<'light' | 'dark', Palette> = {
     ctaText: '#ffffff',
     ctaShadow: '0 6px 18px rgba(0,0,0,.4)',
     ctaShadowHover: '0 10px 24px rgba(0,0,0,.5)',
-    circuitLine: 'rgba(122,152,188,.15)',
-    circuitNode: 'rgba(152,176,206,.38)',
-    circuitActive: 'rgba(94,185,164,.34)',
+    schematicLine: 'rgba(122,152,188,.14)',
+    schematicActive: 'rgba(94,185,164,.28)',
+    schematicComp: 'rgba(122,152,188,.22)',
+    schematicNode: 'rgba(152,176,206,.45)',
     connLive: 'rgba(94,185,164,.58)',
     connPending: 'rgba(122,148,184,.17)',
     badgeLiveBg: 'rgba(94,185,164,.12)',
@@ -172,56 +194,96 @@ const PALETTE: Record<'light' | 'dark', Palette> = {
     badgePendingText: 'rgba(150,172,200,.5)',
   },
   light: {
-    stageBg: '#f0f4f8',
+    stageBg: '#f4f6f9',
     aurora:
-      'radial-gradient(58% 50% at 20% 16%, rgba(12,154,131,.13), transparent 70%),' +
-      'radial-gradient(50% 44% at 80% 80%, rgba(88,96,220,.10), transparent 72%),' +
-      'radial-gradient(38% 32% at 54% 50%, rgba(12,154,131,.06), transparent 68%)',
+      'radial-gradient(60% 50% at 28% 22%, rgba(92,124,158,.11), transparent 70%),' +
+      'radial-gradient(55% 46% at 76% 72%, rgba(82,104,144,.09), transparent 72%)',
     gridLine:
-      'linear-gradient(rgba(12,100,131,.07) 1px, transparent 1px),' +
-      'linear-gradient(90deg, rgba(12,100,131,.055) 1px, transparent 1px)',
-    gridMask: 'linear-gradient(to top, #000 2%, transparent 55%)',
-    laneBorder: 'rgba(12,100,131,.09)',
-    laneBg: 'rgba(12,154,131,.025)',
-    laneText: 'rgba(28,58,90,.38)',
-    cardBg: 'rgba(255,255,255,.88)',
-    cardBorder: 'rgba(12,100,131,.12)',
-    cardShadow: '0 1px 3px rgba(12,80,120,.06), 0 8px 22px -4px rgba(12,80,120,.12)',
-    cardText: '#0e1e30',
-    cardSub: '#4a6478',
-    wordmarkGradient: 'linear-gradient(160deg,#0c9a83 0%,#1a4a78 100%)',
+      'linear-gradient(rgba(92,118,152,.14) 1px, transparent 1px),' +
+      'linear-gradient(90deg, rgba(92,118,152,.11) 1px, transparent 1px)',
+    gridMask: 'linear-gradient(to top, #000 2%, transparent 66%)',
+    laneBorder: 'rgba(70,96,132,.07)',
+    laneBg: 'linear-gradient(160deg, rgba(70,96,132,.045), rgba(70,96,132,.012))',
+    laneText: 'rgba(80,102,132,.48)',
+    cardBg: '#ffffff',
+    cardBorder: 'rgba(20,32,47,.10)',
+    cardShadow: '0 8px 22px rgba(30,42,70,.09), 0 1px 2px rgba(30,42,70,.06)',
+    cardText: '#101828',
+    cardSub: '#667085',
+    wordmarkGradient: 'linear-gradient(180deg,#16202e 0%,#5a687a 100%)',
     wordmarkGlow: 'none',
-    subCopy: '#5c7a92',
-    flowStroke: 'rgba(12,154,131,.22)',
-    pulse: 'rgba(12,154,131,.7)',
+    subCopy: '#667085',
+    flowStroke: 'rgba(70,100,140,.2)',
+    pulse: 'rgba(12,154,131,.6)',
     ctaBg: '#0c9a83',
     ctaText: '#ffffff',
-    ctaShadow: '0 2px 6px rgba(12,154,131,.25), 0 6px 18px rgba(12,154,131,.18)',
-    ctaShadowHover: '0 4px 10px rgba(12,154,131,.35), 0 10px 26px rgba(12,154,131,.25)',
-    circuitLine: 'rgba(12,100,131,.11)',
-    circuitNode: 'rgba(12,154,131,.35)',
-    circuitActive: 'rgba(12,154,131,.38)',
-    connLive: 'rgba(12,154,131,.55)',
-    connPending: 'rgba(88,96,180,.12)',
+    ctaShadow: '0 6px 16px rgba(12,154,131,.2)',
+    ctaShadowHover: '0 10px 22px rgba(12,154,131,.28)',
+    schematicLine: 'rgba(60,90,130,.11)',
+    schematicActive: 'rgba(12,154,131,.26)',
+    schematicComp: 'rgba(60,90,130,.18)',
+    schematicNode: 'rgba(60,90,130,.32)',
+    connLive: 'rgba(12,154,131,.48)',
+    connPending: 'rgba(70,96,140,.15)',
     badgeLiveBg: 'rgba(12,154,131,.1)',
-    badgeLiveText: '#0b7a68',
-    badgePendingText: '#5c7a92',
+    badgeLiveText: '#0a8a75',
+    badgePendingText: '#8b99ab',
   },
 } as const;
 
-/**
- * Landing hero — no explanatory "what is this system" panel, just the 3D scene.
- * The stage itself is static (no mouse-follow tilt); instead, holding the mouse
- * still for a moment highlights a random 1–5 of the service cards for 5s — as if
- * surfacing "these are the artifacts relevant to what you're doing right now" —
- * and moving again cancels it. Dashed paths carry the mockup's `flowdash`
- * animation so lanes and connectors visibly flow.
- */
+/** Render a resistor symbol centered at (cx, cy). horiz = horizontal orientation. */
+function Resistor({ cx, cy, horiz, stroke, strokeW }: {
+  cx: number; cy: number; horiz: boolean; stroke: string; strokeW: number;
+}) {
+  const bw = 2.6, bh = 1.0, stub = 1.2;
+  if (horiz) {
+    return (
+      <g stroke={stroke} strokeWidth={strokeW} fill="none" vectorEffect="non-scaling-stroke">
+        <line x1={cx - bw / 2 - stub} y1={cy} x2={cx - bw / 2} y2={cy} />
+        <rect x={cx - bw / 2} y={cy - bh / 2} width={bw} height={bh} />
+        <line x1={cx + bw / 2} y1={cy} x2={cx + bw / 2 + stub} y2={cy} />
+      </g>
+    );
+  }
+  return (
+    <g stroke={stroke} strokeWidth={strokeW} fill="none" vectorEffect="non-scaling-stroke">
+      <line x1={cx} y1={cy - bw / 2 - stub} x2={cx} y2={cy - bw / 2} />
+      <rect x={cx - bh / 2} y={cy - bw / 2} width={bh} height={bw} />
+      <line x1={cx} y1={cy + bw / 2} x2={cx} y2={cy + bw / 2 + stub} />
+    </g>
+  );
+}
+
+/** Render a capacitor symbol centered at (cx, cy). */
+function Capacitor({ cx, cy, horiz, stroke, strokeW }: {
+  cx: number; cy: number; horiz: boolean; stroke: string; strokeW: number;
+}) {
+  const gap = 0.55, plateH = 1.4, stub = 1.2;
+  if (horiz) {
+    return (
+      <g stroke={stroke} strokeWidth={strokeW} fill="none" vectorEffect="non-scaling-stroke">
+        <line x1={cx - stub - gap} y1={cy} x2={cx - gap} y2={cy} />
+        <line x1={cx - gap} y1={cy - plateH / 2} x2={cx - gap} y2={cy + plateH / 2} />
+        <line x1={cx + gap} y1={cy - plateH / 2} x2={cx + gap} y2={cy + plateH / 2} />
+        <line x1={cx + gap} y1={cy} x2={cx + gap + stub} y2={cy} />
+      </g>
+    );
+  }
+  return (
+    <g stroke={stroke} strokeWidth={strokeW} fill="none" vectorEffect="non-scaling-stroke">
+      <line x1={cx} y1={cy - stub - gap} x2={cx} y2={cy - gap} />
+      <line x1={cx - plateH / 2} y1={cy - gap} x2={cx + plateH / 2} y2={cy - gap} />
+      <line x1={cx - plateH / 2} y1={cy + gap} x2={cx + plateH / 2} y2={cy + gap} />
+      <line x1={cx} y1={cy + gap} x2={cx} y2={cy + gap + stub} />
+    </g>
+  );
+}
+
 export function HomePage() {
   const { data: users } = useUsers();
   const { mode } = useThemeMode();
   const pal = useMemo(() => PALETTE[mode], [mode]);
-  const { nodes: circuitNodes, edges: circuitEdges } = useCircuitGraph(60);
+  const { hLines, vLines, comps, chips, junctions } = useAnalogSchematic(42);
 
   const [active, setActive] = useState<Set<string> | null>(null);
   const idleTimer = useRef<number>();
@@ -249,10 +311,7 @@ export function HomePage() {
     <AppShell users={users ?? []}>
       <Box
         onMouseMove={onStageMouseMove}
-        onMouseLeave={() => {
-          clearTimers();
-          setActive(null);
-        }}
+        onMouseLeave={() => { clearTimers(); setActive(null); }}
         sx={{
           position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden',
           background: pal.stageBg,
@@ -273,31 +332,64 @@ export function HomePage() {
           },
         }}
       >
-        {/* backmost layer — sparse circuit-board constellation filling the empty space */}
+        {/* backmost layer — analog circuit schematic, very faint */}
         <Box
           component="svg"
           viewBox="0 0 100 100"
           preserveAspectRatio="none"
           sx={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
         >
-          {circuitEdges.map((e, i) => (
+          {/* plain horizontal traces */}
+          {hLines.map((l, i) => (
             <line
-              key={i}
-              x1={e.a.x} y1={e.a.y} x2={e.b.x} y2={e.b.y}
-              stroke={e.active ? pal.circuitActive : pal.circuitLine}
-              strokeWidth={e.active ? 0.16 : 0.12}
+              key={`h${i}`}
+              x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2}
+              stroke={l.active ? pal.schematicActive : pal.schematicLine}
+              strokeWidth={l.active ? 0.15 : 0.10}
               vectorEffect="non-scaling-stroke"
-              strokeDasharray={e.active ? '1.4 1.2' : undefined}
-              style={e.active ? { animation: `flowdash ${4 + (i % 5)}s linear infinite` } : undefined}
+              strokeDasharray={l.active ? '1.6 1.2' : undefined}
+              style={l.active ? { animation: `flowdash ${5 + (i % 6)}s linear infinite` } : undefined}
             />
           ))}
-          {circuitNodes.map((n, i) => (
-            <circle key={i} cx={n.x} cy={n.y} r={0.28} fill={pal.circuitNode}>
+          {/* plain vertical traces */}
+          {vLines.map((l, i) => (
+            <line
+              key={`v${i}`}
+              x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2}
+              stroke={l.active ? pal.schematicActive : pal.schematicLine}
+              strokeWidth={l.active ? 0.15 : 0.10}
+              vectorEffect="non-scaling-stroke"
+              strokeDasharray={l.active ? '1.6 1.2' : undefined}
+              style={l.active ? { animation: `flowdash ${5 + (i % 4)}s linear infinite reverse` } : undefined}
+            />
+          ))}
+          {/* component symbols */}
+          {comps.map((c, i) =>
+            c.type === 'R'
+              ? <Resistor key={`c${i}`} cx={c.cx} cy={c.cy} horiz={c.horiz}
+                  stroke={c.active ? pal.schematicActive : pal.schematicComp} strokeW={0.12} />
+              : <Capacitor key={`c${i}`} cx={c.cx} cy={c.cy} horiz={c.horiz}
+                  stroke={c.active ? pal.schematicActive : pal.schematicComp} strokeW={0.12} />
+          )}
+          {/* IC chip outlines */}
+          {chips.map((ch, i) => (
+            <rect
+              key={`chip${i}`}
+              x={ch.x} y={ch.y} width={ch.w} height={ch.h}
+              fill="none"
+              stroke={pal.schematicComp}
+              strokeWidth={0.10}
+              vectorEffect="non-scaling-stroke"
+            />
+          ))}
+          {/* junction dots at wire crossings */}
+          {junctions.map((j, i) => (
+            <circle key={`j${i}`} cx={j.x} cy={j.y} r={0.22} fill={pal.schematicNode}>
               <animate
                 attributeName="opacity"
-                values="0.15;0.85;0.15"
-                dur={`${3.5 + (i % 6) * 0.6}s`}
-                begin={`${(i % 9) * 0.35}s`}
+                values="0.3;1;0.3"
+                dur={`${4 + (i % 7) * 0.5}s`}
+                begin={`${(i % 11) * 0.3}s`}
                 repeatCount="indefinite"
               />
             </circle>
@@ -331,7 +423,7 @@ export function HomePage() {
           }}
         />
 
-        {/* flow lines — lanes converging up into the wordmark, dashes carry the canvas's flowdash motion */}
+        {/* flow lines — lanes converging up into the wordmark */}
         <Box
           component="svg"
           viewBox="0 0 100 100"
@@ -354,12 +446,7 @@ export function HomePage() {
           ))}
           {FLOW_PATHS.map((d, i) => (
             <circle key={`p-${d}`} r={0.38} fill={pal.pulse} opacity={0}>
-              <animateMotion
-                dur={`${3.2 + i * 0.5}s`}
-                begin={`${i * 0.6}s`}
-                repeatCount="indefinite"
-                rotate="auto"
-              >
+              <animateMotion dur={`${3.2 + i * 0.5}s`} begin={`${i * 0.6}s`} repeatCount="indefinite" rotate="auto">
                 <mpath href={`#acro-flow-${i}`} />
               </animateMotion>
               <animate
@@ -374,8 +461,7 @@ export function HomePage() {
           ))}
         </Box>
 
-        {/* faint circuit traces behind each card — decorative PCB stubs, always on,
-            independent of the mouse-idle highlight below */}
+        {/* faint circuit traces behind each service card */}
         <Box
           component="svg"
           viewBox="0 0 100 100"
@@ -386,24 +472,16 @@ export function HomePage() {
             const trace = circuitTrace(svc.x, svc.y, 100 + i);
             return (
               <g key={svc.name}>
-                <path
-                  d={trace.d}
-                  fill="none"
-                  stroke={pal.circuitLine}
-                  strokeWidth={0.1}
-                  vectorEffect="non-scaling-stroke"
-                />
+                <path d={trace.d} fill="none" stroke={pal.schematicLine} strokeWidth={0.1} vectorEffect="non-scaling-stroke" />
                 {trace.vias.map((v, vi) => (
-                  <circle key={vi} cx={v.x} cy={v.y} r={0.16} fill={pal.circuitLine} />
+                  <circle key={vi} cx={v.x} cy={v.y} r={0.16} fill={pal.schematicLine} />
                 ))}
               </g>
             );
           })}
         </Box>
 
-        {/* service connectors — each card wired back into the ACRO hub; live ones (already
-            running as their own service elsewhere) glow and flow, pending ones sit dim and still.
-            Whichever cards the mouse-idle highlight below picked light up brighter; the rest fade. */}
+        {/* service connectors */}
         <Box
           component="svg"
           viewBox="0 0 100 100"
@@ -454,7 +532,7 @@ export function HomePage() {
           ))}
         </Box>
 
-        {/* stage — static now (no mouse-follow tilt); depth still comes from perspective + translateZ */}
+        {/* stage */}
         <Box
           sx={{
             position: 'relative', width: '100%', height: '100%',
@@ -463,13 +541,8 @@ export function HomePage() {
             display: 'grid', placeItems: 'center',
           }}
         >
-          {/* lane plates — the canvas's Phase lanes, stood up in 3D */}
-          <Box
-            sx={{
-              position: 'absolute', display: 'flex', gap: '18px',
-              transform: 'translateZ(-320px)',
-            }}
-          >
+          {/* lane plates */}
+          <Box sx={{ position: 'absolute', display: 'flex', gap: '18px', transform: 'translateZ(-320px)' }}>
             {LANES.map((l, i) => (
               <Box key={l} sx={{ transform: `translateZ(${i * 22}px)`, transformStyle: 'preserve-3d' }}>
                 <Box
@@ -489,63 +562,62 @@ export function HomePage() {
             ))}
           </Box>
 
-          {/* floating deliverable/service cards — content lives in config/heroServices.ts.
-              Holding the mouse still picks a random 1–5 of these as "active"; the rest fade. */}
+          {/* floating service cards */}
           {HERO_SERVICES.map((svc) => {
             const isDim = active !== null && !active.has(svc.name);
             const isBoosted = active !== null && active.has(svc.name);
             return (
-            <Box
-              key={svc.name}
-              sx={{
-                position: 'absolute', pointerEvents: 'none', transformStyle: 'preserve-3d',
-                transform: `translate3d(${svc.x}px, ${svc.y}px, ${svc.z}px) rotateY(${svc.r}deg)`,
-              }}
-            >
               <Box
+                key={svc.name}
                 sx={{
-                  width: 224, padding: '15px 16px', borderRadius: '10px',
-                  background: pal.cardBg,
-                  border: `1px solid ${isBoosted ? svc.color : pal.cardBorder}`,
-                  boxShadow: pal.cardShadow,
-                  color: pal.cardText,
-                  opacity: isDim ? 0.28 : 1,
-                  transition: 'opacity .5s ease, background .3s, border-color .35s, box-shadow .3s, color .3s',
+                  position: 'absolute', pointerEvents: 'none', transformStyle: 'preserve-3d',
+                  transform: `translate3d(${svc.x}px, ${svc.y}px, ${svc.z}px) rotateY(${svc.r}deg)`,
                 }}
               >
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: '9px' }}>
-                  <Box sx={{ width: 22, height: 2, borderRadius: 1, background: svc.color }} />
-                  <Box
-                    sx={{
-                      display: 'inline-flex', alignItems: 'center', gap: '4px',
-                      fontFamily: FONT_MONO, fontSize: 8, letterSpacing: '.08em',
-                      padding: '2px 6px', borderRadius: '999px',
-                      background: svc.connected ? pal.badgeLiveBg : 'transparent',
-                      color: svc.connected ? pal.badgeLiveText : pal.badgePendingText,
-                    }}
-                  >
-                    <Box
-                      component="span"
-                      sx={{
-                        width: 4, height: 4, borderRadius: '50%',
-                        background: 'currentColor',
-                        boxShadow: svc.connected ? '0 0 5px currentColor' : 'none',
-                      }}
-                    />
-                    {svc.connected ? `LIVE ${svc.port}` : 'PENDING'}
-                  </Box>
-                </Box>
-                <Box sx={{ fontSize: 12.5, fontWeight: 600, letterSpacing: '-.01em' }}>{svc.name}</Box>
                 <Box
                   sx={{
-                    fontFamily: FONT_MONO, fontSize: 9, letterSpacing: '.14em',
-                    color: pal.cardSub, mt: '5px', transition: 'color .3s',
+                    width: 224, padding: '15px 16px', borderRadius: '10px',
+                    background: pal.cardBg,
+                    border: `1px solid ${isBoosted ? svc.color : pal.cardBorder}`,
+                    boxShadow: pal.cardShadow,
+                    color: pal.cardText,
+                    opacity: isDim ? 0.28 : 1,
+                    transition: 'opacity .5s ease, background .3s, border-color .35s, box-shadow .3s, color .3s',
                   }}
                 >
-                  {svc.tag}
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: '9px' }}>
+                    <Box sx={{ width: 22, height: 2, borderRadius: 1, background: svc.color }} />
+                    <Box
+                      sx={{
+                        display: 'inline-flex', alignItems: 'center', gap: '4px',
+                        fontFamily: FONT_MONO, fontSize: 8, letterSpacing: '.08em',
+                        padding: '2px 6px', borderRadius: '999px',
+                        background: svc.connected ? pal.badgeLiveBg : 'transparent',
+                        color: svc.connected ? pal.badgeLiveText : pal.badgePendingText,
+                      }}
+                    >
+                      <Box
+                        component="span"
+                        sx={{
+                          width: 4, height: 4, borderRadius: '50%',
+                          background: 'currentColor',
+                          boxShadow: svc.connected ? '0 0 5px currentColor' : 'none',
+                        }}
+                      />
+                      {svc.connected ? `LIVE ${svc.port}` : 'PENDING'}
+                    </Box>
+                  </Box>
+                  <Box sx={{ fontSize: 12.5, fontWeight: 600, letterSpacing: '-.01em' }}>{svc.name}</Box>
+                  <Box
+                    sx={{
+                      fontFamily: FONT_MONO, fontSize: 9, letterSpacing: '.14em',
+                      color: pal.cardSub, mt: '5px', transition: 'color .3s',
+                    }}
+                  >
+                    {svc.tag}
+                  </Box>
                 </Box>
               </Box>
-            </Box>
             );
           })}
 
@@ -574,7 +646,6 @@ export function HomePage() {
             >
               CIS DELIVERABLE CONTROL
             </Box>
-
             <Box
               sx={{
                 display: 'flex', justifyContent: 'center', mt: '34px',
