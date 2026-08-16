@@ -1,8 +1,8 @@
 {
-  "name": "arbor-web",
+  "name": "acro-web",
   "version": "0.1.0",
   "private": true,
-  "description": "ARBOR - Analog Deliverable Release Platform Web (Vite + React + TypeScript + MUI)",
+  "description": "ACRO - Analog Deliverable Release Platform Web (Vite + React + TypeScript + MUI)",
   "type": "module",
   "scripts": {
     "dev": "vite",

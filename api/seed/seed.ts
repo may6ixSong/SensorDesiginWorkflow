@@ -1,5 +1,5 @@
 /**
- * ARBOR 개발용 목업 데이터 시드 CLI.
+ * ACRO 개발용 목업 데이터 시드 CLI.
  * 실행: npm run seed  (사전에 .env의 MONGODB_URI가 설정되어 있어야 함 - 실제 DB 전용)
  *
  * MONGODB_URI를 비워두고 그냥 `npm run start:dev`를 실행하면 DB 연결 자체 없이

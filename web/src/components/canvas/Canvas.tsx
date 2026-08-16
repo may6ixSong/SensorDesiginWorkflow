@@ -40,6 +40,7 @@ export function Canvas({ ip, phases, usersById, canEdit, onSaveLayout }: Props) 
 
   const z = useCanvasStore((s) => s.z);
   const panX = useCanvasStore((s) => s.x);
+  const panY = useCanvasStore((s) => s.y);
   const nodes = useCanvasStore((s) => s.nodes);
   const memos = useCanvasStore((s) => s.memos);
   const edges = useCanvasStore((s) => s.edges);
@@ -65,32 +66,35 @@ export function Canvas({ ip, phases, usersById, canEdit, onSaveLayout }: Props) 
 
   const allBlocks = useCallback((): Blk[] => [...st.getState().nodes, ...st.getState().memos], [st]);
 
-  /* ── zoom clamp ── */
+  /* ── zoom clamp ──
+   * 최소 줌 = 캔버스가 뷰포트를 가로·세로 모두 꽉 채우는 배율. 즉 아무리 축소해도
+   * 캔버스 밖 빈 공간이 보이지 않는다. 가로/세로 중 더 큰 비율을 택한다. */
   const minZoom = useCallback(() => {
     const vp = vpRef.current;
     if (!vp) return ZOOM_MIN;
-    return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, vp.clientWidth / W));
-  }, [W]);
+    return Math.max(ZOOM_MIN, vp.clientWidth / W, vp.clientHeight / H);
+  }, [W, H]);
 
   const clampVP = useCallback(
-    (nz: number, nx: number) => {
+    (nz: number, nx: number, ny: number) => {
       const vp = vpRef.current;
       const mz = minZoom();
-      const zz = Math.max(mz, Math.min(ZOOM_MAX, nz));
-      if (!vp) return { z: zz, x: nx };
-      const scaledW = W * zz;
-      const xx = Math.min(0, Math.max(vp.clientWidth - scaledW, nx));
-      return { z: zz, x: xx };
+      // 채움 배율이 ZOOM_MAX보다 커질 수 있으므로 상한도 함께 올린다.
+      const zz = Math.max(mz, Math.min(Math.max(ZOOM_MAX, mz), nz));
+      if (!vp) return { z: zz, x: nx, y: ny };
+      const xx = Math.min(0, Math.max(vp.clientWidth - W * zz, nx));
+      const yy = Math.min(0, Math.max(vp.clientHeight - H * zz, ny));
+      return { z: zz, x: xx, y: yy };
     },
-    [minZoom, W],
+    [minZoom, W, H],
   );
 
-  // 최초/리사이즈 시 캔버스가 뷰포트보다 좁아지지 않게 (설계서 7.1)
+  // 최초/리사이즈/캔버스 높이 변화 시 빈 공간이 생기지 않게 다시 맞춘다 (설계서 7.1)
   useEffect(() => {
     const fit = () => {
       const s = st.getState();
-      const { z: nz, x: nx } = clampVP(Math.max(s.z, minZoom()), s.x);
-      s.setVP(nz, nx);
+      const c = clampVP(Math.max(s.z, minZoom()), s.x, s.y);
+      s.setVP(c.z, c.x, c.y);
     };
     fit();
     window.addEventListener('resize', fit);
@@ -100,7 +104,8 @@ export function Canvas({ ip, phases, usersById, canEdit, onSaveLayout }: Props) 
   const cvPt = (e: { clientX: number; clientY: number }) => {
     const cv = cvRef.current!;
     const r = cv.getBoundingClientRect();
-    return { x: (e.clientX - r.left) / st.getState().z, y: e.clientY - r.top };
+    const zz = st.getState().z;
+    return { x: (e.clientX - r.left) / zz, y: (e.clientY - r.top) / zz };
   };
 
   /* ── WHEEL ZOOM — 조회 모드에서만 (설계서 7.1) ── */
@@ -109,27 +114,39 @@ export function Canvas({ ip, phases, usersById, canEdit, onSaveLayout }: Props) 
     if (!vp) return;
     const onWheel = (e: WheelEvent) => {
       const s = st.getState();
-      if (s.edit) return; // 편집 중 줌 금지
-      if (e.shiftKey) return; // shift+휠 → 세로 스크롤
-      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return; // 횡 휠 무시
       e.preventDefault();
+      // 편집 중이거나 shift+휠 → 줌 대신 화면 이동 (뷰포트는 overflow:hidden 이라 네이티브 스크롤이 없다)
+      if (s.edit || e.shiftKey) {
+        const c = e.shiftKey
+          ? clampVP(s.z, s.x - e.deltaY, s.y)
+          : clampVP(s.z, s.x - e.deltaX, s.y - e.deltaY);
+        s.setVP(c.z, c.x, c.y);
+        return;
+      }
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return; // 횡 휠 무시
       const r = vp.getBoundingClientRect();
       const mx = e.clientX - r.left;
+      const my = e.clientY - r.top;
       const dz = e.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP;
-      const nz = Math.min(ZOOM_MAX, Math.max(minZoom(), s.z + dz));
-      const nx = mx - (mx - s.x) * (nz / s.z);
-      const c = clampVP(nz, nx);
-      s.setVP(c.z, c.x);
+      const nz = s.z + dz;
+      // 커서 아래 캔버스 좌표를 고정한 채로 확대/축소 (가로·세로 동시)
+      const pre = clampVP(nz, s.x, s.y).z;
+      const k = pre / s.z;
+      const c = clampVP(pre, mx - (mx - s.x) * k, my - (my - s.y) * k);
+      s.setVP(c.z, c.x, c.y);
     };
     vp.addEventListener('wheel', onWheel, { passive: false });
     return () => vp.removeEventListener('wheel', onWheel);
   }, [clampVP, minZoom, st]);
 
   /* ── PAN — 빈 캔버스 좌드래그 / 휠 버튼 ── */
-  const panRef = useRef<{ startX: number; pid: number } | null>(null);
+  const panRef = useRef<{ startX: number; startY: number; pid: number } | null>(null);
   const onVpPointerDown = (e: React.PointerEvent) => {
     if (dragRef.current || phResizeRef.current) return;
     const target = e.target as HTMLElement;
+    // 버튼 안의 <svg> 아이콘도 target이 될 수 있다. 여기서 포인터를 캡처해버리면
+    // 버튼의 click이 아예 발생하지 않으므로 버튼 위에서는 팬을 시작하지 않는다.
+    if (target.closest('button')) return;
     const isMiddle = e.button === 1;
     const isEmptyLeft =
       e.button === 0 &&
@@ -139,7 +156,11 @@ export function Canvas({ ip, phases, usersById, canEdit, onSaveLayout }: Props) 
         target.tagName.toLowerCase() === 'svg');
     if (!isMiddle && !isEmptyLeft) return;
     e.preventDefault();
-    panRef.current = { startX: e.clientX - st.getState().x, pid: e.pointerId };
+    panRef.current = {
+      startX: e.clientX - st.getState().x,
+      startY: e.clientY - st.getState().y,
+      pid: e.pointerId,
+    };
     vpRef.current?.setPointerCapture(e.pointerId);
     if (vpRef.current) vpRef.current.style.cursor = 'grabbing';
   };
@@ -148,8 +169,8 @@ export function Canvas({ ip, phases, usersById, canEdit, onSaveLayout }: Props) 
     if (s.link) s.setLinkPos(cvPt(e));
     const p = panRef.current;
     if (!p || p.pid !== e.pointerId) return;
-    const c = clampVP(s.z, e.clientX - p.startX);
-    s.setVP(c.z, c.x);
+    const c = clampVP(s.z, e.clientX - p.startX, e.clientY - p.startY);
+    s.setVP(c.z, c.x, c.y);
   };
   const endPan = (e: React.PointerEvent) => {
     if (!panRef.current || panRef.current.pid !== e.pointerId) return;
@@ -410,7 +431,7 @@ export function Canvas({ ip, phases, usersById, canEdit, onSaveLayout }: Props) 
         onPointerCancel={endPan}
         onClick={onVpClick}
         sx={{
-          flex: 1, overflowX: 'hidden', overflowY: 'auto', position: 'relative',
+          flex: 1, overflow: 'hidden', position: 'relative',
           background: T.bg,
           ...(edit ? { outline: `2px solid ${T.tl3}`, outlineOffset: '-2px' } : {}),
         }}
@@ -423,7 +444,7 @@ export function Canvas({ ip, phases, usersById, canEdit, onSaveLayout }: Props) 
             height: H,
             transformOrigin: '0 0',
             willChange: 'transform',
-            transform: `translateX(${panX}px) scaleX(${z})`,
+            transform: `translate(${panX}px, ${panY}px) scale(${z})`,
             background: T.sf,
             ...(edit
               ? {

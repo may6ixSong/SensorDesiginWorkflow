@@ -6,7 +6,7 @@ import { useCanvasStore } from '@/store/canvasStore';
 import { toast } from '@/store/toastStore';
 import { DEPARTMENTS, RECEIVABLE_DEPARTMENTS, departmentName } from '@/shared/constants/departments';
 import { ModalShell } from '@/components/common/ModalShell';
-import { ArborButton, Badge, Chip } from '@/components/common/ArborButton';
+import { AcroButton, Badge, Chip } from '@/components/common/AcroButton';
 import { Card, Ey, Field, Row, SelectInput, TextInput } from '@/components/common/Panel';
 import { DocIcon, Icon } from '@/components/common/Icon';
 import { UserAvatar } from '@/components/common/Avatar';
@@ -180,9 +180,9 @@ function OverviewTab({
           {other.seriesTotal > 1 && <Seq>{other.seriesIdx}/{other.seriesTotal}</Seq>}
         </Box>
         <Box component="span" sx={{ fontFamily: FONT_MONO, fontSize: 10.5, color: T.dm2 }}>{op?.key ?? '—'}</Box>
-        <ArborButton variant="ghost" title="연결 해제" onClick={() => onUnlink(e.id)}>
+        <AcroButton variant="ghost" title="연결 해제" onClick={() => onUnlink(e.id)}>
           <Icon name="trash" />
-        </ArborButton>
+        </AcroButton>
       </Box>
     );
   };
@@ -237,9 +237,9 @@ function OverviewTab({
                 ))}
               </Box>
             </Field>
-            <ArborButton variant="primary" onClick={submitInfo}>
+            <AcroButton variant="primary" onClick={submitInfo}>
               <Icon name="check" /> 저장
-            </ArborButton>
+            </AcroButton>
           </Card>
 
           <Card sx={{ mb: '12px' }}>
@@ -271,12 +271,12 @@ function OverviewTab({
                 />
               </Field>
               <Box sx={{ display: 'flex', alignItems: 'flex-end' }}>
-                <ArborButton
+                <AcroButton
                   disabled={!linkable.length}
                   onClick={() => { const t = lkTgt || linkable[0]?.id; if (t) onAddLink(t); }}
                 >
                   <Icon name="plus" /> 연결
-                </ArborButton>
+                </AcroButton>
               </Box>
             </Row>
           </Card>
@@ -312,16 +312,16 @@ function OverviewTab({
         </Box>
         <Box sx={{ mt: '11px' }}>
           {d.net === 'HPC' ? (
-            <ArborButton
+            <AcroButton
               disabled={!cur}
               onClick={() => { if (cur) { navigator.clipboard?.writeText(cur); toast('경로를 복사했습니다'); } }}
             >
               <Icon name="copy" /> 경로 복사
-            </ArborButton>
+            </AcroButton>
           ) : (
-            <ArborButton disabled={!rel} onClick={() => toast('다운로드는 스토리지 연동 후 제공됩니다')}>
+            <AcroButton disabled={!rel} onClick={() => toast('다운로드는 스토리지 연동 후 제공됩니다')}>
               <Icon name="dn" /> 파일 내려받기
-            </ArborButton>
+            </AcroButton>
           )}
         </Box>
       </Card>
@@ -357,16 +357,16 @@ function OverviewTab({
             <TextInput value={note} onChange={setNote} placeholder="무엇이 바뀌었는지 한 줄로" />
           </Field>
           <Box sx={{ display: 'flex', gap: '8px' }}>
-            <ArborButton variant="primary" onClick={submitUpload}>
+            <AcroButton variant="primary" onClick={submitUpload}>
               <Icon name="up" /> 작업본 올리기
-            </ArborButton>
-            <ArborButton
+            </AcroButton>
+            <AcroButton
               disabled={!d.versions.length}
               onClick={onRelease}
               sx={{ color: T.tl, borderColor: T.tl3 }}
             >
               <Icon name="send" /> Release — v{(latR(d)?.major ?? 0) + 1}.0
-            </ArborButton>
+            </AcroButton>
           </Box>
         </Card>
       )}
@@ -476,9 +476,9 @@ function RecvTab({
           />
         </Field>
       </Row>
-      <ArborButton variant="primary" sx={{ mt: '11px' }} onClick={() => onSave({ recvDept: dept || null, recvContact: contact || null })}>
+      <AcroButton variant="primary" sx={{ mt: '11px' }} onClick={() => onSave({ recvDept: dept || null, recvContact: contact || null })}>
         <Icon name="check" /> 저장
-      </ArborButton>
+      </AcroButton>
     </Card>
   );
 }

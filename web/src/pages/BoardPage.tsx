@@ -138,10 +138,10 @@ export function BoardPage() {
     <AppShell
       projects={projects ?? []}
       projectId={projectId}
-      onChangeProject={(id) => navigate(`/projects/${id}`)}
+      onChangeProject={(id) => navigate(`/details/${id}`)}
       ips={ips ?? []}
       ipId={ipId}
-      onChangeIp={(id) => navigate(`/projects/${projectId}/ips/${id}`)}
+      onChangeIp={(id) => navigate(`/details/${projectId}/${id}`)}
       users={users ?? []}
       canToggleRecv={!!isOwner}
     >

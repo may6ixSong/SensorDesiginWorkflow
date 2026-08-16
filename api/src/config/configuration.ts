@@ -5,7 +5,7 @@ export default () => ({
   // 비어 있으면 DatabaseModule이 임시 인메모리 MongoDB를 자동으로 띄우고 목업 데이터를 시드한다.
   mongodbUri: process.env.MONGODB_URI ?? '',
   auth: {
-    devJwtSecret: process.env.DEV_JWT_SECRET ?? 'arbor-dev-secret-change-me',
+    devJwtSecret: process.env.DEV_JWT_SECRET ?? 'acro-dev-secret-change-me',
     devJwtExpiresIn: process.env.DEV_JWT_EXPIRES_IN ?? '8h',
   },
   storage: {

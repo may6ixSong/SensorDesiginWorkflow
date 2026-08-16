@@ -6,15 +6,15 @@ import { useDevLogin, useSwitchableUsers } from '@/api/hooks/useAuth';
 import { useAuthStore } from '@/store/authStore';
 
 /**
- * "/" → 접근 가능한 첫 과제/IP로 리다이렉트 (설계서 7.1 라우팅).
- * "/projects/:projectId"로 직접 진입한 경우(과제 select 변경 등)에는 그 과제의 첫 IP로 보낸다.
+ * "/details" → 접근 가능한 첫 과제/IP의 보드로 리다이렉트 (설계서 7.1 라우팅).
+ * "/details/:projectId"로 진입한 경우(과제 select 변경 등)에는 그 과제의 첫 IP로 보낸다.
  *
  * 현재 로그인된 사용자가 접근 가능한 과제가 하나도 없으면(예: 예전 세션에 로그인된 채로
  * 남아있던 브라우저의 localStorage 토큰이 접근 권한 없는 사용자인 경우), 곧바로 /no-access로
  * 보내기 전에 Analog 부서 사용자로 한 번 자동 전환을 시도한다 - Analog는 반드시 IP owner이므로
  * 접근 가능한 과제가 보장된다(설계서 3.3).
  */
-export function HomeRedirect() {
+export function DetailsRedirect() {
   const navigate = useNavigate();
   const { projectId: routeProjectId } = useParams<{ projectId?: string }>();
   const currentUser = useAuthStore((s) => s.user);
@@ -53,7 +53,7 @@ export function HomeRedirect() {
       navigate('/no-access', { replace: true });
       return;
     }
-    navigate(`/projects/${targetProjectId}/ips/${ips[0].id}`, { replace: true });
+    navigate(`/details/${targetProjectId}/${ips[0].id}`, { replace: true });
   }, [
     projectsLoading,
     projectsFetching,

@@ -11,7 +11,7 @@ interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 /** 목업 .btn / .btn.on / .btn.pr / .btn.gh */
-export const ArborButton = forwardRef<HTMLButtonElement, Props>(function ArborButton(
+export const AcroButton = forwardRef<HTMLButtonElement, Props>(function AcroButton(
   { variant = 'default', children, sx, ...rest },
   ref,
 ) {

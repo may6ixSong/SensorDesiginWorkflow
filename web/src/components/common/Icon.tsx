@@ -5,7 +5,7 @@
 export type IconName =
   | 'word' | 'excel' | 'path' | 'lock' | 'eye' | 'edit' | 'check' | 'plus' | 'x'
   | 'up' | 'dn' | 'send' | 'shield' | 'users' | 'trash' | 'note' | 'copy'
-  | 'pan' | 'grid' | 'undo' | 'expand' | 'fit' | 'hist' | 'link';
+  | 'pan' | 'grid' | 'undo' | 'expand' | 'fit' | 'hist' | 'link' | 'search' | 'list';
 
 const P: Record<IconName, { d: string; s: number }> = {
   word: { s: 14, d: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/>' },
@@ -31,6 +31,8 @@ const P: Record<IconName, { d: string; s: number }> = {
   expand: { s: 12, d: '<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>' },
   fit: { s: 14, d: '<path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/><rect x="8" y="8" width="8" height="8" rx="1"/>' },
   hist: { s: 13, d: '<path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/>' },
+  search: { s: 13, d: '<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>' },
+  list: { s: 14, d: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>' },
   link: { s: 13, d: '<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>' },
 };
 
@@ -59,10 +61,10 @@ export function DocIcon({ type, size }: { type: string; size?: number }) {
   return <Icon name={name} size={size} />;
 }
 
-/** 상단바 ARBOR 로고 (목업 .mark SVG 그대로) */
-export function ArborMark({ size = 28 }: { size?: number }) {
+/** 상단바 ACRO 로고 (목업 .mark SVG 그대로) */
+export function AcroMark({ size = 28 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 32 32" fill="none" aria-label="Arbor" style={{ flex: '0 0 auto', display: 'block' }}>
+    <svg width={size} height={size} viewBox="0 0 32 32" fill="none" aria-label="Acro" style={{ flex: '0 0 auto', display: 'block' }}>
       <path d="M16 29V13" stroke="#0c9a83" strokeWidth="2.2" strokeLinecap="round" />
       <path d="M16 20.5 L9.5 15M16 17 L22.5 11.5M16 24 L21.5 19.5" stroke="#0c9a83" strokeWidth="1.7" strokeLinecap="round" />
       <circle cx="16" cy="9.5" r="4.6" fill="#e0f5f0" stroke="#0c9a83" strokeWidth="1.5" />

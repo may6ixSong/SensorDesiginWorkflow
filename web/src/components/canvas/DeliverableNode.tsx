@@ -81,7 +81,7 @@ export function DeliverableNode({
             background: T.tx, color: '#fff', fontSize: 11.5, fontWeight: 500,
             padding: '5px 11px', borderRadius: '7px', boxShadow: T.sl, zIndex: 40,
             cursor: 'pointer', border: 'none', fontFamily: 'inherit',
-            animation: 'arborPop .16s ease-out',
+            animation: 'acroPop .16s ease-out',
             '&:hover': { background: '#000' },
             '&::after': {
               content: '""', position: 'absolute', left: '50%', bottom: -4, width: 8, height: 8,

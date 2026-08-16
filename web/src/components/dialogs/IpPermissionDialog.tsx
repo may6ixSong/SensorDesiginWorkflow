@@ -3,7 +3,7 @@ import { Box } from '@mui/material';
 import { IpDto, UserDto } from '@/types/domain';
 import { DEPARTMENTS, departmentName } from '@/shared/constants/departments';
 import { ModalShell } from '@/components/common/ModalShell';
-import { ArborButton, Chip } from '@/components/common/ArborButton';
+import { AcroButton, Chip } from '@/components/common/AcroButton';
 import { Card, Ey, Field, Row, SelectInput } from '@/components/common/Panel';
 import { Icon } from '@/components/common/Icon';
 import { UserAvatar } from '@/components/common/Avatar';
@@ -77,9 +77,9 @@ export function IpPermissionDialog({
               <Box sx={{ fontSize: 11, color: T.dm2 }}>{departmentName(o.department)}</Box>
             </Box>
             {own && i > 0 && (
-              <ArborButton variant="ghost" onClick={() => onRemoveOwner(o.id)}>
+              <AcroButton variant="ghost" onClick={() => onRemoveOwner(o.id)}>
                 <Icon name="trash" />
-              </ArborButton>
+              </AcroButton>
             )}
           </Box>
         ))}
@@ -98,7 +98,7 @@ export function IpPermissionDialog({
               />
             </Field>
             <Box sx={{ display: 'flex', alignItems: 'flex-end' }}>
-              <ArborButton
+              <AcroButton
                 disabled={!analogCandidates.length}
                 onClick={() => {
                   const u = ownerSel || analogCandidates[0]?.id;
@@ -106,7 +106,7 @@ export function IpPermissionDialog({
                 }}
               >
                 <Icon name="plus" /> 추가
-              </ArborButton>
+              </AcroButton>
             </Box>
           </Row>
         )}
@@ -123,9 +123,9 @@ export function IpPermissionDialog({
                 <Box sx={{ fontSize: 11, color: T.dm2 }}>포지션: {departmentName(g.department)}</Box>
               </Box>
               {own && (
-                <ArborButton variant="ghost" onClick={() => onRemoveViewGrant(g.user.id)}>
+                <AcroButton variant="ghost" onClick={() => onRemoveViewGrant(g.user.id)}>
                   <Icon name="trash" />
-                </ArborButton>
+                </AcroButton>
               )}
             </Box>
           ))
@@ -155,7 +155,7 @@ export function IpPermissionDialog({
                 />
               </Field>
               <Box sx={{ display: 'flex', alignItems: 'flex-end' }}>
-                <ArborButton
+                <AcroButton
                   disabled={!viewCandidates.length}
                   onClick={() => {
                     const u = viewUser || viewCandidates[0]?.id;
@@ -163,7 +163,7 @@ export function IpPermissionDialog({
                   }}
                 >
                   <Icon name="plus" /> 추가
-                </ArborButton>
+                </AcroButton>
               </Box>
             </Row>
             <Box sx={{ fontSize: 11, color: T.dm2, mt: '8px' }}>

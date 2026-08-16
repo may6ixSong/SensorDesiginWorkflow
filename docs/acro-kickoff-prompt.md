@@ -1,7 +1,7 @@
-# ARBOR 프로젝트 킥오프 프롬프트
+# ACRO 프로젝트 킥오프 프롬프트
 
 > 사용법: 아래 **[A] 작성 구역**을 직접 채운 뒤, 이 파일 전체를 새 세션에 붙여넣으세요.
-> 프로젝트 지식(Project Knowledge)에는 `arbor-design-v2.md`와 `analog-dashboard-v15.html`을 함께 올려두세요.
+> 프로젝트 지식(Project Knowledge)에는 `acro-design-v2.md`와 `analog-dashboard-v15.html`을 함께 올려두세요.
 
 ---
 
@@ -17,7 +17,7 @@
 [개발 환경 주소]
 - FE Dev 서버 포트 (예: 5173):
 - BE Dev API Base URL (예: http://localhost:3000/api/v1):
-- MongoDB 연결 문자열 (예: mongodb://localhost:27017/arbor):
+- MongoDB 연결 문자열 (예: mongodb://localhost:27017/acro):
 - Object Storage(S3 or 사내 호환) Endpoint:
 - Object Storage Bucket명:
 - Object Storage Access Key / Secret 관리 방식 (예: .env, Vault, AWS Secrets Manager):
@@ -48,10 +48,10 @@
 
 ## [B] 지시사항 — 이 아래는 수정하지 말고 그대로 사용하세요
 
-너는 지금부터 **ARBOR**(아날로그 산출물 릴리스 플랫폼)의 FE/BE 소스코드를 처음부터 구축한다.
+너는 지금부터 **ACRO**(아날로그 산출물 릴리스 플랫폼)의 FE/BE 소스코드를 처음부터 구축한다.
 
 ### 참조 자료
-- **`arbor-design-v2.md`** — 데이터 모델, API 계약, 권한 정책, 도메인 규칙의 정본. 여기 명시된 규칙(특히 3장 도메인 규칙, 6장 권한 재검증)은 임의로 바꾸지 말고 그대로 구현할 것.
+- **`acro-design-v2.md`** — 데이터 모델, API 계약, 권한 정책, 도메인 규칙의 정본. 여기 명시된 규칙(특히 3장 도메인 규칙, 6장 권한 재검증)은 임의로 바꾸지 말고 그대로 구현할 것.
 - **`analog-dashboard-v15.html`** — UI/UX의 정본. 색상 토큰(CSS 변수), 레이아웃 상수(`NW`, `NH`, `LANE_PAD`, `GRID`, `ZOOM_MIN/MAX` 등), 캔버스 인터랙션(드래그, 줌/팬, Phase 벽 저항, Auto Fit 알고리즘, flow 하이라이트, 순환 아이콘)은 이 파일의 동작을 그대로 재현해야 한다. 이 파일은 순수 HTML/CSS/JS 단일 파일 목업이므로, React 컴포넌트로 옮길 때 로직을 1:1로 이식하되 컴포넌트 구조·타입 안정성·재사용성은 개선해도 좋다.
 
 ### 프로젝트 구조
@@ -59,7 +59,7 @@
 
 **모노레포인 경우**
 ```
-arbor/
+acro/
 ├── apps/
 │   ├── web/     (FE)
 │   └── api/     (BE)
@@ -70,8 +70,8 @@ arbor/
 
 **완전 분리인 경우**
 ```
-arbor-web/   (FE 레포)
-arbor-api/   (BE 레포)
+acro-web/   (FE 레포)
+acro-api/   (BE 레포)
 ```
 이 경우 `DEPARTMENTS` 등 공유 상수는 양쪽에 중복 정의하되 값이 반드시 일치하도록 주석으로 출처를 명시한다.
 

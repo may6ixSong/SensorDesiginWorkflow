@@ -1,41 +1,52 @@
 import { ReactNode } from 'react';
 import { Box } from '@mui/material';
+import { Link, useLocation } from 'react-router-dom';
 import { IpDto, ProjectDto, UserDto } from '@/types/domain';
 import { useAuthStore } from '@/store/authStore';
 import { useCanvasStore } from '@/store/canvasStore';
 import { useDevLogin } from '@/api/hooks/useAuth';
 import { departmentName } from '@/shared/constants/departments';
-import { ArborMark, Icon } from '@/components/common/Icon';
+import { AcroMark, Icon } from '@/components/common/Icon';
 import { UserAvatar } from '@/components/common/Avatar';
-import { ArborButton } from '@/components/common/ArborButton';
+import { AcroButton } from '@/components/common/AcroButton';
 import { SelectBox } from './SelectBox';
 import { FONT_DISPLAY, FONT_MONO, T } from '@/theme/tokens';
 
 interface AppShellProps {
-  projects: ProjectDto[];
-  projectId: string | undefined;
-  onChangeProject: (id: string) => void;
-  ips: IpDto[];
-  ipId: string | undefined;
-  onChangeIp: (id: string) => void;
+  /** 과제/IP 셀렉트는 보드(/details)에서만 쓰인다. 넘기지 않으면 숨는다. */
+  projects?: ProjectDto[];
+  projectId?: string;
+  onChangeProject?: (id: string) => void;
+  ips?: IpDto[];
+  ipId?: string;
+  onChangeIp?: (id: string) => void;
   users: UserDto[];
-  canToggleRecv: boolean;
+  canToggleRecv?: boolean;
   children: ReactNode;
 }
 
+const NAV = [
+  { to: '/', label: '홈' },
+  { to: '/projects', label: '프로젝트' },
+  { to: '/details', label: '보드' },
+];
+
 /**
- * 목업 .tb 상단바 — 로고 + ARBOR 워드마크 + 과제/IP select + 수신부서 시점 + 사용자 배지.
- * (설계서 7.1 컴포넌트 트리의 AppShell)
+ * 목업 .tb 상단바 — 로고 + ACRO 워드마크 + 페이지 네비 + (보드에서만) 과제/IP select
+ * + 수신부서 시점 + 사용자 배지. (설계서 7.1 컴포넌트 트리의 AppShell)
  */
 export function AppShell({
   projects, projectId, onChangeProject,
   ips, ipId, onChangeIp,
-  users, canToggleRecv, children,
+  users, canToggleRecv = false, children,
 }: AppShellProps) {
   const me = useAuthStore((s) => s.user);
   const devLogin = useDevLogin();
   const recv = useCanvasStore((s) => s.recv);
   const setRecv = useCanvasStore((s) => s.setRecv);
+  const { pathname } = useLocation();
+
+  const showSelects = !!onChangeProject;
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
@@ -53,52 +64,88 @@ export function AppShell({
           boxShadow: T.ss,
         }}
       >
-        <ArborMark />
-        <Box sx={{ fontSize: 15, fontWeight: 800, fontFamily: FONT_DISPLAY, lineHeight: 1.05 }}>
-          ARBOR
-          <Box
-            component="small"
-            sx={{
-              display: 'block',
-              fontSize: 9,
-              letterSpacing: '.18em',
-              color: T.dm2,
-              fontFamily: FONT_MONO,
-              mt: '2px',
-              fontWeight: 400,
-            }}
-          >
-            CIS DELIVERABLE CONTROL
+        <Box
+          component={Link}
+          to="/"
+          sx={{
+            display: 'flex', alignItems: 'center', gap: '12px',
+            textDecoration: 'none', color: 'inherit',
+          }}
+        >
+          <AcroMark />
+          <Box sx={{ fontSize: 15, fontWeight: 800, fontFamily: FONT_DISPLAY, lineHeight: 1.05 }}>
+            ACRO
+            <Box
+              component="small"
+              sx={{
+                display: 'block',
+                fontSize: 9,
+                letterSpacing: '.18em',
+                color: T.dm2,
+                fontFamily: FONT_MONO,
+                mt: '2px',
+                fontWeight: 400,
+              }}
+            >
+              CIS DELIVERABLE CONTROL
+            </Box>
           </Box>
         </Box>
 
         <Box sx={{ width: '1px', height: 22, background: T.ln }} />
 
-        <SelectBox
-          label="과제"
-          value={projectId ?? ''}
-          onChange={onChangeProject}
-          options={projects.map((p) => ({ value: p._id, label: `${p.code} · ${p.name}` }))}
-        />
-        <SelectBox
-          label="IP"
-          value={ipId ?? ''}
-          onChange={onChangeIp}
-          minWidth={110}
-          disabled={!ips.length}
-          options={
-            ips.length
-              ? ips.map((i) => ({ value: i.id, label: i.name }))
-              : [{ value: '', label: '권한 없음' }]
-          }
-        />
+        <Box sx={{ display: 'flex', gap: '2px' }}>
+          {NAV.map((n) => {
+            const on = n.to === '/' ? pathname === '/' : pathname.startsWith(n.to);
+            return (
+              <Box
+                key={n.to}
+                component={Link}
+                to={n.to}
+                sx={{
+                  fontSize: 12, fontWeight: on ? 600 : 500, textDecoration: 'none',
+                  padding: '6px 10px', borderRadius: '7px',
+                  color: on ? T.tx : T.dm,
+                  background: on ? T.sf3 : 'transparent',
+                  '&:hover': { background: T.sf2, color: T.tx },
+                }}
+              >
+                {n.label}
+              </Box>
+            );
+          })}
+        </Box>
+
+        {showSelects && (
+          <>
+            <Box sx={{ width: '1px', height: 22, background: T.ln }} />
+            <SelectBox
+              label="과제"
+              value={projectId ?? ''}
+              onChange={onChangeProject!}
+              options={(projects ?? []).map((p) => ({ value: p._id, label: `${p.code} · ${p.name}` }))}
+            />
+            <SelectBox
+              label="IP"
+              value={ipId ?? ''}
+              onChange={onChangeIp!}
+              minWidth={110}
+              disabled={!ips?.length}
+              options={
+                ips?.length
+                  ? ips.map((i) => ({ value: i.id, label: i.name }))
+                  : [{ value: '', label: '권한 없음' }]
+              }
+            />
+          </>
+        )}
 
         <Box sx={{ flex: 1 }} />
 
         {canToggleRecv && (
-          <ArborButton variant={recv ? 'on' : 'default'} onClick={() => setRecv(!recv)}>
+          <AcroButton variant={recv ? 'on' : 'default'} onClick={() => setRecv(!recv)}>
             <Icon name="eye" /> 수신 부서 시점
-          </ArborButton>
+          </AcroButton>
         )}
 
         <SelectBox

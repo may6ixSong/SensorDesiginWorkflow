@@ -3,7 +3,9 @@ import { Alert, Button, CircularProgress, Stack, Typography } from '@mui/materia
 import { useEffect, useRef } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { useDevLogin, useSwitchableUsers } from '@/api/hooks/useAuth';
-import { HomeRedirect } from '@/pages/HomeRedirect';
+import { DetailsRedirect } from '@/pages/DetailsRedirect';
+import { HomePage } from '@/pages/HomePage';
+import { ProjectListPage } from '@/pages/ProjectListPage';
 import { BoardPage } from '@/pages/BoardPage';
 import { NoAccessPage } from '@/pages/NoAccessPage';
 
@@ -72,9 +74,11 @@ export default function App() {
   return (
     <LoginGate>
       <Routes>
-        <Route path="/" element={<HomeRedirect />} />
-        <Route path="/projects/:projectId" element={<HomeRedirect />} />
-        <Route path="/projects/:projectId/ips/:ipId" element={<BoardPage />} />
+        <Route path="/" element={<HomePage />} />
+        <Route path="/projects" element={<ProjectListPage />} />
+        <Route path="/details" element={<DetailsRedirect />} />
+        <Route path="/details/:projectId" element={<DetailsRedirect />} />
+        <Route path="/details/:projectId/:ipId" element={<BoardPage />} />
         <Route path="/no-access" element={<NoAccessPage />} />
       </Routes>
     </LoginGate>

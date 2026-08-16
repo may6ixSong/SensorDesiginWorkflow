@@ -1,8 +1,8 @@
 {
-  "name": "arbor-api",
+  "name": "acro-api",
   "version": "0.1.0",
   "private": true,
-  "description": "ARBOR - Analog Deliverable Release Platform API (NestJS + Mongoose)",
+  "description": "ACRO - Analog Deliverable Release Platform API (NestJS + Mongoose)",
   "scripts": {
     "build": "nest build",
     "start": "nest start",

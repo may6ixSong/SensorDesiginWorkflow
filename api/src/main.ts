@@ -16,6 +16,6 @@ async function bootstrap() {
   const port = config.get<number>('port') ?? 3000;
   await app.listen(port);
   // eslint-disable-next-line no-console
-  console.log(`ARBOR API listening on http://localhost:${port}/${config.get<string>('apiPrefix')}`);
+  console.log(`ACRO API listening on http://localhost:${port}/${config.get<string>('apiPrefix')}`);
 }
 bootstrap();

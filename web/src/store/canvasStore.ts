@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { CanvasEdge, CanvasMemo, CanvasNode } from '@/lib/canvasModel';
-import { ZOOM_MAX, ZOOM_MIN } from '@/lib/constants';
+import { ZOOM_MIN } from '@/lib/constants';
 
 /**
  * 클라이언트 전용 상태 (목업의 VP + S). 서버로 보내지 않는다 (설계서 7.1).
@@ -14,9 +14,10 @@ export interface CanvasSnapshot {
 }
 
 interface CanvasState {
-  /* viewport — 가로만 스케일 */
+  /* viewport — 가로/세로 동일 배율 스케일 + 2축 팬 */
   z: number;
   x: number;
+  y: number;
   /* 작업 데이터 */
   nodes: CanvasNode[];
   memos: CanvasMemo[];
@@ -44,7 +45,7 @@ interface CanvasState {
   phInfo: string | null;
   ownerDlg: boolean;
 
-  setVP: (z: number, x: number) => void;
+  setVP: (z: number, x: number, y: number) => void;
   setPan: (x: number) => void;
   hydrate: (ipId: string, d: { nodes: CanvasNode[]; memos: CanvasMemo[]; edges: CanvasEdge[] }) => void;
   setNodes: (nodes: CanvasNode[]) => void;
@@ -81,6 +82,7 @@ const clone = <T,>(v: T): T => JSON.parse(JSON.stringify(v));
 export const useCanvasStore = create<CanvasState>((set, get) => ({
   z: 1,
   x: 0,
+  y: 0,
   nodes: [],
   memos: [],
   edges: [],
@@ -105,7 +107,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   ownerDlg: false,
   rev: 0,
 
-  setVP: (z, x) => set({ z: Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z)), x }),
+  setVP: (z, x, y) => set({ z: Math.max(ZOOM_MIN, z), x, y }),
   setPan: (x) => set({ x }),
 
   hydrate: (ipId, d) =>
@@ -119,6 +121,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       sel: s.loadedIpId === ipId ? s.sel : null,
       hlSet: s.loadedIpId === ipId ? s.hlSet : null,
       x: s.loadedIpId === ipId ? s.x : 0,
+      y: s.loadedIpId === ipId ? s.y : 0,
       rev: s.rev + 1,
     })),
 

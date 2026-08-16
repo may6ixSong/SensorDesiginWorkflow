@@ -40,7 +40,7 @@ export const theme = createTheme({
         // 하이라이트된 flow 선의 흐르는 점선 (목업 @keyframes flowdash)
         '@keyframes flowdash': { '0%': { strokeDashoffset: 18 }, to: { strokeDashoffset: 0 } },
         // 상세 버튼 등장 (목업 @keyframes pop)
-        '@keyframes arborPop': {
+        '@keyframes acroPop': {
           from: { opacity: 0, transform: 'translateX(-50%) translateY(4px)' },
           to: { opacity: 1, transform: 'translateX(-50%) translateY(0)' },
         },
