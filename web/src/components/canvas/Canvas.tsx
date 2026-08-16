@@ -66,6 +66,9 @@ export function Canvas({ ip, phases, usersById, canEdit, onSaveLayout }: Props) 
 
   const allBlocks = useCallback((): Blk[] => [...st.getState().nodes, ...st.getState().memos], [st]);
 
+  // today centering을 위해 nodes가 처음 도착한 IP를 추적한다.
+  const centeredForRef = useRef<string | null>(null);
+
   /* ── zoom clamp ──
    * 최소 줌은 ZOOM_MIN 고정 하한만 둔다.
    * canvas가 viewport보다 작을 때는 edge에 붙이지 않고 가운데에 띄운다.
@@ -88,21 +91,23 @@ export function Canvas({ ip, phases, usersById, canEdit, onSaveLayout }: Props) 
     [minZoom, W, H],
   );
 
-  // IP가 바뀔 때: today를 뷰포트 중앙에 오도록 초기 위치 설정
+  // IP가 바뀔 때: hydrate()가 x/y를 0으로 초기화한 뒤 nodes가 도착하면 today 중앙으로 이동.
+  // hydrate는 데이터 쿼리가 해결된 후에 호출되므로, ip.id 변화 시점보다 늦게 실행된다.
+  // → nodes.length > 0 을 함께 감지해, 데이터 도착 이후에 한 번만 센터링한다.
+  const hasNodes = nodes.length > 0;
   useEffect(() => {
+    if (!hasNodes) return;
+    if (centeredForRef.current === ip.id) return; // 이미 이 IP에 대해 센터링 완료
+    centeredForRef.current = ip.id;
     const vp = vpRef.current;
     if (!vp) return;
     const todayCanvas = tx ?? W / 2;
-    // contain 배율(전체 보기)과 가독 최소 배율(0.75) 중 큰 쪽을 초기 줌으로 사용.
-    // canvas가 클 때는 0.75로 고정해 artifact 텍스트가 읽힐 수 있게 하고,
-    // canvas가 작을 때는 contain 배율(> 0.75)로 전체를 보여 준다.
     const containZ = Math.min(vp.clientWidth / W, vp.clientHeight / H, ZOOM_MAX);
     const fitZ = Math.max(ZOOM_MIN, Math.max(containZ, 0.75));
-    // today가 뷰포트 수평 중앙에 오도록 panX 계산; clampVP가 수직 centering 처리
     const c = clampVP(fitZ, vp.clientWidth / 2 - todayCanvas * fitZ, 0);
     st.getState().setVP(c.z, c.x, c.y);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ip.id]);
+  }, [ip.id, hasNodes]);
 
   // 윈도우 리사이즈 or 캔버스 크기 변화 시 현재 줌/팬을 재클램프
   useEffect(() => {

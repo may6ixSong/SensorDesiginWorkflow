@@ -246,7 +246,7 @@ export function wallAdj(
       if (Math.abs(accum) < WALL_FORCE) {
         return { x: bx + bw / 2 < bnd ? bnd - bw - GAP : bnd + GAP, crossed: null };
       }
-      return { x: cx, crossed: bnd };
+      return { x: cx + bw / 2 < bnd ? bnd - bw - GAP : bnd + GAP, crossed: bnd };
     }
   }
   return { x: cx, crossed: null };
