@@ -5,17 +5,27 @@ import { useUsers } from '@/api/hooks/useUsers';
 import { AppShell } from '@/components/layout/AppShell';
 import { useThemeMode } from '@/theme/ThemeModeContext';
 import { FONT_DISPLAY, FONT_MONO } from '@/theme/tokens';
-
-/** Deliverable cards floating in the 3D stage — placed x/y/z around the wordmark, r = tilt. */
-const CARDS = [
-  { t: 'PLL Requirements Spec', s: 'REQ · v2.1', x: -500, y: -235, z: 210, r: 16, d: 0, c: '#2ee6c5' },
-  { t: 'Bandgap Schematic', s: 'SCH · v1.4', x: -540, y: 95, z: 90, r: 20, d: 0.7, c: '#7c8cff' },
-  { t: 'LDO Characterization', s: 'RPT · v3.0', x: 500, y: -250, z: 130, r: -18, d: 1.3, c: '#ffb45e' },
-  { t: 'ADC Verification', s: 'VER · v1.0', x: 545, y: 75, z: 230, r: -22, d: 1.9, c: '#2ee6c5' },
-  { t: 'HLD Release', s: 'REL · v4.2', x: -30, y: 265, z: 290, r: 0, d: 2.5, c: '#ff6f91' },
-];
+import { HERO_SERVICES } from '@/config/heroServices';
 
 const LANES = ['CONCEPT', 'DESIGN', 'VERIFY', 'TAPE-OUT'];
+
+/**
+ * Reference size the card x/y offsets in heroServices.ts are authored against,
+ * used only to convert those px offsets into the flat SVG's 0–100 coordinate
+ * space for the card→wordmark connector lines below. Cards themselves are
+ * positioned by real CSS transforms and don't depend on this.
+ */
+const HERO_REF_W = 1600;
+const HERO_REF_H = 896;
+const HUB = { x: 50, y: 45 };
+
+function connectorPath(svcX: number, svcY: number) {
+  const x = 50 + (svcX / HERO_REF_W) * 100;
+  const y = 50 + (svcY / HERO_REF_H) * 100;
+  const midX = (x + HUB.x) / 2;
+  const midY = (y + HUB.y) / 2 + (y > HUB.y ? -6 : 6);
+  return `M ${x} ${y} Q ${midX} ${midY}, ${HUB.x} ${HUB.y}`;
+}
 
 /** Bottom anchor (x%, per-lane) each flow line starts from, converging up into the wordmark. */
 const FLOW_PATHS = [
@@ -50,6 +60,11 @@ interface Palette {
   circuitLine: string;
   circuitNode: string;
   circuitActive: string;
+  connLive: string;
+  connPending: string;
+  badgeLiveBg: string;
+  badgeLiveText: string;
+  badgePendingText: string;
 }
 
 /** Seeded PRNG (Park–Miller) so the backdrop graph is stable across re-renders. */
@@ -129,6 +144,11 @@ const PALETTE: Record<'light' | 'dark', Palette> = {
     circuitLine: 'rgba(140,170,255,.24)',
     circuitNode: 'rgba(190,212,255,.62)',
     circuitActive: 'rgba(46,230,197,.75)',
+    connLive: 'rgba(46,230,197,.8)',
+    connPending: 'rgba(140,160,210,.28)',
+    badgeLiveBg: 'rgba(46,230,197,.14)',
+    badgeLiveText: '#7cf2da',
+    badgePendingText: 'rgba(180,200,235,.55)',
   },
   light: {
     stageBg: '#eef1f8',
@@ -160,6 +180,11 @@ const PALETTE: Record<'light' | 'dark', Palette> = {
     circuitLine: 'rgba(60,80,140,.18)',
     circuitNode: 'rgba(60,80,140,.46)',
     circuitActive: 'rgba(12,154,131,.62)',
+    connLive: 'rgba(12,154,131,.7)',
+    connPending: 'rgba(60,80,140,.22)',
+    badgeLiveBg: 'rgba(12,154,131,.12)',
+    badgeLiveText: '#0a8a75',
+    badgePendingText: 'rgba(60,74,104,.55)',
   },
 } as const;
 
@@ -326,6 +351,53 @@ export function HomePage() {
           ))}
         </Box>
 
+        {/* service connectors — each card wired back into the ACRO hub; live ones (already
+            running as their own service elsewhere) glow and flow, pending ones sit dim and still */}
+        <Box
+          component="svg"
+          viewBox="0 0 100 100"
+          preserveAspectRatio="none"
+          sx={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
+        >
+          {HERO_SERVICES.map((svc, i) => {
+            const d = connectorPath(svc.x, svc.y);
+            return (
+              <path
+                key={svc.name}
+                id={`acro-conn-${i}`}
+                d={d}
+                fill="none"
+                stroke={svc.connected ? pal.connLive : pal.connPending}
+                strokeWidth={svc.connected ? 0.22 : 0.14}
+                strokeDasharray={svc.connected ? '1.3 1.1' : '0.4 2.4'}
+                strokeLinecap="round"
+                vectorEffect="non-scaling-stroke"
+                style={svc.connected ? { animation: `flowdash ${2.6 + i * 0.35}s linear infinite` } : undefined}
+              />
+            );
+          })}
+          {HERO_SERVICES.filter((s) => s.connected).map((svc, i) => (
+            <circle key={`p-${svc.name}`} r={0.55} fill={pal.connLive} opacity={0}>
+              <animateMotion
+                dur={`${3 + i * 0.6}s`}
+                begin={`${i * 0.7}s`}
+                repeatCount="indefinite"
+                rotate="auto"
+              >
+                <mpath href={`#acro-conn-${HERO_SERVICES.findIndex((s) => s.name === svc.name)}`} />
+              </animateMotion>
+              <animate
+                attributeName="opacity"
+                values="0;1;1;0"
+                keyTimes="0;0.1;0.9;1"
+                dur={`${3 + i * 0.6}s`}
+                begin={`${i * 0.7}s`}
+                repeatCount="indefinite"
+              />
+            </circle>
+          ))}
+        </Box>
+
         {/* stage */}
         <Box
           sx={{
@@ -367,40 +439,61 @@ export function HomePage() {
             ))}
           </Box>
 
-          {/* floating deliverable cards */}
-          {CARDS.map((c) => (
+          {/* floating deliverable/service cards — content lives in config/heroServices.ts */}
+          {HERO_SERVICES.map((svc) => (
             <Box
-              key={c.t}
+              key={svc.name}
               sx={{
                 position: 'absolute', pointerEvents: 'none', transformStyle: 'preserve-3d',
-                transform: `translate3d(${c.x}px, ${c.y}px, ${c.z}px) rotateY(${c.r}deg)`,
+                transform: `translate3d(${svc.x}px, ${svc.y}px, ${svc.z}px) rotateY(${svc.r}deg)`,
               }}
             >
               <Box
                 sx={{
                   width: 224, padding: '15px 16px', borderRadius: '14px',
-                  animation: `acroFloat ${6.5 + c.d}s ease-in-out ${c.d}s infinite`,
+                  animation: `acroFloat ${6.5 + svc.d}s ease-in-out ${svc.d}s infinite`,
                   background: pal.cardBg,
-                  border: `1px solid ${pal.cardBorder(c.c)}`,
-                  boxShadow: pal.cardShadow(c.c),
+                  border: `1px solid ${pal.cardBorder(svc.color)}`,
+                  boxShadow: pal.cardShadow(svc.color),
                   color: pal.cardText,
                   transition: 'background .3s, border-color .3s, box-shadow .3s, color .3s',
                 }}
               >
-                <Box
-                  sx={{
-                    width: 26, height: 3, borderRadius: 2, background: c.c,
-                    boxShadow: `0 0 14px ${c.c}`, mb: '9px',
-                  }}
-                />
-                <Box sx={{ fontSize: 12.5, fontWeight: 600, letterSpacing: '-.01em' }}>{c.t}</Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: '9px' }}>
+                  <Box
+                    sx={{
+                      width: 26, height: 3, borderRadius: 2, background: svc.color,
+                      boxShadow: `0 0 14px ${svc.color}`,
+                    }}
+                  />
+                  <Box
+                    sx={{
+                      display: 'inline-flex', alignItems: 'center', gap: '4px',
+                      fontFamily: FONT_MONO, fontSize: 8, letterSpacing: '.08em',
+                      padding: '2px 6px', borderRadius: '999px',
+                      background: svc.connected ? pal.badgeLiveBg : 'transparent',
+                      color: svc.connected ? pal.badgeLiveText : pal.badgePendingText,
+                    }}
+                  >
+                    <Box
+                      component="span"
+                      sx={{
+                        width: 4, height: 4, borderRadius: '50%',
+                        background: 'currentColor',
+                        boxShadow: svc.connected ? '0 0 5px currentColor' : 'none',
+                      }}
+                    />
+                    {svc.connected ? `LIVE ${svc.port}` : 'PENDING'}
+                  </Box>
+                </Box>
+                <Box sx={{ fontSize: 12.5, fontWeight: 600, letterSpacing: '-.01em' }}>{svc.name}</Box>
                 <Box
                   sx={{
                     fontFamily: FONT_MONO, fontSize: 9, letterSpacing: '.14em',
                     color: pal.cardSub, mt: '5px', transition: 'color .3s',
                   }}
                 >
-                  {c.s}
+                  {svc.tag}
                 </Box>
               </Box>
             </Box>
