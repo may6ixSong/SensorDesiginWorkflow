@@ -15,7 +15,7 @@ export function ThemeToggle() {
       title={isDark ? 'Switch to light theme' : 'Switch to dark theme'}
       sx={{
         display: 'grid', placeItems: 'center', width: 32, height: 32, borderRadius: '8px',
-        background: T.sf, border: `1px solid ${T.ln2}`, color: T.dm, cursor: 'pointer',
+        background: T.sf, color: T.dm, cursor: 'pointer', border: 'none', outline: 'none',
         transition: '.14s', flex: '0 0 auto',
         '&:hover': { background: T.sf3, color: T.tx },
       }}

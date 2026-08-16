@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Box } from '@mui/material';
 import { Link } from 'react-router-dom';
 import { useUsers } from '@/api/hooks/useUsers';
@@ -19,12 +19,34 @@ const HERO_REF_W = 1600;
 const HERO_REF_H = 896;
 const HUB = { x: 50, y: 45 };
 
+function toPct(px: number, py: number) {
+  return { x: 50 + (px / HERO_REF_W) * 100, y: 50 + (py / HERO_REF_H) * 100 };
+}
+
 function connectorPath(svcX: number, svcY: number) {
-  const x = 50 + (svcX / HERO_REF_W) * 100;
-  const y = 50 + (svcY / HERO_REF_H) * 100;
+  const { x, y } = toPct(svcX, svcY);
   const midX = (x + HUB.x) / 2;
   const midY = (y + HUB.y) / 2 + (y > HUB.y ? -6 : 6);
   return `M ${x} ${y} Q ${midX} ${midY}, ${HUB.x} ${HUB.y}`;
+}
+
+/**
+ * Short right-angle PCB-trace stub behind a card — purely decorative, hinting
+ * that the card is wired into something beneath it, independent of the
+ * card→hub connector above.
+ */
+function circuitTrace(svcX: number, svcY: number, seed: number) {
+  const { x: px, y: py } = toPct(svcX, svcY);
+  const rand = makeRng(seed);
+  const dir = rand() < 0.5 ? -1 : 1;
+  const vdir = rand() < 0.5 ? -1 : 1;
+  const x1 = px + dir * (2.2 + rand() * 2.2);
+  const y1 = py + vdir * (1.6 + rand() * 2);
+  const x2 = x1 + dir * (1.2 + rand() * 1.6);
+  return {
+    d: `M ${px} ${py} H ${x1} V ${y1} H ${x2}`,
+    vias: [{ x: px, y: py }, { x: x1, y: py }, { x: x1, y: y1 }, { x: x2, y: y1 }],
+  };
 }
 
 /** Bottom anchor (x%, per-lane) each flow line starts from, converging up into the wordmark. */
@@ -190,43 +212,49 @@ const PALETTE: Record<'light' | 'dark', Palette> = {
 
 /**
  * Landing hero — no explanatory "what is this system" panel, just the 3D scene.
- * Mouse position streams into CSS vars (--mx/--my) to tilt the whole stage, and dashed
- * paths carry the mockup's `flowdash` animation so lanes visibly flow up into the wordmark.
+ * The stage itself is static (no mouse-follow tilt); instead, holding the mouse
+ * still for a moment highlights a random 1–5 of the service cards for 5s — as if
+ * surfacing "these are the artifacts relevant to what you're doing right now" —
+ * and moving again cancels it. Dashed paths carry the mockup's `flowdash`
+ * animation so lanes and connectors visibly flow.
  */
 export function HomePage() {
   const { data: users } = useUsers();
   const { mode } = useThemeMode();
   const pal = useMemo(() => PALETTE[mode], [mode]);
   const { nodes: circuitNodes, edges: circuitEdges } = useCircuitGraph(60);
-  const stageRef = useRef<HTMLDivElement>(null);
-  const raf = useRef(0);
 
-  const onMove = useCallback((e: React.MouseEvent) => {
-    const el = stageRef.current;
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    const mx = (e.clientX - r.left) / r.width - 0.5;
-    const my = (e.clientY - r.top) / r.height - 0.5;
-    cancelAnimationFrame(raf.current);
-    raf.current = requestAnimationFrame(() => {
-      el.style.setProperty('--mx', String(mx));
-      el.style.setProperty('--my', String(my));
-    });
+  const [active, setActive] = useState<Set<string> | null>(null);
+  const idleTimer = useRef<number>();
+  const revertTimer = useRef<number>();
+
+  const clearTimers = () => {
+    if (idleTimer.current) window.clearTimeout(idleTimer.current);
+    if (revertTimer.current) window.clearTimeout(revertTimer.current);
+  };
+
+  const onStageMouseMove = useCallback(() => {
+    clearTimers();
+    setActive(null);
+    idleTimer.current = window.setTimeout(() => {
+      const n = 1 + Math.floor(Math.random() * 5);
+      const shuffled = [...HERO_SERVICES].sort(() => Math.random() - 0.5);
+      setActive(new Set(shuffled.slice(0, n).map((s) => s.name)));
+      revertTimer.current = window.setTimeout(() => setActive(null), 5000);
+    }, 450);
   }, []);
 
-  useEffect(() => () => cancelAnimationFrame(raf.current), []);
+  useEffect(() => () => clearTimers(), []);
 
   return (
     <AppShell users={users ?? []}>
       <Box
-        ref={stageRef}
-        onMouseMove={onMove}
+        onMouseMove={onStageMouseMove}
         onMouseLeave={() => {
-          stageRef.current?.style.setProperty('--mx', '0');
-          stageRef.current?.style.setProperty('--my', '0');
+          clearTimers();
+          setActive(null);
         }}
         sx={{
-          '--mx': 0, '--my': 0,
           position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden',
           background: pal.stageBg,
           transition: 'background .3s',
@@ -351,8 +379,36 @@ export function HomePage() {
           ))}
         </Box>
 
+        {/* faint circuit traces behind each card — decorative PCB stubs, always on,
+            independent of the mouse-idle highlight below */}
+        <Box
+          component="svg"
+          viewBox="0 0 100 100"
+          preserveAspectRatio="none"
+          sx={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
+        >
+          {HERO_SERVICES.map((svc, i) => {
+            const trace = circuitTrace(svc.x, svc.y, 100 + i);
+            return (
+              <g key={svc.name}>
+                <path
+                  d={trace.d}
+                  fill="none"
+                  stroke={pal.circuitLine}
+                  strokeWidth={0.1}
+                  vectorEffect="non-scaling-stroke"
+                />
+                {trace.vias.map((v, vi) => (
+                  <circle key={vi} cx={v.x} cy={v.y} r={0.16} fill={pal.circuitLine} />
+                ))}
+              </g>
+            );
+          })}
+        </Box>
+
         {/* service connectors — each card wired back into the ACRO hub; live ones (already
-            running as their own service elsewhere) glow and flow, pending ones sit dim and still */}
+            running as their own service elsewhere) glow and flow, pending ones sit dim and still.
+            Whichever cards the mouse-idle highlight below picked light up brighter; the rest fade. */}
         <Box
           component="svg"
           viewBox="0 0 100 100"
@@ -361,6 +417,7 @@ export function HomePage() {
         >
           {HERO_SERVICES.map((svc, i) => {
             const d = connectorPath(svc.x, svc.y);
+            const dim = active !== null && !active.has(svc.name);
             return (
               <path
                 key={svc.name}
@@ -372,7 +429,11 @@ export function HomePage() {
                 strokeDasharray={svc.connected ? '1.3 1.1' : '0.4 2.4'}
                 strokeLinecap="round"
                 vectorEffect="non-scaling-stroke"
-                style={svc.connected ? { animation: `flowdash ${2.6 + i * 0.35}s linear infinite` } : undefined}
+                style={{
+                  opacity: dim ? 0.12 : 1,
+                  transition: 'opacity .5s ease',
+                  ...(svc.connected ? { animation: `flowdash ${2.6 + i * 0.35}s linear infinite` } : {}),
+                }}
               />
             );
           })}
@@ -398,14 +459,12 @@ export function HomePage() {
           ))}
         </Box>
 
-        {/* stage */}
+        {/* stage — static now (no mouse-follow tilt); depth still comes from perspective + translateZ */}
         <Box
           sx={{
             position: 'relative', width: '100%', height: '100%',
             transformStyle: 'preserve-3d',
-            transform:
-              'rotateX(calc(var(--my) * -14deg)) rotateY(calc(var(--mx) * 20deg)) translateZ(-40px)',
-            transition: 'transform .5s cubic-bezier(.2,.7,.3,1)',
+            transform: 'translateZ(-40px)',
             display: 'grid', placeItems: 'center',
           }}
         >
@@ -439,8 +498,12 @@ export function HomePage() {
             ))}
           </Box>
 
-          {/* floating deliverable/service cards — content lives in config/heroServices.ts */}
-          {HERO_SERVICES.map((svc) => (
+          {/* floating deliverable/service cards — content lives in config/heroServices.ts.
+              Holding the mouse still picks a random 1–5 of these as "active"; the rest fade. */}
+          {HERO_SERVICES.map((svc) => {
+            const isDim = active !== null && !active.has(svc.name);
+            const isBoosted = active !== null && active.has(svc.name);
+            return (
             <Box
               key={svc.name}
               sx={{
@@ -454,9 +517,12 @@ export function HomePage() {
                   animation: `acroFloat ${6.5 + svc.d}s ease-in-out ${svc.d}s infinite`,
                   background: pal.cardBg,
                   border: `1px solid ${pal.cardBorder(svc.color)}`,
-                  boxShadow: pal.cardShadow(svc.color),
+                  boxShadow: isBoosted
+                    ? `${pal.cardShadow(svc.color)}, 0 0 0 2px ${svc.color}`
+                    : pal.cardShadow(svc.color),
                   color: pal.cardText,
-                  transition: 'background .3s, border-color .3s, box-shadow .3s, color .3s',
+                  opacity: isDim ? 0.22 : 1,
+                  transition: 'opacity .5s ease, background .3s, border-color .3s, box-shadow .3s, color .3s',
                 }}
               >
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: '9px' }}>
@@ -497,7 +563,8 @@ export function HomePage() {
                 </Box>
               </Box>
             </Box>
-          ))}
+            );
+          })}
 
           {/* wordmark */}
           <Box sx={{ position: 'relative', textAlign: 'center', transform: 'translateZ(190px)' }}>
