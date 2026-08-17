@@ -5,7 +5,7 @@ import { ModalShell } from '@/components/common/ModalShell';
 import { AcroButton } from '@/components/common/AcroButton';
 import { Ey, Field, Row, SelectInput, TextInput } from '@/components/common/Panel';
 import { Icon } from '@/components/common/Icon';
-import { FONT_MONO, T } from '@/theme/tokens';
+import { CURSOR_POINTER, FONT_MONO, T } from '@/theme/tokens';
 
 interface Props {
   ipName: string;
@@ -74,7 +74,7 @@ export function AddDeliverableDialog({ ipName, phases, onClose, onCreate }: Prop
               onClick={() => togglePick(p.key)}
               sx={{
                 fontFamily: FONT_MONO, fontSize: 11, fontWeight: 600, padding: '5px 10px',
-                borderRadius: '7px', transition: '.14s', cursor: 'pointer',
+                borderRadius: '7px', transition: '.14s', cursor: CURSOR_POINTER,
                 background: picked.has(p.key) ? T.tl2 : T.sf,
                 border: `1px solid ${picked.has(p.key) ? T.tl : T.ln2}`,
                 color: picked.has(p.key) ? T.tl : T.dm,

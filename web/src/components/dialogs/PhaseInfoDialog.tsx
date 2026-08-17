@@ -5,7 +5,7 @@ import { ModalShell } from '@/components/common/ModalShell';
 import { Badge } from '@/components/common/AcroButton';
 import { Card, Ey, Row } from '@/components/common/Panel';
 import { DocIcon } from '@/components/common/Icon';
-import { FONT_MONO, T } from '@/theme/tokens';
+import { CURSOR_POINTER, FONT_MONO, T } from '@/theme/tokens';
 
 interface Props {
   ipName: string;
@@ -69,7 +69,7 @@ export function PhaseInfoDialog({ ipName, phase: p, nodes, onClose, onOpenRow }:
                 onClick={() => onOpenRow(d.id)}
                 sx={{
                   display: 'flex', alignItems: 'center', gap: '9px', padding: '8px 0',
-                  borderBottom: `1px solid ${T.ln}`, cursor: 'pointer',
+                  borderBottom: `1px solid ${T.ln}`, cursor: CURSOR_POINTER,
                   '&:hover': { background: T.sf2 },
                 }}
               >

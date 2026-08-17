@@ -9,7 +9,7 @@ import { Card, Ey } from '@/components/common/Panel';
 import { Icon } from '@/components/common/Icon';
 import { UserAvatar } from '@/components/common/Avatar';
 import { SelectBox } from '@/components/layout/SelectBox';
-import { FONT_MONO, T } from '@/theme/tokens';
+import { CURSOR_POINTER, FONT_MONO, T } from '@/theme/tokens';
 
 interface Props {
   ipName: string;
@@ -139,7 +139,7 @@ export function HldReleaseDialog({
                   onClick={() => onOpenRow(d.id)}
                   sx={{
                     borderBottom: `1px solid ${T.ln}`,
-                    cursor: 'pointer',
+                    cursor: CURSOR_POINTER,
                     ...(changed ? { background: T.hldChanged, boxShadow: `inset 3px 0 0 ${T.am3}` } : {}),
                     '&:hover': { background: changed ? T.hldChangedHover : T.sf2 },
                   }}

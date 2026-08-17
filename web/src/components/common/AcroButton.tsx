@@ -1,6 +1,6 @@
 import { ButtonHTMLAttributes, forwardRef, ReactNode } from 'react';
 import { Box } from '@mui/material';
-import { T } from '@/theme/tokens';
+import { CURSOR_POINTER, T } from '@/theme/tokens';
 
 type Variant = 'default' | 'on' | 'primary' | 'ghost';
 
@@ -25,7 +25,7 @@ export const AcroButton = forwardRef<HTMLButtonElement, Props>(function AcroButt
     borderRadius: '7px',
     transition: '.14s',
     fontFamily: 'inherit',
-    cursor: 'pointer',
+    cursor: CURSOR_POINTER,
     whiteSpace: 'nowrap',
     '&:disabled': { opacity: 0.4, cursor: 'not-allowed' },
   } as const;
@@ -98,7 +98,7 @@ export function Chip({
         borderRadius: '6px',
         border: '1px solid',
         fontFamily: 'inherit',
-        cursor: onClick ? 'pointer' : 'default',
+        cursor: onClick ? CURSOR_POINTER : 'default',
         ...tones,
         ...sx,
       }}

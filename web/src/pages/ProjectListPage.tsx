@@ -9,7 +9,7 @@ import { AcroButton } from '@/components/common/AcroButton';
 import { UserAvatar } from '@/components/common/Avatar';
 import { Icon } from '@/components/common/Icon';
 import { progressOf } from '@/lib/projectProgress';
-import { FONT_DISPLAY, FONT_MONO, T } from '@/theme/tokens';
+import { CURSOR_POINTER, FONT_DISPLAY, FONT_MONO, T } from '@/theme/tokens';
 
 type View = 'grid' | 'list';
 const FILTERS = ['All', 'Active', 'Archived'] as const;
@@ -84,7 +84,7 @@ export function ProjectListPage() {
                   key={f}
                   onClick={() => setFilter(f)}
                   sx={{
-                    fontSize: 12, padding: '6px 12px', borderRadius: '999px', cursor: 'pointer',
+                    fontSize: 12, padding: '6px 12px', borderRadius: '999px', cursor: CURSOR_POINTER,
                     border: `1px solid ${filter === f ? T.tl3 : T.ln2}`,
                     background: filter === f ? T.tl2 : T.sf,
                     color: filter === f ? T.tl : T.dm,
@@ -105,7 +105,7 @@ export function ProjectListPage() {
                   key={v}
                   onClick={() => setView(v)}
                   sx={{
-                    width: 34, height: 32, display: 'grid', placeItems: 'center', cursor: 'pointer',
+                    width: 34, height: 32, display: 'grid', placeItems: 'center', cursor: CURSOR_POINTER,
                     background: view === v ? T.sf3 : 'transparent',
                     color: view === v ? T.tx : T.dm2,
                     '&:hover': { background: T.sf2 },
@@ -140,7 +140,7 @@ export function ProjectListPage() {
               ))}
               <Box
                 sx={{
-                  border: `1px dashed ${T.ln2}`, borderRadius: '14px', cursor: 'pointer',
+                  border: `1px dashed ${T.ln2}`, borderRadius: '14px', cursor: CURSOR_POINTER,
                   display: 'flex', flexDirection: view === 'grid' ? 'column' : 'row',
                   alignItems: 'center', justifyContent: 'center',
                   minHeight: view === 'grid' ? 190 : 62,
@@ -176,7 +176,7 @@ function ProjectCard({ project, view }: { project: ProjectDto; view: View }) {
     <Box
       onClick={() => navigate(`/projects/${project._id}`)}
       sx={{
-        position: 'relative', cursor: 'pointer', background: T.sf,
+        position: 'relative', cursor: CURSOR_POINTER, background: T.sf,
         border: `1px solid ${T.ln}`, borderRadius: '14px', overflow: 'hidden',
         boxShadow: T.ss, transition: 'transform .18s cubic-bezier(.2,.8,.3,1), box-shadow .18s, border-color .18s',
         padding: row ? '14px 18px' : '18px 18px 16px',

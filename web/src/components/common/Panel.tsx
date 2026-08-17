@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 import { Box } from '@mui/material';
-import { FONT_MONO, T } from '@/theme/tokens';
+import { CURSOR_POINTER, FONT_MONO, T } from '@/theme/tokens';
 
 /** 목업 .card */
 export function Card({ children, sx }: { children: ReactNode; sx?: object }) {
@@ -124,7 +124,7 @@ export function SelectInput({
       onChange={(e) => onChange((e.target as HTMLSelectElement).value)}
       sx={{
         ...controlSx,
-        cursor: disabled ? 'not-allowed' : 'pointer',
+        cursor: disabled ? 'not-allowed' : CURSOR_POINTER,
         // See SelectBox — the native popup keeps its default light background even
         // under color-scheme:dark, so options need an explicit background to pair
         // with the inherited text color.

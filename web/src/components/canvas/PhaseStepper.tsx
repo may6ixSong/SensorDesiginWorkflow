@@ -1,7 +1,7 @@
 import { Box } from '@mui/material';
 import { PhaseRef } from '@/types/domain';
 import { CanvasNode, getPW, todayX } from '@/lib/canvasModel';
-import { FONT_MONO, T } from '@/theme/tokens';
+import { CURSOR_POINTER, FONT_MONO, T } from '@/theme/tokens';
 
 interface Props {
   phases: PhaseRef[];
@@ -88,7 +88,7 @@ export function PhaseStepper({
                 width: `${pw}px`,
                 minWidth: `${pw}px`,
                 overflow: 'hidden',
-                cursor: 'pointer',
+                cursor: CURSOR_POINTER,
                 clipPath:
                   i === 0
                     ? 'polygon(0 0,calc(100% - 14px) 0,100% 50%,calc(100% - 14px) 100%,0 100%)'

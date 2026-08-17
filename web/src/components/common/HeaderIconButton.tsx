@@ -1,7 +1,7 @@
 import { Box } from '@mui/material';
 import { Link } from 'react-router-dom';
 import { Icon, IconName } from './Icon';
-import { T } from '@/theme/tokens';
+import { CURSOR_POINTER, T } from '@/theme/tokens';
 
 interface Props {
   icon: IconName;
@@ -22,7 +22,7 @@ export function HeaderIconButton({ icon, label, to, onClick, active = false }: P
     display: 'grid', placeItems: 'center', width: 32, height: 32, borderRadius: '8px',
     background: active ? T.sf3 : T.sf,
     color: active ? T.tx : T.dm,
-    border: 'none', outline: 'none', cursor: 'pointer',
+    border: 'none', outline: 'none', cursor: CURSOR_POINTER,
     transition: '.14s', flex: '0 0 auto', textDecoration: 'none',
     '&:hover': { background: T.sf3, color: T.tx },
   } as const;

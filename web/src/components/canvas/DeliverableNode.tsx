@@ -3,7 +3,7 @@ import { CanvasNode, latA, latR, hasW, stOf, vstr, fmtAt } from '@/lib/canvasMod
 import { PhaseRef, UserDto } from '@/types/domain';
 import { departmentName } from '@/shared/constants/departments';
 import { DocIcon, Icon } from '@/components/common/Icon';
-import { FONT_MONO, T } from '@/theme/tokens';
+import { CURSOR_POINTER, FONT_MONO, T } from '@/theme/tokens';
 
 interface Props {
   d: CanvasNode;
@@ -60,7 +60,7 @@ export function DeliverableNode({
         padding: '8px 9px 7px',
         outline: onHl && hasHl ? `2px solid ${T.vi}` : 'none',
         outlineOffset: onHl && hasHl ? '2px' : 0,
-        cursor: edit && canEdit ? 'grab' : 'pointer',
+        cursor: edit && canEdit ? 'grab' : CURSOR_POINTER,
         touchAction: 'none',
         transition: edit ? 'none' : 'box-shadow .15s, transform .15s, border-color .14s',
         '&:hover': edit ? {} : { transform: 'translateY(-2px)', boxShadow: T.sl, borderColor: T.ln3 },
@@ -80,7 +80,7 @@ export function DeliverableNode({
             display: 'inline-flex', alignItems: 'center', gap: '5px', whiteSpace: 'nowrap',
             background: T.inv, color: '#fff', fontSize: 11.5, fontWeight: 500,
             padding: '5px 11px', borderRadius: '7px', boxShadow: T.sl, zIndex: 40,
-            cursor: 'pointer', border: 'none', fontFamily: 'inherit',
+            cursor: CURSOR_POINTER, border: 'none', fontFamily: 'inherit',
             animation: 'acroPop .16s ease-out',
             '&:hover': { background: '#000' },
             '&::after': {

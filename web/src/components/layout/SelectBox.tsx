@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 import { Box } from '@mui/material';
-import { FONT_MONO, T } from '@/theme/tokens';
+import { CURSOR_POINTER, FONT_MONO, T } from '@/theme/tokens';
 
 /** 목업 .ey — 모노 대문자 라벨 */
 export function Eyebrow({ children, sx }: { children: ReactNode; sx?: object }) {
@@ -70,7 +70,7 @@ export function SelectBox({
           fontWeight: 600,
           fontSize: 13,
           boxShadow: 'none',
-          cursor: disabled ? 'not-allowed' : 'pointer',
+          cursor: disabled ? 'not-allowed' : CURSOR_POINTER,
           outline: 'none',
           color: T.tx,
           fontFamily: 'inherit',

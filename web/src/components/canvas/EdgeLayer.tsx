@@ -1,5 +1,6 @@
 import { Box } from '@mui/material';
 import { CanvasEdge, CanvasNode, biIconPos, latR, orth, stOf } from '@/lib/canvasModel';
+import { CURSOR_POINTER } from '@/theme/tokens';
 
 interface Props {
   nodes: CanvasNode[];
@@ -96,7 +97,7 @@ export function EdgeLayer({
           stroke="transparent"
           strokeWidth={12}
           fill="none"
-          style={{ pointerEvents: 'stroke', cursor: 'pointer' }}
+          style={{ pointerEvents: 'stroke', cursor: CURSOR_POINTER }}
           onClick={(ev) => {
             ev.stopPropagation();
             onDeleteEdge(e.id);

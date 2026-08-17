@@ -2,7 +2,7 @@ import { Avatar, AvatarGroup, Box, Chip, Stack, Tooltip, Typography } from '@mui
 import { IpDto } from '@/types/domain';
 import { AcroButton } from '@/components/common/AcroButton';
 import { Icon } from '@/components/common/Icon';
-import { T } from '@/theme/tokens';
+import { CURSOR_POINTER, T } from '@/theme/tokens';
 import { initials } from '@/components/common/Avatar';
 
 interface IpHeaderProps {
@@ -55,7 +55,7 @@ export function IpHeader({ ip, recv, onOpenPermissions, onOpenHld }: IpHeaderPro
           spacing={1}
           alignItems="center"
           onClick={onOpenPermissions}
-          sx={{ cursor: 'pointer', px: 1, py: 0.5, borderRadius: 2, '&:hover': { bgcolor: T.sf2 } }}
+          sx={{ cursor: CURSOR_POINTER, px: 1, py: 0.5, borderRadius: 2, '&:hover': { bgcolor: T.sf2 } }}
         >
           <AvatarGroup max={4} sx={{ '& .MuiAvatar-root': { width: 24, height: 24, fontSize: 11 } }}>
             {ip.owners.map((o) => (

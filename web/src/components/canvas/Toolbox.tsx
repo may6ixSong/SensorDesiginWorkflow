@@ -1,6 +1,6 @@
 import { Box, Tooltip } from '@mui/material';
 import { Icon, IconName } from '@/components/common/Icon';
-import { T } from '@/theme/tokens';
+import { CURSOR_POINTER, T } from '@/theme/tokens';
 
 interface Props {
   canEdit: boolean;
@@ -79,7 +79,7 @@ function TbBtn({
           borderColor: on ? T.tl3 : 'transparent',
           color: on ? T.tl : T.dm,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          cursor: 'pointer', transition: '.14s', position: 'relative', fontFamily: 'inherit',
+          cursor: CURSOR_POINTER, transition: '.14s', position: 'relative', fontFamily: 'inherit',
           '&:hover': danger
             ? { background: '#fde8e7', color: T.rd }
             : { background: on ? T.tl2 : T.sf2, color: on ? T.tl : T.tx },

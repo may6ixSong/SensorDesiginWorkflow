@@ -10,7 +10,7 @@ import { AcroButton, Badge, Chip } from '@/components/common/AcroButton';
 import { Card, Ey, Field, Row, SelectInput, TextInput } from '@/components/common/Panel';
 import { DocIcon, Icon } from '@/components/common/Icon';
 import { UserAvatar } from '@/components/common/Avatar';
-import { FONT_MONO, T } from '@/theme/tokens';
+import { CURSOR_POINTER, FONT_MONO, T } from '@/theme/tokens';
 
 interface Props {
   node: CanvasNode | null;
@@ -78,7 +78,7 @@ export function DeliverableDialog({
                 padding: '8px 13px', fontSize: 12.5, fontWeight: 500, fontFamily: 'inherit',
                 color: tab === k ? T.tl : T.dm, background: 'none', border: 'none',
                 borderBottom: `2px solid ${tab === k ? T.tl : 'transparent'}`,
-                mb: '-1px', cursor: 'pointer',
+                mb: '-1px', cursor: CURSOR_POINTER,
               }}
             >
               {l}
@@ -225,7 +225,7 @@ function OverviewTab({
                     onClick={() => togglePick(p.key)}
                     sx={{
                       fontFamily: FONT_MONO, fontSize: 11, fontWeight: 600, padding: '5px 10px',
-                      borderRadius: '7px', transition: '.14s', cursor: 'pointer',
+                      borderRadius: '7px', transition: '.14s', cursor: CURSOR_POINTER,
                       background: picked.has(p.key) ? T.tl2 : T.sf,
                       border: `1px solid ${picked.has(p.key) ? T.tl : T.ln2}`,
                       color: picked.has(p.key) ? T.tl : T.dm,
