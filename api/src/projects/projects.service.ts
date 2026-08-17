@@ -29,10 +29,49 @@ export class ProjectsService {
     return project;
   }
 
-  /** phases는 읽기 전용 참조 (설계서 3.2, 4.4) - 이 시스템에는 쓰는 API가 없다. */
   async getPhases(id: string) {
     const project = await this.findByIdOrThrow(id);
     return project.phases;
+  }
+
+  /**
+   * 마일스톤(Phase) 일정 수정 — label/start/end만 바꾼다. key/order는 산출물의
+   * phaseKey·캔버스 레이아웃이 참조하므로 이 API로 추가/삭제/개명하지 않는다 -
+   * 그래서 들어온 phases는 기존 key 집합과 정확히 일치해야 한다.
+   */
+  async updatePhases(id: string, updates: { key: string; label: string; start: string; end: string }[], actor: UserDocument) {
+    await this.assertManageAccess(id, actor);
+    const project = await this.findByIdOrThrow(id);
+
+    const existingKeys = new Set(project.phases.map((p) => p.key));
+    const updateKeys = new Set(updates.map((p) => p.key));
+    if (existingKeys.size !== updateKeys.size || [...existingKeys].some((k) => !updateKeys.has(k))) {
+      throw new BadRequestException('Milestones cannot be added or removed here — only the schedule can change.');
+    }
+    const byKey = new Map(updates.map((p) => [p.key, p]));
+    for (const p of project.phases) {
+      const u = byKey.get(p.key)!;
+      const start = new Date(u.start);
+      const end = new Date(u.end);
+      if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+        throw new BadRequestException(`Invalid date for milestone ${p.key}.`);
+      }
+      if (start.getTime() >= end.getTime()) {
+        throw new BadRequestException(`${p.key}: start date must be before the end date.`);
+      }
+      if (!u.label.trim()) {
+        throw new BadRequestException(`${p.key}: label cannot be empty.`);
+      }
+    }
+
+    project.phases = project.phases.map((p) => {
+      const u = byKey.get(p.key)!;
+      return { key: p.key, order: p.order, label: u.label.trim(), start: u.start, end: u.end };
+    });
+
+    await project.save();
+    await this.audit.log(actor._id, 'PROJECT_PHASES_UPDATE', 'project', project._id, {});
+    return this.findDetailOrThrow(id, actor._id.toString());
   }
 
   /**

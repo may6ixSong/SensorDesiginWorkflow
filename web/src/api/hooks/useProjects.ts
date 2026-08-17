@@ -43,6 +43,22 @@ export function useUpdateProject(projectId: string) {
   });
 }
 
+/** 마일스톤 일정(label/start/end) 수정 — key/order는 이 API로 바꾸지 않는다. */
+export function useUpdatePhases(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (phases: { key: string; label: string; start: string; end: string }[]) => {
+      const res = await apiClient.patch<ApiEnvelope<ProjectDetailDto>>(`/projects/${projectId}/phases`, { phases });
+      return res.data.data;
+    },
+    onSuccess: (project) => {
+      qc.setQueryData(queryKeys.project(projectId), project);
+      qc.invalidateQueries({ queryKey: queryKeys.projectPhases(projectId) });
+      qc.invalidateQueries({ queryKey: queryKeys.projects });
+    },
+  });
+}
+
 /** 과제 팀원(부서별 로스터) 추가 — 이 과제의 IP 중 하나라도 Edit 권한이 있어야 한다(BE 재검증). */
 export function useAddProjectMember(projectId: string) {
   const qc = useQueryClient();
@@ -66,7 +82,7 @@ export function useRemoveProjectMember(projectId: string) {
   });
 }
 
-/** Phase는 읽기 전용 참조 (설계서 3.2) - 이 앱에는 Phase를 쓰는 API가 없다. */
+/** 캔버스가 사용하는 조회용 Phase 목록 — 일정 수정은 useUpdatePhases 참고. */
 export function useProjectPhases(projectId: string | undefined) {
   return useQuery({
     queryKey: queryKeys.projectPhases(projectId ?? ''),

@@ -2,8 +2,10 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 
 /**
- * Phase는 이 시스템에서 읽기 전용 참조 (설계서 3.2, 4.4).
- * 이번 개발 범위에는 phases를 쓰는 API가 없다 - 향후 별도 "프로젝트 설정" 서비스가 채운다는 가정.
+ * Phase(마일스톤) 일정. 설계서 3.2/4.4는 원래 읽기 전용 참조를 가정했지만, Project
+ * Information 페이지에서 일정(label/start/end)을 직접 수정할 수 있도록 확장했다
+ * (PATCH /projects/:id/phases, ProjectsService.updatePhases). key/order는 산출물의
+ * phaseKey·레이아웃 계산이 참조하는 식별자라 이 API로는 바꾸지 않는다.
  */
 @Schema({ _id: false })
 export class PhaseRef {

@@ -8,6 +8,7 @@ import { toIpDto } from '../ips/dto/ip.dto';
 import { toProjectDetailDto } from './dto/project.dto';
 import { AddMemberDto } from './dto/add-member.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
+import { UpdatePhasesDto } from './dto/update-phases.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('projects')
@@ -34,6 +35,13 @@ export class ProjectsController {
   async phases(@Param('id') id: string) {
     const phases = await this.projects.getPhases(id);
     return { data: phases };
+  }
+
+  /** 마일스톤 일정(label/start/end) 수정 — 이 과제의 IP 중 하나라도 Edit 권한이 있는 사람만 가능. */
+  @Patch(':id/phases')
+  async updatePhases(@Param('id') id: string, @Body() body: UpdatePhasesDto, @CurrentUser() me: UserDocument) {
+    const project = await this.projects.updatePhases(id, body.phases, me);
+    return { data: toProjectDetailDto(project) };
   }
 
   /** 과제 메타데이터 수정 — 이 과제의 IP 중 하나라도 Edit 권한이 있는 사람만 가능. */

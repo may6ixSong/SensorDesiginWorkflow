@@ -75,6 +75,23 @@ export function TextInput({
   );
 }
 
+export function DateInput({
+  value, onChange, error, id,
+}: {
+  value: string; onChange: (v: string) => void; error?: boolean; id?: string;
+}) {
+  return (
+    <Box
+      component="input"
+      type="date"
+      id={id}
+      value={value}
+      onChange={(e) => onChange((e.target as HTMLInputElement).value)}
+      sx={{ ...controlSx, ...(error ? { borderColor: T.rd } : {}) }}
+    />
+  );
+}
+
 export function TextArea({
   value, onChange, rows = 4,
 }: {
