@@ -167,6 +167,72 @@ export function reflowLane(blocks: Blk[], phases: PhaseRef[], phasePW: Record<st
   });
 }
 
+/**
+ * 새로 생성된 블록을 지정된 Phase 레인 안쪽(좌상단)에 배치한다.
+ * 백엔드가 내려주는 기본 layout(0,0)은 Phase를 모르므로, FE에서 레인 좌표로 보정해야
+ * `phase` 필드와 실제 x 좌표가 어긋나 엉뚱한 레인에 그려지는 것을 막는다.
+ */
+export function placeInLane(
+  block: { x: number; y: number; phase: string },
+  phases: PhaseRef[],
+  phasePW: Record<string, number>,
+): void {
+  const g = laneG(phases, phasePW).lanes[block.phase];
+  if (!g) return;
+  block.x = snp(g.x + LANE_PAD);
+  block.y = snp(TOP_PAD);
+}
+
+/**
+ * 편집 완료 시 1회만 호출 — 산출물(Deliverable)은 메모와 달리 Phase 경계에
+ * 애매하게 걸쳐 있을 수 없다. 각 노드가 가장 많이 겹치는 Phase 레인을 찾아,
+ * 걸쳐 있다면 그 레인 안으로 완전히 밀어넣고 `phase`를 그 레인으로 확정한다.
+ * 드래그 중(포인터 이동/업)마다 계산하면 비용이 크므로 세션 종료 시점에만 실행한다.
+ */
+export function resolveNodePhases(
+  nodes: CanvasNode[],
+  phases: PhaseRef[],
+  phasePW: Record<string, number>,
+): { moved: number; reassigned: number } {
+  if (!phases.length) return { moved: 0, reassigned: 0 };
+  const { lanes } = laneG(phases, phasePW);
+  let moved = 0;
+  let reassigned = 0;
+
+  nodes.forEach((n) => {
+    let bestKey = phases[0].key;
+    let bestOverlap = -Infinity;
+    phases.forEach((p) => {
+      const g = lanes[p.key];
+      const overlap = Math.min(n.x + n.w, g.x + g.w) - Math.max(n.x, g.x);
+      if (overlap > bestOverlap) {
+        bestOverlap = overlap;
+        bestKey = p.key;
+      }
+    });
+
+    const g = lanes[bestKey];
+    const straddles = phases.some((p) => {
+      if (p.key === bestKey) return false;
+      const gp = lanes[p.key];
+      return n.x < gp.x + gp.w && n.x + n.w > gp.x;
+    });
+
+    if (straddles) {
+      const minX = g.x + LANE_PAD;
+      const maxX = Math.max(minX, g.x + g.w - LANE_PAD - n.w);
+      n.x = snp(Math.max(minX, Math.min(maxX, n.x)));
+      moved++;
+    }
+    if (n.phase !== bestKey) {
+      n.phase = bestKey;
+      reassigned++;
+    }
+  });
+
+  return { moved, reassigned };
+}
+
 /** Phase 최소 폭 (목업 minPW) */
 export function minPW(blocks: Blk[], pid: string) {
   const maxW = blocks.filter((b) => b.phase === pid).reduce((m, b) => Math.max(m, b.w || NW), NW);

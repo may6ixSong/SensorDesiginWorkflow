@@ -44,6 +44,8 @@ interface CanvasState {
   hldBack: boolean;
   phInfo: string | null;
   ownerDlg: boolean;
+  /** 새로 추가된 블록 id — 설정되면 Canvas가 뷰포트를 그 블록으로 이동시키고 비운다. */
+  focusReq: string | null;
 
   setVP: (z: number, x: number, y: number) => void;
   setPan: (x: number) => void;
@@ -73,6 +75,7 @@ interface CanvasState {
   setHldBack: (v: boolean) => void;
   setPhInfo: (id: string | null) => void;
   setOwnerDlg: (v: boolean) => void;
+  setFocusReq: (id: string | null) => void;
   /** 블록 재렌더 트리거용 카운터 (드래그 커밋 후 등) */
   rev: number;
 }
@@ -105,6 +108,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   hldBack: false,
   phInfo: null,
   ownerDlg: false,
+  focusReq: null,
   rev: 0,
 
   setVP: (z, x, y) => set({ z: Math.max(ZOOM_MIN, z), x, y }),
@@ -173,4 +177,5 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   setHldBack: (v) => set({ hldBack: v }),
   setPhInfo: (id) => set({ phInfo: id }),
   setOwnerDlg: (v) => set({ ownerDlg: v }),
+  setFocusReq: (id) => set({ focusReq: id }),
 }));
