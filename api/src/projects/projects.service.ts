@@ -25,7 +25,7 @@ export class ProjectsService {
 
   async findByIdOrThrow(id: string) {
     const project = await this.model.findById(id).exec();
-    if (!project) throw new NotFoundException('Program not found.');
+    if (!project) throw new NotFoundException('Project not found.');
     return project;
   }
 
@@ -80,16 +80,16 @@ export class ProjectsService {
    */
   async findDetailOrThrow(id: string, userId: string) {
     const hasAccess = await this.ips.hasAnyAccessToProject(id, userId);
-    if (!hasAccess) throw new ForbiddenException('You do not have access to this program.');
+    if (!hasAccess) throw new ForbiddenException('You do not have access to this project.');
     const project = await this.model.findById(id).populate('members.userId').exec();
-    if (!project) throw new NotFoundException('Program not found.');
+    if (!project) throw new NotFoundException('Project not found.');
     return project;
   }
 
   private async assertManageAccess(id: string, actor: UserDocument) {
     const hasEdit = await this.ips.hasEditAccessToProject(id, actor._id.toString());
     if (!hasEdit) {
-      throw new ForbiddenException('Only members who own an IP in this program can manage it.');
+      throw new ForbiddenException('Only members who own an IP in this project can manage it.');
     }
   }
 
@@ -105,7 +105,7 @@ export class ProjectsService {
     if (dto.code !== undefined && dto.code !== project.code) {
       const existing = await this.model.findOne({ code: dto.code }).exec();
       if (existing && existing._id.toString() !== project._id.toString()) {
-        throw new BadRequestException('That program code is already in use.');
+        throw new BadRequestException('That project code is already in use.');
       }
       project.code = dto.code;
     }

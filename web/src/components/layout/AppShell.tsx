@@ -119,7 +119,7 @@ export function AppShell({
           <>
             <Box sx={{ width: '1px', height: 22, background: T.ln }} />
             <SelectBox
-              label="Program"
+              label="Project"
               value={projectId ?? ''}
               onChange={onChangeProject!}
               options={(projects ?? []).map((p) => ({ value: p._id, label: `${p.code} · ${p.name}` }))}

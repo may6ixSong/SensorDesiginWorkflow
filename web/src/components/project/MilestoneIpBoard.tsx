@@ -109,7 +109,7 @@ export function MilestoneIpBoard({ projectId, phases, ips }: { projectId: string
 
             {!ips.length && (
               <Box sx={{ gridColumn: `1 / -1`, padding: '24px', fontSize: 12.5, color: T.dm2, textAlign: 'center' }}>
-                No viewable IPs under this program.
+                No viewable IPs under this project.
               </Box>
             )}
           </Box>

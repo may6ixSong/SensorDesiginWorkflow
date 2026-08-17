@@ -40,7 +40,7 @@ export function EditProjectDialog({ project, onClose, onSave, saving, error }: P
       header={
         <>
           <Ey>{project.code}</Ey>
-          <Box sx={{ fontSize: 16, fontWeight: 700, mt: '2px' }}>Edit Program</Box>
+          <Box sx={{ fontSize: 16, fontWeight: 700, mt: '2px' }}>Edit Project</Box>
         </>
       }
     >

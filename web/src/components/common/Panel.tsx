@@ -122,7 +122,14 @@ export function SelectInput({
       value={value}
       disabled={disabled}
       onChange={(e) => onChange((e.target as HTMLSelectElement).value)}
-      sx={{ ...controlSx, cursor: disabled ? 'not-allowed' : 'pointer' }}
+      sx={{
+        ...controlSx,
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        // See SelectBox — the native popup keeps its default light background even
+        // under color-scheme:dark, so options need an explicit background to pair
+        // with the inherited text color.
+        '& option': { background: T.sf, color: T.tx },
+      }}
     >
       {options.map((o) => (
         <option key={o.value} value={o.value}>

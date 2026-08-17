@@ -191,7 +191,7 @@ export function BoardPage() {
               No viewable IP
             </Typography>
             <Typography sx={{ fontSize: 13, color: T.dm, lineHeight: 1.8 }}>
-              {me?.name} has no access to this program's Analog IPs.
+              {me?.name} has no access to this project's Analog IPs.
             </Typography>
           </Box>
         </Box>

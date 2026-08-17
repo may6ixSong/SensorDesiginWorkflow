@@ -56,9 +56,9 @@ export function ProjectPageShell({ children }: Props) {
       <AppShell users={users ?? []}>
         <Box sx={{ flex: 1, display: 'grid', placeItems: 'center', padding: '40px' }}>
           <Box sx={{ textAlign: 'center', maxWidth: 420 }}>
-            <Typography sx={{ fontSize: 20, fontWeight: 700, mb: '10px' }}>No viewable program</Typography>
+            <Typography sx={{ fontSize: 20, fontWeight: 700, mb: '10px' }}>No viewable project</Typography>
             <Typography sx={{ fontSize: 13, color: T.dm, lineHeight: 1.8 }}>
-              You don't have access to any IP under this program.
+              You don't have access to any IP under this project.
             </Typography>
           </Box>
         </Box>
@@ -109,7 +109,7 @@ export function ProjectPageShell({ children }: Props) {
             </Box>
 
             <Card sx={{ width: 260 }}>
-              <Ey sx={{ mb: '7px' }}>Program progress</Ey>
+              <Ey sx={{ mb: '7px' }}>Project progress</Ey>
               <Box sx={{ display: 'flex', alignItems: 'baseline', gap: '6px', mb: '6px' }}>
                 <Box sx={{ fontFamily: FONT_MONO, fontSize: 11, color: T.dm2 }}>{current}</Box>
                 <Box sx={{ flex: 1 }} />
@@ -164,7 +164,7 @@ export function ProjectPageShell({ children }: Props) {
           onSave={(p) => {
             setEditErr(null);
             updateProject.mutate(p, {
-              onSuccess: () => { setEditOpen(false); toast('Program updated'); },
+              onSuccess: () => { setEditOpen(false); toast('Project updated'); },
               onError: (e: any) => setEditErr(e?.response?.data?.message ?? 'Failed to save'),
             });
           }}

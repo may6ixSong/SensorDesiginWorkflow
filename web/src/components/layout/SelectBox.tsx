@@ -75,6 +75,11 @@ export function SelectBox({
           color: T.tx,
           fontFamily: 'inherit',
           '&:focus': { boxShadow: 'none' },
+          // Options must carry their own background, not just the inherited color:
+          // once an author color is set on the <select>, Chromium still paints the
+          // native popup with its default light background, so dark mode's near-white
+          // text ended up invisible on it. Setting both keeps the pair consistent.
+          '& option': { background: T.sf, color: T.tx },
         }}
       >
         {options.map((o) => (
