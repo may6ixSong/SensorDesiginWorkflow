@@ -80,7 +80,7 @@ export function PhaseStepper({
                 flexDirection: 'column',
                 justifyContent: 'center',
                 padding: i === 0 ? '8px 22px 8px 18px' : '8px 22px 8px 28px',
-                background: cur ? 'linear-gradient(180deg,#d9f3ec,#eaf9f5)' : past ? T.sf2 : T.sf,
+                background: cur ? T.tl2 : past ? T.sf2 : T.sf,
                 border: `1px solid ${T.ln}`,
                 textAlign: 'left',
                 transition: 'background .15s',

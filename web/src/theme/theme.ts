@@ -95,14 +95,18 @@ export function buildTheme(mode: ThemeMode): Theme {
     },
     MuiTooltip: {
       styleOverrides: {
+        // T.inv (not T.tx): a tooltip is meant to read as a fixed dark pill with
+        // white text in both themes — T.tx flips to near-white in dark mode, which
+        // paired with MUI's light tooltip text would make it unreadable.
         tooltip: {
-          background: T.tx,
+          background: T.inv,
+          color: '#fff',
           fontSize: 11.5,
           padding: '4px 9px',
           borderRadius: 6,
           boxShadow: T.sm,
         },
-        arrow: { color: T.tx },
+        arrow: { color: T.inv },
       },
     },
   },

@@ -23,7 +23,7 @@ export function Toast() {
         left: '50%',
         bottom: 22,
         transform: visible ? 'translateX(-50%) translateY(-4px)' : 'translateX(-50%)',
-        background: T.tx,
+        background: T.inv,
         color: '#fff',
         fontSize: 12.5,
         px: '15px',

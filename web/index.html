@@ -13,6 +13,16 @@
     />
     <style>
       :root {
+        /* Tells the browser to render native form chrome (select popups, checkboxes,
+           scrollbars) with the light palette. Without this, an open <select> dropdown
+           always uses the OS's light popup regardless of data-theme, so dark-mode text
+           colors (meant for a dark background) land on a bright native background and
+           become unreadable. */
+        color-scheme: light;
+        /* Fixed dark surface for floating chips (toast, canvas "Details" button) that
+           are meant to read as a dark pill in both themes — intentionally NOT redefined
+           under [data-theme='dark'] below, so it never flips like --acro-tx does. */
+        --acro-inv: #14202f;
         --acro-bg: #eceff5;
         --acro-sf: #ffffff;
         --acro-sf2: #f6f8fc;
@@ -49,6 +59,7 @@
         --acro-hld-changed-hover: #fff3d6;
       }
       html[data-theme='dark'] {
+        color-scheme: dark;
         --acro-bg: #0b0e15;
         --acro-sf: #141924;
         --acro-sf2: #171d2a;

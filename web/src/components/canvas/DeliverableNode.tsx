@@ -78,14 +78,14 @@ export function DeliverableNode({
           sx={{
             position: 'absolute', left: '50%', top: -32, transform: 'translateX(-50%)',
             display: 'inline-flex', alignItems: 'center', gap: '5px', whiteSpace: 'nowrap',
-            background: T.tx, color: '#fff', fontSize: 11.5, fontWeight: 500,
+            background: T.inv, color: '#fff', fontSize: 11.5, fontWeight: 500,
             padding: '5px 11px', borderRadius: '7px', boxShadow: T.sl, zIndex: 40,
             cursor: 'pointer', border: 'none', fontFamily: 'inherit',
             animation: 'acroPop .16s ease-out',
             '&:hover': { background: '#000' },
             '&::after': {
               content: '""', position: 'absolute', left: '50%', bottom: -4, width: 8, height: 8,
-              background: T.tx, transform: 'translateX(-50%) rotate(45deg)',
+              background: T.inv, transform: 'translateX(-50%) rotate(45deg)',
             },
           }}
         >

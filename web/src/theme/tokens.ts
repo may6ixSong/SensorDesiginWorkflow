@@ -17,6 +17,9 @@ export const T = {
   tx: 'var(--acro-tx)',
   dm: 'var(--acro-dm)',
   dm2: 'var(--acro-dm2)',
+  /** 항상 어두운 표면 — 테마와 무관하게 어두운 배경 위에 흰 글자로 떠 있어야 하는
+   * 칩(Toast, 캔버스 "Details" 버튼, 툴팁)용. T.tx처럼 테마에 따라 뒤집히지 않는다. */
+  inv: 'var(--acro-inv)',
 
   tl: 'var(--acro-tl)',
   tl2: 'var(--acro-tl2)',
