@@ -25,7 +25,8 @@ import { usePutCanvas } from '@/api/hooks/useCanvas';
 import { useCanvasStore } from '@/store/canvasStore';
 import { useAuthStore } from '@/store/authStore';
 import { toast } from '@/store/toastStore';
-import { toCanvasEdge, toCanvasMemo, toCanvasNode } from '@/lib/canvasModel';
+import { placeInLane, toCanvasEdge, toCanvasMemo, toCanvasNode } from '@/lib/canvasModel';
+import { DeliverableDto, PhaseRef } from '@/types/domain';
 import { T } from '@/theme/tokens';
 
 export function BoardPage() {
@@ -97,8 +98,10 @@ export function BoardPage() {
     }
   };
 
-  /* 편집 종료 시 캔버스 일괄 저장 (설계서 5.5) */
-  const saveLayout = () => {
+  /* 편집 종료 시 캔버스 일괄 저장 (설계서 5.5). Canvas는 저장이 끝난 뒤(성공/실패
+   * 무관)에만 편집 모드를 종료한다 — 그 전에 종료하면 disabled였던 조회 쿼리가
+   * 재활성화되며 아직 저장되지 않은 로컬 편집 결과를 stale 서버 데이터로 덮어쓸 수 있다. */
+  const saveLayout = (onSettled?: () => void) => {
     const s = st.getState();
     putCanvas.mutate(
       {
@@ -120,10 +123,46 @@ export function BoardPage() {
         })),
       },
       {
-        onSuccess: () => toast('Layout saved'),
-        onError: () => toast('Save failed'),
+        onSuccess: () => { toast('Layout saved'); onSettled?.(); },
+        onError: () => { toast('Save failed'); onSettled?.(); },
       },
     );
+  };
+
+  /**
+   * 산출물 생성/Release 일정(series) 변경 결과를 로컬 캔버스에 즉시 반영한다.
+   * `useDeliverables` 쿼리는 편집 중엔 disabled라 invalidate만으로는 화면에 나타나지
+   * 않는다(설계서 7.1) — 그래서 응답으로 받은 DTO를 직접 store에 병합한다.
+   * 이미 로컬에 있던 노드는 위치/크기(x,y,w,h,phase)를 보존하고 메타데이터만 갱신하고,
+   * 새로 생긴 노드만 해당 Phase 레인 안쪽으로 배치한다(placeInLane) — 그렇지 않으면
+   * 서버 기본 좌표(0,0)가 그대로 쓰여 phase 라벨과 실제 표시 위치가 어긋난다.
+   */
+  const mergeDeliverableResults = (list: DeliverableDto[], phaseListForPlacement: PhaseRef[]) => {
+    const s = st.getState();
+    const existingById = new Map(s.nodes.map((n) => [n.id, n]));
+    const touched = list.map((d) => {
+      const local = existingById.get(d.id);
+      if (local) {
+        return {
+          ...local,
+          name: d.name,
+          type: d.docType,
+          net: d.network,
+          series: d.series,
+          seriesIdx: d.seriesIdx,
+          seriesTotal: d.seriesTotal,
+          recvDept: d.recvDept,
+          recvContact: d.recvContact,
+          versions: d.versions ?? [],
+          canEdit: d.canEdit,
+        };
+      }
+      const fresh = toCanvasNode(d);
+      placeInLane(fresh, phaseListForPlacement, s.phasePW);
+      return fresh;
+    });
+    const untouched = s.nodes.filter((n) => !touched.some((t) => t.id === n.id));
+    s.setNodes([...untouched, ...touched]);
   };
 
   if (ipLoading) {
@@ -191,7 +230,13 @@ export function BoardPage() {
                       if (before !== after) {
                         updateSchedule.mutate(
                           { id: sid, phaseKeys },
-                          { onSuccess: () => toast(`Release schedule: ${phaseKeys.length} phase(s)`) },
+                          {
+                            onSuccess: (list) => {
+                              mergeDeliverableResults(list, phaseList);
+                              toast(`Release schedule: ${phaseKeys.length} phase(s)`);
+                            },
+                            onError: () => toast('Failed to update release schedule'),
+                          },
                         );
                       } else {
                         toast('Saved');
@@ -312,15 +357,38 @@ export function BoardPage() {
               ipName={ip.name}
               phases={phaseList}
               onClose={() => st.getState().setAddDlg(false)}
-              onCreate={(p) =>
-                createDeliverable.mutate(p, {
-                  onSuccess: () => {
-                    st.getState().setAddDlg(false);
-                    toast('Deliverable added');
+              onCreate={({ name, phaseKeys, docType, network }) => {
+                const [firstPhase, ...rest] = phaseKeys;
+                createDeliverable.mutate(
+                  { name, phaseKey: firstPhase, docType, network },
+                  {
+                    onSuccess: (created) => {
+                      const s = st.getState();
+                      const fresh = toCanvasNode(created);
+                      placeInLane(fresh, phaseList, s.phasePW);
+                      s.setNodes([...s.nodes, fresh]);
+                      st.getState().setAddDlg(false);
+                      if (rest.length) {
+                        updateSchedule.mutate(
+                          { id: created.id, phaseKeys },
+                          {
+                            onSuccess: (list) => {
+                              mergeDeliverableResults(list, phaseList);
+                              st.getState().setFocusReq(created.id);
+                              toast(`Deliverable added across ${phaseKeys.length} phases`);
+                            },
+                            onError: () => toast('Deliverable added, but failed to set the extra phases'),
+                          },
+                        );
+                      } else {
+                        st.getState().setFocusReq(fresh.id);
+                        toast('Deliverable added');
+                      }
+                    },
+                    onError: () => toast('Failed to add'),
                   },
-                  onError: () => toast('Failed to add'),
-                })
-              }
+                );
+              }}
             />
           )}
 

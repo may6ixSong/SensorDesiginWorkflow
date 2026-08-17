@@ -167,7 +167,10 @@ export class DeliverablesService {
 
     const existing = await this.model.find({ series: origin._id }).sort({ seriesIdx: 1 }).exec();
     const existingByPhase = new Map(existing.map((e) => [e.phaseKey, e]));
-    const uniquePhaseKeys = Array.from(new Set(phaseKeys));
+    // 원본(origin) 자신이 이미 자신의 phaseKey를 차지하고 있으므로, 그 Phase는
+    // series 인스턴스로 다시 만들면 안 된다 - 그렇지 않으면 원본과 같은 Phase에
+    // 중복 인스턴스가 생긴다(실측 확인된 버그).
+    const uniquePhaseKeys = Array.from(new Set(phaseKeys)).filter((k) => k !== origin.phaseKey);
 
     // 선택 해제된 Phase의 인스턴스 삭제 + 관련 edge 정리
     const toDelete = existing.filter((e) => !uniquePhaseKeys.includes(e.phaseKey));
@@ -205,14 +208,19 @@ export class DeliverablesService {
       }
     }
 
+    // 원본은 항상 1회차 - 인스턴스는 2회차부터 이어서 번호를 매긴다(원본과 번호가
+    // 겹치던 실측 확인된 버그: 이전엔 원본 seriesTotal엔 원본을 포함하고 인스턴스
+    // seriesTotal엔 포함하지 않아 서로 다른 값이 표시됐다).
     const remaining = await this.model.find({ series: origin._id }).sort({ createdAt: 1 }).exec();
-    let idx = 1;
+    const total = remaining.length + 1;
+    let idx = 2;
     for (const inst of remaining) {
       inst.seriesIdx = idx++;
-      inst.seriesTotal = remaining.length;
+      inst.seriesTotal = total;
       await inst.save();
     }
-    origin.seriesTotal = remaining.length + 1; // origin 자신 포함
+    origin.seriesIdx = 1;
+    origin.seriesTotal = total;
     await origin.save();
 
     if (wasEmpty && created.length > 0) {

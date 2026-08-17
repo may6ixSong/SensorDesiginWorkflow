@@ -6,6 +6,7 @@ import { toast } from '@/store/toastStore';
 import {
   CanvasEdge, CanvasMemo, CanvasNode, connectedSet, laneG, getPW, phaseAtX,
   laneOverflow, reflowLane, resizePhase, wallAdj, todayX, autoFit as computeAutoFit,
+  resolveNodePhases,
 } from '@/lib/canvasModel';
 import {
   CANVAS_TAIL, CH, MAXH, MAXW, MINH, MINW, PAD, ZOOM_MAX, ZOOM_MIN, ZOOM_STEP, snp,
@@ -23,7 +24,8 @@ interface Props {
   phases: PhaseRef[];
   usersById: Map<string, UserDto>;
   canEdit: boolean;
-  onSaveLayout: () => void;
+  /** 저장 완료(성공/실패 무관) 후 호출할 콜백을 받는다 — 편집 종료를 저장 이후로 미뤄 쿼리 재활성화 레이스를 막는다. */
+  onSaveLayout: (onSettled: () => void) => void;
 }
 
 type Blk = CanvasNode | CanvasMemo;
@@ -51,6 +53,7 @@ export function Canvas({ ip, phases, usersById, canEdit, onSaveLayout }: Props) 
   const link = useCanvasStore((s) => s.link);
   const linkPos = useCanvasStore((s) => s.linkPos);
   const rev = useCanvasStore((s) => s.rev);
+  const focusReq = useCanvasStore((s) => s.focusReq);
 
   const st = useCanvasStore;
 
@@ -215,6 +218,24 @@ export function Canvas({ ip, phases, usersById, canEdit, onSaveLayout }: Props) 
   const findBlk = (id: string): Blk | undefined =>
     st.getState().nodes.find((n) => n.id === id) ?? st.getState().memos.find((m) => m.id === id);
 
+  /* ── 새로 추가된 블록으로 뷰포트 이동 ──
+   * 새 산출물/메모는 현재 스크롤 위치와 무관하게 추가되므로(Phase 레인 기준 배치),
+   * 화면 밖에 생겨도 사용자 눈에 보이도록 뷰포트를 그 블록 중심으로 이동시킨다. */
+  useEffect(() => {
+    if (!focusReq) return;
+    const b = findBlk(focusReq);
+    const vp = vpRef.current;
+    if (b && vp) {
+      const s = st.getState();
+      const cx = b.x + b.w / 2;
+      const cy = b.y + b.h / 2;
+      const c = clampVP(s.z, vp.clientWidth / 2 - cx * s.z, vp.clientHeight / 2 - cy * s.z);
+      s.setVP(c.z, c.x, c.y);
+    }
+    st.getState().setFocusReq(null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusReq]);
+
   const onBlockPointerDown = (id: string) => (e: React.PointerEvent) => {
     const s = st.getState();
     if (!s.edit || !canEdit) return;
@@ -271,14 +292,18 @@ export function Canvas({ ip, phases, usersById, canEdit, onSaveLayout }: Props) 
     if (!b) return;
 
     if (moved) {
-      // 놓인 위치의 Phase 레인으로 소속 변경 (설계서 3.7)
-      const cx = b.x + b.w / 2;
-      const np = phaseAtX(phases, s.phasePW, cx);
-      if (np && np !== b.phase) {
-        b.phase = np;
-        const blocks = allBlocks();
-        if (laneOverflow(blocks, phases, s.phasePW, np)) reflowLane(blocks, phases, s.phasePW, np);
-        toast(`Moved to ${(phases.find((p) => p.key === np) || { key: '' }).key}`);
+      // 메모는 Phase 사이 어디든 걸쳐 있어도 무방 — 놓인 위치의 레인으로 즉시 소속 갱신.
+      // 산출물(Deliverable)은 Phase에 애매하게 걸칠 수 없으므로, 강제 이동 + phase 확정은
+      // 매 드래그마다 계산하지 않고 편집 완료 시점에 한 번만 수행한다(resolveNodePhases, 성능).
+      if (st.getState().memos.some((m) => m.id === id)) {
+        const cx = b.x + b.w / 2;
+        const np = phaseAtX(phases, s.phasePW, cx);
+        if (np && np !== b.phase) {
+          b.phase = np;
+          const blocks = allBlocks();
+          if (laneOverflow(blocks, phases, s.phasePW, np)) reflowLane(blocks, phases, s.phasePW, np);
+          toast(`Moved to ${(phases.find((p) => p.key === np) || { key: '' }).key}`);
+        }
       }
       s.bumpBlocks();
       return;
@@ -381,11 +406,16 @@ export function Canvas({ ip, phases, usersById, canEdit, onSaveLayout }: Props) 
   /* ── 툴박스 액션 ── */
   const handleToggleEdit = () => {
     const s = st.getState();
-    if (!s.edit) s.enterEdit();
-    else {
-      onSaveLayout();
-      s.exitEdit();
+    if (!s.edit) {
+      s.enterEdit();
+      return;
     }
+    // 산출물의 Phase 확정 — 드래그마다 계산하지 않고 편집 완료 시점에 1회만 수행(성능).
+    const { moved } = resolveNodePhases(s.nodes, phases, s.phasePW);
+    if (moved) s.bumpBlocks();
+    // 저장이 끝난 뒤에야 edit을 끈다 — 그 전에 끄면 disabled 쿼리가 재활성화되며
+    // 아직 반영 안 된 서버 데이터로 로컬 편집 결과를 덮어써 버릴 수 있다.
+    onSaveLayout(() => st.getState().exitEdit());
   };
   const handleCancel = () => {
     st.getState().cancelEdit();
@@ -407,10 +437,11 @@ export function Canvas({ ip, phases, usersById, canEdit, onSaveLayout }: Props) 
   const handleAddNote = () => {
     const s = st.getState();
     const g = lanes[phases[0].key] ?? { x: 0 };
+    const id = `tmp-note-${Date.now()}`;
     s.setMemos([
       ...s.memos,
       {
-        id: `tmp-note-${Date.now()}`,
+        id,
         ip: ip.id,
         phase: phases[0].key,
         text: 'New memo',
@@ -420,6 +451,7 @@ export function Canvas({ ip, phases, usersById, canEdit, onSaveLayout }: Props) 
         h: 68,
       },
     ]);
+    s.setFocusReq(id);
     toast('Memo added');
   };
 
