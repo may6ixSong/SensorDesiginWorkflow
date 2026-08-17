@@ -59,4 +59,4 @@ export const FONT_MONO = "'IBM Plex Mono',monospace";
 export const FONT_DISPLAY = "'Syne',sans-serif";
 
 /** 회로도풍 커스텀 커서 — 클릭 가능한 컴포넌트에 적용. 기본 화살표 커서는 index.html의 전역 `cursor`로 처리된다. */
-export const CURSOR_POINTER = "url('/cursors/pointer.svg') 4 4, pointer";
+export const CURSOR_POINTER = "url('/cursors/pointer.svg') 16 16, pointer";
