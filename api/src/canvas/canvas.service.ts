@@ -79,8 +79,10 @@ export class CanvasService {
   }
 
   private assertValidLayouts(dto: PutCanvasDto) {
+    // y는 위 방향 벽(top wall)을 없애 자유롭게 음수로 드래그할 수 있으므로 하한을
+    // 두지 않는다 - x(Phase 레인 좌측 경계)는 여전히 0 이상이어야 한다.
     const isValid = (l: { x: number; y: number; w: number; h: number }) =>
-      l && l.x >= 0 && l.y >= 0 && l.w > 0 && l.h > 0;
+      l && l.x >= 0 && Number.isFinite(l.y) && l.w > 0 && l.h > 0;
     for (const d of dto.deliverables) {
       if (!isValid(d.layout)) throw new BadRequestException(`Invalid coordinates: ${d.id}`);
     }

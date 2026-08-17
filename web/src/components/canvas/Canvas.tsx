@@ -262,7 +262,10 @@ export function Canvas({ ip, phases, usersById, canEdit, onSaveLayout }: Props) 
     if (!b) return;
     const p = cvPt(e);
     const rawX = Math.max(PAD, Math.min(W - b.w - PAD, p.x - D.dx));
-    const rawY = Math.max(PAD, Math.min(H - b.h - PAD, p.y - D.dy));
+    // 위쪽엔 벽을 두지 않는다 — 기본 배치(TOP_PAD=40)와 최소 여백(PAD=8) 사이 32px밖에
+    // 안 남아 "위로 이동이 안 된다"고 느껴졌던 문제. Phase 이름 라벨과 겹치더라도
+    // 캔버스 맨 위(y<0)까지 자유롭게 끌어올릴 수 있게 한다.
+    const rawY = Math.min(H - b.h - PAD, p.y - D.dy);
     D.accX += rawX - b.x;
     const adj = wallAdj(phases, s.phasePW, b.x, b.w, rawX, D.accX);
     const nx = snp(adj.x);
