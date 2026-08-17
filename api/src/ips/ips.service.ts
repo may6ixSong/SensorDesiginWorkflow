@@ -36,6 +36,21 @@ export class IpsService {
     return ids as Types.ObjectId[];
   }
 
+  /** 과제 상세(Project Info) 조회 권한 — 그 과제의 IP 중 하나라도 edit/view 권한이 있으면 된다. */
+  async hasAnyAccessToProject(projectId: string, userId: string) {
+    const count = await this.model.countDocuments({
+      projectId,
+      $or: [{ owners: userId }, { 'viewGrants.userId': userId }],
+    });
+    return count > 0;
+  }
+
+  /** 과제 팀원 명단 관리 권한 — 그 과제의 IP 중 하나라도 Edit(owner) 권한이 있어야 한다. */
+  async hasEditAccessToProject(projectId: string, userId: string) {
+    const count = await this.model.countDocuments({ projectId, owners: userId });
+    return count > 0;
+  }
+
   async findPopulatedOrThrow(ipId: string) {
     const ip = await this.model
       .findById(ipId)

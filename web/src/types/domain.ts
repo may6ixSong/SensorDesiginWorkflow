@@ -27,6 +27,18 @@ export interface ProjectDto {
   status: string;
 }
 
+/** 과제 단위 부서별 팀원 로스터 항목 — IP owners/viewGrants(접근 권한)와는 별개의 정보성 명단. */
+export interface ProjectMemberDto {
+  user: UserDto;
+  department: string;
+  addedAt: string;
+}
+
+/** Project Information 페이지용 상세 — 목록용 ProjectDto에 팀원 로스터가 더해진 것. */
+export interface ProjectDetailDto extends ProjectDto {
+  members: ProjectMemberDto[];
+}
+
 export interface ViewGrantDto {
   user: UserDto;
   department: string;

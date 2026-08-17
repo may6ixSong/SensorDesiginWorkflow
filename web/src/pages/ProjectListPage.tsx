@@ -8,6 +8,7 @@ import { AppShell } from '@/components/layout/AppShell';
 import { AcroButton } from '@/components/common/AcroButton';
 import { UserAvatar } from '@/components/common/Avatar';
 import { Icon } from '@/components/common/Icon';
+import { progressOf } from '@/lib/projectProgress';
 import { FONT_DISPLAY, FONT_MONO, T } from '@/theme/tokens';
 
 type View = 'grid' | 'list';
@@ -159,23 +160,10 @@ export function ProjectListPage() {
   );
 }
 
-/** 오늘 날짜가 phases 구간의 어디쯤인지 → 진행률(%)과 현재 Phase */
-function progressOf(p: ProjectDto) {
-  const ph = [...p.phases].sort((a, b) => a.order - b.order);
-  if (!ph.length) return { pct: 0, current: null as null | string, done: 0, total: 0 };
-  const now = Date.now();
-  const done = ph.filter((x) => new Date(x.end).getTime() < now).length;
-  const current = ph.find((x) => new Date(x.start).getTime() <= now && now <= new Date(x.end).getTime());
-  const s = new Date(ph[0].start).getTime();
-  const e = new Date(ph[ph.length - 1].end).getTime();
-  const pct = Math.round((Math.min(1, Math.max(0, (now - s) / (e - s || 1)))) * 100);
-  return { pct, current: current?.key ?? (done >= ph.length ? 'Done' : ph[0].key), done, total: ph.length };
-}
-
 function ProjectCard({ project, view }: { project: ProjectDto; view: View }) {
   const navigate = useNavigate();
   const { data: ips } = useProjectIps(project._id);
-  const { pct, current, done, total } = progressOf(project);
+  const { pct, current, done, total } = progressOf(project.phases);
   const owners = useMemo(() => {
     const seen = new Map<string, UserDto>();
     (ips ?? []).flatMap((i) => i.owners).forEach((u) => seen.set(u.id, u));
@@ -186,7 +174,7 @@ function ProjectCard({ project, view }: { project: ProjectDto; view: View }) {
 
   return (
     <Box
-      onClick={() => navigate(`/details/${project._id}`)}
+      onClick={() => navigate(`/projects/${project._id}`)}
       sx={{
         position: 'relative', cursor: 'pointer', background: T.sf,
         border: `1px solid ${T.ln}`, borderRadius: '14px', overflow: 'hidden',
@@ -304,7 +292,7 @@ function ProjectCard({ project, view }: { project: ProjectDto; view: View }) {
             fontSize: 11.5, fontWeight: 600, color: T.tl,
           }}
         >
-          Open board <Icon name="expand" />
+          View project <Icon name="expand" />
         </Box>
       </Box>
     </Box>

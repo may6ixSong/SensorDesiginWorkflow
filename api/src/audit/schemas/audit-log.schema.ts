@@ -16,6 +16,8 @@ export const AUDIT_ACTIONS = [
   'EDGE_DELETE',
   'HLD_RELEASE',
   'FILE_DOWNLOAD',
+  'PROJECT_MEMBER_ADD',
+  'PROJECT_MEMBER_REMOVE',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 

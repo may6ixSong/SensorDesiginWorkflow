@@ -24,6 +24,25 @@ export class PhaseRef {
 }
 export const PhaseRefSchema = SchemaFactory.createForClass(PhaseRef);
 
+/**
+ * 과제(Project) 단위 부서별 팀원 로스터 — IP의 owners/viewGrants(접근 권한)와는
+ * 별개 개념이다. 이 프로젝트에 실제로 참여하는 인원을 부서별로 보여주기 위한
+ * 정보성 명단이며, department는 부여 시점에 자유 입력(사용자의 실제 소속과
+ * 다를 수 있음 — ViewGrant.department와 동일한 패턴).
+ */
+@Schema({ _id: false })
+export class ProjectMember {
+  @Prop({ type: Types.ObjectId, ref: 'User', required: true })
+  userId: Types.ObjectId;
+
+  @Prop({ required: true })
+  department: string;
+
+  @Prop({ default: () => new Date() })
+  addedAt: Date;
+}
+export const ProjectMemberSchema = SchemaFactory.createForClass(ProjectMember);
+
 export type ProjectDocument = Project & Document;
 
 @Schema({ timestamps: true })
@@ -42,6 +61,9 @@ export class Project {
 
   @Prop({ default: 'ACTIVE' })
   status: string;
+
+  @Prop({ type: [ProjectMemberSchema], default: [] })
+  members: ProjectMember[];
 
   _id: Types.ObjectId;
 }

@@ -167,6 +167,36 @@ const MOCK_ITEMS: MockItem[] = [
   { id:'f07', ip:'ip3', phase:'ML4', row:0, name:'Post-layout Re-verification', type:'excel', net:'OA', versions:[] },
   { id:'f08', ip:'ip3', phase:'FDR', row:0, name:'FDR Checklist', type:'word', net:'OA', recvDept:'pte', recvContact:'u5', versions:[] },
   { id:'f09', ip:'ip3', phase:'MTO', row:0, name:'MTO Sign-off Sheet', type:'excel', net:'OA', versions:[] },
+
+  { id:'g01', ip:'ip4', phase:'KO', row:0, name:'BGR Requirements Intake', type:'word', net:'OA', recvDept:'pte', recvContact:'u5',
+    versions:[[1,0,'major','u1','2026-01-11 10:00','Initial draft','BGR_req_v1.0.docx']] },
+  { id:'g02', ip:'ip4', phase:'ML1', row:0, name:'BGR Architecture Note', type:'word', net:'OA',
+    versions:[[1,0,'major','u1','2026-02-20 14:00','1st release','BGR_arch_v1.0.docx']] },
+  { id:'g03', ip:'ip4', phase:'AR', row:0, name:'AR Review Package', type:'word', net:'OA',
+    versions:[[1,0,'major','u1','2026-03-18 09:00','1st release','BGR_AR_v1.0.docx']] },
+  { id:'g04', ip:'ip4', phase:'ML3', row:0, name:'Temp Coefficient Simulation', type:'excel', net:'OA',
+    versions:[[1,1,'minor','u1','2026-06-09 12:00','Corner sweep added','BGR_tempco_v1.1.xlsx']] },
+  { id:'g05', ip:'ip4', phase:'MDR', row:0, name:'MDR Review Package', type:'word', net:'OA', versions:[] },
+  { id:'g06', ip:'ip4', phase:'FDR', row:0, name:'FDR Checklist', type:'word', net:'OA', recvDept:'pte', recvContact:'u5', versions:[] },
+
+  { id:'h01', ip:'ip5', phase:'KO', row:0, name:'TG Requirements Intake', type:'word', net:'OA', recvDept:'digital', recvContact:'u3',
+    versions:[[1,0,'major','u2','2026-01-12 11:20','Initial draft','TG_req_v1.0.docx']] },
+  { id:'h02', ip:'ip5', phase:'ML2', row:0, name:'Timing Diagram Spec', type:'word', net:'OA',
+    versions:[[1,0,'major','u2','2026-04-24 10:15','1st release','TG_timing_v1.0.docx']] },
+  { id:'h03', ip:'ip5', phase:'ML3', row:0, name:'Driver Strength Simulation', type:'excel', net:'OA',
+    versions:[[1,0,'major','u2','2026-06-06 15:40','1st release','TG_drv_sim_v1.0.xlsx']] },
+  { id:'h04', ip:'ip5', phase:'ML4', row:0, name:'Post-layout Re-verification', type:'excel', net:'OA', versions:[] },
+  { id:'h05', ip:'ip5', phase:'FDR', row:0, name:'FDR Checklist', type:'word', net:'OA', recvDept:'digital', recvContact:'u3', versions:[] },
+
+  { id:'k01', ip:'ip6', phase:'KO', row:0, name:'Comparator Requirements Intake', type:'word', net:'OA', recvDept:'pte', recvContact:'u5',
+    versions:[[1,0,'major','u2','2026-01-14 09:30','Initial draft','COMP_req_v1.0.docx']] },
+  { id:'k02', ip:'ip6', phase:'AR', row:0, name:'Architecture Review Material', type:'word', net:'OA',
+    versions:[[1,0,'major','u2','2026-03-20 13:10','1st release','COMP_arch_v1.0.docx']] },
+  { id:'k03', ip:'ip6', phase:'ML2', row:0, name:'Offset Simulation Results', type:'excel', net:'OA',
+    versions:[[1,2,'minor','u2','2026-04-25 16:20','Monte Carlo added','COMP_offset_v1.2.xlsx']] },
+  { id:'k04', ip:'ip6', phase:'ML3', row:0, name:'Layout DB', type:'path', net:'HPC',
+    versions:[[1,0,'major','u2','2026-06-07 18:00','Layout freeze','/vwp/cis_a7/comp_block/layout/r1']] },
+  { id:'k05', ip:'ip6', phase:'MTO', row:0, name:'MTO Sign-off Sheet', type:'excel', net:'OA', versions:[] },
 ];
 
 const MOCK_NOTES = [
@@ -175,6 +205,7 @@ const MOCK_NOTES = [
   { id:'n3', ip:'ip1', phase:'FABOUT', row:1, text:'→ Final handoff to Product Engineering & MP Engineering' },
   { id:'n4', ip:'ip2', phase:'ML4', row:1, text:'Reliability item (HTOL) must be confirmed before MP handover' },
   { id:'n5', ip:'ip3', phase:'ML3', row:2, text:'Layout DB exists only on the HPC network — path shared only' },
+  { id:'n6', ip:'ip6', phase:'ML2', row:1, text:'Offset target tightened after ADC_RAMP INL/DNL review — resimulate corners' },
 ];
 
 /** 목업 EDGES. 역방향 쌍(g7/g7r)이 곧 양방향 표현이므로 그대로 옮긴다. */
@@ -192,6 +223,12 @@ const MOCK_EDGES: { id: string; from: string; to: string; auto?: boolean }[] = [
   { id:'i1', from:'f01', to:'f02' }, { id:'i2', from:'f02', to:'f03' }, { id:'i3', from:'f03', to:'f04' },
   { id:'i4', from:'f03', to:'f05' }, { id:'i5', from:'f04', to:'f06' }, { id:'i6', from:'f05', to:'f07' },
   { id:'i7', from:'f06', to:'f07' }, { id:'i8', from:'f07', to:'f08' }, { id:'i9', from:'f08', to:'f09' },
+  { id:'j1', from:'g01', to:'g02' }, { id:'j2', from:'g02', to:'g03' }, { id:'j3', from:'g03', to:'g04' },
+  { id:'j4', from:'g04', to:'g05' }, { id:'j5', from:'g05', to:'g06' },
+  { id:'l1', from:'h01', to:'h02' }, { id:'l2', from:'h02', to:'h03' }, { id:'l3', from:'h03', to:'h04' },
+  { id:'l4', from:'h04', to:'h05' },
+  { id:'m1', from:'k01', to:'k02' }, { id:'m2', from:'k02', to:'k03' }, { id:'m3', from:'k03', to:'k04' },
+  { id:'m4', from:'k04', to:'k05' },
 ];
 
 interface MockHldItem { ver: string; file: string; at: string; cmt: string }
@@ -262,9 +299,21 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
   const U: Record<string, Types.ObjectId> = {};
   MOCK_USERS.forEach((u, i) => (U[u.key] = userDocs[i]._id));
 
-  /* ── Projects (Phase는 두 과제 공통) ── */
+  /* ── Projects (Phase는 두 과제 공통) ──
+   * members: 과제 단위 부서별 팀원 로스터 (Project Info 페이지) — IP owners/viewGrants
+   * (접근 권한)와는 별개의 정보성 명단이라 여기 department는 실제 소속과 다를 수 있다. */
   const p1 = await ProjectModel.create({
     code: 'CIS-A7', name: '50MP Mobile CIS', domain: 'ANALOG', phases: COM_PH, status: 'ACTIVE',
+    // 일부러 u7/u8은 비워둔다 - "부서별 멤버 추가" UI를 실제로 시연/검증할 후보가 남아있어야
+    // 하고, APS/PI-PD 카드가 빈 상태(empty state) 렌더링도 함께 보여주기 때문.
+    members: [
+      { userId: U.u1, department: 'analog', addedAt: new Date('2026-01-05') },
+      { userId: U.u2, department: 'analog', addedAt: new Date('2026-01-05') },
+      { userId: U.u6, department: 'analog', addedAt: new Date('2026-01-06') },
+      { userId: U.u3, department: 'digital', addedAt: new Date('2026-01-07') },
+      { userId: U.u4, department: 'solution', addedAt: new Date('2026-01-08') },
+      { userId: U.u5, department: 'pte', addedAt: new Date('2026-01-08') },
+    ],
   });
   const p2 = await ProjectModel.create({
     code: 'CIS-B3', name: '8MP Automotive CIS', domain: 'ANALOG', phases: COM_PH, status: 'ACTIVE',
@@ -295,7 +344,30 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
     ],
     color: '#2563c9',
   });
-  const IPID: Record<string, Types.ObjectId> = { ip1: ip1._id, ip2: ip2._id, ip3: ip3._id };
+  const ip4 = await IpModel.create({
+    projectId: p1._id, name: 'BGR_REF', description: 'Bandgap voltage reference',
+    owners: [U.u1],
+    viewGrants: [{ userId: U.u5, department: 'pte', grantedAt: new Date() }],
+    color: '#d97706',
+  });
+  const ip5 = await IpModel.create({
+    projectId: p1._id, name: 'TG_DRIVER', description: 'Timing generator output driver',
+    owners: [U.u2],
+    viewGrants: [{ userId: U.u3, department: 'digital', grantedAt: new Date() }],
+    color: '#0891b2',
+  });
+  const ip6 = await IpModel.create({
+    projectId: p1._id, name: 'COMP_BLOCK', description: 'ADC comparator block',
+    owners: [U.u2],
+    viewGrants: [
+      { userId: U.u5, department: 'pte', grantedAt: new Date() },
+      { userId: U.u3, department: 'digital', grantedAt: new Date() },
+    ],
+    color: '#be185d',
+  });
+  const IPID: Record<string, Types.ObjectId> = {
+    ip1: ip1._id, ip2: ip2._id, ip3: ip3._id, ip4: ip4._id, ip5: ip5._id, ip6: ip6._id,
+  };
 
   /* ── Deliverables ── (series 참조를 위해 id를 먼저 확정) */
   const DID: Record<string, Types.ObjectId> = {};
@@ -379,7 +451,7 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
 
   // eslint-disable-next-line no-console
   console.log(
-    `Seed complete (mockup v15 baseline): users=${MOCK_USERS.length}, projects=2, ips=3, ` +
+    `Seed complete (mockup v15 baseline): users=${MOCK_USERS.length}, projects=2, ips=6, ` +
       `deliverables=${MOCK_ITEMS.length}, memos=${MOCK_NOTES.length}, edges=${MOCK_EDGES.length}, hlds=${MOCK_HLDS.length}`,
   );
 }

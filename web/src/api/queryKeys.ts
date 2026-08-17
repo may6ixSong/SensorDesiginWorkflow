@@ -3,6 +3,7 @@ export const queryKeys = {
   me: ['auth', 'me'] as const,
   users: (department?: string) => ['users', department ?? 'all'] as const,
   projects: ['projects'] as const,
+  project: (projectId: string) => ['projects', projectId] as const,
   projectPhases: (projectId: string) => ['projects', projectId, 'phases'] as const,
   projectIps: (projectId: string) => ['projects', projectId, 'ips'] as const,
   ip: (ipId: string) => ['ips', ipId] as const,

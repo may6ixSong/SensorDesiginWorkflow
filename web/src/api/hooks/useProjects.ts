@@ -1,7 +1,7 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient, ApiEnvelope } from '../client';
 import { queryKeys } from '../queryKeys';
-import { IpDto, PhaseRef, ProjectDto } from '@/types/domain';
+import { IpDto, PhaseRef, ProjectDetailDto, ProjectDto } from '@/types/domain';
 import { useAuthStore } from '@/store/authStore';
 
 export function useProjects() {
@@ -13,6 +13,41 @@ export function useProjects() {
       const res = await apiClient.get<ApiEnvelope<ProjectDto[]>>('/projects');
       return res.data.data;
     },
+  });
+}
+
+/** Project Information 페이지용 상세(phases + 부서별 팀원 로스터). */
+export function useProject(projectId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.project(projectId ?? ''),
+    enabled: Boolean(projectId),
+    queryFn: async () => {
+      const res = await apiClient.get<ApiEnvelope<ProjectDetailDto>>(`/projects/${projectId}`);
+      return res.data.data;
+    },
+  });
+}
+
+/** 과제 팀원(부서별 로스터) 추가 — 이 과제의 IP 중 하나라도 Edit 권한이 있어야 한다(BE 재검증). */
+export function useAddProjectMember(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: { userId: string; department: string }) => {
+      const res = await apiClient.post<ApiEnvelope<ProjectDetailDto>>(`/projects/${projectId}/members`, payload);
+      return res.data.data;
+    },
+    onSuccess: (project) => qc.setQueryData(queryKeys.project(projectId), project),
+  });
+}
+
+export function useRemoveProjectMember(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (userId: string) => {
+      const res = await apiClient.delete<ApiEnvelope<ProjectDetailDto>>(`/projects/${projectId}/members/${userId}`);
+      return res.data.data;
+    },
+    onSuccess: (project) => qc.setQueryData(queryKeys.project(projectId), project),
   });
 }
 

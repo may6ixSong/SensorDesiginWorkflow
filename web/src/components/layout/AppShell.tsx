@@ -136,6 +136,7 @@ export function AppShell({
                   : [{ value: '', label: 'No access' }]
               }
             />
+            {projectId && <HeaderIconButton icon="info" label="Project information" to={`/projects/${projectId}`} />}
           </>
         )}
 

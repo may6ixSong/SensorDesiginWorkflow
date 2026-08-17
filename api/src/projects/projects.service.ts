@@ -1,14 +1,20 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { Project, ProjectDocument } from './schemas/project.schema';
 import { IpsService } from '../ips/ips.service';
+import { UsersService } from '../users/users.service';
+import { AuditService } from '../audit/audit.service';
+import { UserDocument } from '../users/schemas/user.schema';
+import { isValidDepartment } from '../common/constants/departments';
 
 @Injectable()
 export class ProjectsService {
   constructor(
     @InjectModel(Project.name) private readonly model: Model<ProjectDocument>,
     private readonly ips: IpsService,
+    private readonly users: UsersService,
+    private readonly audit: AuditService,
   ) {}
 
   /** 접근 가능한 과제 목록 = 하나 이상의 IP에 Edit/View 권한이 있는 과제 (설계서 5.1). */
@@ -27,5 +33,49 @@ export class ProjectsService {
   async getPhases(id: string) {
     const project = await this.findByIdOrThrow(id);
     return project.phases;
+  }
+
+  /**
+   * Project Information 페이지 상세 조회 — 그 과제의 IP 중 하나라도 접근 권한이
+   * 있어야 한다(IP 목록 필터링과 동일한 기준, 설계서 5.1). members.userId를 populate한다.
+   */
+  async findDetailOrThrow(id: string, userId: string) {
+    const hasAccess = await this.ips.hasAnyAccessToProject(id, userId);
+    if (!hasAccess) throw new ForbiddenException('You do not have access to this program.');
+    const project = await this.model.findById(id).populate('members.userId').exec();
+    if (!project) throw new NotFoundException('Program not found.');
+    return project;
+  }
+
+  private async assertManageAccess(id: string, actor: UserDocument) {
+    const hasEdit = await this.ips.hasEditAccessToProject(id, actor._id.toString());
+    if (!hasEdit) {
+      throw new ForbiddenException('Only members who own an IP in this program can manage the roster.');
+    }
+  }
+
+  /** 과제 팀원 명단(부서별 로스터)에 인원을 추가한다 — IP owners/viewGrants(접근 권한)와는 별개 개념. */
+  async addMember(id: string, userId: string, department: string, actor: UserDocument) {
+    if (!isValidDepartment(department)) {
+      throw new BadRequestException('Unknown department.');
+    }
+    await this.assertManageAccess(id, actor);
+    await this.users.findById(userId); // 존재 검증
+    const project = await this.findByIdOrThrow(id);
+    if (!project.members.some((m) => m.userId.toString() === userId)) {
+      project.members.push({ userId: new Types.ObjectId(userId), department, addedAt: new Date() });
+      await project.save();
+      await this.audit.log(actor._id, 'PROJECT_MEMBER_ADD', 'project', project._id, { userId, department });
+    }
+    return this.findDetailOrThrow(id, actor._id.toString());
+  }
+
+  async removeMember(id: string, userId: string, actor: UserDocument) {
+    await this.assertManageAccess(id, actor);
+    const project = await this.findByIdOrThrow(id);
+    project.members = project.members.filter((m) => m.userId.toString() !== userId);
+    await project.save();
+    await this.audit.log(actor._id, 'PROJECT_MEMBER_REMOVE', 'project', project._id, { userId });
+    return this.findDetailOrThrow(id, actor._id.toString());
   }
 }
