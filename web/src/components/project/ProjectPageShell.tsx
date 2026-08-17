@@ -1,0 +1,175 @@
+import { ReactNode, useMemo, useState } from 'react';
+import { Box, CircularProgress, Stack, Typography } from '@mui/material';
+import { Link, useLocation, useParams } from 'react-router-dom';
+import { IpDto, ProjectDetailDto } from '@/types/domain';
+import { useProject, useProjectIps, useUpdateProject } from '@/api/hooks/useProjects';
+import { useUsers } from '@/api/hooks/useUsers';
+import { AppShell } from '@/components/layout/AppShell';
+import { AcroButton } from '@/components/common/AcroButton';
+import { Card, Ey } from '@/components/common/Panel';
+import { Icon } from '@/components/common/Icon';
+import { EditProjectDialog } from '@/components/dialogs/EditProjectDialog';
+import { progressOf } from '@/lib/projectProgress';
+import { toast } from '@/store/toastStore';
+import { FONT_DISPLAY, FONT_MONO, T } from '@/theme/tokens';
+
+const TABS = [
+  { to: '', label: 'Information', icon: 'info' as const },
+  { to: '/members', label: 'Members', icon: 'users' as const },
+];
+
+interface Props {
+  children: (ctx: { project: ProjectDetailDto; ips: IpDto[]; own: boolean }) => ReactNode;
+}
+
+/**
+ * Project Information / Members 페이지가 공유하는 헤더 — 메타데이터 + Edit 버튼 +
+ * 두 페이지를 오가는 탭. 데이터 로딩도 여기서 한 번만 수행해 두 페이지가 각자
+ * 다시 fetch하지 않게 한다.
+ */
+export function ProjectPageShell({ children }: Props) {
+  const { projectId } = useParams<{ projectId: string }>();
+  const { pathname } = useLocation();
+  const { data: project, isLoading: projectLoading, isError } = useProject(projectId);
+  const { data: ips, isLoading: ipsLoading } = useProjectIps(projectId);
+  const { data: users } = useUsers();
+  const updateProject = useUpdateProject(projectId ?? '');
+  const [editOpen, setEditOpen] = useState(false);
+  const [editErr, setEditErr] = useState<string | null>(null);
+
+  const own = useMemo(() => (ips ?? []).some((ip) => ip.myAccess === 'edit'), [ips]);
+  const { pct, current, done, total } = useMemo(
+    () => progressOf(project?.phases ?? []),
+    [project?.phases],
+  );
+
+  if (projectLoading || ipsLoading) {
+    return (
+      <Stack alignItems="center" justifyContent="center" sx={{ height: '100vh' }}>
+        <CircularProgress />
+      </Stack>
+    );
+  }
+
+  if (isError || !project) {
+    return (
+      <AppShell users={users ?? []}>
+        <Box sx={{ flex: 1, display: 'grid', placeItems: 'center', padding: '40px' }}>
+          <Box sx={{ textAlign: 'center', maxWidth: 420 }}>
+            <Typography sx={{ fontSize: 20, fontWeight: 700, mb: '10px' }}>No viewable program</Typography>
+            <Typography sx={{ fontSize: 13, color: T.dm, lineHeight: 1.8 }}>
+              You don't have access to any IP under this program.
+            </Typography>
+          </Box>
+        </Box>
+      </AppShell>
+    );
+  }
+
+  const base = `/projects/${project._id}`;
+
+  return (
+    <AppShell users={users ?? []}>
+      <Box sx={{ flex: 1, overflow: 'auto', background: T.bg }}>
+        <Box sx={{ maxWidth: 1180, mx: 'auto', px: '28px', py: '30px' }}>
+          {/* ── 메타데이터 헤더 ── */}
+          <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: '14px', mb: '18px', flexWrap: 'wrap' }}>
+            <Box sx={{ flex: 1, minWidth: 260 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', mb: '6px' }}>
+                <Box
+                  component="span"
+                  sx={{
+                    fontFamily: FONT_MONO, fontSize: 10.5, letterSpacing: '.1em', padding: '2px 8px',
+                    borderRadius: '6px', background: T.sf3, color: T.dm, border: `1px solid ${T.ln}`,
+                  }}
+                >
+                  {project.code}
+                </Box>
+                <Box
+                  component="span"
+                  sx={{
+                    fontFamily: FONT_MONO, fontSize: 9.5, letterSpacing: '.1em', padding: '2px 8px',
+                    borderRadius: '999px', background: T.tl2, color: T.tl, border: `1px solid ${T.tl3}`,
+                  }}
+                >
+                  {project.status}
+                </Box>
+                <Box component="span" sx={{ fontSize: 11.5, color: T.dm }}>{project.domain}</Box>
+              </Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Box sx={{ fontFamily: FONT_DISPLAY, fontSize: 27, fontWeight: 800, letterSpacing: '-.02em' }}>
+                  {project.name}
+                </Box>
+                {own && (
+                  <AcroButton onClick={() => { setEditErr(null); setEditOpen(true); }}>
+                    <Icon name="edit" /> Edit
+                  </AcroButton>
+                )}
+              </Box>
+            </Box>
+
+            <Card sx={{ width: 260 }}>
+              <Ey sx={{ mb: '7px' }}>Program progress</Ey>
+              <Box sx={{ display: 'flex', alignItems: 'baseline', gap: '6px', mb: '6px' }}>
+                <Box sx={{ fontFamily: FONT_MONO, fontSize: 11, color: T.dm2 }}>{current}</Box>
+                <Box sx={{ flex: 1 }} />
+                <Box sx={{ fontFamily: FONT_MONO, fontSize: 13, fontWeight: 600, color: T.tl }}>{pct}%</Box>
+              </Box>
+              <Box sx={{ height: 6, borderRadius: 999, background: T.sf3, overflow: 'hidden' }}>
+                <Box
+                  sx={{
+                    width: `${pct}%`, height: '100%', borderRadius: 999,
+                    background: `linear-gradient(90deg, ${T.tl}, ${T.vi})`,
+                  }}
+                />
+              </Box>
+              <Box sx={{ fontSize: 10.5, color: T.dm2, mt: '6px' }}>{done}/{total} phases complete</Box>
+            </Card>
+          </Box>
+
+          {/* ── 탭 ── */}
+          <Box sx={{ display: 'flex', gap: '2px', mb: '24px', borderBottom: `1px solid ${T.ln}` }}>
+            {TABS.map((t) => {
+              const to = `${base}${t.to}`;
+              const on = pathname === to || (t.to === '' && pathname === `${base}/`);
+              return (
+                <Box
+                  key={t.to}
+                  component={Link}
+                  to={to}
+                  sx={{
+                    display: 'flex', alignItems: 'center', gap: '6px',
+                    padding: '9px 14px', fontSize: 13, fontWeight: on ? 600 : 500,
+                    color: on ? T.tl : T.dm, textDecoration: 'none',
+                    borderBottom: `2px solid ${on ? T.tl : 'transparent'}`, mb: '-1px',
+                    '&:hover': { color: T.tx },
+                  }}
+                >
+                  <Icon name={t.icon} size={13} /> {t.label}
+                </Box>
+              );
+            })}
+          </Box>
+
+          {children({ project, ips: ips ?? [], own })}
+        </Box>
+      </Box>
+
+      {editOpen && (
+        <EditProjectDialog
+          project={project}
+          saving={updateProject.isPending}
+          error={editErr}
+          onClose={() => setEditOpen(false)}
+          onSave={(p) => {
+            setEditErr(null);
+            updateProject.mutate(p, {
+              onSuccess: () => { setEditOpen(false); toast('Program updated'); },
+              onError: (e: any) => setEditErr(e?.response?.data?.message ?? 'Failed to save'),
+            });
+          }}
+        />
+      )}
+    </AppShell>
+  );
+}

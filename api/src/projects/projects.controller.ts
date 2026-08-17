@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { UserDocument } from '../users/schemas/user.schema';
@@ -7,6 +7,7 @@ import { IpsService } from '../ips/ips.service';
 import { toIpDto } from '../ips/dto/ip.dto';
 import { toProjectDetailDto } from './dto/project.dto';
 import { AddMemberDto } from './dto/add-member.dto';
+import { UpdateProjectDto } from './dto/update-project.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('projects')
@@ -33,6 +34,13 @@ export class ProjectsController {
   async phases(@Param('id') id: string) {
     const phases = await this.projects.getPhases(id);
     return { data: phases };
+  }
+
+  /** 과제 메타데이터 수정 — 이 과제의 IP 중 하나라도 Edit 권한이 있는 사람만 가능. */
+  @Patch(':id')
+  async update(@Param('id') id: string, @Body() body: UpdateProjectDto, @CurrentUser() me: UserDocument) {
+    const project = await this.projects.updateProject(id, body, me);
+    return { data: toProjectDetailDto(project) };
   }
 
   /** Edit 또는 View 권한이 있는 IP만 반환 (설계서 5.1). */

@@ -7,6 +7,7 @@ import { DetailsRedirect } from '@/pages/DetailsRedirect';
 import { HomePage } from '@/pages/HomePage';
 import { ProjectListPage } from '@/pages/ProjectListPage';
 import { ProjectInfoPage } from '@/pages/ProjectInfoPage';
+import { ProjectMembersPage } from '@/pages/ProjectMembersPage';
 import { BoardPage } from '@/pages/BoardPage';
 import { NoAccessPage } from '@/pages/NoAccessPage';
 import { GuidePage } from '@/pages/GuidePage';
@@ -79,6 +80,7 @@ export default function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/projects" element={<ProjectListPage />} />
         <Route path="/projects/:projectId" element={<ProjectInfoPage />} />
+        <Route path="/projects/:projectId/members" element={<ProjectMembersPage />} />
         <Route path="/details" element={<DetailsRedirect />} />
         <Route path="/details/:projectId" element={<DetailsRedirect />} />
         <Route path="/details/:projectId/:ipId" element={<BoardPage />} />

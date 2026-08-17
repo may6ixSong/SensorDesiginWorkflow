@@ -50,8 +50,33 @@ export class ProjectsService {
   private async assertManageAccess(id: string, actor: UserDocument) {
     const hasEdit = await this.ips.hasEditAccessToProject(id, actor._id.toString());
     if (!hasEdit) {
-      throw new ForbiddenException('Only members who own an IP in this program can manage the roster.');
+      throw new ForbiddenException('Only members who own an IP in this program can manage it.');
     }
+  }
+
+  /** 과제 메타데이터(이름/코드/도메인/상태) 수정 — Phase는 읽기 전용이라 여기서 다루지 않는다. */
+  async updateProject(
+    id: string,
+    dto: { name?: string; code?: string; domain?: string; status?: string },
+    actor: UserDocument,
+  ) {
+    await this.assertManageAccess(id, actor);
+    const project = await this.findByIdOrThrow(id);
+
+    if (dto.code !== undefined && dto.code !== project.code) {
+      const existing = await this.model.findOne({ code: dto.code }).exec();
+      if (existing && existing._id.toString() !== project._id.toString()) {
+        throw new BadRequestException('That program code is already in use.');
+      }
+      project.code = dto.code;
+    }
+    if (dto.name !== undefined) project.name = dto.name;
+    if (dto.domain !== undefined) project.domain = dto.domain;
+    if (dto.status !== undefined) project.status = dto.status;
+
+    await project.save();
+    await this.audit.log(actor._id, 'PROJECT_UPDATE', 'project', project._id, dto);
+    return this.findDetailOrThrow(id, actor._id.toString());
   }
 
   /** 과제 팀원 명단(부서별 로스터)에 인원을 추가한다 — IP owners/viewGrants(접근 권한)와는 별개 개념. */

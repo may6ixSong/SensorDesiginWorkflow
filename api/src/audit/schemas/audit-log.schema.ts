@@ -18,6 +18,7 @@ export const AUDIT_ACTIONS = [
   'FILE_DOWNLOAD',
   'PROJECT_MEMBER_ADD',
   'PROJECT_MEMBER_REMOVE',
+  'PROJECT_UPDATE',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
