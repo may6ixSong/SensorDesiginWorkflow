@@ -25,16 +25,20 @@ export interface SeedModels {
   HldRelease: Model<HldReleaseDocument>;
 }
 
-/* ── 목업 CONSTANTS (analog-dashboard-v15.html) ── */
+/* ── 목업 CONSTANTS (analog-dashboard-v15.html) ──
+ * FE의 web/src/lib/constants.ts 값과 반드시 일치해야 한다. 여기가 어긋나면
+ * seedXY()가 계산하는 절대 x좌표와 FE가 실제로 그리는 레인 폭(DEFAULT_PW)이
+ * 서로 달라져, 시드 산출물들이 의도한 Phase 레인을 벗어나 옆 Phase와 겹쳐
+ * 보인다(실측 확인된 버그 — FE 블록 크기를 키운 커밋에서 이 사본을 안 고쳤었다). */
 const GRID = 10;
 const ROW_H = 150;
 const TOP_PAD = 40;
-const NW = 160;
-const NH = 82;
-const MW = 160;
-const MH = 68;
+const NW = 200;
+const NH = 108;
+const MW = 200;
+const MH = 80;
 const LANE_PAD = 46;
-const DEFAULT_PW = Math.round((180 + LANE_PAD * 2) * 2 * 0.7);
+const DEFAULT_PW = Math.round((NW + LANE_PAD * 2) * 2 * 0.72);
 const snp = (v: number) => Math.round(v / GRID) * GRID;
 
 /* ── 목업 COM_PH ── */
