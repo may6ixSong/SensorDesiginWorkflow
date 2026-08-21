@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Box } from '@mui/material';
 import { ModalShell } from '@/components/common/ModalShell';
-import { AcroButton } from '@/components/common/AcroButton';
+import { SirenButton } from '@/components/common/SirenButton';
 import { Ey, Field, TextArea } from '@/components/common/Panel';
 import { Icon } from '@/components/common/Icon';
 import { T } from '@/theme/tokens';
@@ -32,12 +32,12 @@ export function NoteDialog({ text, onClose, onSave, onDelete }: Props) {
         <TextArea value={v} onChange={setV} rows={4} />
       </Field>
       <Box sx={{ display: 'flex', gap: '8px' }}>
-        <AcroButton variant="primary" onClick={() => onSave(v)}>
+        <SirenButton variant="primary" onClick={() => onSave(v)}>
           <Icon name="check" /> Save
-        </AcroButton>
-        <AcroButton onClick={onDelete} sx={{ color: T.rd }}>
+        </SirenButton>
+        <SirenButton onClick={onDelete} sx={{ color: T.rd }}>
           <Icon name="trash" /> Delete
-        </AcroButton>
+        </SirenButton>
       </Box>
     </ModalShell>
   );

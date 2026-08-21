@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 
 export type Lang = 'en' | 'ko';
 
-const STORAGE_KEY = 'acro-lang';
+const STORAGE_KEY = 'siren-lang';
 
 interface LanguageCtx {
   lang: Lang;

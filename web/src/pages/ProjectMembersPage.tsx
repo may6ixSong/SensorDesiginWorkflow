@@ -4,7 +4,7 @@ import { UserDto } from '@/types/domain';
 import { useAddProjectMember, useRemoveProjectMember } from '@/api/hooks/useProjects';
 import { useUsers } from '@/api/hooks/useUsers';
 import { ProjectPageShell } from '@/components/project/ProjectPageShell';
-import { AcroButton } from '@/components/common/AcroButton';
+import { SirenButton } from '@/components/common/SirenButton';
 import { Card, Ey, Field, Row, SelectInput } from '@/components/common/Panel';
 import { UserAvatar } from '@/components/common/Avatar';
 import { Icon } from '@/components/common/Icon';
@@ -78,12 +78,12 @@ function DepartmentMemberCard({
               <Box sx={{ fontSize: 10.5, color: T.dm2 }}>{departmentName(m.user.department)}</Box>
             </Box>
             {canManage && (
-              <AcroButton
+              <SirenButton
                 variant="ghost"
                 onClick={() => removeMember.mutate(m.user.id, { onSuccess: () => toast('Member removed') })}
               >
                 <Icon name="trash" />
-              </AcroButton>
+              </SirenButton>
             )}
           </Box>
         ))
@@ -106,7 +106,7 @@ function DepartmentMemberCard({
             />
           </Field>
           <Box sx={{ display: 'flex', alignItems: 'flex-end' }}>
-            <AcroButton
+            <SirenButton
               disabled={!candidates.length}
               onClick={() => {
                 const u = sel || candidates[0]?.id;
@@ -119,7 +119,7 @@ function DepartmentMemberCard({
               }}
             >
               <Icon name="plus" /> Add
-            </AcroButton>
+            </SirenButton>
           </Box>
         </Row>
       )}

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Box } from '@mui/material';
 import { PhaseRef } from '@/types/domain';
 import { ModalShell } from '@/components/common/ModalShell';
-import { AcroButton } from '@/components/common/AcroButton';
+import { SirenButton } from '@/components/common/SirenButton';
 import { DateInput, Ey, TextInput } from '@/components/common/Panel';
 import { Icon } from '@/components/common/Icon';
 import { FONT_MONO, T } from '@/theme/tokens';
@@ -90,9 +90,9 @@ export function EditMilestonesDialog({ phases, onClose, onSave, saving, error }:
         </Box>
       )}
       {error && <Box sx={{ fontSize: 11.5, color: T.rd, mt: '10px' }}>{error}</Box>}
-      <AcroButton variant="primary" onClick={submit} disabled={saving} sx={{ mt: '16px' }}>
+      <SirenButton variant="primary" onClick={submit} disabled={saving} sx={{ mt: '16px' }}>
         <Icon name="check" /> {saving ? 'Saving…' : 'Save'}
-      </AcroButton>
+      </SirenButton>
     </ModalShell>
   );
 }

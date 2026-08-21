@@ -1,7 +1,7 @@
 import { ReactNode } from 'react';
 import { Box, Dialog } from '@mui/material';
 import { T } from '@/theme/tokens';
-import { AcroButton } from './AcroButton';
+import { SirenButton } from './SirenButton';
 import { Icon } from './Icon';
 
 interface Props {
@@ -40,9 +40,9 @@ export function ModalShell({ open, onClose, width = 640, header, belowHeader, ch
       <Box sx={{ padding: '15px 20px 0', flex: '0 0 auto' }}>
         <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
           <Box sx={{ flex: 1, minWidth: 0 }}>{header}</Box>
-          <AcroButton variant="ghost" onClick={onClose} aria-label="Close">
+          <SirenButton variant="ghost" onClick={onClose} aria-label="Close">
             <Icon name="x" />
-          </AcroButton>
+          </SirenButton>
         </Box>
         {belowHeader}
       </Box>

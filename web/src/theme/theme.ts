@@ -70,7 +70,7 @@ export function buildTheme(mode: ThemeMode): Theme {
         // 하이라이트된 flow 선의 흐르는 점선 (목업 @keyframes flowdash)
         '@keyframes flowdash': { '0%': { strokeDashoffset: 18 }, to: { strokeDashoffset: 0 } },
         // 상세 버튼 등장 (목업 @keyframes pop)
-        '@keyframes acroPop': {
+        '@keyframes sirenPop': {
           from: { opacity: 0, transform: 'translateX(-50%) translateY(4px)' },
           to: { opacity: 1, transform: 'translateX(-50%) translateY(0)' },
         },
@@ -84,13 +84,13 @@ export function buildTheme(mode: ThemeMode): Theme {
         paper: {
           border: `1px solid ${T.ln2}`,
           borderRadius: 14,
-          boxShadow: 'var(--acro-shadow-dialog)',
+          boxShadow: 'var(--siren-shadow-dialog)',
         },
       },
     },
     MuiBackdrop: {
       styleOverrides: {
-        root: { background: 'var(--acro-backdrop)', backdropFilter: 'blur(2px)' },
+        root: { background: 'var(--siren-backdrop)', backdropFilter: 'blur(2px)' },
       },
     },
     MuiTooltip: {

@@ -206,15 +206,15 @@ export function HomePage() {
           transition: 'background .3s',
           display: 'grid', placeItems: 'center',
           perspective: '1400px', perspectiveOrigin: '50% 45%',
-          '@keyframes acroDrift': {
+          '@keyframes sirenDrift': {
             from: { backgroundPosition: '0 0' },
             to: { backgroundPosition: '0 -800px' },
           },
-          '@keyframes acroGlow': {
+          '@keyframes sirenGlow': {
             '0%,100%': { opacity: 0.75 },
             '50%': { opacity: 1 },
           },
-          '@keyframes acroRise': {
+          '@keyframes sirenRise': {
             from: { opacity: 0, transform: 'translateY(14px)' },
             to: { opacity: 1, transform: 'translateY(0)' },
           },
@@ -229,7 +229,7 @@ export function HomePage() {
             position: 'absolute', inset: '-30%', pointerEvents: 'none',
             background: pal.aurora,
             filter: 'blur(20px)',
-            animation: 'acroGlow 16s ease-in-out infinite',
+            animation: 'sirenGlow 16s ease-in-out infinite',
             transition: 'background .3s',
           }}
         />
@@ -242,7 +242,7 @@ export function HomePage() {
             transform: 'rotateX(74deg)',
             backgroundImage: pal.gridLine,
             backgroundSize: '80px 80px',
-            animation: 'acroDrift 18s linear infinite',
+            animation: 'sirenDrift 18s linear infinite',
             maskImage: pal.gridMask,
             WebkitMaskImage: pal.gridMask,
             pointerEvents: 'none',
@@ -260,7 +260,7 @@ export function HomePage() {
           {FLOW_PATHS.map((d, i) => (
             <path
               key={d}
-              id={`acro-flow-${i}`}
+              id={`siren-flow-${i}`}
               d={d}
               fill="none"
               stroke={pal.flowStroke}
@@ -274,7 +274,7 @@ export function HomePage() {
           {FLOW_PATHS.map((d, i) => (
             <circle key={`p-${d}`} r={0.38} fill={pal.pulse} opacity={0}>
               <animateMotion dur={`${3.2 + i * 0.5}s`} begin={`${i * 0.6}s`} repeatCount="indefinite" rotate="auto">
-                <mpath href={`#acro-flow-${i}`} />
+                <mpath href={`#siren-flow-${i}`} />
               </animateMotion>
               <animate
                 attributeName="opacity"
@@ -327,7 +327,7 @@ export function HomePage() {
             return (
               <path
                 key={svc.name}
-                id={`acro-conn-${i}`}
+                id={`siren-conn-${i}`}
                 d={d}
                 fill="none"
                 stroke={svc.connected ? pal.connLive : pal.connPending}
@@ -351,7 +351,7 @@ export function HomePage() {
                 repeatCount="indefinite"
                 rotate="auto"
               >
-                <mpath href={`#acro-conn-${HERO_SERVICES.findIndex((s) => s.name === svc.name)}`} />
+                <mpath href={`#siren-conn-${HERO_SERVICES.findIndex((s) => s.name === svc.name)}`} />
               </animateMotion>
               <animate
                 attributeName="opacity"
@@ -463,17 +463,17 @@ export function HomePage() {
                 background: pal.wordmarkGradient,
                 WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
                 filter: pal.wordmarkGlow,
-                animation: 'acroRise .8s cubic-bezier(.2,.8,.3,1) both',
+                animation: 'sirenRise .8s cubic-bezier(.2,.8,.3,1) both',
                 transition: 'filter .3s',
               }}
             >
-              ACRO
+              SIREN
             </Box>
             <Box
               sx={{
                 fontFamily: FONT_MONO, fontSize: 10, letterSpacing: '.38em',
                 color: pal.subCopy, mt: '16px', pl: '.38em',
-                animation: 'acroRise .8s cubic-bezier(.2,.8,.3,1) .12s both',
+                animation: 'sirenRise .8s cubic-bezier(.2,.8,.3,1) .12s both',
                 transition: 'color .3s',
               }}
             >
@@ -483,7 +483,7 @@ export function HomePage() {
               sx={{
                 display: 'flex', justifyContent: 'center', mt: '34px',
                 transformStyle: 'preserve-3d',
-                animation: 'acroRise .8s cubic-bezier(.2,.8,.3,1) .24s both',
+                animation: 'sirenRise .8s cubic-bezier(.2,.8,.3,1) .24s both',
               }}
             >
               <HeroLink to="/projects" pal={pal}>View Projects</HeroLink>

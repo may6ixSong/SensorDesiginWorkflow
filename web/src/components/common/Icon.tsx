@@ -68,18 +68,18 @@ export function DocIcon({ type, size }: { type: string; size?: number }) {
   return <Icon name={name} size={size} />;
 }
 
-/** 상단바 ACRO 로고 (목업 .mark SVG 그대로, 색상만 테마 변수로) */
-export function AcroMark({ size = 28 }: { size?: number }) {
+/** 상단바 SIREN 로고 (목업 .mark SVG 그대로, 색상만 테마 변수로) */
+export function SirenMark({ size = 28 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 32 32" fill="none" aria-label="Acro" style={{ flex: '0 0 auto', display: 'block' }}>
-      <path d="M16 29V13" stroke="var(--acro-tl)" strokeWidth="2.2" strokeLinecap="round" />
-      <path d="M16 20.5 L9.5 15M16 17 L22.5 11.5M16 24 L21.5 19.5" stroke="var(--acro-tl)" strokeWidth="1.7" strokeLinecap="round" />
-      <circle cx="16" cy="9.5" r="4.6" fill="var(--acro-tl2)" stroke="var(--acro-tl)" strokeWidth="1.5" />
-      <circle cx="8.6" cy="14.2" r="3.1" fill="var(--acro-tl2)" stroke="var(--acro-tl)" strokeWidth="1.4" />
-      <circle cx="23.4" cy="10.6" r="2.8" fill="var(--acro-tl2)" stroke="var(--acro-tl)" strokeWidth="1.4" />
-      <circle cx="22.4" cy="18.8" r="2.4" fill="var(--acro-tl2)" stroke="var(--acro-tl)" strokeWidth="1.3" />
-      <circle cx="16" cy="9.5" r="1.5" fill="var(--acro-tl)" />
-      <path d="M12 29h8" stroke="var(--acro-tl)" strokeWidth="2" strokeLinecap="round" />
+    <svg width={size} height={size} viewBox="0 0 32 32" fill="none" aria-label="Siren" style={{ flex: '0 0 auto', display: 'block' }}>
+      <path d="M16 29V13" stroke="var(--siren-tl)" strokeWidth="2.2" strokeLinecap="round" />
+      <path d="M16 20.5 L9.5 15M16 17 L22.5 11.5M16 24 L21.5 19.5" stroke="var(--siren-tl)" strokeWidth="1.7" strokeLinecap="round" />
+      <circle cx="16" cy="9.5" r="4.6" fill="var(--siren-tl2)" stroke="var(--siren-tl)" strokeWidth="1.5" />
+      <circle cx="8.6" cy="14.2" r="3.1" fill="var(--siren-tl2)" stroke="var(--siren-tl)" strokeWidth="1.4" />
+      <circle cx="23.4" cy="10.6" r="2.8" fill="var(--siren-tl2)" stroke="var(--siren-tl)" strokeWidth="1.4" />
+      <circle cx="22.4" cy="18.8" r="2.4" fill="var(--siren-tl2)" stroke="var(--siren-tl)" strokeWidth="1.3" />
+      <circle cx="16" cy="9.5" r="1.5" fill="var(--siren-tl)" />
+      <path d="M12 29h8" stroke="var(--siren-tl)" strokeWidth="2" strokeLinecap="round" />
     </svg>
   );
 }

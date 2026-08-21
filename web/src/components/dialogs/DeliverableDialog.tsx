@@ -6,7 +6,7 @@ import { useCanvasStore } from '@/store/canvasStore';
 import { toast } from '@/store/toastStore';
 import { DEPARTMENTS, RECEIVABLE_DEPARTMENTS, departmentName } from '@/shared/constants/departments';
 import { ModalShell } from '@/components/common/ModalShell';
-import { AcroButton, Badge, Chip } from '@/components/common/AcroButton';
+import { SirenButton, Badge, Chip } from '@/components/common/SirenButton';
 import { Card, Ey, Field, Row, SelectInput, TextInput } from '@/components/common/Panel';
 import { DocIcon, Icon } from '@/components/common/Icon';
 import { UserAvatar } from '@/components/common/Avatar';
@@ -180,9 +180,9 @@ function OverviewTab({
           {other.seriesTotal > 1 && <Seq>{other.seriesIdx}/{other.seriesTotal}</Seq>}
         </Box>
         <Box component="span" sx={{ fontFamily: FONT_MONO, fontSize: 10.5, color: T.dm2 }}>{op?.key ?? '—'}</Box>
-        <AcroButton variant="ghost" title="Unlink" onClick={() => onUnlink(e.id)}>
+        <SirenButton variant="ghost" title="Unlink" onClick={() => onUnlink(e.id)}>
           <Icon name="trash" />
-        </AcroButton>
+        </SirenButton>
       </Box>
     );
   };
@@ -237,9 +237,9 @@ function OverviewTab({
                 ))}
               </Box>
             </Field>
-            <AcroButton variant="primary" onClick={submitInfo}>
+            <SirenButton variant="primary" onClick={submitInfo}>
               <Icon name="check" /> Save
-            </AcroButton>
+            </SirenButton>
           </Card>
 
           <Card sx={{ mb: '12px' }}>
@@ -271,12 +271,12 @@ function OverviewTab({
                 />
               </Field>
               <Box sx={{ display: 'flex', alignItems: 'flex-end' }}>
-                <AcroButton
+                <SirenButton
                   disabled={!linkable.length}
                   onClick={() => { const t = lkTgt || linkable[0]?.id; if (t) onAddLink(t); }}
                 >
                   <Icon name="plus" /> Link
-                </AcroButton>
+                </SirenButton>
               </Box>
             </Row>
           </Card>
@@ -312,16 +312,16 @@ function OverviewTab({
         </Box>
         <Box sx={{ mt: '11px' }}>
           {d.net === 'HPC' ? (
-            <AcroButton
+            <SirenButton
               disabled={!cur}
               onClick={() => { if (cur) { navigator.clipboard?.writeText(cur); toast('Path copied'); } }}
             >
               <Icon name="copy" /> Copy path
-            </AcroButton>
+            </SirenButton>
           ) : (
-            <AcroButton disabled={!rel} onClick={() => toast('Downloads will be available once storage is connected')}>
+            <SirenButton disabled={!rel} onClick={() => toast('Downloads will be available once storage is connected')}>
               <Icon name="dn" /> Download file
-            </AcroButton>
+            </SirenButton>
           )}
         </Box>
       </Card>
@@ -357,16 +357,16 @@ function OverviewTab({
             <TextInput value={note} onChange={setNote} placeholder="One line describing what changed" />
           </Field>
           <Box sx={{ display: 'flex', gap: '8px' }}>
-            <AcroButton variant="primary" onClick={submitUpload}>
+            <SirenButton variant="primary" onClick={submitUpload}>
               <Icon name="up" /> Upload working copy
-            </AcroButton>
-            <AcroButton
+            </SirenButton>
+            <SirenButton
               disabled={!d.versions.length}
               onClick={onRelease}
               sx={{ color: T.tl, borderColor: T.tl3 }}
             >
               <Icon name="send" /> Release — v{(latR(d)?.major ?? 0) + 1}.0
-            </AcroButton>
+            </SirenButton>
           </Box>
         </Card>
       )}
@@ -476,9 +476,9 @@ function RecvTab({
           />
         </Field>
       </Row>
-      <AcroButton variant="primary" sx={{ mt: '11px' }} onClick={() => onSave({ recvDept: dept || null, recvContact: contact || null })}>
+      <SirenButton variant="primary" sx={{ mt: '11px' }} onClick={() => onSave({ recvDept: dept || null, recvContact: contact || null })}>
         <Icon name="check" /> Save
-      </AcroButton>
+      </SirenButton>
     </Card>
   );
 }

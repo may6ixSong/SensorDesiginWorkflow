@@ -5,7 +5,7 @@ import { ProjectPageShell } from '@/components/project/ProjectPageShell';
 import { MilestoneIpBoard } from '@/components/project/MilestoneIpBoard';
 import { EditMilestonesDialog } from '@/components/dialogs/EditMilestonesDialog';
 import { useUpdatePhases } from '@/api/hooks/useProjects';
-import { AcroButton } from '@/components/common/AcroButton';
+import { SirenButton } from '@/components/common/SirenButton';
 import { Icon } from '@/components/common/Icon';
 import { toast } from '@/store/toastStore';
 import { T } from '@/theme/tokens';
@@ -38,9 +38,9 @@ function MilestonesSection({
         </Box>
         <Box sx={{ flex: 1 }} />
         {own && (
-          <AcroButton onClick={() => { setEditErr(null); setEditOpen(true); }}>
+          <SirenButton onClick={() => { setEditErr(null); setEditOpen(true); }}>
             <Icon name="edit" /> Edit schedule
-          </AcroButton>
+          </SirenButton>
         )}
       </Box>
       <MilestoneIpBoard projectId={projectId} phases={phases} ips={ips} />

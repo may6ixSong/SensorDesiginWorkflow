@@ -5,7 +5,7 @@ import { ProjectDto, UserDto } from '@/types/domain';
 import { useProjects, useProjectIps } from '@/api/hooks/useProjects';
 import { useUsers } from '@/api/hooks/useUsers';
 import { AppShell } from '@/components/layout/AppShell';
-import { AcroButton } from '@/components/common/AcroButton';
+import { SirenButton } from '@/components/common/SirenButton';
 import { UserAvatar } from '@/components/common/Avatar';
 import { Icon } from '@/components/common/Icon';
 import { progressOf } from '@/lib/projectProgress';
@@ -42,9 +42,9 @@ export function ProjectListPage() {
               </Box>
             </Box>
             <Box sx={{ flex: 1 }} />
-            <AcroButton variant="primary">
+            <SirenButton variant="primary">
               <Icon name="plus" /> New Project
-            </AcroButton>
+            </SirenButton>
           </Box>
 
           {/* 툴바 */}
