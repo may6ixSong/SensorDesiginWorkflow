@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Box } from '@mui/material';
 import { PhaseRef } from '@/types/domain';
 import { ModalShell } from '@/components/common/ModalShell';
-import { AcroButton } from '@/components/common/AcroButton';
+import { SirenButton } from '@/components/common/SirenButton';
 import { Ey, Field, Row, SelectInput, TextInput } from '@/components/common/Panel';
 import { Icon } from '@/components/common/Icon';
 import { CURSOR_POINTER, FONT_MONO, T } from '@/theme/tokens';
@@ -103,9 +103,9 @@ export function AddDeliverableDialog({ ipName, phases, onClose, onCreate }: Prop
           />
         </Field>
       </Row>
-      <AcroButton variant="primary" onClick={submit}>
+      <SirenButton variant="primary" onClick={submit}>
         <Icon name="plus" /> Create
-      </AcroButton>
+      </SirenButton>
     </ModalShell>
   );
 }

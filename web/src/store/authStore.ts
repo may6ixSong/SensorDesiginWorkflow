@@ -21,6 +21,6 @@ export const useAuthStore = create<AuthState>()(
       setSession: (token, user) => set({ token, user }),
       logout: () => set({ token: null, user: null }),
     }),
-    { name: 'acro-auth' },
+    { name: 'siren-auth' },
   ),
 );

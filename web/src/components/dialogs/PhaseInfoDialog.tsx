@@ -2,7 +2,7 @@ import { Box } from '@mui/material';
 import { PhaseRef } from '@/types/domain';
 import { CanvasNode, latR, stOf } from '@/lib/canvasModel';
 import { ModalShell } from '@/components/common/ModalShell';
-import { Badge } from '@/components/common/AcroButton';
+import { Badge } from '@/components/common/SirenButton';
 import { Card, Ey, Row } from '@/components/common/Panel';
 import { DocIcon } from '@/components/common/Icon';
 import { CURSOR_POINTER, FONT_MONO, T } from '@/theme/tokens';

@@ -1,7 +1,7 @@
-# ACRO — Sensor(CIS) Design Work flow
+# SIREN — Sensor(CIS) Design Work flow
 
 CIS(CMOS Image Sensor) 개발의 Analog 영역 산출물을 IP 단위 캔버스 위에서 흐름(flow)으로
-관리하고 버전·권한을 통제하는 시스템. 설계서는 [`docs/acro-design-v2.md`](docs/acro-design-v2.md)를 참고한다.
+관리하고 버전·권한을 통제하는 시스템. 설계서는 [`docs/siren-design-v2.md`](docs/siren-design-v2.md)를 참고한다.
 
 > 이번 세션에는 UI 정본인 `analog-dashboard-v15.html` 목업 파일이 첨부되지 않았다. 캔버스 레이아웃
 > 상수(`web/src/lib/layoutConstants.ts`)와 색상 토큰(`web/src/theme/theme.ts`)은 설계서 3장/7.1절의

@@ -1,5 +1,5 @@
 /**
- * ACRO 목업 데이터 시드 로직. 이미 resolve된 Model 묶음을 받아서 채워 넣기만 한다 -
+ * SIREN 목업 데이터 시드 로직. 이미 resolve된 Model 묶음을 받아서 채워 넣기만 한다 -
  * 연결(실제 DB든 인메모리든)은 전적으로 호출자 책임이다.
  *
  * ★ 이 파일의 데이터는 UI 정본인 `analog-dashboard-v15.html` 목업의

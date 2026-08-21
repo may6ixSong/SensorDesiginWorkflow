@@ -6,9 +6,9 @@ import { useAuthStore } from '@/store/authStore';
 import { useCanvasStore } from '@/store/canvasStore';
 import { useDevLogin } from '@/api/hooks/useAuth';
 import { departmentName } from '@/shared/constants/departments';
-import { AcroMark, Icon } from '@/components/common/Icon';
+import { SirenMark, Icon } from '@/components/common/Icon';
 import { UserAvatar } from '@/components/common/Avatar';
-import { AcroButton } from '@/components/common/AcroButton';
+import { SirenButton } from '@/components/common/SirenButton';
 import { ThemeToggle } from '@/components/common/ThemeToggle';
 import { LanguageToggle } from '@/components/common/LanguageToggle';
 import { HeaderIconButton } from '@/components/common/HeaderIconButton';
@@ -31,7 +31,7 @@ interface AppShellProps {
 const NAV = [{ to: '/projects', label: 'Projects' }];
 
 /**
- * 목업 .tb 상단바 — 로고 + ACRO 워드마크 + 페이지 네비 + (보드에서만) 과제/IP select
+ * 목업 .tb 상단바 — 로고 + SIREN 워드마크 + 페이지 네비 + (보드에서만) 과제/IP select
  * + 수신부서 시점 + 사용자 배지. (설계서 7.1 컴포넌트 트리의 AppShell)
  */
 export function AppShell({
@@ -71,9 +71,9 @@ export function AppShell({
             textDecoration: 'none', color: 'inherit',
           }}
         >
-          <AcroMark />
+          <SirenMark />
           <Box sx={{ fontSize: 15, fontWeight: 800, fontFamily: FONT_DISPLAY, lineHeight: 1.05 }}>
-            ACRO
+            SIREN
             <Box
               component="small"
               sx={{
@@ -143,9 +143,9 @@ export function AppShell({
         <Box sx={{ flex: 1 }} />
 
         {canToggleRecv && (
-          <AcroButton variant={recv ? 'on' : 'default'} onClick={() => setRecv(!recv)}>
+          <SirenButton variant={recv ? 'on' : 'default'} onClick={() => setRecv(!recv)}>
             <Icon name="eye" /> Recipient-dept view
-          </AcroButton>
+          </SirenButton>
         )}
 
         <HeaderIconButton icon="book" label="User guide" to="/guide" />

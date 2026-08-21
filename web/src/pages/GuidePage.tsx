@@ -60,7 +60,7 @@ export function GuidePage() {
       <Box sx={{ flex: 1, overflow: 'auto', background: T.bg }}>
         <Box sx={{ maxWidth: 780, mx: 'auto', px: '28px', py: '40px' }}>
           <Box sx={{ fontFamily: FONT_MONO, fontSize: 10, letterSpacing: '.22em', color: T.dm2 }}>
-            ACRO
+            SIREN
           </Box>
           <Box
             sx={{
@@ -71,7 +71,7 @@ export function GuidePage() {
             User Guide
           </Box>
           <Box sx={{ fontSize: 13, color: T.dm, mt: '8px', lineHeight: 1.7 }}>
-            How deliverables move through a project in ACRO — the board, versioning, HLD
+            How deliverables move through a project in SIREN — the board, versioning, HLD
             snapshots, and who can change what.
           </Box>
 

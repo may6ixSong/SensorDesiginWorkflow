@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Box } from '@mui/material';
 import { ProjectDetailDto } from '@/types/domain';
 import { ModalShell } from '@/components/common/ModalShell';
-import { AcroButton } from '@/components/common/AcroButton';
+import { SirenButton } from '@/components/common/SirenButton';
 import { Ey, Field, Row, SelectInput, TextInput } from '@/components/common/Panel';
 import { Icon } from '@/components/common/Icon';
 import { T } from '@/theme/tokens';
@@ -63,9 +63,9 @@ export function EditProjectDialog({ project, onClose, onSave, saving, error }: P
         />
       </Field>
       {error && <Box sx={{ fontSize: 11.5, color: T.rd, mb: '10px' }}>{error}</Box>}
-      <AcroButton variant="primary" onClick={submit} disabled={saving}>
+      <SirenButton variant="primary" onClick={submit} disabled={saving}>
         <Icon name="check" /> {saving ? 'Saving…' : 'Save'}
-      </AcroButton>
+      </SirenButton>
     </ModalShell>
   );
 }

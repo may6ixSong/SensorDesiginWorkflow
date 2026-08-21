@@ -4,7 +4,7 @@ import { HldReleaseDto, PhaseRef, UserDto } from '@/types/domain';
 import { CanvasNode } from '@/lib/canvasModel';
 import { departmentName } from '@/shared/constants/departments';
 import { ModalShell } from '@/components/common/ModalShell';
-import { Badge } from '@/components/common/AcroButton';
+import { Badge } from '@/components/common/SirenButton';
 import { Card, Ey } from '@/components/common/Panel';
 import { Icon } from '@/components/common/Icon';
 import { UserAvatar } from '@/components/common/Avatar';

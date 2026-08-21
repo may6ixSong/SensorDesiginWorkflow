@@ -5,7 +5,7 @@ import { IpDto, ProjectDetailDto } from '@/types/domain';
 import { useProject, useProjectIps, useUpdateProject } from '@/api/hooks/useProjects';
 import { useUsers } from '@/api/hooks/useUsers';
 import { AppShell } from '@/components/layout/AppShell';
-import { AcroButton } from '@/components/common/AcroButton';
+import { SirenButton } from '@/components/common/SirenButton';
 import { Card, Ey } from '@/components/common/Panel';
 import { Icon } from '@/components/common/Icon';
 import { EditProjectDialog } from '@/components/dialogs/EditProjectDialog';
@@ -101,9 +101,9 @@ export function ProjectPageShell({ children }: Props) {
                   {project.name}
                 </Box>
                 {own && (
-                  <AcroButton onClick={() => { setEditErr(null); setEditOpen(true); }}>
+                  <SirenButton onClick={() => { setEditErr(null); setEditOpen(true); }}>
                     <Icon name="edit" /> Edit
-                  </AcroButton>
+                  </SirenButton>
                 )}
               </Box>
             </Box>

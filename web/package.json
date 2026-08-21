@@ -1,8 +1,8 @@
 {
-  "name": "acro-web",
+  "name": "siren-web",
   "version": "0.1.0",
   "private": true,
-  "description": "ACRO - Analog Deliverable Release Platform Web (Vite + React + TypeScript + MUI)",
+  "description": "SIREN - Analog Deliverable Release Platform Web (Vite + React + TypeScript + MUI)",
   "type": "module",
   "scripts": {
     "dev": "vite",

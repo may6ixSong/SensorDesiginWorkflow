@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { ThemeMode } from './themeVars';
 
-const STORAGE_KEY = 'acro-theme-mode';
+const STORAGE_KEY = 'siren-theme-mode';
 
 interface ThemeModeCtx {
   mode: ThemeMode;

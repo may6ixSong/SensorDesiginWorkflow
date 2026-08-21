@@ -4,8 +4,8 @@
  * else in the app reads this file, so it's safe to add, remove, or rename freely.
  *
  * `connected: true` renders a live "● LIVE :port" badge and an animated,
- * brightly-lit line flowing from the card into the ACRO wordmark — meant to read
- * as "already running as its own service, being folded into ACRO." `connected:
+ * brightly-lit line flowing from the card into the SIREN wordmark — meant to read
+ * as "already running as its own service, being folded into SIREN." `connected:
  * false` renders a dim, static line with a "○ pending" badge instead — "not
  * integrated yet."
  *

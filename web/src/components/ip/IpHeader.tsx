@@ -1,6 +1,6 @@
 import { Avatar, AvatarGroup, Box, Chip, Stack, Tooltip, Typography } from '@mui/material';
 import { IpDto } from '@/types/domain';
-import { AcroButton } from '@/components/common/AcroButton';
+import { SirenButton } from '@/components/common/SirenButton';
 import { Icon } from '@/components/common/Icon';
 import { CURSOR_POINTER, T } from '@/theme/tokens';
 import { initials } from '@/components/common/Avatar';
@@ -70,9 +70,9 @@ export function IpHeader({ ip, recv, onOpenPermissions, onOpenHld }: IpHeaderPro
         </Stack>
       </Tooltip>
 
-      <AcroButton onClick={onOpenHld}>
+      <SirenButton onClick={onOpenHld}>
         <Icon name="grid" /> HLD Release
-      </AcroButton>
+      </SirenButton>
     </Stack>
   );
 }
