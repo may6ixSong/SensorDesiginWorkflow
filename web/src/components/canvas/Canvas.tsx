@@ -521,9 +521,6 @@ export function Canvas({ ip, phases, usersById, canEdit, onSaveLayout }: Props) 
                   pointerEvents: 'none',
                 }}
               >
-                <Box component="span" sx={{ position: 'absolute', top: 10, left: 10, fontFamily: FONT_MONO, fontSize: 10, letterSpacing: '.1em', color: T.dm2 }}>
-                  {p.key}
-                </Box>
                 <Box component="span" sx={{ position: 'absolute', bottom: 10, left: 10, fontSize: 10, color: T.ln3 }}>
                   {p.label}
                 </Box>
@@ -631,6 +628,29 @@ export function Canvas({ ip, phases, usersById, canEdit, onSaveLayout }: Props) 
                 zIndex: 1,
               }}
             />
+          );
+        })}
+
+        {/* Phase 레인 타이틀 — canvas scale() 밖 screen-space에 렌더해서 줌아웃해도 항상
+            같은 픽셀 크기·대비를 유지한다 (Today 선 / Phase 경계 점선과 같은 방식). 세로 위치는
+            의도적으로 뷰포트 상단에 고정 — 레인을 오래 내려다봐도 이름표가 항상 보인다. */}
+        {phases.map((p) => {
+          const g = lanes[p.key];
+          const left = Math.round(g.x * z + panX);
+          return (
+            <Box
+              key={`ph-label-${p.key}`}
+              sx={{
+                position: 'absolute', top: 10, left: left + 10,
+                display: 'inline-flex', alignItems: 'center',
+                fontFamily: FONT_MONO, fontSize: 11, fontWeight: 700, letterSpacing: '.09em',
+                color: T.tx, background: T.sf, border: `1px solid ${T.ln2}`,
+                borderRadius: '5px', padding: '3px 8px', boxShadow: T.ss,
+                pointerEvents: 'none', zIndex: 2, whiteSpace: 'nowrap',
+              }}
+            >
+              {p.key}
+            </Box>
           );
         })}
 

@@ -150,7 +150,8 @@ export function DeliverableNode({
         </Box>
         <Box
           sx={{
-            fontSize: 13, fontWeight: 600, lineHeight: 1.35, flex: 1, overflow: 'hidden',
+            fontSize: 14, fontWeight: 700, letterSpacing: '-.005em', color: T.tx,
+            lineHeight: 1.32, flex: 1, overflow: 'hidden',
             display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
           }}
         >
