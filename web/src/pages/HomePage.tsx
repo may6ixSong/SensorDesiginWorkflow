@@ -494,7 +494,7 @@ export function HomePage() {
                 transition: 'color .3s',
               }}
             >
-              CIS DELIVERABLE CONTROL
+              SENSOR DESIGN WORKFLOW
             </Box>
             <Box
               sx={{

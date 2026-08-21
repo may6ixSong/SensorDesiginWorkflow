@@ -72,8 +72,18 @@ export function AppShell({
           }}
         >
           <SirenMark />
-          <Box sx={{ fontSize: 15, fontWeight: 800, fontFamily: FONT_DISPLAY, lineHeight: 1.05 }}>
-            SIREN
+          <Box sx={{ fontSize: 17, fontWeight: 800, fontFamily: FONT_DISPLAY, lineHeight: 1.05 }}>
+            <Box
+              component="span"
+              sx={{
+                display: 'inline-block',
+                background: `linear-gradient(100deg, ${T.tl} 0%, ${T.vi} 100%)`,
+                WebkitBackgroundClip: 'text', backgroundClip: 'text', WebkitTextFillColor: 'transparent',
+                letterSpacing: '.01em',
+              }}
+            >
+              SIREN
+            </Box>
             <Box
               component="small"
               sx={{
@@ -86,7 +96,7 @@ export function AppShell({
                 fontWeight: 400,
               }}
             >
-              CIS DELIVERABLE CONTROL
+              SENSOR DESIGN WORKFLOW
             </Box>
           </Box>
         </Box>
