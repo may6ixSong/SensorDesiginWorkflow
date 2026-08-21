@@ -4,14 +4,16 @@ import { Box, CircularProgress, Stack, Typography } from '@mui/material';
 import { AppShell } from '@/components/layout/AppShell';
 import { IpHeader } from '@/components/ip/IpHeader';
 import { Canvas } from '@/components/canvas/Canvas';
+import { IncomingArtifactsPanel } from '@/components/canvas/IncomingArtifactsPanel';
 import { DeliverableDialog } from '@/components/dialogs/DeliverableDialog';
+import { IncomingDeliverableDialog } from '@/components/dialogs/IncomingDeliverableDialog';
 import { HldReleaseDialog } from '@/components/dialogs/HldReleaseDialog';
 import { PhaseInfoDialog } from '@/components/dialogs/PhaseInfoDialog';
 import { IpPermissionDialog } from '@/components/dialogs/IpPermissionDialog';
 import { AddDeliverableDialog } from '@/components/dialogs/AddDeliverableDialog';
 import { NoteDialog } from '@/components/dialogs/NoteDialog';
 import { Toast } from '@/components/common/Toast';
-import { useProjectIps, useProjectPhases, useProjects } from '@/api/hooks/useProjects';
+import { useProjectIpDirectory, useProjectIps, useProjectPhases, useProjects } from '@/api/hooks/useProjects';
 import { useAddOwner, useAddViewGrant, useIp, useRemoveOwner, useRemoveViewGrant } from '@/api/hooks/useIp';
 import {
   useAddVersion, useCreateDeliverable, useDeliverables, useRelease,
@@ -37,8 +39,11 @@ export function BoardPage() {
   const { data: projects } = useProjects();
   const { data: phases } = useProjectPhases(projectId);
   const { data: ips } = useProjectIps(projectId);
+  const { data: ipDirectory } = useProjectIpDirectory(projectId);
   const { data: ip, isLoading: ipLoading } = useIp(ipId);
-  const { data: deliverables } = useDeliverables(ipId);
+  const { data: deliverablesResp } = useDeliverables(ipId);
+  const deliverables = deliverablesResp?.data;
+  const incoming = useMemo(() => deliverablesResp?.incoming ?? [], [deliverablesResp]);
   const { data: memos } = useMemos(ipId);
   const { data: edges } = useEdges(ipId);
   const { data: hlds } = useHldReleases(ipId);
@@ -57,6 +62,7 @@ export function BoardPage() {
   const hldBack = useCanvasStore((s) => s.hldBack);
   const phInfo = useCanvasStore((s) => s.phInfo);
   const ownerDlg = useCanvasStore((s) => s.ownerDlg);
+  const incomingId = useCanvasStore((s) => s.incomingId);
 
   const putCanvas = usePutCanvas(ipId ?? '');
   const createDeliverable = useCreateDeliverable(ipId ?? '');
@@ -87,6 +93,7 @@ export function BoardPage() {
   const own = !!isOwner && !recv; // 목업 own = isOwn(ip) && !S.recv
 
   const openNode = useMemo(() => nodes.find((n) => n.id === openId) ?? null, [nodes, openId]);
+  const incomingNode = useMemo(() => incoming.find((d) => d.id === incomingId) ?? null, [incoming, incomingId]);
   const phaseList = phases ?? [];
 
   const closeDeliverable = () => {
@@ -153,6 +160,7 @@ export function BoardPage() {
           seriesTotal: d.seriesTotal,
           recvDept: d.recvDept,
           recvContact: d.recvContact,
+          recvIpId: d.recvIpId,
           versions: d.versions ?? [],
           canEdit: d.canEdit,
         };
@@ -203,6 +211,10 @@ export function BoardPage() {
             onOpenPermissions={() => st.getState().setOwnerDlg(true)}
             onOpenHld={() => st.getState().setHldDlg(true, null)}
           />
+          <IncomingArtifactsPanel
+            incoming={incoming}
+            onOpen={(id) => st.getState().setIncomingId(id)}
+          />
           <Canvas
             ip={ip}
             phases={phaseList}
@@ -218,6 +230,7 @@ export function BoardPage() {
               usersById={usersById}
               users={users ?? []}
               own={own}
+              ipDirectory={ipDirectory ?? []}
               onClose={closeDeliverable}
               onSaveInfo={({ name, net, type, phaseKeys }) => {
                 updateDeliverable.mutate(
@@ -272,9 +285,9 @@ export function BoardPage() {
                   { onSuccess: () => toast('Released'), onError: () => toast('Release failed') },
                 )
               }
-              onSaveRecv={({ recvDept, recvContact }) =>
+              onSaveRecv={({ recvDept, recvContact, recvIpId }) =>
                 updateRecv.mutate(
-                  { id: openNode.id, recvDept, recvContact },
+                  { id: openNode.id, recvDept, recvContact, recvIpId },
                   {
                     onSuccess: () => toast('Handoff info saved'),
                     onError: () => toast('Failed to save recipient department'),
@@ -296,6 +309,15 @@ export function BoardPage() {
                 s.setEdges(s.edges.filter((e) => e.id !== edgeId));
                 toast('Unlinked — applies once you save the layout');
               }}
+            />
+          )}
+
+          {incomingNode && (
+            <IncomingDeliverableDialog
+              d={incomingNode}
+              phases={phaseList}
+              usersById={usersById}
+              onClose={() => st.getState().setIncomingId(null)}
             />
           )}
 

@@ -76,6 +76,13 @@ export interface DeliverableVersionDto {
   at: string;
 }
 
+/** 산출물 수신 IP 셀렉트 박스 및 Incoming 카드용 최소 정보. */
+export interface IpBriefDto {
+  id: string;
+  name: string;
+  color: string;
+}
+
 export interface DeliverableDto {
   id: string;
   projectId: string;
@@ -90,11 +97,21 @@ export interface DeliverableDto {
   layout: Layout;
   recvDept: string | null;
   recvContact: string | null;
+  /** 이 산출물을 받아야 하는 다른 Analog IP — 설정되면 그 IP 보드에 Incoming으로 노출된다. */
+  recvIpId: string | null;
   /** 권한에 맞게 이미 필터링된 버전 목록 */
   versions: DeliverableVersionDto[];
   releasedVersion: DeliverableVersionDto | null;
   workingVersion: DeliverableVersionDto | null;
   canEdit: boolean;
+  /** Incoming 목록(GET .../deliverables의 incoming[])에서만 채워진다 — 이 산출물을 준 IP. */
+  sourceIp: IpBriefDto | null;
+}
+
+/** GET /ips/:ipId/deliverables 응답 — own은 이 IP가 주는 산출물, incoming은 다른 IP로부터 받는 산출물. */
+export interface DeliverablesListResponse {
+  data: DeliverableDto[];
+  incoming: DeliverableDto[];
 }
 
 export interface MemoDto {

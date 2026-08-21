@@ -120,7 +120,8 @@ export function MilestoneIpBoard({ projectId, phases, ips }: { projectId: string
 }
 
 function IpBoardRow({ projectId, ip, phases }: { projectId: string; ip: IpDto; phases: PhaseRef[] }) {
-  const { data: deliverables } = useDeliverables(ip.id);
+  const { data: deliverablesResp } = useDeliverables(ip.id);
+  const deliverables = deliverablesResp?.data;
   const byPhase = useMemo(() => {
     const m = new Map<string, DeliverableDto[]>();
     (deliverables ?? []).forEach((d) => {

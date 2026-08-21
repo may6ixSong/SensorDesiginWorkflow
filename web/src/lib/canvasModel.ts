@@ -34,6 +34,8 @@ export interface CanvasNode {
   seriesTotal: number;
   recvDept: string | null;
   recvContact: string | null;
+  /** 이 산출물을 받아야 하는 다른 Analog IP. */
+  recvIpId: string | null;
   versions: VersionView[];
   canEdit: boolean;
   x: number;
@@ -82,6 +84,7 @@ export function toCanvasNode(d: DeliverableDto): CanvasNode {
     seriesTotal: d.seriesTotal,
     recvDept: d.recvDept,
     recvContact: d.recvContact,
+    recvIpId: d.recvIpId,
     versions: d.versions ?? [],
     canEdit: d.canEdit,
     x: d.layout?.x ?? 0,

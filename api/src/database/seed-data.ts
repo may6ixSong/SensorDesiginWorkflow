@@ -96,6 +96,8 @@ interface MockItem {
   net: 'OA' | 'HPC';
   recvDept?: string | null;
   recvContact?: MockUserKey | null;
+  /** 이 산출물을 받아야 하는 다른 Analog IP (recvDept와 별개, IP↔IP 핸드오프 목업용). */
+  recvIp?: string | null;
   series?: string;
   seriesIdx?: number;
   seriesTotal?: number;
@@ -105,9 +107,9 @@ interface MockItem {
 const MOCK_ITEMS: MockItem[] = [
   { id:'d01', ip:'ip1', phase:'KO', row:0, name:'PLL Requirements Intake', type:'word', net:'OA', recvDept:'digital', recvContact:'u3',
     versions:[[1,0,'major','u1','2026-01-09 10:20','Initial draft','PLL_req_v1.0.docx']] },
-  { id:'d02', ip:'ip1', phase:'ML1', row:0, name:'PLL Architecture Review', type:'word', net:'OA',
+  { id:'d02', ip:'ip1', phase:'ML1', row:0, name:'PLL Architecture Review', type:'word', net:'OA', recvIp:'ip5',
     versions:[[1,0,'major','u1','2026-02-18 16:05','Initial draft','PLL_arch_v1.0.docx']] },
-  { id:'d03', ip:'ip1', phase:'AR', row:0, name:'AR Review Package', type:'word', net:'OA', recvDept:'digital', recvContact:'u3',
+  { id:'d03', ip:'ip1', phase:'AR', row:0, name:'AR Review Package', type:'word', net:'OA', recvDept:'digital', recvContact:'u3', recvIp:'ip5',
     versions:[
       [2,1,'minor','u1','2026-04-02 09:30','Added action items','PLL_AR_v2.1.docx'],
       [2,0,'major','u1','2026-03-18 14:00','2nd release','PLL_AR_v2.0.docx'],
@@ -170,11 +172,11 @@ const MOCK_ITEMS: MockItem[] = [
 
   { id:'g01', ip:'ip4', phase:'KO', row:0, name:'BGR Requirements Intake', type:'word', net:'OA', recvDept:'pte', recvContact:'u5',
     versions:[[1,0,'major','u1','2026-01-11 10:00','Initial draft','BGR_req_v1.0.docx']] },
-  { id:'g02', ip:'ip4', phase:'ML1', row:0, name:'BGR Architecture Note', type:'word', net:'OA',
+  { id:'g02', ip:'ip4', phase:'ML1', row:0, name:'BGR Architecture Note', type:'word', net:'OA', recvIp:'ip1',
     versions:[[1,0,'major','u1','2026-02-20 14:00','1st release','BGR_arch_v1.0.docx']] },
-  { id:'g03', ip:'ip4', phase:'AR', row:0, name:'AR Review Package', type:'word', net:'OA',
+  { id:'g03', ip:'ip4', phase:'AR', row:0, name:'AR Review Package', type:'word', net:'OA', recvIp:'ip2',
     versions:[[1,0,'major','u1','2026-03-18 09:00','1st release','BGR_AR_v1.0.docx']] },
-  { id:'g04', ip:'ip4', phase:'ML3', row:0, name:'Temp Coefficient Simulation', type:'excel', net:'OA',
+  { id:'g04', ip:'ip4', phase:'ML3', row:0, name:'Temp Coefficient Simulation', type:'excel', net:'OA', recvIp:'ip2',
     versions:[[1,1,'minor','u1','2026-06-09 12:00','Corner sweep added','BGR_tempco_v1.1.xlsx']] },
   { id:'g05', ip:'ip4', phase:'MDR', row:0, name:'MDR Review Package', type:'word', net:'OA', versions:[] },
   { id:'g06', ip:'ip4', phase:'FDR', row:0, name:'FDR Checklist', type:'word', net:'OA', recvDept:'pte', recvContact:'u5', versions:[] },
@@ -190,9 +192,9 @@ const MOCK_ITEMS: MockItem[] = [
 
   { id:'k01', ip:'ip6', phase:'KO', row:0, name:'Comparator Requirements Intake', type:'word', net:'OA', recvDept:'pte', recvContact:'u5',
     versions:[[1,0,'major','u2','2026-01-14 09:30','Initial draft','COMP_req_v1.0.docx']] },
-  { id:'k02', ip:'ip6', phase:'AR', row:0, name:'Architecture Review Material', type:'word', net:'OA',
+  { id:'k02', ip:'ip6', phase:'AR', row:0, name:'Architecture Review Material', type:'word', net:'OA', recvIp:'ip3',
     versions:[[1,0,'major','u2','2026-03-20 13:10','1st release','COMP_arch_v1.0.docx']] },
-  { id:'k03', ip:'ip6', phase:'ML2', row:0, name:'Offset Simulation Results', type:'excel', net:'OA',
+  { id:'k03', ip:'ip6', phase:'ML2', row:0, name:'Offset Simulation Results', type:'excel', net:'OA', recvIp:'ip3',
     versions:[[1,2,'minor','u2','2026-04-25 16:20','Monte Carlo added','COMP_offset_v1.2.xlsx']] },
   { id:'k04', ip:'ip6', phase:'ML3', row:0, name:'Layout DB', type:'path', net:'HPC',
     versions:[[1,0,'major','u2','2026-06-07 18:00','Layout freeze','/vwp/cis_a7/comp_block/layout/r1']] },
@@ -388,6 +390,7 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
       seriesTotal: m.seriesTotal ?? 1,
       recvDept: m.recvDept ?? null,
       recvContact: m.recvContact ? U[m.recvContact] : null,
+      recvIpId: m.recvIp ? IPID[m.recvIp] : null,
       layout,
       versions: m.versions.map(([major, minor, kind, by, when, note, file]) => ({
         major, minor, kind,

@@ -44,6 +44,8 @@ interface CanvasState {
   hldBack: boolean;
   phInfo: string | null;
   ownerDlg: boolean;
+  /** Incoming 카드 클릭 시 선택된 산출물 id — 읽기 전용 상세 dialog에 쓰인다. */
+  incomingId: string | null;
   /** 새로 추가된 블록 id — 설정되면 Canvas가 뷰포트를 그 블록으로 이동시키고 비운다. */
   focusReq: string | null;
 
@@ -75,6 +77,7 @@ interface CanvasState {
   setHldBack: (v: boolean) => void;
   setPhInfo: (id: string | null) => void;
   setOwnerDlg: (v: boolean) => void;
+  setIncomingId: (id: string | null) => void;
   setFocusReq: (id: string | null) => void;
   /** 블록 재렌더 트리거용 카운터 (드래그 커밋 후 등) */
   rev: number;
@@ -108,6 +111,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   hldBack: false,
   phInfo: null,
   ownerDlg: false,
+  incomingId: null,
   focusReq: null,
   rev: 0,
 
@@ -177,5 +181,6 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   setHldBack: (v) => set({ hldBack: v }),
   setPhInfo: (id) => set({ phInfo: id }),
   setOwnerDlg: (v) => set({ ownerDlg: v }),
+  setIncomingId: (id) => set({ incomingId: id }),
   setFocusReq: (id) => set({ focusReq: id }),
 }));

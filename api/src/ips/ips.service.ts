@@ -28,6 +28,17 @@ export class IpsService {
       .exec();
   }
 
+  /**
+   * 과제 소속 IP 전체를 가볍게(id/name/color) 반환한다 — 산출물 수신 IP(recvIpId)를
+   * 지정하는 셀렉트 박스용. listAccessibleForProject와 달리 조회자의 개인 접근
+   * 권한으로 필터링하지 않는다: Analog IP 담당자가 이 산출물을 넘겨줄 대상 IP를
+   * 고를 때, 자신이 view 권한을 갖지 않은 다른 담당자의 IP도 후보에 있어야 한다.
+   */
+  async listDirectoryForProject(projectId: string) {
+    const ips = await this.model.find({ projectId }).exec();
+    return ips.map((ip) => ({ id: ip._id.toString(), name: ip.name, color: ip.color }));
+  }
+
   /** GET /projects 에서 "접근 가능한 과제"를 판정하기 위해 사용 (설계서 5.1). */
   async distinctAccessibleProjectIds(userId: string) {
     const ids = await this.model.distinct('projectId', {

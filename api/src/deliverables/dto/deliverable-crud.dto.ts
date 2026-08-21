@@ -38,6 +38,11 @@ export class UpdateRecvDto {
   @IsOptional()
   @IsMongoId()
   recvContact: string | null;
+
+  /** 이 산출물을 받아야 하는 다른 Analog IP. recvDept(부서)와 별개 필드. */
+  @IsOptional()
+  @IsMongoId()
+  recvIpId: string | null;
 }
 
 export class UpdateScheduleDto {

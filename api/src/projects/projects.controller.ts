@@ -59,6 +59,17 @@ export class ProjectsController {
     return { data: populated.map((ip) => toIpDto(ip, me)) };
   }
 
+  /**
+   * 산출물의 수신 IP(recvIpId) 셀렉트 박스용 — 과제 소속 IP 전체를 가볍게 반환한다
+   * (개인 접근 권한으로 필터링하지 않음). 이 과제에 접근 권한이 있어야 조회 가능.
+   */
+  @Get(':id/ip-directory')
+  async ipDirectory(@Param('id') id: string, @CurrentUser() me: UserDocument) {
+    await this.projects.assertViewAccess(id, me._id.toString());
+    const list = await this.ips.listDirectoryForProject(id);
+    return { data: list };
+  }
+
   /** 과제 팀원(부서별 로스터) 추가 — 이 과제의 IP 중 하나라도 Edit 권한이 있는 사람만 관리 가능. */
   @Post(':id/members')
   async addMember(@Param('id') id: string, @Body() body: AddMemberDto, @CurrentUser() me: UserDocument) {

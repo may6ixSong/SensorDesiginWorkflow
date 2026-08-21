@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Box } from '@mui/material';
-import { PhaseRef, UserDto } from '@/types/domain';
+import { IpBriefDto, PhaseRef, UserDto } from '@/types/domain';
 import { CanvasNode, VersionView, fmtAt, hasW, latA, latR, stOf, vstr } from '@/lib/canvasModel';
 import { useCanvasStore } from '@/store/canvasStore';
 import { toast } from '@/store/toastStore';
@@ -19,18 +19,20 @@ interface Props {
   users: UserDto[];
   /** 목업 own = isOwn(ip) && !S.recv */
   own: boolean;
+  /** 수신 IP 셀렉트 박스용 — 과제 소속 IP 전체(id/name/color). */
+  ipDirectory: IpBriefDto[];
   onClose: () => void;
   onSaveInfo: (p: { name: string; net: 'OA' | 'HPC'; type: string; phaseKeys: string[] }) => void;
   onUpload: (p: { file: string; note: string; net: 'OA' | 'HPC'; type: string }) => void;
   onRelease: () => void;
-  onSaveRecv: (p: { recvDept: string | null; recvContact: string | null }) => void;
+  onSaveRecv: (p: { recvDept: string | null; recvContact: string | null; recvIpId: string | null }) => void;
   onAddLink: (toId: string) => void;
   onUnlink: (edgeId: string) => void;
 }
 
 /** 목업 renderModal()의 산출물 상세 — 개요 / 버전 이력 / 전달 3탭 */
 export function DeliverableDialog({
-  node: d, phases, usersById, users, own, onClose,
+  node: d, phases, usersById, users, own, ipDirectory, onClose,
   onSaveInfo, onUpload, onRelease, onSaveRecv, onAddLink, onUnlink,
 }: Props) {
   const tab = useCanvasStore((s) => s.tab);
@@ -95,7 +97,9 @@ export function DeliverableDialog({
         />
       )}
       {tab === 'versions' && <VersionsTab d={d} usersById={usersById} />}
-      {tab === 'recv' && <RecvTab d={d} own={own} users={users} usersById={usersById} onSave={onSaveRecv} />}
+      {tab === 'recv' && (
+        <RecvTab d={d} own={own} users={users} usersById={usersById} ipDirectory={ipDirectory} onSave={onSaveRecv} />
+      )}
     </ModalShell>
   );
 }
@@ -419,33 +423,53 @@ function VersionsTab({ d, usersById }: { d: CanvasNode; usersById: Map<string, U
 
 /* ── 전달 탭 ── */
 function RecvTab({
-  d, own, users, usersById, onSave,
+  d, own, users, usersById, ipDirectory, onSave,
 }: {
   d: CanvasNode; own: boolean; users: UserDto[];
-  usersById: Map<string, UserDto>; onSave: Props['onSaveRecv'];
+  usersById: Map<string, UserDto>; ipDirectory: IpBriefDto[]; onSave: Props['onSaveRecv'];
 }) {
   const [dept, setDept] = useState(d.recvDept ?? '');
   const [contact, setContact] = useState(d.recvContact ?? '');
-  useEffect(() => { setDept(d.recvDept ?? ''); setContact(d.recvContact ?? ''); }, [d.id]); // eslint-disable-line
+  const [recvIp, setRecvIp] = useState(d.recvIpId ?? '');
+  useEffect(() => {
+    setDept(d.recvDept ?? ''); setContact(d.recvContact ?? ''); setRecvIp(d.recvIpId ?? '');
+  }, [d.id]); // eslint-disable-line
+
+  const ipById = new Map(ipDirectory.map((ip) => [ip.id, ip]));
+  const otherIps = ipDirectory.filter((ip) => ip.id !== d.ip);
+  const recvIpInfo = d.recvIpId ? ipById.get(d.recvIpId) : undefined;
 
   if (!own) {
     return (
-      <Card>
-        <Ey sx={{ mb: '9px' }}>Recipient department</Ey>
-        {d.recvDept ? (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: '9px', padding: '9px 0' }}>
-            <Badge color={T.dm} bg={T.sf2} borderColor={T.ln}>{departmentName(d.recvDept)}</Badge>
-            {d.recvContact && (
-              <>
-                <UserAvatar user={usersById.get(d.recvContact)} size={24} />
-                <Box sx={{ fontSize: 13 }}>{usersById.get(d.recvContact)?.name}</Box>
-              </>
-            )}
-          </Box>
-        ) : (
-          <Box sx={{ fontSize: 12.5, color: T.dm2 }}>No recipient department set.</Box>
-        )}
-      </Card>
+      <>
+        <Card sx={{ mb: '12px' }}>
+          <Ey sx={{ mb: '9px' }}>Recipient department</Ey>
+          {d.recvDept ? (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: '9px', padding: '9px 0' }}>
+              <Badge color={T.dm} bg={T.sf2} borderColor={T.ln}>{departmentName(d.recvDept)}</Badge>
+              {d.recvContact && (
+                <>
+                  <UserAvatar user={usersById.get(d.recvContact)} size={24} />
+                  <Box sx={{ fontSize: 13 }}>{usersById.get(d.recvContact)?.name}</Box>
+                </>
+              )}
+            </Box>
+          ) : (
+            <Box sx={{ fontSize: 12.5, color: T.dm2 }}>No recipient department set.</Box>
+          )}
+        </Card>
+        <Card>
+          <Ey sx={{ mb: '9px' }}>Recipient IP</Ey>
+          {recvIpInfo ? (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: '9px', padding: '9px 0' }}>
+              <Box sx={{ width: 9, height: 9, borderRadius: '50%', background: recvIpInfo.color }} />
+              <Box sx={{ fontSize: 13 }}>{recvIpInfo.name}</Box>
+            </Box>
+          ) : (
+            <Box sx={{ fontSize: 12.5, color: T.dm2 }}>No recipient IP set.</Box>
+          )}
+        </Card>
+      </>
     );
   }
 
@@ -453,33 +477,57 @@ function RecvTab({
   const contacts = users.filter((u) => !dept || u.department === dept);
 
   return (
-    <Card>
-      <Ey sx={{ mb: '9px' }}>Recipient department</Ey>
-      <Row>
-        <Field label="Department" sx={{ flex: 1, mb: 0 }}>
+    <>
+      <Card sx={{ mb: '12px' }}>
+        <Ey sx={{ mb: '9px' }}>Recipient department</Ey>
+        <Row>
+          <Field label="Department" sx={{ flex: 1, mb: 0 }}>
+            <SelectInput
+              value={dept}
+              onChange={(v) => { setDept(v); setContact(''); }}
+              options={[{ value: '', label: 'Not set' }, ...RECEIVABLE_DEPARTMENTS.map((dp) => ({ value: dp.id, label: dp.name }))]}
+            />
+          </Field>
+        </Row>
+        <Row sx={{ mt: '11px' }}>
+          <Field label="Individual contact" sx={{ flex: 1, mb: 0 }}>
+            <SelectInput
+              value={contact}
+              onChange={setContact}
+              options={[
+                { value: '', label: 'Not set' },
+                ...contacts.map((u) => ({ value: u.id, label: `${u.name} · ${departmentName(u.department)}` })),
+              ]}
+            />
+          </Field>
+        </Row>
+      </Card>
+
+      <Card sx={{ mb: '12px' }}>
+        <Ey sx={{ mb: '9px' }}>Recipient IP</Ey>
+        <Box sx={{ fontSize: 11.5, color: T.dm2, mb: '9px' }}>
+          Set another Analog IP that should receive this deliverable — it'll show up on that
+          IP's board as "Incoming from other IPs", showing only the version you release.
+        </Box>
+        <Field label="IP" sx={{ mb: 0 }}>
           <SelectInput
-            value={dept}
-            onChange={(v) => { setDept(v); setContact(''); }}
-            options={[{ value: '', label: 'Not set' }, ...RECEIVABLE_DEPARTMENTS.map((dp) => ({ value: dp.id, label: dp.name }))]}
-          />
-        </Field>
-      </Row>
-      <Row sx={{ mt: '11px' }}>
-        <Field label="Individual contact" sx={{ flex: 1, mb: 0 }}>
-          <SelectInput
-            value={contact}
-            onChange={setContact}
+            value={recvIp}
+            onChange={setRecvIp}
             options={[
               { value: '', label: 'Not set' },
-              ...contacts.map((u) => ({ value: u.id, label: `${u.name} · ${departmentName(u.department)}` })),
+              ...otherIps.map((ip) => ({ value: ip.id, label: ip.name })),
             ]}
           />
         </Field>
-      </Row>
-      <SirenButton variant="primary" sx={{ mt: '11px' }} onClick={() => onSave({ recvDept: dept || null, recvContact: contact || null })}>
+      </Card>
+
+      <SirenButton
+        variant="primary"
+        onClick={() => onSave({ recvDept: dept || null, recvContact: contact || null, recvIpId: recvIp || null })}
+      >
         <Icon name="check" /> Save
       </SirenButton>
-    </Card>
+    </>
   );
 }
 

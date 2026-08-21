@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Deliverable, DeliverableDocument } from './schemas/deliverable.schema';
-import { IpDocument } from '../ips/schemas/ip.schema';
+import { Ip, IpDocument } from '../ips/schemas/ip.schema';
 import { UserDocument } from '../users/schemas/user.schema';
 import { UsersService } from '../users/users.service';
 import { AuditService } from '../audit/audit.service';
@@ -20,6 +20,7 @@ import {
 export class DeliverablesService {
   constructor(
     @InjectModel(Deliverable.name) private readonly model: Model<DeliverableDocument>,
+    @InjectModel(Ip.name) private readonly ipModel: Model<IpDocument>,
     private readonly users: UsersService,
     private readonly audit: AuditService,
     private readonly edges: EdgesService,
@@ -27,6 +28,26 @@ export class DeliverablesService {
 
   listForIp(ipId: string) {
     return this.model.find({ ipId }).sort({ phaseKey: 1, 'layout.x': 1 }).exec();
+  }
+
+  /**
+   * 다른 IP가 recvIpId로 이 ipId를 지정한 산출물들 = "Incoming from other IPs".
+   * 각 산출물을 준 IP(sourceIp) 문서를 함께 묶어 반환한다 (설계서에 없는 신규 기능).
+   */
+  async listIncomingForIp(ipId: string): Promise<{ deliverable: DeliverableDocument; sourceIp: IpDocument }[]> {
+    const list = await this.model.find({ recvIpId: ipId }).sort({ phaseKey: 1, 'layout.x': 1 }).exec();
+    if (!list.length) return [];
+
+    const sourceIpIds = Array.from(new Set(list.map((d) => d.ipId.toString())));
+    const sourceIps = await this.ipModel.find({ _id: { $in: sourceIpIds } }).exec();
+    const ipById = new Map(sourceIps.map((ip) => [ip._id.toString(), ip]));
+
+    const result: { deliverable: DeliverableDocument; sourceIp: IpDocument }[] = [];
+    for (const deliverable of list) {
+      const sourceIp = ipById.get(deliverable.ipId.toString());
+      if (sourceIp) result.push({ deliverable, sourceIp });
+    }
+    return result;
   }
 
   async findOrThrow(id: string) {
@@ -89,12 +110,25 @@ export class DeliverablesService {
       }
     }
 
+    if (dto.recvIpId) {
+      if (dto.recvIpId === d.ipId.toString()) {
+        throw new BadRequestException('A deliverable cannot list its own IP as the recipient IP.');
+      }
+      const targetIp = await this.ipModel.findById(dto.recvIpId).exec();
+      if (!targetIp) throw new NotFoundException('Recipient IP not found.');
+      if (targetIp.projectId.toString() !== d.projectId.toString()) {
+        throw new BadRequestException('Recipient IP must belong to the same project.');
+      }
+    }
+
     d.recvDept = dto.recvDept ?? null;
     d.recvContact = dto.recvContact ? new Types.ObjectId(dto.recvContact) : null;
+    d.recvIpId = dto.recvIpId ? new Types.ObjectId(dto.recvIpId) : null;
     await d.save();
     await this.audit.log(actor._id, 'RECV_UPDATE', 'deliverable', d._id, {
       recvDept: d.recvDept,
       recvContact: d.recvContact,
+      recvIpId: d.recvIpId,
     });
     return d;
   }
@@ -195,6 +229,7 @@ export class DeliverablesService {
           seriesTotal: uniquePhaseKeys.length,
           recvDept: origin.recvDept,
           recvContact: origin.recvContact,
+          recvIpId: origin.recvIpId,
           layout: {
             x: origin.layout.x + 40,
             y: origin.layout.y + 40,

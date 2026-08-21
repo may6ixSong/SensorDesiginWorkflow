@@ -8,7 +8,7 @@ import { UserDocument } from '../users/schemas/user.schema';
 import { IpDocument } from '../ips/schemas/ip.schema';
 import { DeliverablesService } from './deliverables.service';
 import { StorageService } from '../storage/storage.service';
-import { toDeliverableDto, toVisibleVersions } from './dto/deliverable.dto';
+import { toDeliverableDto, toIncomingDeliverableDto, toVisibleVersions } from './dto/deliverable.dto';
 import {
   AddVersionDto,
   CreateDeliverableDto,
@@ -27,12 +27,22 @@ export class DeliverablesController {
     private readonly storage: StorageService,
   ) {}
 
-  /** BE가 major/minor 가시성을 미리 필터링해서 응답 (설계서 5.1, 6.1). */
+  /**
+   * BE가 major/minor 가시성을 미리 필터링해서 응답 (설계서 5.1, 6.1).
+   * `incoming`은 다른 IP가 이 IP를 recvIpId로 지정한 산출물 — 항상 Release 버전만
+   * 담겨 온다. 주는 쪽이 release()하면 이 목록도 즉시 그 결과를 반영한다.
+   */
   @IpAccess('view')
   @Get('ips/:ipId/deliverables')
   async listForIp(@Param('ipId') ipId: string, @CurrentIp() ip: IpDocument, @CurrentUser() me: UserDocument) {
-    const list = await this.deliverables.listForIp(ipId);
-    return { data: list.map((d) => toDeliverableDto(d, ip, me)) };
+    const [list, incoming] = await Promise.all([
+      this.deliverables.listForIp(ipId),
+      this.deliverables.listIncomingForIp(ipId),
+    ]);
+    return {
+      data: list.map((d) => toDeliverableDto(d, ip, me)),
+      incoming: incoming.map(({ deliverable, sourceIp }) => toIncomingDeliverableDto(deliverable, sourceIp)),
+    };
   }
 
   @IpAccess('edit')

@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient, ApiEnvelope } from '../client';
 import { queryKeys } from '../queryKeys';
-import { IpDto, PhaseRef, ProjectDetailDto, ProjectDto } from '@/types/domain';
+import { IpBriefDto, IpDto, PhaseRef, ProjectDetailDto, ProjectDto } from '@/types/domain';
 import { useAuthStore } from '@/store/authStore';
 
 export function useProjects() {
@@ -101,6 +101,21 @@ export function useProjectIps(projectId: string | undefined) {
     enabled: Boolean(projectId),
     queryFn: async () => {
       const res = await apiClient.get<ApiEnvelope<IpDto[]>>(`/projects/${projectId}/ips`);
+      return res.data.data;
+    },
+  });
+}
+
+/**
+ * 과제 소속 IP 전체를 가볍게(id/name/color) 반환한다 — 개인 접근 권한과 무관하게
+ * 산출물의 "수신 IP"를 지정하는 셀렉트 박스에서 쓴다.
+ */
+export function useProjectIpDirectory(projectId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.projectIpDirectory(projectId ?? ''),
+    enabled: Boolean(projectId),
+    queryFn: async () => {
+      const res = await apiClient.get<ApiEnvelope<IpBriefDto[]>>(`/projects/${projectId}/ip-directory`);
       return res.data.data;
     },
   });

@@ -90,6 +90,14 @@ export class Deliverable {
   @Prop({ type: Types.ObjectId, ref: 'User', default: null })
   recvContact: Types.ObjectId | null;
 
+  /**
+   * 이 산출물을 받아야 하는 다른 IP. recvDept(부서)와 별개로, Analog IP끼리
+   * 서로 주고받는 산출물(예: BGR_REF → PLL_MAIN)을 표현한다. 설정되면 그 IP의
+   * 보드에 "Incoming from other IPs" 섹션으로 노출되며, Release된 버전만 보인다.
+   */
+  @Prop({ type: Types.ObjectId, ref: 'Ip', default: null })
+  recvIpId: Types.ObjectId | null;
+
   @Prop({ type: LayoutSchema, required: true })
   layout: Layout;
 
@@ -106,3 +114,4 @@ export class Deliverable {
 export const DeliverableSchema = SchemaFactory.createForClass(Deliverable);
 DeliverableSchema.index({ ipId: 1, phaseKey: 1 });
 DeliverableSchema.index({ series: 1 });
+DeliverableSchema.index({ recvIpId: 1 });

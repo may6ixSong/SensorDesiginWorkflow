@@ -49,10 +49,12 @@ export function toDeliverableDto(d: DeliverableDocument, ip: IpDocument, me: Use
     layout: { x: d.layout.x, y: d.layout.y, w: d.layout.w, h: d.layout.h },
     recvDept: d.recvDept ?? null,
     recvContact: d.recvContact ? d.recvContact.toString() : null,
+    recvIpId: d.recvIpId ? d.recvIpId.toString() : null,
     versions: visible.map(toVersionDto),
     releasedVersion: released ? toVersionDto(released) : null,
     workingVersion: isEdit && latest?.kind === 'minor' ? toVersionDto(latest) : null,
     canEdit: isEdit,
+    sourceIp: null,
   };
 }
 
@@ -61,4 +63,36 @@ export function toVisibleVersions(d: DeliverableDocument, ip: IpDocument, me: Us
   const isEdit = isEditor(ip, me);
   const versions = isEdit ? d.versions : d.versions.filter((v) => v.kind === 'major');
   return versions.map(toVersionDto);
+}
+
+/**
+ * 다른 IP의 보드에 "Incoming from other IPs"로 노출되는 산출물 응답.
+ * 주는 쪽(sourceIp)에서의 Edit 권한과 무관하게 항상 Release(major) 버전만 보이고,
+ * Working copy는 절대 노출하지 않는다 — 받는 쪽은 Release 버전만 볼 수 있다는
+ * 규칙은 조회자가 우연히 sourceIp의 owner여도 예외 없이 적용된다.
+ */
+export function toIncomingDeliverableDto(d: DeliverableDocument, sourceIp: IpDocument) {
+  const released = (d.versions ?? []).find((v) => v.kind === 'major') ?? null;
+
+  return {
+    id: d._id.toString(),
+    projectId: d.projectId.toString(),
+    ipId: d.ipId.toString(),
+    phaseKey: d.phaseKey,
+    name: d.name,
+    docType: d.docType,
+    network: d.network,
+    series: d.series ? d.series.toString() : null,
+    seriesIdx: d.seriesIdx,
+    seriesTotal: d.seriesTotal,
+    layout: { x: d.layout.x, y: d.layout.y, w: d.layout.w, h: d.layout.h },
+    recvDept: d.recvDept ?? null,
+    recvContact: d.recvContact ? d.recvContact.toString() : null,
+    recvIpId: d.recvIpId ? d.recvIpId.toString() : null,
+    versions: released ? [toVersionDto(released)] : [],
+    releasedVersion: released ? toVersionDto(released) : null,
+    workingVersion: null,
+    canEdit: false,
+    sourceIp: { id: sourceIp._id.toString(), name: sourceIp.name, color: sourceIp.color },
+  };
 }

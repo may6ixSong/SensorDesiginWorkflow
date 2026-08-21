@@ -86,6 +86,12 @@ export class ProjectsService {
     return project;
   }
 
+  /** 과제 열람 권한만 확인한다(팀원 로스터 populate 없이) — ip-directory처럼 가벼운 조회용. */
+  async assertViewAccess(id: string, userId: string) {
+    const hasAccess = await this.ips.hasAnyAccessToProject(id, userId);
+    if (!hasAccess) throw new ForbiddenException('You do not have access to this project.');
+  }
+
   private async assertManageAccess(id: string, actor: UserDocument) {
     const hasEdit = await this.ips.hasEditAccessToProject(id, actor._id.toString());
     if (!hasEdit) {
