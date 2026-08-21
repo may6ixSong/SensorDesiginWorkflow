@@ -61,6 +61,7 @@ interface Palette {
   cardSub: string;
   wordmarkGradient: string;
   wordmarkGlow: string;
+  wordmarkGlowStrong: string;
   subCopy: string;
   flowStroke: string;
   pulse: string;
@@ -103,8 +104,10 @@ const PALETTE: Record<'light' | 'dark', Palette> = {
     cardShadow: '0 10px 28px rgba(0,0,0,.5)',
     cardText: '#e8edf5',
     cardSub: 'rgba(150,172,200,.58)',
-    wordmarkGradient: 'linear-gradient(180deg,#f2f6fb 0%,#a9b8cb 100%)',
-    wordmarkGlow: 'none',
+    wordmarkGradient:
+      'linear-gradient(120deg,#2ee6c5 0%,#f2f6fb 25%,#9a8bff 50%,#f2f6fb 75%,#2ee6c5 100%)',
+    wordmarkGlow: 'drop-shadow(0 4px 28px rgba(46,230,197,.25))',
+    wordmarkGlowStrong: 'drop-shadow(0 4px 44px rgba(46,230,197,.55))',
     subCopy: 'rgba(150,172,200,.62)',
     flowStroke: 'rgba(120,158,190,.26)',
     pulse: 'rgba(94,185,164,.7)',
@@ -143,8 +146,10 @@ const PALETTE: Record<'light' | 'dark', Palette> = {
     cardShadow: '0 8px 22px rgba(30,42,70,.09), 0 1px 2px rgba(30,42,70,.06)',
     cardText: '#101828',
     cardSub: '#667085',
-    wordmarkGradient: 'linear-gradient(180deg,#16202e 0%,#5a687a 100%)',
-    wordmarkGlow: 'none',
+    wordmarkGradient:
+      'linear-gradient(120deg,#0c9a83 0%,#16202e 25%,#5849cf 50%,#16202e 75%,#0c9a83 100%)',
+    wordmarkGlow: 'drop-shadow(0 4px 20px rgba(12,154,131,.2))',
+    wordmarkGlowStrong: 'drop-shadow(0 4px 32px rgba(12,154,131,.38))',
     subCopy: '#667085',
     flowStroke: 'rgba(70,100,140,.2)',
     pulse: 'rgba(12,154,131,.6)',
@@ -217,6 +222,14 @@ export function HomePage() {
           '@keyframes sirenRise': {
             from: { opacity: 0, transform: 'translateY(14px)' },
             to: { opacity: 1, transform: 'translateY(0)' },
+          },
+          '@keyframes sirenSheen': {
+            '0%,100%': { backgroundPosition: '0% 50%' },
+            '50%': { backgroundPosition: '100% 50%' },
+          },
+          '@keyframes sirenPulseGlow': {
+            '0%,100%': { filter: pal.wordmarkGlow },
+            '50%': { filter: pal.wordmarkGlowStrong },
           },
         }}
       >
@@ -458,13 +471,17 @@ export function HomePage() {
           <Box sx={{ position: 'relative', textAlign: 'center', transform: 'translateZ(190px)' }}>
             <Box
               sx={{
-                fontFamily: FONT_DISPLAY, fontWeight: 700,
-                fontSize: 'clamp(64px, 9.5vw, 132px)', lineHeight: 0.9, letterSpacing: '-.03em',
+                display: 'inline-block',
+                fontFamily: FONT_DISPLAY, fontWeight: 800, fontStyle: 'italic',
+                fontSize: 'clamp(64px, 9.5vw, 132px)', lineHeight: 0.9, letterSpacing: '.006em',
+                transform: 'skewX(-6deg)',
                 background: pal.wordmarkGradient,
-                WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-                filter: pal.wordmarkGlow,
-                animation: 'sirenRise .8s cubic-bezier(.2,.8,.3,1) both',
-                transition: 'filter .3s',
+                backgroundSize: '220% auto',
+                WebkitBackgroundClip: 'text', backgroundClip: 'text', WebkitTextFillColor: 'transparent',
+                animation:
+                  'sirenRise .8s cubic-bezier(.2,.8,.3,1) both, '
+                  + 'sirenSheen 7s ease-in-out 1s infinite, '
+                  + 'sirenPulseGlow 3.6s ease-in-out 1s infinite',
               }}
             >
               SIREN
