@@ -245,6 +245,8 @@ const MOCK_EDGES: { id: string; from: string; to: string; auto?: boolean; ip?: s
   { id:'x3', from:'g04', to:'e04', ip:'ip2' },
   { id:'x4', from:'k02', to:'f02', ip:'ip3' },
   { id:'x5', from:'k03', to:'f03', ip:'ip3' },
+  { id:'x6', from:'d02', to:'h02', ip:'ip5' },
+  { id:'x7', from:'d03', to:'h03', ip:'ip5' },
 ];
 
 interface MockHldItem { ver: string; file: string; at: string; cmt: string }
