@@ -169,6 +169,10 @@ export function Canvas({ ip, phases, usersById, canEdit, onOpenIncoming, ipDirec
 
   /* ── PAN — 빈 캔버스 좌드래그 / 휠 버튼 ── */
   const panRef = useRef<{ startX: number; startY: number; pid: number } | null>(null);
+  // 팬 드래그가 실제로 화면을 움직였는지 — pointerup 다음에 발생하는 click까지 살아있어야
+  // 하므로 endPan에서 지우지 않고 onVpClick이 소비한 뒤 리셋한다(설계서 3.9 선택 해제 규칙 보강:
+  // "배경 클릭"만 선택을 풀어야지, 드래그로 화면 이동한 것까지 클릭으로 잡히면 안 된다).
+  const panMovedRef = useRef(false);
   const onVpPointerDown = (e: React.PointerEvent) => {
     if (dragRef.current || phResizeRef.current) return;
     const target = e.target as HTMLElement;
@@ -184,6 +188,7 @@ export function Canvas({ ip, phases, usersById, canEdit, onOpenIncoming, ipDirec
         target.tagName.toLowerCase() === 'svg');
     if (!isMiddle && !isEmptyLeft) return;
     e.preventDefault();
+    panMovedRef.current = false;
     panRef.current = {
       startX: e.clientX - st.getState().x,
       startY: e.clientY - st.getState().y,
@@ -197,6 +202,7 @@ export function Canvas({ ip, phases, usersById, canEdit, onOpenIncoming, ipDirec
     if (s.link) s.setLinkPos(cvPt(e));
     const p = panRef.current;
     if (!p || p.pid !== e.pointerId) return;
+    panMovedRef.current = true;
     const c = clampVP(s.z, e.clientX - p.startX, e.clientY - p.startY);
     s.setVP(c.z, c.x, c.y);
   };
@@ -206,10 +212,14 @@ export function Canvas({ ip, phases, usersById, canEdit, onOpenIncoming, ipDirec
     if (vpRef.current) vpRef.current.style.cursor = '';
   };
 
-  /* ── 배경 클릭 → 선택/연결 해제 ── */
+  /* ── 배경 클릭 → 선택/연결 해제 (드래그로 화면을 옮긴 경우는 제외) ── */
   const onVpClick = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
     if (target.closest('[data-bid]') || target.closest('button')) return;
+    if (panMovedRef.current) {
+      panMovedRef.current = false;
+      return;
+    }
     const s = st.getState();
     if (s.link) s.setLink(null);
     else if (s.sel || s.hlSet) s.select(null, null);
