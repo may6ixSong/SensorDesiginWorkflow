@@ -1,6 +1,6 @@
 import { Box } from '@mui/material';
 import { CanvasNode, latA, latR, hasW, stOf, vstr, fmtAt } from '@/lib/canvasModel';
-import { PhaseRef, UserDto } from '@/types/domain';
+import { IpBriefDto, PhaseRef, UserDto } from '@/types/domain';
 import { departmentName } from '@/shared/constants/departments';
 import { DocIcon, Icon } from '@/components/common/Icon';
 import { CURSOR_POINTER, FONT_MONO, T } from '@/theme/tokens';
@@ -9,6 +9,8 @@ interface Props {
   d: CanvasNode;
   phase?: PhaseRef;
   usersById: Map<string, UserDto>;
+  /** recvIpId가 가리키는 대상 IP(id/name/color) — "→ 다른 IP에 준다" 배지용. */
+  recvIp?: IpBriefDto;
   edit: boolean;
   canEdit: boolean;
   isSel: boolean;
@@ -28,7 +30,7 @@ interface Props {
 
 /** 목업 nodeH() — 산출물 블록 */
 export function DeliverableNode({
-  d, phase, usersById, edit, canEdit, isSel, onHl, dimLink, hasHl,
+  d, phase, usersById, recvIp, edit, canEdit, isSel, onHl, dimLink, hasHl,
   onOpen, onPinClick, onGripDown, linkActive, registerRef,
   onPointerDown, onPointerMove, onPointerUp, onClick,
 }: Props) {
@@ -192,6 +194,7 @@ export function DeliverableNode({
           )}
           {canEdit && work && <Chip c={T.am} bg={T.am2} bd={T.am3}>In progress {vstr(work)}</Chip>}
           {d.recvDept && <Chip c={T.dm2} bg={T.sf2} bd={T.ln}>{departmentName(d.recvDept)}</Chip>}
+          {recvIp && <Chip c={recvIp.color} bg={T.sf2} bd={T.ln}>→ {recvIp.name}</Chip>}
         </Box>
       )}
     </Box>

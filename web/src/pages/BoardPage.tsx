@@ -4,7 +4,6 @@ import { Box, CircularProgress, Stack, Typography } from '@mui/material';
 import { AppShell } from '@/components/layout/AppShell';
 import { IpHeader } from '@/components/ip/IpHeader';
 import { Canvas } from '@/components/canvas/Canvas';
-import { IncomingArtifactsPanel } from '@/components/canvas/IncomingArtifactsPanel';
 import { DeliverableDialog } from '@/components/dialogs/DeliverableDialog';
 import { IncomingDeliverableDialog } from '@/components/dialogs/IncomingDeliverableDialog';
 import { HldReleaseDialog } from '@/components/dialogs/HldReleaseDialog';
@@ -211,15 +210,14 @@ export function BoardPage() {
             onOpenPermissions={() => st.getState().setOwnerDlg(true)}
             onOpenHld={() => st.getState().setHldDlg(true, null)}
           />
-          <IncomingArtifactsPanel
-            incoming={incoming}
-            onOpen={(id) => st.getState().setIncomingId(id)}
-          />
           <Canvas
             ip={ip}
             phases={phaseList}
             usersById={usersById}
             canEdit={canEdit}
+            incoming={incoming}
+            onOpenIncoming={(id) => st.getState().setIncomingId(id)}
+            ipDirectory={ipDirectory ?? []}
             onSaveLayout={saveLayout}
           />
 

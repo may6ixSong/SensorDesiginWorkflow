@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Box } from '@mui/material';
-import { IpDto, PhaseRef, UserDto } from '@/types/domain';
+import { DeliverableDto, IpBriefDto, IpDto, PhaseRef, UserDto } from '@/types/domain';
 import { useCanvasStore } from '@/store/canvasStore';
 import { toast } from '@/store/toastStore';
 import {
@@ -13,6 +13,7 @@ import {
 } from '@/lib/constants';
 import { FONT_MONO, T } from '@/theme/tokens';
 import { PhaseStepper } from './PhaseStepper';
+import { IncomingLane } from './IncomingLane';
 import { EdgeLayer } from './EdgeLayer';
 import { DeliverableNode } from './DeliverableNode';
 import { MemoBlock } from './MemoBlock';
@@ -24,6 +25,11 @@ interface Props {
   phases: PhaseRef[];
   usersById: Map<string, UserDto>;
   canEdit: boolean;
+  /** 이 IP가 다른 IP로부터 받는 산출물 — Phase 레인 위쪽에 같은 팬/줌으로 정렬해서 보여준다. */
+  incoming: DeliverableDto[];
+  onOpenIncoming: (id: string) => void;
+  /** "다른 IP에 준다" 배지(→ IP명) 해석용 — 과제 소속 IP 전체(id/name/color). */
+  ipDirectory: IpBriefDto[];
   /** 저장 완료(성공/실패 무관) 후 호출할 콜백을 받는다 — 편집 종료를 저장 이후로 미뤄 쿼리 재활성화 레이스를 막는다. */
   onSaveLayout: (onSettled: () => void) => void;
 }
@@ -35,7 +41,8 @@ type Blk = CanvasNode | CanvasMemo;
  * 줌/팬, 자유 드래그 + Phase 벽 저항, grip 리사이즈, pin 연결, Phase 레인 폭 조절,
  * flow 하이라이트, Auto Fit 이 모두 여기서 완결된다 (설계서 3.7~3.9, 7.1).
  */
-export function Canvas({ ip, phases, usersById, canEdit, onSaveLayout }: Props) {
+export function Canvas({ ip, phases, usersById, canEdit, incoming, onOpenIncoming, ipDirectory, onSaveLayout }: Props) {
+  const ipById = useMemo(() => new Map(ipDirectory.map((d) => [d.id, d])), [ipDirectory]);
   const vpRef = useRef<HTMLDivElement>(null);
   const cvRef = useRef<HTMLDivElement>(null);
   const elRefs = useRef(new Map<string, HTMLDivElement>());
@@ -478,6 +485,15 @@ export function Canvas({ ip, phases, usersById, canEdit, onSaveLayout }: Props) 
         onResizeStart={onPhResizeStart}
       />
 
+      <IncomingLane
+        phases={phases}
+        phasePW={phasePW}
+        z={z}
+        panX={panX}
+        incoming={incoming}
+        onOpen={onOpenIncoming}
+      />
+
       <Box
         ref={vpRef}
         onPointerDown={onVpPointerDown}
@@ -581,6 +597,7 @@ export function Canvas({ ip, phases, usersById, canEdit, onSaveLayout }: Props) 
               d={d}
               phase={phases.find((p) => p.key === d.phase)}
               usersById={usersById}
+              recvIp={d.recvIpId ? ipById.get(d.recvIpId) : undefined}
               edit={edit}
               canEdit={canEdit}
               isSel={sel === d.id}
