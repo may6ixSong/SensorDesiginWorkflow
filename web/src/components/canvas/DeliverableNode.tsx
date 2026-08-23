@@ -38,7 +38,7 @@ export function DeliverableNode({
   const rel = latR(d);
   const work = hasW(d) ? latA(d) : null;
   const last = latA(d);
-  const compact = d.h < 120;
+  const compact = d.h < 175;
   const col = d.net === 'HPC' ? T.hp : d.type === 'excel' ? T.tl : T.bl;
   const incoming = d.origin === 'incoming';
   // 받는 산출물은 "다른 IP가 준 것"이라는 정도만 드러내고 어느 IP인지는 캔버스
@@ -58,20 +58,20 @@ export function DeliverableNode({
       style={{ left: d.x, top: d.y, width: d.w, height: d.h }}
       sx={{
         position: 'absolute',
-        borderRadius: '10px',
+        borderRadius: '15px',
         background: incoming ? T.vi2 : T.sf,
-        border: `1.5px ${incoming ? 'dashed' : 'solid'} ${isSel ? T.tl : dimLink ? T.vi : incoming ? srcColor : T.ln2}`,
-        boxShadow: isSel ? `0 0 0 3px ${T.tl2}, ${T.sm}` : T.sm,
+        border: `2px ${incoming ? 'dashed' : 'solid'} ${isSel ? T.tl : dimLink ? T.vi : incoming ? srcColor : T.ln2}`,
+        boxShadow: isSel ? `0 0 0 4px ${T.tl2}, ${T.sm}` : T.sm,
         overflow: 'visible',
-        padding: '8px 9px 7px',
-        outline: onHl && hasHl ? `2px solid ${T.vi}` : 'none',
-        outlineOffset: onHl && hasHl ? '2px' : 0,
+        padding: '12px 13px 10px',
+        outline: onHl && hasHl ? `3px solid ${T.vi}` : 'none',
+        outlineOffset: onHl && hasHl ? '3px' : 0,
         cursor: edit && canEdit && !incoming ? 'grab' : CURSOR_POINTER,
         touchAction: 'none',
         transition: edit ? 'none' : 'box-shadow .15s, transform .15s, border-color .14s',
-        '&:hover': edit ? {} : { transform: 'translateY(-2px)', boxShadow: T.sl, borderColor: incoming ? srcColor : T.ln3 },
+        '&:hover': edit ? {} : { transform: 'translateY(-3px)', boxShadow: T.sl, borderColor: incoming ? srcColor : T.ln3 },
         '&::before': {
-          content: '""', position: 'absolute', top: 7, left: 7, width: 4, height: 4,
+          content: '""', position: 'absolute', top: 10, left: 10, width: 6, height: 6,
           borderRadius: '50%', background: incoming ? srcColor : T.ln3,
         },
       }}
@@ -82,20 +82,20 @@ export function DeliverableNode({
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => { e.stopPropagation(); onOpen(d.id); }}
           sx={{
-            position: 'absolute', left: '50%', top: -32, transform: 'translateX(-50%)',
-            display: 'inline-flex', alignItems: 'center', gap: '5px', whiteSpace: 'nowrap',
-            background: T.inv, color: '#fff', fontSize: 11.5, fontWeight: 500,
-            padding: '5px 11px', borderRadius: '7px', boxShadow: T.sl, zIndex: 40,
+            position: 'absolute', left: '50%', top: -47, transform: 'translateX(-50%)',
+            display: 'inline-flex', alignItems: 'center', gap: '7px', whiteSpace: 'nowrap',
+            background: T.inv, color: '#fff', fontSize: 17, fontWeight: 500,
+            padding: '7px 16px', borderRadius: '10px', boxShadow: T.sl, zIndex: 40,
             cursor: CURSOR_POINTER, border: 'none', fontFamily: 'inherit',
             animation: 'sirenPop .16s ease-out',
             '&:hover': { background: '#000' },
             '&::after': {
-              content: '""', position: 'absolute', left: '50%', bottom: -4, width: 8, height: 8,
+              content: '""', position: 'absolute', left: '50%', bottom: -6, width: 12, height: 12,
               background: T.inv, transform: 'translateX(-50%) rotate(45deg)',
             },
           }}
         >
-          <Icon name="expand" /> Details
+          <Icon name="expand" size={17} /> Details
         </Box>
       )}
 
@@ -106,19 +106,19 @@ export function DeliverableNode({
           component="span"
           title="Received from another IP — open for details"
           sx={{
-            position: 'absolute', top: 0, left: 0, padding: '3px 6px',
-            borderBottomRightRadius: '8px', background: srcColor, color: '#fff',
+            position: 'absolute', top: 0, left: 0, padding: '4px 9px',
+            borderBottomRightRadius: '12px', background: srcColor, color: '#fff',
             display: 'flex', alignItems: 'center',
           }}
         >
-          <Icon name="lock" size={9} />
+          <Icon name="lock" size={13} />
         </Box>
       )}
       <Box
         component="span"
         sx={{
-          position: 'absolute', top: 0, right: 0, fontFamily: FONT_MONO, fontSize: 9.5,
-          letterSpacing: '.08em', padding: '2px 7px 3px', borderBottomLeftRadius: '8px',
+          position: 'absolute', top: 0, right: 0, fontFamily: FONT_MONO, fontSize: 14,
+          letterSpacing: '.08em', padding: '3px 10px 4px', borderBottomLeftRadius: '12px',
           background: d.net === 'HPC' ? T.hp2 : T.sf3,
           color: d.net === 'HPC' ? T.hp : T.dm,
         }}
@@ -129,9 +129,9 @@ export function DeliverableNode({
       {/* pin (좌: 입력, 우: 연결 시작) */}
       <Box
         sx={{
-          position: 'absolute', top: '50%', left: -6, width: 12, height: 12, mt: '-6px',
+          position: 'absolute', top: '50%', left: -9, width: 18, height: 18, mt: '-9px',
           borderRadius: '50%', background: dimLink ? T.vi : T.sf,
-          border: `2px solid ${dimLink ? T.vi : T.ln3}`, transition: '.12s', zIndex: 4,
+          border: `3px solid ${dimLink ? T.vi : T.ln3}`, transition: '.12s', zIndex: 4,
         }}
       />
       {edit && (
@@ -141,10 +141,10 @@ export function DeliverableNode({
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => onPinClick(d.id, e)}
             sx={{
-              position: 'absolute', top: '50%', right: -6, width: 12, height: 12, mt: '-6px',
+              position: 'absolute', top: '50%', right: -9, width: 18, height: 18, mt: '-9px',
               borderRadius: '50%', transition: '.12s', zIndex: 4, cursor: 'crosshair',
               background: linkActive ? T.tl : T.sf,
-              border: `2px solid ${linkActive ? T.tl : T.ln3}`,
+              border: `3px solid ${linkActive ? T.tl : T.ln3}`,
               transform: linkActive ? 'scale(1.3)' : 'none',
               '&:hover': { background: T.tl, borderColor: T.tl, transform: 'scale(1.3)' },
             }}
@@ -155,11 +155,11 @@ export function DeliverableNode({
               data-grip={d.id}
               onPointerDown={(e) => onGripDown(d.id, e)}
               sx={{
-                position: 'absolute', right: 0, bottom: 0, width: 16, height: 16,
+                position: 'absolute', right: 0, bottom: 0, width: 24, height: 24,
                 cursor: 'nwse-resize', zIndex: 5, touchAction: 'none',
                 '&::after': {
-                  content: '""', position: 'absolute', right: 3, bottom: 3, width: 8, height: 8,
-                  borderRight: `2px solid ${T.ln3}`, borderBottom: `2px solid ${T.ln3}`,
+                  content: '""', position: 'absolute', right: 4, bottom: 4, width: 12, height: 12,
+                  borderRight: `3px solid ${T.ln3}`, borderBottom: `3px solid ${T.ln3}`,
                 },
                 '&:hover::after': { borderColor: T.tl },
               }}
@@ -168,13 +168,13 @@ export function DeliverableNode({
         </>
       )}
 
-      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: '7px', pl: '8px' }}>
+      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: '10px', pl: '12px' }}>
         <Box component="span" sx={{ color: col, flex: '0 0 auto' }}>
-          <DocIcon type={d.type} />
+          <DocIcon type={d.type} size={20} />
         </Box>
         <Box
           sx={{
-            fontSize: 14, fontWeight: 700, letterSpacing: '-.005em', color: T.tx,
+            fontSize: 20, fontWeight: 700, letterSpacing: '-.005em', color: T.tx,
             lineHeight: 1.32, flex: 1, overflow: 'hidden',
             display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
           }}
@@ -186,8 +186,8 @@ export function DeliverableNode({
             component="span"
             title={`Release schedule ${d.seriesIdx}/${d.seriesTotal}`}
             sx={{
-              fontFamily: FONT_MONO, fontSize: 10.5, fontWeight: 600, padding: '1px 5px',
-              borderRadius: '9px', background: T.vi2, color: T.vi, border: `1px solid ${T.vi3}`,
+              fontFamily: FONT_MONO, fontSize: 15, fontWeight: 600, padding: '2px 8px',
+              borderRadius: '13px', background: T.vi2, color: T.vi, border: `1px solid ${T.vi3}`,
               flex: '0 0 auto', mt: '1px',
             }}
           >
@@ -198,7 +198,7 @@ export function DeliverableNode({
 
       <Box
         sx={{
-          fontSize: 11, color: T.dm2, margin: '6px 0', pl: '8px', fontFamily: FONT_MONO,
+          fontSize: 16, color: T.dm2, margin: '9px 0', pl: '12px', fontFamily: FONT_MONO,
           whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
         }}
       >
@@ -207,7 +207,7 @@ export function DeliverableNode({
       </Box>
 
       {!compact && (
-        <Box sx={{ display: 'flex', gap: '4px', pl: '8px', flexWrap: 'wrap' }}>
+        <Box sx={{ display: 'flex', gap: '6px', pl: '12px', flexWrap: 'wrap' }}>
           <Chip c={st.c} bg={st.bg} bd={st.bd}>{st.lb}</Chip>
           {rel ? (
             <Chip c={T.tl} bg={T.tl2} bd={T.tl3}>{vstr(rel)}</Chip>
@@ -228,7 +228,7 @@ function Chip({ c, bg, bd, children }: { c: string; bg: string; bd: string; chil
     <Box
       component="span"
       sx={{
-        fontFamily: FONT_MONO, fontSize: 10, padding: '1px 4px', borderRadius: '5px',
+        fontFamily: FONT_MONO, fontSize: 14, padding: '2px 6px', borderRadius: '7px',
         border: `1px solid ${bd}`, background: bg, color: c, whiteSpace: 'nowrap',
       }}
     >

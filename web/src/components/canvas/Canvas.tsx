@@ -9,7 +9,7 @@ import {
   resolveNodePhases,
 } from '@/lib/canvasModel';
 import {
-  CANVAS_TAIL, CH, MAXH, MAXW, MINH, MINW, PAD, ZOOM_MAX, ZOOM_MIN, ZOOM_STEP, snp,
+  CANVAS_TAIL, CH, MAXH, MAXW, MINH, MINW, PAD, ZOOM_DEFAULT_FLOOR, ZOOM_MAX, ZOOM_MIN, ZOOM_STEP, snp,
 } from '@/lib/constants';
 import { FONT_MONO, T } from '@/theme/tokens';
 import { PhaseStepper } from './PhaseStepper';
@@ -111,7 +111,7 @@ export function Canvas({ ip, phases, usersById, canEdit, onOpenIncoming, ipDirec
     if (!vp) return;
     const todayCanvas = tx ?? W / 2;
     const containZ = Math.min(vp.clientWidth / W, vp.clientHeight / H, ZOOM_MAX);
-    const fitZ = Math.max(ZOOM_MIN, Math.max(containZ, 0.75));
+    const fitZ = Math.max(ZOOM_MIN, Math.max(containZ, ZOOM_DEFAULT_FLOOR));
     const c = clampVP(fitZ, vp.clientWidth / 2 - todayCanvas * fitZ, 0);
     st.getState().setVP(c.z, c.x, c.y);
   // eslint-disable-next-line react-hooks/exhaustive-deps

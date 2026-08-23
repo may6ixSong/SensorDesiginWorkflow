@@ -51,26 +51,26 @@ export function EdgeLayer({
         key={`${e.id}-main`}
         d={dpath}
         stroke={col}
-        strokeWidth={on ? 2.1 : 1.6}
+        strokeWidth={on ? 3.1 : 2.4}
         fill="none"
         markerEnd={`url(#${mk})`}
         markerStart={bi ? `url(#${on ? 'ahl-s' : 'ah-s'})` : undefined}
-        strokeDasharray={blocked ? '5 4' : undefined}
+        strokeDasharray={blocked ? '7 6' : undefined}
         shapeRendering="crispEdges"
       />,
     );
 
     if (on) {
       parts.push(
-        <path key={`${e.id}-bg`} d={dpath} stroke={col} strokeWidth={1.6} fill="none" opacity={0.18} shapeRendering="crispEdges" />,
+        <path key={`${e.id}-bg`} d={dpath} stroke={col} strokeWidth={2.4} fill="none" opacity={0.18} shapeRendering="crispEdges" />,
         <path
           key={`${e.id}-dash`}
           d={dpath}
           stroke="#0c9a83"
-          strokeWidth={2.2}
+          strokeWidth={3.2}
           fill="none"
           strokeLinecap="round"
-          strokeDasharray="8 10"
+          strokeDasharray="12 15"
           style={{ animation: 'flowdash .65s linear infinite' }}
           markerEnd="url(#ahl)"
         />,
@@ -80,7 +80,7 @@ export function EdgeLayer({
     if (bi && !edit) {
       const c = biIconPos(a, b);
       parts.push(
-        <g key={`${e.id}-cyc`} transform={`translate(${c.x - 11},${c.y - 11})`} pointerEvents="none">
+        <g key={`${e.id}-cyc`} transform={`translate(${c.x - 16},${c.y - 16}) scale(1.47)`} pointerEvents="none">
           <path d="M16.8 9.8A5.4 5.4 0 0 0 6.8 8.9" stroke="#bc4f1a" strokeWidth="1.9" fill="none" strokeLinecap="round" />
           <path d="M5.2 13.2a5.4 5.4 0 0 0 9.8 1.1" stroke="#bc4f1a" strokeWidth="1.9" fill="none" strokeLinecap="round" />
           <path d="M17 6v3.8h-3.8" stroke="#bc4f1a" strokeWidth="1.9" fill="none" strokeLinecap="round" strokeLinejoin="round" />
@@ -95,7 +95,7 @@ export function EdgeLayer({
           key={`${e.id}-hit`}
           d={dpath}
           stroke="transparent"
-          strokeWidth={12}
+          strokeWidth={18}
           fill="none"
           style={{ pointerEvents: 'stroke', cursor: CURSOR_POINTER }}
           onClick={(ev) => {
@@ -117,8 +117,8 @@ export function EdgeLayer({
         key="linkline"
         d={`M${a.x + a.w},${Math.round(a.y + a.h / 2)}H${linkPos.x}V${linkPos.y}`}
         stroke="#0c9a83"
-        strokeWidth={1.6}
-        strokeDasharray="5 4"
+        strokeWidth={2.4}
+        strokeDasharray="7 6"
         fill="none"
         markerEnd="url(#ahl)"
       />,
@@ -133,20 +133,20 @@ export function EdgeLayer({
       sx={{ position: 'absolute', inset: 0, overflow: 'visible', pointerEvents: 'none' }}
     >
       <defs>
-        <marker id="ah" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
-          <path d="M0,0L8,4L0,8Z" fill="#8b99ab" />
+        <marker id="ah" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+          <path d="M0,0L12,6L0,12Z" fill="#8b99ab" />
         </marker>
-        <marker id="ahb" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
-          <path d="M0,0L8,4L0,8Z" fill="#ac6f08" />
+        <marker id="ahb" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+          <path d="M0,0L12,6L0,12Z" fill="#ac6f08" />
         </marker>
-        <marker id="ahl" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
-          <path d="M0,0L8,4L0,8Z" fill="#0c9a83" />
+        <marker id="ahl" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+          <path d="M0,0L12,6L0,12Z" fill="#0c9a83" />
         </marker>
-        <marker id="ah-s" markerWidth="8" markerHeight="8" refX="1" refY="4" orient="auto">
-          <path d="M8,0L0,4L8,8Z" fill="#8b99ab" />
+        <marker id="ah-s" markerWidth="12" markerHeight="12" refX="2" refY="6" orient="auto">
+          <path d="M12,0L0,6L12,12Z" fill="#8b99ab" />
         </marker>
-        <marker id="ahl-s" markerWidth="8" markerHeight="8" refX="1" refY="4" orient="auto">
-          <path d="M8,0L0,4L8,8Z" fill="#0c9a83" />
+        <marker id="ahl-s" markerWidth="12" markerHeight="12" refX="2" refY="6" orient="auto">
+          <path d="M12,0L0,6L12,12Z" fill="#0c9a83" />
         </marker>
       </defs>
       {parts}

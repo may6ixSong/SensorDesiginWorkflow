@@ -31,13 +31,13 @@ export interface SeedModels {
  * 서로 달라져, 시드 산출물들이 의도한 Phase 레인을 벗어나 옆 Phase와 겹쳐
  * 보인다(실측 확인된 버그 — FE 블록 크기를 키운 커밋에서 이 사본을 안 고쳤었다). */
 const GRID = 10;
-const ROW_H = 150;
-const TOP_PAD = 40;
-const NW = 200;
-const NH = 108;
-const MW = 200;
-const MH = 80;
-const LANE_PAD = 46;
+const ROW_H = 220;
+const TOP_PAD = 60;
+const NW = 295;
+const NH = 160;
+const MW = 295;
+const MH = 120;
+const LANE_PAD = 68;
 const DEFAULT_PW = Math.round((NW + LANE_PAD * 2) * 2 * 0.72);
 const snp = (v: number) => Math.round(v / GRID) * GRID;
 
