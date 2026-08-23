@@ -124,6 +124,7 @@ export class DeliverablesService {
     d.recvDept = dto.recvDept ?? null;
     d.recvContact = dto.recvContact ? new Types.ObjectId(dto.recvContact) : null;
     d.recvIpId = dto.recvIpId ? new Types.ObjectId(dto.recvIpId) : null;
+    d.sourceDept = dto.sourceDept?.trim() || null;
     await d.save();
     await this.audit.log(actor._id, 'RECV_UPDATE', 'deliverable', d._id, {
       recvDept: d.recvDept,
@@ -230,6 +231,7 @@ export class DeliverablesService {
           recvDept: origin.recvDept,
           recvContact: origin.recvContact,
           recvIpId: origin.recvIpId,
+          sourceDept: origin.sourceDept,
           layout: {
             x: origin.layout.x + 40,
             y: origin.layout.y + 40,

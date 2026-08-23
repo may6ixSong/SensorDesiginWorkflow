@@ -99,6 +99,12 @@ export interface DeliverableDto {
   recvContact: string | null;
   /** 이 산출물을 받아야 하는 다른 Analog IP — 설정되면 그 IP 보드에 Incoming으로 노출된다. */
   recvIpId: string | null;
+  /**
+   * 이 시스템에 없는 외부 부서(파운드리 등)로부터 받았음을 나타내는 자유 텍스트.
+   * recvIpId와 달리 이 값이 있어도 여전히 own 산출물 그대로다 — 위치·Phase를
+   * own처럼 자유롭게(여러 Phase 포함) 편집할 수 있다.
+   */
+  sourceDept: string | null;
   /** 권한에 맞게 이미 필터링된 버전 목록 */
   versions: DeliverableVersionDto[];
   releasedVersion: DeliverableVersionDto | null;

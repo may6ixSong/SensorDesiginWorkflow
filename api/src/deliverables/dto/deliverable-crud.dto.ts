@@ -43,6 +43,12 @@ export class UpdateRecvDto {
   @IsOptional()
   @IsMongoId()
   recvIpId: string | null;
+
+  /** 이 시스템에 없는 외부 부서로부터 받았음을 나타내는 자유 텍스트 (예: "Foundry"). */
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  sourceDept: string | null;
 }
 
 export class UpdateScheduleDto {

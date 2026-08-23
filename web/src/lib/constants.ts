@@ -28,11 +28,11 @@ export const ZOOM_MIN = 0.3;
 export const ZOOM_MAX = 2.2;
 export const ZOOM_STEP = 0.08;
 /**
- * 보드 진입 시 기본 줌의 하한 — 옛 기본값 0.75에서 마우스 휠로 3칸(ZOOM_STEP*3=0.24)
- * 만큼 줌아웃한 값을 새 기본값으로 삼는다(사용자 요청). 콘텐츠가 뷰포트보다 작은
- * 소규모 IP는 여전히 그보다 확대된 값(containZ)을 쓴다 — Canvas.tsx 참고.
+ * 보드 진입 시 기본 줌의 하한 — 옛 기본값 0.75에서 마우스 휠로 3칸 줌아웃(0.51)한 뒤,
+ * 다시 1칸 줌인(+ZOOM_STEP)한 값을 최종 기본값으로 삼는다(사용자 요청). 콘텐츠가
+ * 뷰포트보다 작은 소규모 IP는 여전히 그보다 확대된 값(containZ)을 쓴다 — Canvas.tsx 참고.
  */
-export const ZOOM_DEFAULT_FLOOR = 0.51;
+export const ZOOM_DEFAULT_FLOOR = 0.59;
 
 /** Phase 레인 좌우 여백 — flow 화살표 공간 */
 export const LANE_PAD = 68;

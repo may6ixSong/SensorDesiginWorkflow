@@ -25,7 +25,9 @@ interface Props {
   onSaveInfo: (p: { name: string; net: 'OA' | 'HPC'; type: string; phaseKeys: string[] }) => void;
   onUpload: (p: { file: string; note: string; net: 'OA' | 'HPC'; type: string }) => void;
   onRelease: () => void;
-  onSaveRecv: (p: { recvDept: string | null; recvContact: string | null; recvIpId: string | null }) => void;
+  onSaveRecv: (p: {
+    recvDept: string | null; recvContact: string | null; recvIpId: string | null; sourceDept: string | null;
+  }) => void;
   onAddLink: (toId: string) => void;
   onUnlink: (edgeId: string) => void;
 }
@@ -436,8 +438,10 @@ function RecvTab({
   const [dept, setDept] = useState(d.recvDept ?? '');
   const [contact, setContact] = useState(d.recvContact ?? '');
   const [recvIp, setRecvIp] = useState(d.recvIpId ?? '');
+  const [sourceDept, setSourceDept] = useState(d.sourceDept ?? '');
   useEffect(() => {
     setDept(d.recvDept ?? ''); setContact(d.recvContact ?? ''); setRecvIp(d.recvIpId ?? '');
+    setSourceDept(d.sourceDept ?? '');
   }, [d.id]); // eslint-disable-line
 
   const ipById = new Map(ipDirectory.map((ip) => [ip.id, ip]));
@@ -463,7 +467,7 @@ function RecvTab({
             <Box sx={{ fontSize: 12.5, color: T.dm2 }}>No recipient department set.</Box>
           )}
         </Card>
-        <Card>
+        <Card sx={{ mb: '12px' }}>
           <Ey sx={{ mb: '9px' }}>Recipient IP</Ey>
           {recvIpInfo ? (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: '9px', padding: '9px 0' }}>
@@ -472,6 +476,14 @@ function RecvTab({
             </Box>
           ) : (
             <Box sx={{ fontSize: 12.5, color: T.dm2 }}>No recipient IP set.</Box>
+          )}
+        </Card>
+        <Card>
+          <Ey sx={{ mb: '9px' }}>Received from</Ey>
+          {d.sourceDept ? (
+            <Box sx={{ fontSize: 13, padding: '9px 0' }}>{d.sourceDept}</Box>
+          ) : (
+            <Box sx={{ fontSize: 12.5, color: T.dm2 }}>Not marked as received from anywhere.</Box>
           )}
         </Card>
       </>
@@ -526,9 +538,24 @@ function RecvTab({
         </Field>
       </Card>
 
+      <Card sx={{ mb: '12px' }}>
+        <Ey sx={{ mb: '9px' }}>Received from (external department)</Ey>
+        <Box sx={{ fontSize: 11.5, color: T.dm2, mb: '9px' }}>
+          Mark this as something handed to you from a department that doesn't use this system
+          (e.g. a foundry or vendor). It stays your own deliverable — position it in any Phase(s)
+          just like anything else you own.
+        </Box>
+        <Field label="Department" sx={{ mb: 0 }}>
+          <TextInput value={sourceDept} onChange={setSourceDept} placeholder="e.g. Foundry" />
+        </Field>
+      </Card>
+
       <SirenButton
         variant="primary"
-        onClick={() => onSave({ recvDept: dept || null, recvContact: contact || null, recvIpId: recvIp || null })}
+        onClick={() => onSave({
+          recvDept: dept || null, recvContact: contact || null, recvIpId: recvIp || null,
+          sourceDept: sourceDept.trim() || null,
+        })}
       >
         <Icon name="check" /> Save
       </SirenButton>

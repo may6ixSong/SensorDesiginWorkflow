@@ -98,6 +98,17 @@ export class Deliverable {
   @Prop({ type: Types.ObjectId, ref: 'Ip', default: null })
   recvIpId: Types.ObjectId | null;
 
+  /**
+   * 이 산출물이 실제로는 이 시스템에 들어오지 않은 외부 부서(IP도 아니고 이 앱의
+   * 사용자 조직도 아닌 곳, 예: 파운드리/외주 업체)로부터 받은 것임을 표시하는
+   * 자유 텍스트. recvIpId(시스템 내 다른 IP로부터 수신)와 달리, 이 값이 설정된
+   * 산출물은 여전히 ipId가 가리키는 이 IP의 "own" 산출물이다 — 그래서 위치·Phase
+   * 배치(series 포함)를 own 산출물과 완전히 동일하게 자유롭게 편집할 수 있다.
+   * 오직 표시(캔버스 배지·상세 "Received from")만 다르다.
+   */
+  @Prop({ type: String, default: null })
+  sourceDept: string | null;
+
   @Prop({ type: LayoutSchema, required: true })
   layout: Layout;
 

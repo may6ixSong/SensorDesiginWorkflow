@@ -93,14 +93,16 @@ export function useUpdateRecv(ipId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({
-      id, recvDept, recvContact, recvIpId,
+      id, recvDept, recvContact, recvIpId, sourceDept,
     }: {
       id: string; recvDept: string | null; recvContact: string | null; recvIpId?: string | null;
+      sourceDept?: string | null;
     }) => {
       const res = await apiClient.patch<ApiEnvelope<DeliverableDto>>(`/deliverables/${id}/recv`, {
         recvDept,
         recvContact,
         recvIpId,
+        sourceDept,
       });
       return res.data.data;
     },

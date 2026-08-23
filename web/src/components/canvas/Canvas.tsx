@@ -5,7 +5,7 @@ import { useCanvasStore } from '@/store/canvasStore';
 import { toast } from '@/store/toastStore';
 import {
   CanvasEdge, CanvasMemo, CanvasNode, connectedSet, laneG, getPW, phaseAtX,
-  laneOverflow, reflowLane, resizePhase, wallAdj, todayX, autoFit as computeAutoFit,
+  resizePhase, wallAdj, todayX, autoFit as computeAutoFit,
   resolveNodePhases,
 } from '@/lib/canvasModel';
 import {
@@ -316,16 +316,14 @@ export function Canvas({ ip, phases, usersById, canEdit, onOpenIncoming, ipDirec
     if (!b) return;
 
     if (moved) {
-      // 메모는 Phase 사이 어디든 걸쳐 있어도 무방 — 놓인 위치의 레인으로 즉시 소속 갱신.
-      // 산출물(Deliverable)은 Phase에 애매하게 걸칠 수 없으므로, 강제 이동 + phase 확정은
-      // 매 드래그마다 계산하지 않고 편집 완료 시점에 한 번만 수행한다(resolveNodePhases, 성능).
+      // 메모는 Phase 사이 어디든 걸쳐 있어도 무방 — 놓인 위치의 레인으로 소속만 갱신한다.
+      // 겹침은 이제 허용되므로(사용자 요청) 다른 블록을 밀어내는 재배치(reflowLane)는
+      // 절대 하지 않는다 — 내가 옮긴 블록 외에는 아무것도 움직이지 않아야 한다.
       if (st.getState().memos.some((m) => m.id === id)) {
         const cx = b.x + b.w / 2;
         const np = phaseAtX(phases, s.phasePW, cx);
         if (np && np !== b.phase) {
           b.phase = np;
-          const blocks = allBlocks();
-          if (laneOverflow(blocks, phases, s.phasePW, np)) reflowLane(blocks, phases, s.phasePW, np);
           toast(`Moved to ${(phases.find((p) => p.key === np) || { key: '' }).key}`);
         }
       }
@@ -442,10 +440,10 @@ export function Canvas({ ip, phases, usersById, canEdit, onOpenIncoming, ipDirec
       s.enterEdit();
       return;
     }
-    // 산출물의 Phase 확정 — 드래그마다 계산하지 않고 편집 완료 시점에 1회만 수행(성능).
+    // 산출물의 Phase 메타데이터 확정 — 좌표는 건드리지 않는다(겹침 허용, 위 주석 참고).
     // origin==='incoming' 노드는 위치가 이 캔버스 소유가 아니므로 재배정 대상에서 뺀다.
-    const { moved } = resolveNodePhases(s.nodes.filter((n) => n.origin !== 'incoming'), phases, s.phasePW);
-    if (moved) s.bumpBlocks();
+    const { reassigned } = resolveNodePhases(s.nodes.filter((n) => n.origin !== 'incoming'), phases, s.phasePW);
+    if (reassigned) s.bumpBlocks();
     // 저장이 끝난 뒤에야 edit을 끈다 — 그 전에 끄면 disabled 쿼리가 재활성화되며
     // 아직 반영 안 된 서버 데이터로 로컬 편집 결과를 덮어써 버릴 수 있다.
     onSaveLayout(() => st.getState().exitEdit());

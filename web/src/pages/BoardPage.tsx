@@ -177,6 +177,7 @@ export function BoardPage() {
           recvDept: d.recvDept,
           recvContact: d.recvContact,
           recvIpId: d.recvIpId,
+          sourceDept: d.sourceDept,
           versions: d.versions ?? [],
           canEdit: d.canEdit,
         };
@@ -299,9 +300,9 @@ export function BoardPage() {
                   { onSuccess: () => toast('Released'), onError: () => toast('Release failed') },
                 )
               }
-              onSaveRecv={({ recvDept, recvContact, recvIpId }) =>
+              onSaveRecv={({ recvDept, recvContact, recvIpId, sourceDept }) =>
                 updateRecv.mutate(
-                  { id: openNode.id, recvDept, recvContact, recvIpId },
+                  { id: openNode.id, recvDept, recvContact, recvIpId, sourceDept },
                   {
                     onSuccess: () => toast('Handoff info saved'),
                     onError: () => toast('Failed to save recipient department'),

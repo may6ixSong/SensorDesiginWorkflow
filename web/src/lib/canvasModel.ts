@@ -36,6 +36,8 @@ export interface CanvasNode {
   recvContact: string | null;
   /** 이 산출물을 받아야 하는 다른 Analog IP. */
   recvIpId: string | null;
+  /** 이 시스템에 없는 외부 부서로부터 받았음을 나타내는 자유 텍스트 — own 그대로라 자유 편집 가능. */
+  sourceDept: string | null;
   /** 'incoming'이면 다른 IP가 이 IP로 보낸 산출물 — 드래그/리사이즈 불가, 저장 대상 아님. */
   origin: 'own' | 'incoming';
   /** origin==='incoming'일 때만 채워진다 — 이 산출물을 준 IP. */
@@ -93,6 +95,7 @@ export function toCanvasNode(d: DeliverableDto, origin: 'own' | 'incoming' = 'ow
     recvDept: d.recvDept,
     recvContact: d.recvContact,
     recvIpId: d.recvIpId,
+    sourceDept: d.sourceDept ?? null,
     origin,
     sourceIp: d.sourceIp ?? null,
     versions: d.versions ?? [],
@@ -242,19 +245,20 @@ export function placeIncomingNodes(
 }
 
 /**
- * 편집 완료 시 1회만 호출 — 산출물(Deliverable)은 메모와 달리 Phase 경계에
- * 애매하게 걸쳐 있을 수 없다. 각 노드가 가장 많이 겹치는 Phase 레인을 찾아,
- * 걸쳐 있다면 그 레인 안으로 완전히 밀어넣고 `phase`를 그 레인으로 확정한다.
+ * 편집 완료 시 1회만 호출 — 각 노드가 가장 많이 겹치는 Phase 레인을 찾아 `phase`
+ * 필드(소속 표시·필터링용 메타데이터)만 확정한다. 겹침이 이제 허용되므로(설계
+ * 변경 — 사용자 요청) 좌표는 절대 건드리지 않는다: 내가 직접 드래그하지 않은
+ * 다른 노드가 "제멋대로" 움직이는 일이 없어야 한다 — 이 함수는 항상 내가
+ * 옮긴 노드만 만지고, 나머지는 순수 조회만 한다.
  * 드래그 중(포인터 이동/업)마다 계산하면 비용이 크므로 세션 종료 시점에만 실행한다.
  */
 export function resolveNodePhases(
   nodes: CanvasNode[],
   phases: PhaseRef[],
   phasePW: Record<string, number>,
-): { moved: number; reassigned: number } {
-  if (!phases.length) return { moved: 0, reassigned: 0 };
+): { reassigned: number } {
+  if (!phases.length) return { reassigned: 0 };
   const { lanes } = laneG(phases, phasePW);
-  let moved = 0;
   let reassigned = 0;
 
   nodes.forEach((n) => {
@@ -269,26 +273,13 @@ export function resolveNodePhases(
       }
     });
 
-    const g = lanes[bestKey];
-    const straddles = phases.some((p) => {
-      if (p.key === bestKey) return false;
-      const gp = lanes[p.key];
-      return n.x < gp.x + gp.w && n.x + n.w > gp.x;
-    });
-
-    if (straddles) {
-      const minX = g.x + LANE_PAD;
-      const maxX = Math.max(minX, g.x + g.w - LANE_PAD - n.w);
-      n.x = snp(Math.max(minX, Math.min(maxX, n.x)));
-      moved++;
-    }
     if (n.phase !== bestKey) {
       n.phase = bestKey;
       reassigned++;
     }
   });
 
-  return { moved, reassigned };
+  return { reassigned };
 }
 
 /** Phase 최소 폭 (목업 minPW) */

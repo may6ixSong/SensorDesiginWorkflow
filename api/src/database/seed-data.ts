@@ -54,7 +54,10 @@ const COM_PH = [
   { id: 'MTO', key: 'MTO', label: 'Mask Tape-out', start: '2026-09-21', end: '2026-10-12' },
   { id: 'FABOUT', key: 'Fab out', label: 'Fab Out', start: '2026-10-12', end: '2026-12-21' },
 ];
-const PHASE_INDEX: Record<string, number> = Object.fromEntries(COM_PH.map((p, i) => [p.id, i]));
+// id와 key가 다른 항목(FABOUT/'Fab out')도 있어 둘 다로 조회 가능하게 인덱싱한다.
+const PHASE_INDEX: Record<string, number> = Object.fromEntries(
+  COM_PH.flatMap((p, i) => [[p.id, i], [p.key, i]] as [string, number][]),
+);
 
 /** 목업 seedXY(): x = snp(laneX + max(6,(laneW-w)/2)), y = TOP_PAD + row*ROW_H */
 function seedXY(phaseId: string, row: number, w: number, h: number) {
@@ -98,6 +101,9 @@ interface MockItem {
   recvContact?: MockUserKey | null;
   /** 이 산출물을 받아야 하는 다른 Analog IP (recvDept와 별개, IP↔IP 핸드오프 목업용). */
   recvIp?: string | null;
+  /** 이 시스템에 없는 외부 부서(파운드리 등)로부터 받았음을 나타내는 자유 텍스트.
+   * own 산출물 그대로이므로 own처럼 여러 Phase에 자유 배치(series) 가능하다. */
+  sourceDept?: string | null;
   series?: string;
   seriesIdx?: number;
   seriesTotal?: number;
@@ -138,7 +144,12 @@ const MOCK_ITEMS: MockItem[] = [
   { id:'d10', ip:'ip1', phase:'ML4', row:1, name:'Layout DB', type:'path', net:'HPC', versions:[] },
   { id:'d11', ip:'ip1', phase:'FDR', row:0, name:'FDR Checklist', type:'word', net:'OA', recvDept:'digital', recvContact:'u3', versions:[] },
   { id:'d12', ip:'ip1', phase:'MTO', row:0, name:'MTO Sign-off Sheet', type:'excel', net:'OA', recvDept:'pte', recvContact:'u5', versions:[] },
-  { id:'d13', ip:'ip1', phase:'FABOUT', row:0, name:'Fab-out Characterization Plan', type:'word', net:'OA', versions:[] },
+  { id:'d13', ip:'ip1', phase:'Fab out', row:0, name:'Fab-out Characterization Plan', type:'word', net:'OA', versions:[] },
+  { id:'d14', ip:'ip1', phase:'ML2', row:2, name:'Substrate/Package Outline Spec', type:'word', net:'OA', sourceDept:'Package (Foundry)',
+    series:'d14', seriesIdx:1, seriesTotal:2,
+    versions:[[1,0,'major','u1','2026-04-24 10:05','Received from foundry','PKG_outline_v1.0.docx']] },
+  { id:'d14_ML3', ip:'ip1', phase:'ML3', row:2, name:'Substrate/Package Outline Spec', type:'word', net:'OA', sourceDept:'Package (Foundry)',
+    series:'d14', seriesIdx:2, seriesTotal:2, versions:[] },
 
   { id:'e01', ip:'ip2', phase:'KO', row:0, name:'LDO Requirements Intake', type:'word', net:'OA', recvDept:'solution', recvContact:'u4',
     versions:[[1,0,'major','u1','2026-01-10 09:40','Initial draft','LDO_req_v1.0.docx']] },
@@ -153,7 +164,7 @@ const MOCK_ITEMS: MockItem[] = [
   { id:'e06', ip:'ip2', phase:'MDR', row:0, name:'MDR Review Package', type:'word', net:'OA', versions:[] },
   { id:'e07', ip:'ip2', phase:'ML4', row:0, name:'Post-layout Re-verification', type:'excel', net:'OA', versions:[] },
   { id:'e08', ip:'ip2', phase:'FDR', row:0, name:'Reliability Review', type:'word', net:'OA', recvDept:'solution', recvContact:'u4', versions:[] },
-  { id:'e09', ip:'ip2', phase:'FABOUT', row:0, name:'Mass Production Handover Package', type:'word', net:'OA', recvDept:'solution', recvContact:'u4', versions:[] },
+  { id:'e09', ip:'ip2', phase:'Fab out', row:0, name:'Mass Production Handover Package', type:'word', net:'OA', recvDept:'solution', recvContact:'u4', versions:[] },
 
   { id:'f01', ip:'ip3', phase:'KO', row:0, name:'ADC Requirements Intake', type:'word', net:'OA', recvDept:'pte', recvContact:'u5',
     versions:[[1,0,'major','u2','2026-01-08 13:50','Initial draft','ADC_req_v1.0.docx']] },
@@ -204,7 +215,7 @@ const MOCK_ITEMS: MockItem[] = [
 const MOCK_NOTES = [
   { id:'n1', ip:'ip1', phase:'ML2', row:2, text:'Start post-layout once Digital team returns CDC review' },
   { id:'n2', ip:'ip1', phase:'ML4', row:2, text:'Reflect Verification team review results in the FDR checklist' },
-  { id:'n3', ip:'ip1', phase:'FABOUT', row:1, text:'→ Final handoff to Product Engineering & MP Engineering' },
+  { id:'n3', ip:'ip1', phase:'Fab out', row:1, text:'→ Final handoff to Product Engineering & MP Engineering' },
   { id:'n4', ip:'ip2', phase:'ML4', row:1, text:'Reliability item (HTOL) must be confirmed before MP handover' },
   { id:'n5', ip:'ip3', phase:'ML3', row:2, text:'Layout DB exists only on the HPC network — path shared only' },
   { id:'n6', ip:'ip6', phase:'ML2', row:1, text:'Offset target tightened after ADC_RAMP INL/DNL review — resimulate corners' },
@@ -407,6 +418,7 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
       recvDept: m.recvDept ?? null,
       recvContact: m.recvContact ? U[m.recvContact] : null,
       recvIpId: m.recvIp ? IPID[m.recvIp] : null,
+      sourceDept: m.sourceDept ?? null,
       layout,
       versions: m.versions.map(([major, minor, kind, by, when, note, file]) => ({
         major, minor, kind,

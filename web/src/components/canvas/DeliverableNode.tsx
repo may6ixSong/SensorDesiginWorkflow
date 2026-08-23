@@ -40,9 +40,14 @@ export function DeliverableNode({
   const last = latA(d);
   const compact = d.h < 175;
   const col = d.net === 'HPC' ? T.hp : d.type === 'excel' ? T.tl : T.bl;
+  // 진짜 다른 IP 소유 — 이 캔버스에서 위치 편집 불가, edit 모드에서 흐리게 처리.
   const incoming = d.origin === 'incoming';
-  // 받는 산출물은 "다른 IP가 준 것"이라는 정도만 드러내고 어느 IP인지는 캔버스
-  // 블록에 표시하지 않는다 — 그래서 출처 IP 색상 대신 고정된 violet을 쓴다.
+  // 이 시스템에 없는 외부 부서로부터 받은 것으로 표시된 own 산출물 — own이므로
+  // 위치·Phase 편집은 완전히 자유롭다. 시각적으로만 "받은 것" 느낌을 준다.
+  const externalIncoming = !incoming && !!d.sourceDept;
+  const showIncomingStyle = incoming || externalIncoming;
+  // 받는 산출물은 "다른 IP가 준 것"이라는 정도만 드러내고 어느 IP/부서인지는 캔버스
+  // 블록에 표시하지 않는다 — 그래서 출처 색상 대신 고정된 violet을 쓴다.
   const srcColor = T.vi;
 
   return (
@@ -59,20 +64,23 @@ export function DeliverableNode({
       sx={{
         position: 'absolute',
         borderRadius: '15px',
-        background: incoming ? T.vi2 : T.sf,
-        border: `2px ${incoming ? 'dashed' : 'solid'} ${isSel ? T.tl : dimLink ? T.vi : incoming ? srcColor : T.ln2}`,
+        background: showIncomingStyle ? T.vi2 : T.sf,
+        border: `2px ${showIncomingStyle ? 'dashed' : 'solid'} ${isSel ? T.tl : dimLink ? T.vi : showIncomingStyle ? srcColor : T.ln2}`,
         boxShadow: isSel ? `0 0 0 4px ${T.tl2}, ${T.sm}` : T.sm,
         overflow: 'visible',
         padding: '12px 13px 10px',
         outline: onHl && hasHl ? `3px solid ${T.vi}` : 'none',
         outlineOffset: onHl && hasHl ? '3px' : 0,
+        // 다른 IP 소유(incoming)는 이 캔버스에서 절대 건드릴 수 없는 영역임을 edit
+        // 모드에서 낮은 opacity로 드러낸다 — pin(연결)은 opacity와 무관하게 계속 동작한다.
+        opacity: edit && incoming ? 0.45 : 1,
         cursor: edit && canEdit && !incoming ? 'grab' : CURSOR_POINTER,
         touchAction: 'none',
-        transition: edit ? 'none' : 'box-shadow .15s, transform .15s, border-color .14s',
-        '&:hover': edit ? {} : { transform: 'translateY(-3px)', boxShadow: T.sl, borderColor: incoming ? srcColor : T.ln3 },
+        transition: edit ? 'opacity .15s' : 'box-shadow .15s, transform .15s, border-color .14s',
+        '&:hover': edit ? {} : { transform: 'translateY(-3px)', boxShadow: T.sl, borderColor: showIncomingStyle ? srcColor : T.ln3 },
         '&::before': {
           content: '""', position: 'absolute', top: 10, left: 10, width: 6, height: 6,
-          borderRadius: '50%', background: incoming ? srcColor : T.ln3,
+          borderRadius: '50%', background: showIncomingStyle ? srcColor : T.ln3,
         },
       }}
     >
@@ -99,12 +107,13 @@ export function DeliverableNode({
         </Box>
       )}
 
-      {/* 어느 IP가 준 건지는 블록에 안 드러낸다(요청) — 상세(dialog)에서만 확인 가능.
-          여기서는 "받은 산출물"이라는 것만 잠금 아이콘으로 드러낸다. */}
-      {incoming && (
+      {/* 어느 IP/부서가 준 건지는 블록에 안 드러낸다(요청) — 상세(dialog)에서만 확인 가능.
+          여기서는 "받은 산출물"이라는 것만 잠금 아이콘으로 드러낸다. incoming(다른 IP
+          소유)과 externalIncoming(외부 부서, 하지만 own) 둘 다 대상. */}
+      {showIncomingStyle && (
         <Box
           component="span"
-          title="Received from another IP — open for details"
+          title="Received — open for details"
           sx={{
             position: 'absolute', top: 0, left: 0, padding: '4px 9px',
             borderBottomRightRadius: '12px', background: srcColor, color: '#fff',
