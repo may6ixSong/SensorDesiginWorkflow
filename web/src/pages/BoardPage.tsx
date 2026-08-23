@@ -97,6 +97,16 @@ export function BoardPage() {
     });
     const s = st.getState();
     placeIncomingNodes(s.nodes, phases ?? [], s.phasePW);
+    // 사용자가 같은 Phase 안에서 옮겨둔 incoming 노드 위치를 다시 덮어씌운다 — 그
+    // Phase로 재배치된 것이 아니면(다른 IP가 스케줄을 바꿨으면) 무시한다.
+    const overrides = s.incomingOverrides;
+    s.nodes.forEach((n) => {
+      const ov = overrides[n.id];
+      if (n.origin === 'incoming' && ov && ov.phase === n.phase) {
+        n.x = ov.x;
+        n.y = ov.y;
+      }
+    });
     s.bumpBlocks();
   }, [ipId, deliverables, incoming, memos, edges, phases, st]);
 

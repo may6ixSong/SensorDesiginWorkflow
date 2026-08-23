@@ -228,6 +228,8 @@ export function Canvas({ ip, phases, usersById, canEdit, onOpenIncoming, ipDirec
   /* ── BLOCK DRAG (목업 pointerdown/move/up + accX 벽 저항) ── */
   const dragRef = useRef<{
     id: string; el: HTMLDivElement; dx: number; dy: number; moved: boolean; accX: number;
+    /** origin==='incoming' 노드가 Phase를 벗어나 원위치로 되돌려야 할 때 쓰는 드래그 시작 위치. */
+    origX: number; origY: number;
   } | null>(null);
 
   const findBlk = (id: string): Blk | undefined =>
@@ -262,13 +264,13 @@ export function Canvas({ ip, phases, usersById, canEdit, onOpenIncoming, ipDirec
     const el = elRefs.current.get(id);
     if (!b || !el) return;
     const p = cvPt(e);
-    dragRef.current = { id, el, dx: p.x - b.x, dy: p.y - b.y, moved: false, accX: 0 };
-    // origin==='incoming'은 클릭(선택/연결)만 받고 실제 드래그 비주얼은 주지 않는다.
-    if (!('origin' in b && b.origin === 'incoming')) {
-      el.style.transition = 'none';
-      el.style.zIndex = '30';
-      el.style.cursor = 'grabbing';
-    }
+    dragRef.current = {
+      id, el, dx: p.x - b.x, dy: p.y - b.y, moved: false, accX: 0, origX: b.x, origY: b.y,
+    };
+    // origin==='incoming' 노드도 같은 Phase 안에서는 실제로 옮길 수 있다 — 드래그 비주얼도 동일하게 준다.
+    el.style.transition = 'none';
+    el.style.zIndex = '30';
+    el.style.cursor = 'grabbing';
     el.setPointerCapture(e.pointerId);
   };
 
@@ -278,22 +280,28 @@ export function Canvas({ ip, phases, usersById, canEdit, onOpenIncoming, ipDirec
     const s = st.getState();
     const b = findBlk(id);
     if (!b) return;
-    // origin==='incoming' 노드는 다른 IP 소유라 이 캔버스에 위치를 저장할 곳이 없다 —
-    // 클릭(선택/연결)은 그대로 동작해야 하므로 dragRef는 세팅되지만, 실제 이동만 막는다.
-    if ('origin' in b && b.origin === 'incoming') return;
     const p = cvPt(e);
     const rawX = Math.max(PAD, Math.min(W - b.w - PAD, p.x - D.dx));
     // 위쪽엔 벽을 두지 않는다 — 기본 배치(TOP_PAD=40)와 최소 여백(PAD=8) 사이 32px밖에
     // 안 남아 "위로 이동이 안 된다"고 느껴졌던 문제. Phase 이름 라벨과 겹치더라도
     // 캔버스 맨 위(y<0)까지 자유롭게 끌어올릴 수 있게 한다.
     const rawY = Math.min(H - b.h - PAD, p.y - D.dy);
+    D.moved = true;
+    // origin==='incoming' 노드는 다른 IP 소유라 Phase 벽 물리(wallAdj)를 적용하지 않고
+    // 자유롭게 옮기기만 한다 — Phase를 실제로 벗어났는지는 놓는 순간(pointerUp)에만
+    // 검사해서 벗어났으면 alert 후 원위치로 되돌린다.
+    if ('origin' in b && b.origin === 'incoming') {
+      b.x = snp(rawX);
+      b.y = snp(rawY);
+      s.bumpBlocks();
+      return;
+    }
     D.accX += rawX - b.x;
     const adj = wallAdj(phases, s.phasePW, b.x, b.w, rawX, D.accX);
     const nx = snp(adj.x);
     if (nx !== snp(rawX)) D.accX = 0;
     if (adj.crossed !== null) s.flash(adj.crossed);
     const ny = snp(rawY);
-    D.moved = true;
     b.x = nx;
     b.y = ny;
     // 위치는 style prop으로 렌더되므로 상태만 갱신하면 블록과 엣지가 함께 따라온다.
@@ -316,6 +324,23 @@ export function Canvas({ ip, phases, usersById, canEdit, onOpenIncoming, ipDirec
     if (!b) return;
 
     if (moved) {
+      // origin==='incoming' 노드: 같은 Phase 안에서는 자유롭게 옮길 수 있지만, 다른
+      // Phase로 넘어가면 이 IP가 결정할 수 있는 스케줄이 아니므로 alert 후 드래그
+      // 시작 위치로 되돌린다. Phase 안에 머물렀으면 서버엔 저장하지 않고(이 캔버스
+      // 소유가 아니므로) 세션 동안만 유지되는 override로 기억해 hydrate 후에도 유지되게 한다.
+      if ('origin' in b && b.origin === 'incoming') {
+        const cx = b.x + b.w / 2;
+        const np = phaseAtX(phases, s.phasePW, cx);
+        if (np !== b.phase) {
+          alert("Can't move a received deliverable out of its phase.");
+          b.x = D.origX;
+          b.y = D.origY;
+        } else {
+          s.setIncomingOverride(id, b.x, b.y, b.phase);
+        }
+        s.bumpBlocks();
+        return;
+      }
       // 메모는 Phase 사이 어디든 걸쳐 있어도 무방 — 놓인 위치의 레인으로 소속만 갱신한다.
       // 겹침은 이제 허용되므로(사용자 요청) 다른 블록을 밀어내는 재배치(reflowLane)는
       // 절대 하지 않는다 — 내가 옮긴 블록 외에는 아무것도 움직이지 않아야 한다.

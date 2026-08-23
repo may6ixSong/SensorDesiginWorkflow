@@ -71,10 +71,11 @@ export function DeliverableNode({
         padding: '12px 13px 10px',
         outline: onHl && hasHl ? `3px solid ${T.vi}` : 'none',
         outlineOffset: onHl && hasHl ? '3px' : 0,
-        // 다른 IP 소유(incoming)는 이 캔버스에서 절대 건드릴 수 없는 영역임을 edit
-        // 모드에서 낮은 opacity로 드러낸다 — pin(연결)은 opacity와 무관하게 계속 동작한다.
+        // 다른 IP 소유(incoming)는 같은 Phase 안에서만 옮길 수 있는 제한된 영역임을
+        // edit 모드에서 낮은 opacity로 드러낸다 — pin(연결)·같은 Phase 내 드래그 모두
+        // opacity와 무관하게 계속 동작한다.
         opacity: edit && incoming ? 0.45 : 1,
-        cursor: edit && canEdit && !incoming ? 'grab' : CURSOR_POINTER,
+        cursor: edit && canEdit ? 'grab' : CURSOR_POINTER,
         touchAction: 'none',
         transition: edit ? 'opacity .15s' : 'box-shadow .15s, transform .15s, border-color .14s',
         '&:hover': edit ? {} : { transform: 'translateY(-3px)', boxShadow: T.sl, borderColor: showIncomingStyle ? srcColor : T.ln3 },

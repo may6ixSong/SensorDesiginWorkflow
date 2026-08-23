@@ -11,6 +11,7 @@ export interface CanvasSnapshot {
   memos: CanvasMemo[];
   edges: CanvasEdge[];
   phasePW: Record<string, number>;
+  incomingOverrides: Record<string, { x: number; y: number; phase: string }>;
 }
 
 interface CanvasState {
@@ -48,6 +49,14 @@ interface CanvasState {
   incomingId: string | null;
   /** 새로 추가된 블록 id — 설정되면 Canvas가 뷰포트를 그 블록으로 이동시키고 비운다. */
   focusReq: string | null;
+  /**
+   * origin==='incoming' 노드는 이 캔버스 소유가 아니라 서버에 위치를 저장할 곳이 없어
+   * hydrate마다 placeIncomingNodes()가 새로 배치한다 — 그래서 사용자가 같은 Phase
+   * 안에서 옮긴 위치를 기억해 두었다가 hydrate 직후 다시 덮어씌워, "옮겼는데 곧
+   * 원위치로 튕겨나가는" 것처럼 보이지 않게 한다. phase가 바뀌면(다른 IP가 스케줄을
+   * 바꾸면) 더 이상 유효하지 않으므로 무시한다. 세션 동안만 유지되고 서버엔 저장되지 않는다.
+   */
+  incomingOverrides: Record<string, { x: number; y: number; phase: string }>;
 
   setVP: (z: number, x: number, y: number) => void;
   setPan: (x: number) => void;
@@ -79,6 +88,7 @@ interface CanvasState {
   setOwnerDlg: (v: boolean) => void;
   setIncomingId: (id: string | null) => void;
   setFocusReq: (id: string | null) => void;
+  setIncomingOverride: (id: string, x: number, y: number, phase: string) => void;
   /** 블록 재렌더 트리거용 카운터 (드래그 커밋 후 등) */
   rev: number;
 }
@@ -113,6 +123,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   ownerDlg: false,
   incomingId: null,
   focusReq: null,
+  incomingOverrides: {},
   rev: 0,
 
   setVP: (z, x, y) => set({ z: Math.max(ZOOM_MIN, z), x, y }),
@@ -143,7 +154,10 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     const s = get();
     set({
       edit: true,
-      snapshot: clone({ nodes: s.nodes, memos: s.memos, edges: s.edges, phasePW: s.phasePW }),
+      snapshot: clone({
+        nodes: s.nodes, memos: s.memos, edges: s.edges, phasePW: s.phasePW,
+        incomingOverrides: s.incomingOverrides,
+      }),
       link: null,
       sel: null,
       hlSet: null,
@@ -162,6 +176,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       memos: snap ? snap.memos : s.memos,
       edges: snap ? snap.edges : s.edges,
       phasePW: snap ? snap.phasePW : s.phasePW,
+      incomingOverrides: snap ? snap.incomingOverrides : s.incomingOverrides,
       rev: s.rev + 1,
     }));
   },
@@ -183,4 +198,6 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   setOwnerDlg: (v) => set({ ownerDlg: v }),
   setIncomingId: (id) => set({ incomingId: id }),
   setFocusReq: (id) => set({ focusReq: id }),
+  setIncomingOverride: (id, x, y, phase) =>
+    set((s) => ({ incomingOverrides: { ...s.incomingOverrides, [id]: { x, y, phase } } })),
 }));
