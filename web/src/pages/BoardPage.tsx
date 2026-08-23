@@ -26,7 +26,7 @@ import { usePutCanvas } from '@/api/hooks/useCanvas';
 import { useCanvasStore } from '@/store/canvasStore';
 import { useAuthStore } from '@/store/authStore';
 import { toast } from '@/store/toastStore';
-import { placeInLane, toCanvasEdge, toCanvasMemo, toCanvasNode } from '@/lib/canvasModel';
+import { placeIncomingNodes, placeInLane, toCanvasEdge, toCanvasMemo, toCanvasNode } from '@/lib/canvasModel';
 import { DeliverableDto, PhaseRef } from '@/types/domain';
 import { T } from '@/theme/tokens';
 
@@ -75,16 +75,30 @@ export function BoardPage() {
   const addViewGrant = useAddViewGrant(ipId ?? '');
   const removeViewGrant = useRemoveViewGrant(ipId ?? '');
 
-  /* 서버 데이터 → 캔버스 작업 모델 (편집 중에는 덮어쓰지 않는다) */
+  /**
+   * 서버 데이터 → 캔버스 작업 모델 (편집 중에는 덮어쓰지 않는다).
+   * own(이 IP가 주는 산출물)과 incoming(다른 IP로부터 받는 산출물)을 하나의 nodes
+   * 배열로 합쳐서 같은 캔버스 위에 그린다 — incoming은 origin==='incoming'으로
+   * 표시돼 UI만 구분되고(점선 테두리 등), 그 외에는 own 노드와 똑같이 edge로 자유롭게
+   * 연결할 수 있어 "받아서 → 내가 작업해서 → 다음으로 넘긴다"는 흐름이 한 캔버스에
+   * 이어져 보인다. incoming은 이 IP 소유가 아니라 위치를 저장할 곳이 없으므로,
+   * hydrate 직후 placeIncomingNodes로 own 노드와 겹치지 않는 자리에 매번 다시 배치한다.
+   */
   useEffect(() => {
     if (!ipId || !deliverables || !memos || !edges) return;
     if (st.getState().edit) return;
     st.getState().hydrate(ipId, {
-      nodes: deliverables.map(toCanvasNode),
+      nodes: [
+        ...deliverables.map((d) => toCanvasNode(d, 'own')),
+        ...incoming.map((d) => toCanvasNode(d, 'incoming')),
+      ],
       memos: memos.map(toCanvasMemo),
       edges: edges.map(toCanvasEdge),
     });
-  }, [ipId, deliverables, memos, edges, st]);
+    const s = st.getState();
+    placeIncomingNodes(s.nodes, phases ?? [], s.phasePW);
+    s.bumpBlocks();
+  }, [ipId, deliverables, incoming, memos, edges, phases, st]);
 
   const usersById = useMemo(() => new Map((users ?? []).map((u) => [u.id, u])), [users]);
   const isOwner = ip?.myAccess === 'edit';
@@ -111,11 +125,14 @@ export function BoardPage() {
     const s = st.getState();
     putCanvas.mutate(
       {
-        deliverables: s.nodes.map((n) => ({
-          id: n.id,
-          layout: { x: n.x, y: n.y, w: n.w, h: n.h },
-          phaseKey: n.phase,
-        })),
+        // origin==='incoming'은 다른 IP 소유라 이 IP의 캔버스 저장 대상이 아니다.
+        deliverables: s.nodes
+          .filter((n) => n.origin !== 'incoming')
+          .map((n) => ({
+            id: n.id,
+            layout: { x: n.x, y: n.y, w: n.w, h: n.h },
+            phaseKey: n.phase,
+          })),
         memos: s.memos.map((m) => ({
           phaseKey: m.phase,
           text: m.text,
@@ -215,7 +232,6 @@ export function BoardPage() {
             phases={phaseList}
             usersById={usersById}
             canEdit={canEdit}
-            incoming={incoming}
             onOpenIncoming={(id) => st.getState().setIncomingId(id)}
             ipDirectory={ipDirectory ?? []}
             onSaveLayout={saveLayout}

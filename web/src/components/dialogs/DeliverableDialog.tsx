@@ -142,7 +142,12 @@ function OverviewTab({
 
   const outs = edges.filter((e) => e.from === d.id);
   const ins = edges.filter((e) => e.to === d.id);
-  const linkable = nodes.filter((x) => x.id !== d.id && !edges.some((e) => e.from === d.id && e.to === x.id));
+  // 받은 산출물(origin==='incoming')로는 링크할 수 없다 — 그건 다른 IP 소유라
+  // "내가 그 IP에 준다"는 방향이 되어 의미가 반대가 된다. 그 방향은 캔버스에서
+  // incoming 노드의 pin을 직접 끌어 own 노드로 연결하면 된다.
+  const linkable = nodes.filter(
+    (x) => x.id !== d.id && x.origin !== 'incoming' && !edges.some((e) => e.from === d.id && e.to === x.id),
+  );
   const [lkTgt, setLkTgt] = useState('');
 
   const togglePick = (k: string) => {

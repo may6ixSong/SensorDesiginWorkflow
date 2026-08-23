@@ -210,8 +210,14 @@ const MOCK_NOTES = [
   { id:'n6', ip:'ip6', phase:'ML2', row:1, text:'Offset target tightened after ADC_RAMP INL/DNL review — resimulate corners' },
 ];
 
-/** 목업 EDGES. 역방향 쌍(g7/g7r)이 곧 양방향 표현이므로 그대로 옮긴다. */
-const MOCK_EDGES: { id: string; from: string; to: string; auto?: boolean }[] = [
+/**
+ * 목업 EDGES. 역방향 쌍(g7/g7r)이 곧 양방향 표현이므로 그대로 옮긴다.
+ * `ip`가 없으면 기존처럼 from 산출물의 소유 IP에 귀속된다. IP↔IP 핸드오프 edge(아래
+ * x1~x5)는 받는 쪽 IP에 귀속시켜야 그 IP의 보드에서 캔버스가 렌더되므로 `ip`로 명시한다
+ * (deliverables.controller의 listForIp/listIncomingForIp와 대응 — recvIpId로 지정한
+ * IP가 곧 그 edge를 저장·조회하는 IP다).
+ */
+const MOCK_EDGES: { id: string; from: string; to: string; auto?: boolean; ip?: string }[] = [
   { id:'g1', from:'d01', to:'d02' }, { id:'g2', from:'d02', to:'d03' }, { id:'g3', from:'d03', to:'d04' },
   { id:'g4', from:'d03', to:'d05' }, { id:'g5', from:'d04', to:'d06' }, { id:'g6', from:'d05', to:'d06' },
   { id:'g7', from:'d06', to:'d07' }, { id:'g7r', from:'d07', to:'d06' },
@@ -231,6 +237,14 @@ const MOCK_EDGES: { id: string; from: string; to: string; auto?: boolean }[] = [
   { id:'l4', from:'h04', to:'h05' },
   { id:'m1', from:'k01', to:'k02' }, { id:'m2', from:'k02', to:'k03' }, { id:'m3', from:'k03', to:'k04' },
   { id:'m4', from:'k04', to:'k05' },
+
+  /* IP↔IP 핸드오프 edge — recvIp로 지정된 산출물이 받는 쪽 IP의 캔버스에서 자기 own
+   * 산출물과 실제로 이어져 보이도록 한다 (설계서에 없는 신규 기능, 목업 데모용). */
+  { id:'x1', from:'g02', to:'d02', ip:'ip1' },
+  { id:'x2', from:'g03', to:'e03', ip:'ip2' },
+  { id:'x3', from:'g04', to:'e04', ip:'ip2' },
+  { id:'x4', from:'k02', to:'f02', ip:'ip3' },
+  { id:'x5', from:'k03', to:'f03', ip:'ip3' },
 ];
 
 interface MockHldItem { ver: string; file: string; at: string; cmt: string }
@@ -419,7 +433,7 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
   /* ── Edges ── */
   await EdgeModel.insertMany(
     MOCK_EDGES.filter((e) => DID[e.from] && DID[e.to]).map((e) => {
-      const ipKey = MOCK_ITEMS.find((m) => m.id === e.from)!.ip;
+      const ipKey = e.ip ?? MOCK_ITEMS.find((m) => m.id === e.from)!.ip;
       return {
         ipId: IPID[ipKey],
         fromId: DID[e.from],

@@ -40,6 +40,8 @@ export function DeliverableNode({
   const last = latA(d);
   const compact = d.h < 120;
   const col = d.net === 'HPC' ? T.hp : d.type === 'excel' ? T.tl : T.bl;
+  const incoming = d.origin === 'incoming';
+  const srcColor = d.sourceIp?.color ?? T.vi;
 
   return (
     <Box
@@ -55,20 +57,20 @@ export function DeliverableNode({
       sx={{
         position: 'absolute',
         borderRadius: '10px',
-        background: T.sf,
-        border: `1px solid ${isSel ? T.tl : dimLink ? T.vi : T.ln2}`,
+        background: incoming ? T.vi2 : T.sf,
+        border: `1.5px ${incoming ? 'dashed' : 'solid'} ${isSel ? T.tl : dimLink ? T.vi : incoming ? srcColor : T.ln2}`,
         boxShadow: isSel ? `0 0 0 3px ${T.tl2}, ${T.sm}` : T.sm,
         overflow: 'visible',
         padding: '8px 9px 7px',
         outline: onHl && hasHl ? `2px solid ${T.vi}` : 'none',
         outlineOffset: onHl && hasHl ? '2px' : 0,
-        cursor: edit && canEdit ? 'grab' : CURSOR_POINTER,
+        cursor: edit && canEdit && !incoming ? 'grab' : CURSOR_POINTER,
         touchAction: 'none',
         transition: edit ? 'none' : 'box-shadow .15s, transform .15s, border-color .14s',
-        '&:hover': edit ? {} : { transform: 'translateY(-2px)', boxShadow: T.sl, borderColor: T.ln3 },
+        '&:hover': edit ? {} : { transform: 'translateY(-2px)', boxShadow: T.sl, borderColor: incoming ? srcColor : T.ln3 },
         '&::before': {
           content: '""', position: 'absolute', top: 7, left: 7, width: 4, height: 4,
-          borderRadius: '50%', background: T.ln3,
+          borderRadius: '50%', background: incoming ? srcColor : T.ln3,
         },
       }}
     >
@@ -95,6 +97,20 @@ export function DeliverableNode({
         </Box>
       )}
 
+      {incoming && (
+        <Box
+          component="span"
+          title={`Received from ${d.sourceIp?.name ?? 'another IP'}`}
+          sx={{
+            position: 'absolute', top: 0, left: 0, fontFamily: FONT_MONO, fontSize: 9.5,
+            letterSpacing: '.06em', padding: '2px 7px 3px', borderBottomRightRadius: '8px',
+            background: srcColor, color: '#fff', display: 'flex', alignItems: 'center', gap: '3px',
+            maxWidth: '78%', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
+          }}
+        >
+          <Icon name="lock" size={9} /> {d.sourceIp?.name ?? 'incoming'}
+        </Box>
+      )}
       <Box
         component="span"
         sx={{
@@ -130,19 +146,22 @@ export function DeliverableNode({
               '&:hover': { background: T.tl, borderColor: T.tl, transform: 'scale(1.3)' },
             }}
           />
-          <Box
-            data-grip={d.id}
-            onPointerDown={(e) => onGripDown(d.id, e)}
-            sx={{
-              position: 'absolute', right: 0, bottom: 0, width: 16, height: 16,
-              cursor: 'nwse-resize', zIndex: 5, touchAction: 'none',
-              '&::after': {
-                content: '""', position: 'absolute', right: 3, bottom: 3, width: 8, height: 8,
-                borderRight: `2px solid ${T.ln3}`, borderBottom: `2px solid ${T.ln3}`,
-              },
-              '&:hover::after': { borderColor: T.tl },
-            }}
-          />
+          {/* origin==='incoming'은 다른 IP 소유라 이 캔버스에서 리사이즈할 수 없다 — pin(연결)만 허용. */}
+          {!incoming && (
+            <Box
+              data-grip={d.id}
+              onPointerDown={(e) => onGripDown(d.id, e)}
+              sx={{
+                position: 'absolute', right: 0, bottom: 0, width: 16, height: 16,
+                cursor: 'nwse-resize', zIndex: 5, touchAction: 'none',
+                '&::after': {
+                  content: '""', position: 'absolute', right: 3, bottom: 3, width: 8, height: 8,
+                  borderRight: `2px solid ${T.ln3}`, borderBottom: `2px solid ${T.ln3}`,
+                },
+                '&:hover::after': { borderColor: T.tl },
+              }}
+            />
+          )}
         </>
       )}
 

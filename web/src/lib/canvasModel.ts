@@ -36,6 +36,10 @@ export interface CanvasNode {
   recvContact: string | null;
   /** 이 산출물을 받아야 하는 다른 Analog IP. */
   recvIpId: string | null;
+  /** 'incoming'이면 다른 IP가 이 IP로 보낸 산출물 — 드래그/리사이즈 불가, 저장 대상 아님. */
+  origin: 'own' | 'incoming';
+  /** origin==='incoming'일 때만 채워진다 — 이 산출물을 준 IP. */
+  sourceIp: { id: string; name: string; color: string } | null;
   versions: VersionView[];
   canEdit: boolean;
   x: number;
@@ -71,7 +75,11 @@ export interface CanvasData {
 }
 
 /* ── DTO → 작업 모델 ── */
-export function toCanvasNode(d: DeliverableDto): CanvasNode {
+/**
+ * origin='incoming'이면 다른 IP가 준 산출물 — 그 IP의 layout(x,y,w,h)은 이 캔버스와
+ * 무관하므로 기본 크기로 시작해 placeIncomingNodes()가 매 hydrate마다 위치를 다시 계산한다.
+ */
+export function toCanvasNode(d: DeliverableDto, origin: 'own' | 'incoming' = 'own'): CanvasNode {
   return {
     id: d.id,
     ip: d.ipId,
@@ -85,12 +93,14 @@ export function toCanvasNode(d: DeliverableDto): CanvasNode {
     recvDept: d.recvDept,
     recvContact: d.recvContact,
     recvIpId: d.recvIpId,
+    origin,
+    sourceIp: d.sourceIp ?? null,
     versions: d.versions ?? [],
     canEdit: d.canEdit,
-    x: d.layout?.x ?? 0,
-    y: d.layout?.y ?? 0,
-    w: d.layout?.w || NW,
-    h: d.layout?.h || NH,
+    x: origin === 'incoming' ? 0 : d.layout?.x ?? 0,
+    y: origin === 'incoming' ? 0 : d.layout?.y ?? 0,
+    w: origin === 'incoming' ? NW : d.layout?.w || NW,
+    h: origin === 'incoming' ? NH : d.layout?.h || NH,
   };
 }
 export function toCanvasMemo(m: MemoDto): CanvasMemo {
@@ -184,6 +194,51 @@ export function placeInLane(
   if (!g) return;
   block.x = snp(g.x + LANE_PAD);
   block.y = snp(TOP_PAD);
+}
+
+/**
+ * origin==='incoming' 노드(다른 IP가 이 IP에 보낸 산출물)는 이 캔버스의 저장 대상이
+ * 아니므로 서버에 위치가 없다 — 매 hydrate마다 이 함수로 다시 계산한다. own 노드의
+ * 위치(사용자가 드래그해 저장한 값)는 절대 건드리지 않고, incoming 노드만 그 Phase
+ * 레인 안에서 own/다른 incoming 노드와 겹치지 않는 첫 빈 자리(위→아래 탐색)에 놓는다.
+ * 그래서 own 노드들 사이에 실제로 "섞여" 보이고, edge로 자유롭게 연결할 수 있다.
+ */
+export function placeIncomingNodes(
+  nodes: CanvasNode[],
+  phases: PhaseRef[],
+  phasePW: Record<string, number>,
+): void {
+  const { lanes } = laneG(phases, phasePW);
+  const placedByPhase = new Map<string, { x: number; y: number; w: number; h: number }[]>();
+  nodes
+    .filter((n) => n.origin !== 'incoming')
+    .forEach((n) => {
+      const arr = placedByPhase.get(n.phase) ?? [];
+      arr.push({ x: n.x, y: n.y, w: n.w, h: n.h });
+      placedByPhase.set(n.phase, arr);
+    });
+
+  nodes
+    .filter((n) => n.origin === 'incoming')
+    .sort((a, b) => a.id.localeCompare(b.id))
+    .forEach((n) => {
+      const g = lanes[n.phase];
+      if (!g) return;
+      const placed = placedByPhase.get(n.phase) ?? [];
+      const x = snp(g.x + LANE_PAD);
+      let y = TOP_PAD;
+      for (let guard = 0; guard < 200; guard++) {
+        const collides = placed.some(
+          (p) => x < p.x + p.w + GAP && x + n.w + GAP > p.x && y < p.y + p.h + GAP && y + n.h + GAP > p.y,
+        );
+        if (!collides) break;
+        y += ROW_H;
+      }
+      n.x = x;
+      n.y = snp(y);
+      placed.push({ x: n.x, y: n.y, w: n.w, h: n.h });
+      placedByPhase.set(n.phase, placed);
+    });
 }
 
 /**

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Box } from '@mui/material';
-import { DeliverableDto, IpBriefDto, IpDto, PhaseRef, UserDto } from '@/types/domain';
+import { IpBriefDto, IpDto, PhaseRef, UserDto } from '@/types/domain';
 import { useCanvasStore } from '@/store/canvasStore';
 import { toast } from '@/store/toastStore';
 import {
@@ -13,7 +13,6 @@ import {
 } from '@/lib/constants';
 import { FONT_MONO, T } from '@/theme/tokens';
 import { PhaseStepper } from './PhaseStepper';
-import { IncomingLane } from './IncomingLane';
 import { EdgeLayer } from './EdgeLayer';
 import { DeliverableNode } from './DeliverableNode';
 import { MemoBlock } from './MemoBlock';
@@ -25,8 +24,7 @@ interface Props {
   phases: PhaseRef[];
   usersById: Map<string, UserDto>;
   canEdit: boolean;
-  /** 이 IP가 다른 IP로부터 받는 산출물 — Phase 레인 위쪽에 같은 팬/줌으로 정렬해서 보여준다. */
-  incoming: DeliverableDto[];
+  /** origin==='incoming'인 노드를 열 때(읽기 전용 상세) 호출된다. */
   onOpenIncoming: (id: string) => void;
   /** "다른 IP에 준다" 배지(→ IP명) 해석용 — 과제 소속 IP 전체(id/name/color). */
   ipDirectory: IpBriefDto[];
@@ -41,7 +39,7 @@ type Blk = CanvasNode | CanvasMemo;
  * 줌/팬, 자유 드래그 + Phase 벽 저항, grip 리사이즈, pin 연결, Phase 레인 폭 조절,
  * flow 하이라이트, Auto Fit 이 모두 여기서 완결된다 (설계서 3.7~3.9, 7.1).
  */
-export function Canvas({ ip, phases, usersById, canEdit, incoming, onOpenIncoming, ipDirectory, onSaveLayout }: Props) {
+export function Canvas({ ip, phases, usersById, canEdit, onOpenIncoming, ipDirectory, onSaveLayout }: Props) {
   const ipById = useMemo(() => new Map(ipDirectory.map((d) => [d.id, d])), [ipDirectory]);
   const vpRef = useRef<HTMLDivElement>(null);
   const cvRef = useRef<HTMLDivElement>(null);
@@ -255,9 +253,12 @@ export function Canvas({ ip, phases, usersById, canEdit, incoming, onOpenIncomin
     if (!b || !el) return;
     const p = cvPt(e);
     dragRef.current = { id, el, dx: p.x - b.x, dy: p.y - b.y, moved: false, accX: 0 };
-    el.style.transition = 'none';
-    el.style.zIndex = '30';
-    el.style.cursor = 'grabbing';
+    // origin==='incoming'은 클릭(선택/연결)만 받고 실제 드래그 비주얼은 주지 않는다.
+    if (!('origin' in b && b.origin === 'incoming')) {
+      el.style.transition = 'none';
+      el.style.zIndex = '30';
+      el.style.cursor = 'grabbing';
+    }
     el.setPointerCapture(e.pointerId);
   };
 
@@ -267,6 +268,9 @@ export function Canvas({ ip, phases, usersById, canEdit, incoming, onOpenIncomin
     const s = st.getState();
     const b = findBlk(id);
     if (!b) return;
+    // origin==='incoming' 노드는 다른 IP 소유라 이 캔버스에 위치를 저장할 곳이 없다 —
+    // 클릭(선택/연결)은 그대로 동작해야 하므로 dragRef는 세팅되지만, 실제 이동만 막는다.
+    if ('origin' in b && b.origin === 'incoming') return;
     const p = cvPt(e);
     const rawX = Math.max(PAD, Math.min(W - b.w - PAD, p.x - D.dx));
     // 위쪽엔 벽을 두지 않는다 — 기본 배치(TOP_PAD=40)와 최소 여백(PAD=8) 사이 32px밖에
@@ -320,16 +324,24 @@ export function Canvas({ ip, phases, usersById, canEdit, incoming, onOpenIncomin
     }
 
     // 이동 없이 클릭한 경우 (편집 모드)
-    if (s.link && s.link !== id && st.getState().nodes.some((n) => n.id === id)) {
-      if (!s.edges.some((x) => x.from === s.link && x.to === id)) {
-        s.setEdges([
-          ...s.edges,
-          { id: `tmp-${Date.now()}`, from: s.link!, to: id, auto: false, bidirectional: false },
-        ]);
+    if (s.link && s.link !== id) {
+      const target = st.getState().nodes.find((n) => n.id === id);
+      if (target && target.origin === 'incoming') {
+        toast("Can't link into a received artifact — link from it instead");
+        s.setLink(null);
+        return;
       }
-      s.setLink(null);
-      toast('Linked');
-      return;
+      if (target) {
+        if (!s.edges.some((x) => x.from === s.link && x.to === id)) {
+          s.setEdges([
+            ...s.edges,
+            { id: `tmp-${Date.now()}`, from: s.link!, to: id, auto: false, bidirectional: false },
+          ]);
+        }
+        s.setLink(null);
+        toast('Linked');
+        return;
+      }
     }
     if (st.getState().memos.some((m) => m.id === id)) {
       s.setNoteDlg(id);
@@ -421,7 +433,8 @@ export function Canvas({ ip, phases, usersById, canEdit, incoming, onOpenIncomin
       return;
     }
     // 산출물의 Phase 확정 — 드래그마다 계산하지 않고 편집 완료 시점에 1회만 수행(성능).
-    const { moved } = resolveNodePhases(s.nodes, phases, s.phasePW);
+    // origin==='incoming' 노드는 위치가 이 캔버스 소유가 아니므로 재배정 대상에서 뺀다.
+    const { moved } = resolveNodePhases(s.nodes.filter((n) => n.origin !== 'incoming'), phases, s.phasePW);
     if (moved) s.bumpBlocks();
     // 저장이 끝난 뒤에야 edit을 끈다 — 그 전에 끄면 disabled 쿼리가 재활성화되며
     // 아직 반영 안 된 서버 데이터로 로컬 편집 결과를 덮어써 버릴 수 있다.
@@ -483,15 +496,6 @@ export function Canvas({ ip, phases, usersById, canEdit, incoming, onOpenIncomin
         edit={edit}
         onPhaseClick={(k) => st.getState().setPhInfo(k)}
         onResizeStart={onPhResizeStart}
-      />
-
-      <IncomingLane
-        phases={phases}
-        phasePW={phasePW}
-        z={z}
-        panX={panX}
-        incoming={incoming}
-        onOpen={onOpenIncoming}
       />
 
       <Box
@@ -605,7 +609,7 @@ export function Canvas({ ip, phases, usersById, canEdit, incoming, onOpenIncomin
               hasHl={!!hlSet}
               dimLink={!!link && link !== d.id}
               linkActive={link === d.id}
-              onOpen={(id) => st.getState().openDeliverable(id)}
+              onOpen={(id) => (d.origin === 'incoming' ? onOpenIncoming(id) : st.getState().openDeliverable(id))}
               onPinClick={onPinClick}
               onGripDown={onGripDown}
               registerRef={registerRef}
