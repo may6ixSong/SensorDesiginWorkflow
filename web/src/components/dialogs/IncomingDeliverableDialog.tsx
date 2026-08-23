@@ -49,8 +49,8 @@ export function IncomingDeliverableDialog({ d, phases, usersById, onClose }: Pro
       <Card sx={{ mb: '12px', display: 'flex', alignItems: 'center', gap: '9px' }}>
         <Box sx={{ width: 9, height: 9, borderRadius: '50%', background: d.sourceIp?.color ?? T.dm2, flex: '0 0 auto' }} />
         <Box sx={{ flex: 1 }}>
-          <Ey>From</Ey>
-          <Box sx={{ fontSize: 14, fontWeight: 700, mt: '2px' }}>{d.sourceIp?.name ?? 'Unknown IP'}</Box>
+          <Ey>Received from</Ey>
+          <Box sx={{ fontSize: 14, fontWeight: 700, mt: '2px' }}>{d.sourceIp?.name ?? 'Unknown department'}</Box>
         </Box>
         <Badge
           color={d.network === 'HPC' ? T.hp : T.dm}

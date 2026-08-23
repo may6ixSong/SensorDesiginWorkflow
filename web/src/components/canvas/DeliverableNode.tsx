@@ -41,7 +41,9 @@ export function DeliverableNode({
   const compact = d.h < 120;
   const col = d.net === 'HPC' ? T.hp : d.type === 'excel' ? T.tl : T.bl;
   const incoming = d.origin === 'incoming';
-  const srcColor = d.sourceIp?.color ?? T.vi;
+  // 받는 산출물은 "다른 IP가 준 것"이라는 정도만 드러내고 어느 IP인지는 캔버스
+  // 블록에 표시하지 않는다 — 그래서 출처 IP 색상 대신 고정된 violet을 쓴다.
+  const srcColor = T.vi;
 
   return (
     <Box
@@ -97,18 +99,19 @@ export function DeliverableNode({
         </Box>
       )}
 
+      {/* 어느 IP가 준 건지는 블록에 안 드러낸다(요청) — 상세(dialog)에서만 확인 가능.
+          여기서는 "받은 산출물"이라는 것만 잠금 아이콘으로 드러낸다. */}
       {incoming && (
         <Box
           component="span"
-          title={`Received from ${d.sourceIp?.name ?? 'another IP'}`}
+          title="Received from another IP — open for details"
           sx={{
-            position: 'absolute', top: 0, left: 0, fontFamily: FONT_MONO, fontSize: 9.5,
-            letterSpacing: '.06em', padding: '2px 7px 3px', borderBottomRightRadius: '8px',
-            background: srcColor, color: '#fff', display: 'flex', alignItems: 'center', gap: '3px',
-            maxWidth: '78%', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
+            position: 'absolute', top: 0, left: 0, padding: '3px 6px',
+            borderBottomRightRadius: '8px', background: srcColor, color: '#fff',
+            display: 'flex', alignItems: 'center',
           }}
         >
-          <Icon name="lock" size={9} /> {d.sourceIp?.name ?? 'incoming'}
+          <Icon name="lock" size={9} />
         </Box>
       )}
       <Box
