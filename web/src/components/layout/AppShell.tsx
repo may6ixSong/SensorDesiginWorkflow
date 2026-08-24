@@ -1,7 +1,6 @@
 import { ReactNode } from 'react';
 import { Box } from '@mui/material';
 import { Link, useLocation } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
 import MenuBookRoundedIcon from '@mui/icons-material/MenuBookRounded';
 import { IpDto, ProjectDto } from '@/types/domain';
 import { useCanvasStore } from '@/store/canvasStore';
@@ -13,7 +12,7 @@ import { NoticeBell } from './NoticeBell';
 import { LanguagePopover } from './LanguagePopover';
 import { ThemeTogglePlatform } from './ThemeTogglePlatform';
 import { ProfileButton } from './ProfileButton';
-import { SelectBox } from './SelectBox';
+import { NavDropdown } from './NavDropdown';
 import { FONT_DISPLAY, FONT_MONO, T } from '@/theme/tokens';
 
 interface AppShellProps {
@@ -27,6 +26,11 @@ interface AppShellProps {
   canToggleRecv?: boolean;
   children: ReactNode;
 }
+
+// Short technical labels used throughout the top bar are kept in English
+// regardless of the language toggle (matches the rest of the mock content —
+// IP/deliverable names, phase codes — which is English-only by design).
+const NAV_LABEL = 'Project List';
 
 /**
  * 목업 .tb 상단바 — 로고 + SIREN 워드마크 + 페이지 네비 + (보드에서만) 과제/IP select
@@ -43,14 +47,13 @@ export function AppShell({
   ips, ipId, onChangeIp,
   canToggleRecv = false, children,
 }: AppShellProps) {
-  const { t } = useTranslation();
   const { user } = useAuth();
   const recv = useCanvasStore((s) => s.recv);
   const setRecv = useCanvasStore((s) => s.setRecv);
   const { pathname } = useLocation();
 
   const showSelects = !!onChangeProject;
-  const nav = [{ to: '/projects', label: t('appShell.nav.projects') }];
+  const navOn = pathname.startsWith('/projects');
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
@@ -101,49 +104,41 @@ export function AppShell({
         <Box sx={{ width: '1px', height: 22, background: T.ln }} />
 
         <Box sx={{ display: 'flex', gap: '2px' }}>
-          {nav.map((n) => {
-            const on = n.to === '/' ? pathname === '/' : pathname.startsWith(n.to);
-            return (
-              <Box
-                key={n.to}
-                component={Link}
-                to={n.to}
-                sx={{
-                  fontSize: 12, fontWeight: on ? 600 : 500, textDecoration: 'none',
-                  padding: '6px 10px', borderRadius: '7px',
-                  color: on ? T.tx : T.dm,
-                  background: on ? T.sf3 : 'transparent',
-                  '&:hover': { background: T.sf2, color: T.tx },
-                }}
-              >
-                {n.label}
-              </Box>
-            );
-          })}
+          <Box
+            component={Link}
+            to="/projects"
+            sx={{
+              fontSize: 12, fontWeight: navOn ? 600 : 500, textDecoration: 'none',
+              padding: '6px 10px', borderRadius: '7px', whiteSpace: 'nowrap', flex: '0 0 auto',
+              color: navOn ? T.tx : T.dm,
+              background: navOn ? T.sf3 : 'transparent',
+              '&:hover': { background: T.sf2, color: T.tx },
+            }}
+          >
+            {NAV_LABEL}
+          </Box>
         </Box>
 
         {showSelects && (
           <>
             <Box sx={{ width: '1px', height: 22, background: T.ln }} />
-            <SelectBox
-              label="Project"
+            <NavDropdown
               value={projectId ?? ''}
               onChange={onChangeProject!}
+              width={260}
               options={(projects ?? []).map((p) => ({ value: p._id, label: `${p.code} · ${p.name}` }))}
             />
-            <SelectBox
-              label="IP"
+            {projectId && (
+              <HeaderIconButton icon="info" label="Project Info" to={`/projects/${projectId}`} />
+            )}
+            <NavDropdown
               value={ipId ?? ''}
               onChange={onChangeIp!}
-              minWidth={110}
+              width={180}
               disabled={!ips?.length}
-              options={
-                ips?.length
-                  ? ips.map((i) => ({ value: i.id, label: i.name }))
-                  : [{ value: '', label: t('appShell.noAccess') }]
-              }
+              placeholder="No access"
+              options={ips?.length ? ips.map((i) => ({ value: i.id, label: i.name })) : []}
             />
-            {projectId && <HeaderIconButton icon="info" label={t('appShell.projectInfo')} to={`/projects/${projectId}`} />}
           </>
         )}
 
@@ -151,13 +146,13 @@ export function AppShell({
 
         {canToggleRecv && (
           <SirenButton variant={recv ? 'on' : 'default'} onClick={() => setRecv(!recv)}>
-            <Icon name="eye" /> {t('appShell.recvView')}
+            <Icon name="eye" /> Recipient-dept view
           </SirenButton>
         )}
 
         <HeaderIconButton
-          iconElement={<MenuBookRoundedIcon sx={{ fontSize: 15 }} />}
-          label={t('appShell.guide')}
+          iconElement={<MenuBookRoundedIcon sx={{ fontSize: 20 }} />}
+          label="User Guide"
           to="/guide"
         />
         <NoticeBell clientId={user?.KnoxID ?? ''} />

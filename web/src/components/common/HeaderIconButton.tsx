@@ -18,13 +18,13 @@ interface Props {
 }
 
 /**
- * Borderless 32px icon button used for the cluster of controls on the right of
+ * Borderless 36px icon button used for the cluster of controls on the right of
  * the top bar (user guide / language / theme). Shared so they stay identical as
- * more get added.
+ * more get added. Sized to match SSM_WEB's TopAppBar icon buttons.
  */
 export function HeaderIconButton({ icon, iconElement, label, to, onClick, active = false }: Props) {
   const sx = {
-    display: 'grid', placeItems: 'center', width: 32, height: 32, borderRadius: '8px',
+    display: 'grid', placeItems: 'center', width: 36, height: 36, borderRadius: '8px',
     background: active ? T.sf3 : T.sf,
     color: active ? T.tx : T.dm,
     border: 'none', outline: 'none', cursor: CURSOR_POINTER,
@@ -32,7 +32,7 @@ export function HeaderIconButton({ icon, iconElement, label, to, onClick, active
     '&:hover': { background: T.sf3, color: T.tx },
   } as const;
 
-  const content = iconElement ?? <Icon name={icon!} size={15} />;
+  const content = iconElement ?? <Icon name={icon!} size={18} />;
 
   if (to) {
     return (

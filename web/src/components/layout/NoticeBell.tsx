@@ -74,22 +74,22 @@ export function NoticeBell({ clientId }: { clientId: string }) {
           component="button"
           ref={btnRef}
           onClick={toggleNotice}
-          aria-label={t('appShell.notices.tooltip')}
-          title={t('appShell.notices.tooltip')}
+          aria-label="Notices"
+          title="Notices"
           sx={{
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            width: '32px', height: '32px', borderRadius: '8px',
+            width: '36px', height: '36px', borderRadius: '8px',
             background: noticeOpen ? T.sf3 : T.sf, color: noticeOpen ? T.tx : T.dm,
             border: 'none', outline: 'none', cursor: CURSOR_POINTER, transition: '.14s',
             '&:hover': { background: T.sf3, color: T.tx },
           }}
         >
-          <Icon name="bell" size={15} />
+          <Icon name="bell" size={18} />
         </Box>
         {unreadCount > 0 && (
           <Box
             sx={{
-              position: 'absolute', top: '-2px', right: '-2px',
+              position: 'absolute', top: '-1px', right: '-1px',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               minWidth: '14px', height: '14px', px: '2px',
               background: '#E82C1F', border: '0.5px solid #F73529', borderRadius: '999px',
@@ -112,7 +112,7 @@ export function NoticeBell({ clientId }: { clientId: string }) {
         PaperProps={{ sx: { mt: 1, width: 320, maxHeight: 420, border: `1px solid ${T.ln}`, borderRadius: 2 } }}
       >
         <Typography sx={{ px: 2, py: 1.25, fontWeight: 700, fontSize: 13, borderBottom: `1px solid ${T.ln}` }}>
-          {t('appShell.notices.title')}
+          Notices
         </Typography>
         {notices.length === 0 ? (
           <Typography sx={{ px: 2, py: 3, fontSize: 12.5, color: T.dm, textAlign: 'center' }}>

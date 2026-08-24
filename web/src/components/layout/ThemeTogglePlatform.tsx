@@ -35,7 +35,7 @@ export function ThemeTogglePlatform() {
 
   return (
     <HeaderIconButton
-      iconElement={mode === 'dark' ? <LightModeRoundedIcon sx={{ fontSize: 15 }} /> : <DarkModeRoundedIcon sx={{ fontSize: 15 }} />}
+      iconElement={mode === 'dark' ? <LightModeRoundedIcon sx={{ fontSize: 20 }} /> : <DarkModeRoundedIcon sx={{ fontSize: 20 }} />}
       label={mode === 'dark' ? 'Light mode' : 'Dark mode'}
       onClick={onToggleTheme}
     />

@@ -17,7 +17,7 @@ function ProfileRow({ label, value }: { label: string; value: string }) {
 
 /** Platform-identity avatar + name/dept, opens a read-only profile dialog. Right-most in the top bar. */
 export function ProfileButton() {
-  const { t, i18n } = useTranslation();
+  const { i18n } = useTranslation();
   const { user } = useAuth();
   const { mode } = useThemeMode();
   const [open, setOpen] = useState(false);
@@ -52,19 +52,19 @@ export function ProfileButton() {
       </Box>
 
       <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="xs">
-        <DialogTitle sx={{ fontWeight: 700 }}>{t('appShell.profile.title')}</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 700 }}>Profile</DialogTitle>
         <DialogContent dividers>
           <Stack spacing={1.25}>
-            <ProfileRow label={t('appShell.profile.name')} value={name} />
-            <ProfileRow label={t('appShell.profile.department')} value={dept} />
-            <ProfileRow label={t('appShell.profile.group')} value={user?.Group ?? '-'} />
-            <ProfileRow label={t('appShell.profile.language')} value={isKo ? '한국어' : 'English'} />
-            <ProfileRow label={t('appShell.profile.theme')} value={mode} />
+            <ProfileRow label="Name" value={name} />
+            <ProfileRow label="Department" value={dept} />
+            <ProfileRow label="Group" value={user?.Group ?? '-'} />
+            <ProfileRow label="Language" value={isKo ? '한국어' : 'English'} />
+            <ProfileRow label="Theme" value={mode} />
           </Stack>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpen(false)} variant="outlined">
-            {t('appShell.profile.close')}
+            Close
           </Button>
         </DialogActions>
       </Dialog>

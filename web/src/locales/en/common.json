@@ -1,36 +1,7 @@
 {
   "appShell": {
-    "nav": {
-      "projects": "Projects"
-    },
-    "projectInfo": "Project information",
-    "noAccess": "No access",
-    "recvView": "Recipient-dept view",
-    "guide": "User guide",
     "notices": {
-      "tooltip": "Notices",
-      "title": "Notices",
-      "empty": "No notices yet.",
-      "close": "Close"
-    },
-    "language": {
-      "tooltip": "Language",
-      "ko": "한국어",
-      "en": "English"
-    },
-    "theme": {
-      "toLight": "Switch to light theme",
-      "toDark": "Switch to dark theme"
-    },
-    "profile": {
-      "title": "Profile",
-      "name": "Name",
-      "department": "Department",
-      "group": "Group",
-      "email": "Email",
-      "language": "Language",
-      "theme": "Theme",
-      "close": "Close"
+      "empty": "No notices yet."
     }
   }
 }
