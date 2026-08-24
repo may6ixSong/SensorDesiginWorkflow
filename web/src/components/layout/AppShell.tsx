@@ -12,7 +12,7 @@ import { NoticeBell } from './NoticeBell';
 import { LanguagePopover } from './LanguagePopover';
 import { ThemeTogglePlatform } from './ThemeTogglePlatform';
 import { ProfileButton } from './ProfileButton';
-import { NavDropdown } from './NavDropdown';
+import { SelectBox } from './SelectBox';
 import { FONT_DISPLAY, FONT_MONO, T } from '@/theme/tokens';
 
 interface AppShellProps {
@@ -122,23 +122,25 @@ export function AppShell({
         {showSelects && (
           <>
             <Box sx={{ width: '1px', height: 22, background: T.ln }} />
-            <NavDropdown
+            <SelectBox
+              label="Project"
               value={projectId ?? ''}
               onChange={onChangeProject!}
-              width={260}
               options={(projects ?? []).map((p) => ({ value: p._id, label: `${p.code} · ${p.name}` }))}
             />
-            {projectId && (
-              <HeaderIconButton icon="info" label="Project Info" to={`/projects/${projectId}`} />
-            )}
-            <NavDropdown
+            <SelectBox
+              label="IP"
               value={ipId ?? ''}
               onChange={onChangeIp!}
-              width={180}
+              minWidth={110}
               disabled={!ips?.length}
-              placeholder="No access"
-              options={ips?.length ? ips.map((i) => ({ value: i.id, label: i.name })) : []}
+              options={
+                ips?.length
+                  ? ips.map((i) => ({ value: i.id, label: i.name }))
+                  : [{ value: '', label: 'No access' }]
+              }
             />
+            {projectId && <HeaderIconButton icon="info" label="Project Info" to={`/projects/${projectId}`} />}
           </>
         )}
 
