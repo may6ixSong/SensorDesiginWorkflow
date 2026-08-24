@@ -50,7 +50,7 @@ function LoginGate({ children }: { children: React.ReactNode }) {
           {failureMessage}
         </Alert>
         <Typography variant="caption" color="text.secondary">
-          Check that the API server (npm run start:dev) is running and web/.env's VITE_API_BASE_URL is correct.
+          Check that the API server (npm run start:dev) is running and web/.env's SIREN_API is correct.
         </Typography>
         <Button
           variant="outlined"

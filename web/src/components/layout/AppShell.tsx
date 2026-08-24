@@ -1,17 +1,17 @@
 import { ReactNode } from 'react';
 import { Box } from '@mui/material';
 import { Link, useLocation } from 'react-router-dom';
-import { IpDto, ProjectDto, UserDto } from '@/types/domain';
-import { useAuthStore } from '@/store/authStore';
+import { useTranslation } from 'react-i18next';
+import { IpDto, ProjectDto } from '@/types/domain';
 import { useCanvasStore } from '@/store/canvasStore';
-import { useDevLogin } from '@/api/hooks/useAuth';
-import { departmentName } from '@/shared/constants/departments';
+import { usePlatformAuth } from '@/app/providers/AuthProvider';
 import { SirenMark, Icon } from '@/components/common/Icon';
-import { UserAvatar } from '@/components/common/Avatar';
 import { SirenButton } from '@/components/common/SirenButton';
-import { ThemeToggle } from '@/components/common/ThemeToggle';
-import { LanguageToggle } from '@/components/common/LanguageToggle';
 import { HeaderIconButton } from '@/components/common/HeaderIconButton';
+import { NoticeBell } from './NoticeBell';
+import { LanguagePopover } from './LanguagePopover';
+import { ThemeTogglePlatform } from './ThemeTogglePlatform';
+import { ProfileButton } from './ProfileButton';
 import { SelectBox } from './SelectBox';
 import { FONT_DISPLAY, FONT_MONO, T } from '@/theme/tokens';
 
@@ -23,29 +23,33 @@ interface AppShellProps {
   ips?: IpDto[];
   ipId?: string;
   onChangeIp?: (id: string) => void;
-  users: UserDto[];
   canToggleRecv?: boolean;
   children: ReactNode;
 }
 
-const NAV = [{ to: '/projects', label: 'Projects' }];
-
 /**
  * 목업 .tb 상단바 — 로고 + SIREN 워드마크 + 페이지 네비 + (보드에서만) 과제/IP select
  * + 수신부서 시점 + 사용자 배지. (설계서 7.1 컴포넌트 트리의 AppShell)
+ *
+ * Right-side chrome (language/theme/notices/profile) mirrors SSM_WEB's
+ * TopAppBar, wired to the platform AuthProvider (ADSSO / dev fixed admin) and
+ * the common-platform APIs. Who is "logged in" for SIREN's own dept-based
+ * permissions (project/IP ownership) is unrelated plumbing — see
+ * store/authStore.ts + api/hooks/useAuth.ts — and unaffected by this.
  */
 export function AppShell({
   projects, projectId, onChangeProject,
   ips, ipId, onChangeIp,
-  users, canToggleRecv = false, children,
+  canToggleRecv = false, children,
 }: AppShellProps) {
-  const me = useAuthStore((s) => s.user);
-  const devLogin = useDevLogin();
+  const { t } = useTranslation();
+  const { platformUser } = usePlatformAuth();
   const recv = useCanvasStore((s) => s.recv);
   const setRecv = useCanvasStore((s) => s.setRecv);
   const { pathname } = useLocation();
 
   const showSelects = !!onChangeProject;
+  const nav = [{ to: '/projects', label: t('appShell.nav.projects') }];
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
@@ -96,7 +100,7 @@ export function AppShell({
         <Box sx={{ width: '1px', height: 22, background: T.ln }} />
 
         <Box sx={{ display: 'flex', gap: '2px' }}>
-          {NAV.map((n) => {
+          {nav.map((n) => {
             const on = n.to === '/' ? pathname === '/' : pathname.startsWith(n.to);
             return (
               <Box
@@ -135,10 +139,10 @@ export function AppShell({
               options={
                 ips?.length
                   ? ips.map((i) => ({ value: i.id, label: i.name }))
-                  : [{ value: '', label: 'No access' }]
+                  : [{ value: '', label: t('appShell.noAccess') }]
               }
             />
-            {projectId && <HeaderIconButton icon="info" label="Project information" to={`/projects/${projectId}`} />}
+            {projectId && <HeaderIconButton icon="info" label={t('appShell.projectInfo')} to={`/projects/${projectId}`} />}
           </>
         )}
 
@@ -146,26 +150,15 @@ export function AppShell({
 
         {canToggleRecv && (
           <SirenButton variant={recv ? 'on' : 'default'} onClick={() => setRecv(!recv)}>
-            <Icon name="eye" /> Recipient-dept view
+            <Icon name="eye" /> {t('appShell.recvView')}
           </SirenButton>
         )}
 
-        <HeaderIconButton icon="book" label="User guide" to="/guide" />
-        <LanguageToggle />
-        <ThemeToggle />
-
-        <SelectBox
-          padLeft={6}
-          value={me?.id ?? ''}
-          width={158}
-          onChange={(id) => devLogin.mutate(id)}
-          options={users.map((u) => ({
-            value: u.id,
-            label: `${u.name} · ${departmentName(u.department)}`,
-          }))}
-        >
-          <UserAvatar user={me} />
-        </SelectBox>
+        <HeaderIconButton icon="book" label={t('appShell.guide')} to="/guide" />
+        <NoticeBell clientId={platformUser?.KnoxID ?? ''} />
+        <LanguagePopover />
+        <ThemeTogglePlatform />
+        <ProfileButton />
       </Box>
 
       <Box component="main" sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>

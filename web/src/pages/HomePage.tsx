@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Box } from '@mui/material';
 import { Link } from 'react-router-dom';
-import { useUsers } from '@/api/hooks/useUsers';
 import { AppShell } from '@/components/layout/AppShell';
 import { useThemeMode } from '@/theme/ThemeModeContext';
 import { FONT_DISPLAY, FONT_MONO } from '@/theme/tokens';
@@ -174,7 +173,6 @@ const PALETTE: Record<'light' | 'dark', Palette> = {
 } as const;
 
 export function HomePage() {
-  const { data: users } = useUsers();
   const { mode } = useThemeMode();
   const pal = useMemo(() => PALETTE[mode], [mode]);
 
@@ -201,7 +199,7 @@ export function HomePage() {
   useEffect(() => () => clearTimers(), []);
 
   return (
-    <AppShell users={users ?? []}>
+    <AppShell>
       <Box
         onMouseMove={onStageMouseMove}
         onMouseLeave={() => { clearTimers(); setActive(null); }}

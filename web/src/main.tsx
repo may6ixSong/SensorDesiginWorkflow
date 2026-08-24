@@ -6,8 +6,10 @@ import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { buildTheme } from './theme/theme';
 import { ThemeModeProvider, useThemeMode } from './theme/ThemeModeContext';
-import { LanguageProvider } from './i18n/LanguageContext';
+import { AuthProvider } from './app/providers/AuthProvider';
+import { PlatformPreferencesSync } from './components/layout/PlatformPreferencesSync';
 import App from './App';
+import './i18n';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -33,15 +35,16 @@ function MuiThemeBridge({ children }: { children: React.ReactNode }) {
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ThemeModeProvider>
-      <LanguageProvider>
+      <AuthProvider>
         <MuiThemeBridge>
+          <PlatformPreferencesSync />
           <QueryClientProvider client={queryClient}>
             <BrowserRouter>
               <App />
             </BrowserRouter>
           </QueryClientProvider>
         </MuiThemeBridge>
-      </LanguageProvider>
+      </AuthProvider>
     </ThemeModeProvider>
   </React.StrictMode>,
 );

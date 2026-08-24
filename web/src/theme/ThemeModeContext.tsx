@@ -6,6 +6,7 @@ const STORAGE_KEY = 'siren-theme-mode';
 interface ThemeModeCtx {
   mode: ThemeMode;
   toggle: () => void;
+  setMode: (mode: ThemeMode) => void;
 }
 
 const Ctx = createContext<ThemeModeCtx | null>(null);
@@ -23,16 +24,17 @@ function readInitialMode(): ThemeMode {
 }
 
 export function ThemeModeProvider({ children }: { children: React.ReactNode }) {
-  const [mode, setMode] = useState<ThemeMode>(readInitialMode);
+  const [mode, setModeState] = useState<ThemeMode>(readInitialMode);
 
   useEffect(() => {
     document.documentElement.dataset.theme = mode;
     window.localStorage.setItem(STORAGE_KEY, mode);
   }, [mode]);
 
-  const toggle = useCallback(() => setMode((m) => (m === 'light' ? 'dark' : 'light')), []);
+  const toggle = useCallback(() => setModeState((m) => (m === 'light' ? 'dark' : 'light')), []);
+  const setMode = useCallback((next: ThemeMode) => setModeState(next), []);
 
-  const value = useMemo(() => ({ mode, toggle }), [mode, toggle]);
+  const value = useMemo(() => ({ mode, toggle, setMode }), [mode, toggle, setMode]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 

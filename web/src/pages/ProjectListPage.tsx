@@ -3,7 +3,6 @@ import { Box } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { ProjectDto, UserDto } from '@/types/domain';
 import { useProjects, useProjectIps } from '@/api/hooks/useProjects';
-import { useUsers } from '@/api/hooks/useUsers';
 import { AppShell } from '@/components/layout/AppShell';
 import { SirenButton } from '@/components/common/SirenButton';
 import { UserAvatar } from '@/components/common/Avatar';
@@ -16,7 +15,6 @@ const FILTERS = ['All', 'Active', 'Archived'] as const;
 
 export function ProjectListPage() {
   const { data: projects } = useProjects();
-  const { data: users } = useUsers();
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>('All');
   const [view, setView] = useState<View>('grid');
@@ -29,7 +27,7 @@ export function ProjectListPage() {
   }, [projects, q, filter]);
 
   return (
-    <AppShell users={users ?? []}>
+    <AppShell>
       <Box sx={{ flex: 1, overflow: 'auto', background: T.bg }}>
         <Box sx={{ maxWidth: 1180, mx: 'auto', px: '28px', py: '30px' }}>
           <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: '14px', mb: '22px' }}>

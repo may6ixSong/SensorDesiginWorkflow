@@ -216,7 +216,6 @@ export function BoardPage() {
       ips={ips ?? []}
       ipId={ipId}
       onChangeIp={(id) => navigate(`/details/${projectId}/${id}`)}
-      users={users ?? []}
       canToggleRecv={!!isOwner}
     >
       {!ip ? (

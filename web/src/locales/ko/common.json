@@ -1,0 +1,36 @@
+{
+  "appShell": {
+    "nav": {
+      "projects": "과제 목록"
+    },
+    "projectInfo": "과제 정보",
+    "noAccess": "접근 권한 없음",
+    "recvView": "수신부서 시점",
+    "guide": "사용자 가이드",
+    "notices": {
+      "tooltip": "공지사항",
+      "title": "공지사항",
+      "empty": "등록된 공지사항이 없습니다.",
+      "close": "닫기"
+    },
+    "language": {
+      "tooltip": "언어",
+      "ko": "한국어",
+      "en": "English"
+    },
+    "theme": {
+      "toLight": "라이트 테마로 전환",
+      "toDark": "다크 테마로 전환"
+    },
+    "profile": {
+      "title": "프로필",
+      "name": "이름",
+      "department": "부서",
+      "group": "그룹",
+      "email": "이메일",
+      "language": "언어",
+      "theme": "테마",
+      "close": "닫기"
+    }
+  }
+}

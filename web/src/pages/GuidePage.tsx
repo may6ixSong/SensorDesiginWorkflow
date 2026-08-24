@@ -1,5 +1,4 @@
 import { Box } from '@mui/material';
-import { useUsers } from '@/api/hooks/useUsers';
 import { AppShell } from '@/components/layout/AppShell';
 import { FONT_DISPLAY, FONT_MONO, T } from '@/theme/tokens';
 
@@ -53,10 +52,8 @@ const SECTIONS: Section[] = [
 ];
 
 export function GuidePage() {
-  const { data: users } = useUsers();
-
   return (
-    <AppShell users={users ?? []}>
+    <AppShell>
       <Box sx={{ flex: 1, overflow: 'auto', background: T.bg }}>
         <Box sx={{ maxWidth: 780, mx: 'auto', px: '28px', py: '40px' }}>
           <Box sx={{ fontFamily: FONT_MONO, fontSize: 10, letterSpacing: '.22em', color: T.dm2 }}>

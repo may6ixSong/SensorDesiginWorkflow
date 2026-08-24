@@ -3,7 +3,6 @@ import { Box, CircularProgress, Stack, Typography } from '@mui/material';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { IpDto, ProjectDetailDto } from '@/types/domain';
 import { useProject, useProjectIps, useUpdateProject } from '@/api/hooks/useProjects';
-import { useUsers } from '@/api/hooks/useUsers';
 import { AppShell } from '@/components/layout/AppShell';
 import { SirenButton } from '@/components/common/SirenButton';
 import { Card, Ey } from '@/components/common/Panel';
@@ -32,7 +31,6 @@ export function ProjectPageShell({ children }: Props) {
   const { pathname } = useLocation();
   const { data: project, isLoading: projectLoading, isError } = useProject(projectId);
   const { data: ips, isLoading: ipsLoading } = useProjectIps(projectId);
-  const { data: users } = useUsers();
   const updateProject = useUpdateProject(projectId ?? '');
   const [editOpen, setEditOpen] = useState(false);
   const [editErr, setEditErr] = useState<string | null>(null);
@@ -53,7 +51,7 @@ export function ProjectPageShell({ children }: Props) {
 
   if (isError || !project) {
     return (
-      <AppShell users={users ?? []}>
+      <AppShell>
         <Box sx={{ flex: 1, display: 'grid', placeItems: 'center', padding: '40px' }}>
           <Box sx={{ textAlign: 'center', maxWidth: 420 }}>
             <Typography sx={{ fontSize: 20, fontWeight: 700, mb: '10px' }}>No viewable project</Typography>
@@ -69,7 +67,7 @@ export function ProjectPageShell({ children }: Props) {
   const base = `/projects/${project._id}`;
 
   return (
-    <AppShell users={users ?? []}>
+    <AppShell>
       <Box sx={{ flex: 1, overflow: 'auto', background: T.bg }}>
         <Box sx={{ maxWidth: 1180, mx: 'auto', px: '28px', py: '30px' }}>
           {/* ── 메타데이터 헤더 ── */}
