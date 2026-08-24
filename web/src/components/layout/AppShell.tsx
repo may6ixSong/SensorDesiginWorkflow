@@ -2,9 +2,10 @@ import { ReactNode } from 'react';
 import { Box } from '@mui/material';
 import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import MenuBookRoundedIcon from '@mui/icons-material/MenuBookRounded';
 import { IpDto, ProjectDto } from '@/types/domain';
 import { useCanvasStore } from '@/store/canvasStore';
-import { usePlatformAuth } from '@/app/providers/AuthProvider';
+import { useAuth } from '@/app/providers/AuthProvider';
 import { SirenMark, Icon } from '@/components/common/Icon';
 import { SirenButton } from '@/components/common/SirenButton';
 import { HeaderIconButton } from '@/components/common/HeaderIconButton';
@@ -43,7 +44,7 @@ export function AppShell({
   canToggleRecv = false, children,
 }: AppShellProps) {
   const { t } = useTranslation();
-  const { platformUser } = usePlatformAuth();
+  const { user } = useAuth();
   const recv = useCanvasStore((s) => s.recv);
   const setRecv = useCanvasStore((s) => s.setRecv);
   const { pathname } = useLocation();
@@ -154,8 +155,12 @@ export function AppShell({
           </SirenButton>
         )}
 
-        <HeaderIconButton icon="book" label={t('appShell.guide')} to="/guide" />
-        <NoticeBell clientId={platformUser?.KnoxID ?? ''} />
+        <HeaderIconButton
+          iconElement={<MenuBookRoundedIcon sx={{ fontSize: 15 }} />}
+          label={t('appShell.guide')}
+          to="/guide"
+        />
+        <NoticeBell clientId={user?.KnoxID ?? ''} />
         <LanguagePopover />
         <ThemeTogglePlatform />
         <ProfileButton />

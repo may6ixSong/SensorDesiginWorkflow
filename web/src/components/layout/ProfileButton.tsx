@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Stack, Typography } from '@mui/material';
-import { usePlatformAuth } from '@/app/providers/AuthProvider';
+import { useAuth } from '@/app/providers/AuthProvider';
 import { initials } from '@/components/common/Avatar';
 import { useThemeMode } from '@/theme/ThemeModeContext';
 import { CURSOR_POINTER, T } from '@/theme/tokens';
@@ -18,13 +18,13 @@ function ProfileRow({ label, value }: { label: string; value: string }) {
 /** Platform-identity avatar + name/dept, opens a read-only profile dialog. Right-most in the top bar. */
 export function ProfileButton() {
   const { t, i18n } = useTranslation();
-  const { platformUser } = usePlatformAuth();
+  const { user } = useAuth();
   const { mode } = useThemeMode();
   const [open, setOpen] = useState(false);
   const isKo = i18n.language?.startsWith('ko');
 
-  const name = (isKo ? platformUser?.Name : platformUser?.EnName) || platformUser?.KnoxID || 'User';
-  const dept = (isKo ? platformUser?.Department : platformUser?.EnDepartment) || '';
+  const name = (isKo ? user?.Name : user?.EnName) || user?.KnoxID || 'User';
+  const dept = (isKo ? user?.Department : user?.EnDepartment) || '';
 
   return (
     <>
@@ -57,8 +57,7 @@ export function ProfileButton() {
           <Stack spacing={1.25}>
             <ProfileRow label={t('appShell.profile.name')} value={name} />
             <ProfileRow label={t('appShell.profile.department')} value={dept} />
-            <ProfileRow label={t('appShell.profile.group')} value={platformUser?.Group ?? '-'} />
-            <ProfileRow label={t('appShell.profile.email')} value={platformUser?.Email ?? '-'} />
+            <ProfileRow label={t('appShell.profile.group')} value={user?.Group ?? '-'} />
             <ProfileRow label={t('appShell.profile.language')} value={isKo ? '한국어' : 'English'} />
             <ProfileRow label={t('appShell.profile.theme')} value={mode} />
           </Stack>

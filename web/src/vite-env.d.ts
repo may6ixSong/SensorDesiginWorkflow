@@ -13,6 +13,8 @@ interface ImportMetaEnv {
   readonly SYSTEM_API: string;
   /** 'dev' | 'prod' */
   readonly ENVIRONMENT: string;
+  /** Hostname of the deployed online build; blank = no offline build to distinguish from. */
+  readonly ONLINE_HOST?: string;
 }
 
 interface ImportMeta {

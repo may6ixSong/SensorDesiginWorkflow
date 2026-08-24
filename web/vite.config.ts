@@ -16,5 +16,5 @@ export default defineConfig({
   // The common-platform API base URLs (SSM_WEB convention) are stored without a
   // VITE_ prefix in .env.development/.env.production, so they must be listed
   // here explicitly alongside the default 'VITE_'.
-  envPrefix: ['VITE_', 'SIREN_API', 'MOBILAVE', 'USER_GROUP_API', 'SDP_COMMON_API', 'SYSTEM_API', 'ENVIRONMENT'],
+  envPrefix: ['VITE_', 'SIREN_API', 'MOBILAVE', 'USER_GROUP_API', 'SDP_COMMON_API', 'SYSTEM_API', 'ENVIRONMENT', 'ONLINE_HOST'],
 });

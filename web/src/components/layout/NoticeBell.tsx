@@ -1,90 +1,112 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Box, Dialog, DialogContent, DialogTitle, List, ListItemButton, ListItemText, Popover, Typography } from '@mui/material';
 import { formatDistanceToNow } from 'date-fns';
 import { Icon } from '@/components/common/Icon';
 import { CURSOR_POINTER, T } from '@/theme/tokens';
-import { getNoticesByStatus } from '@/service/notice-service';
+import { NoticeService, getUnreadNotices, markNoticeRead } from '@/service/notice-service';
 import { useSignalRNotice } from '@/hooks/useSignalRNotice';
-import type { NoticeItem } from '@/types/notice';
-
-const READ_KEY = 'siren-notice-last-read';
+import type { Notice } from '@/types/notice';
 
 /**
- * Bell icon + popover, backed by SYSTEM_API. Resolves to an always-empty list
- * (and simply hides the "new" indicator) when SYSTEM_API is blank, which is
- * the case in dev — see service/notice-service.ts.
+ * Bell icon + popover, backed by SYSTEM_API. State/behavior (fetch on mount,
+ * unread count, read tracking via the shared 'sdp:notice-read' event) mirrors
+ * the platform's standard notice-bell pattern; only the icon/list UI is
+ * SIREN's own.
  */
 export function NoticeBell({ clientId }: { clientId: string }) {
   const { t } = useTranslation();
-  const [notices, setNotices] = useState<NoticeItem[]>([]);
-  const [hasNew, setHasNew] = useState(false);
-  const [anchor, setAnchor] = useState<null | HTMLElement>(null);
-  const [selected, setSelected] = useState<NoticeItem | null>(null);
-  const open = Boolean(anchor);
+  const btnRef = useRef<HTMLButtonElement>(null);
 
-  const refresh = useCallback(async () => {
-    const list = await getNoticesByStatus();
-    const sorted = [...list].sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
-    setNotices(sorted);
+  const [notices, setNotices] = useState<Notice[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [noticeOpen, setNoticeOpen] = useState(false);
+  const [selected, setSelected] = useState<Notice | null>(null);
 
-    const lastRead = localStorage.getItem(READ_KEY);
-    setHasNew(sorted.length > 0 && (!lastRead || new Date(sorted[0].startDate).getTime() > new Date(lastRead).getTime()));
+  useEffect(() => {
+    const noticeService = new NoticeService();
+    Promise.all([noticeService.getNoticesByStatus('SIREN', 'posting')])
+      .then(([sirenNotices]) => {
+        setNotices(sirenNotices);
+        setUnreadCount(getUnreadNotices(sirenNotices).length);
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    const handler = () => setUnreadCount((prev) => Math.max(0, prev - 1));
+    window.addEventListener('sdp:notice-read', handler);
+    return () => window.removeEventListener('sdp:notice-read', handler);
+  }, []);
+
+  const handleNoticeRead = useCallback((notice: Notice) => {
+    markNoticeRead(notice);
+    setUnreadCount((prev) => Math.max(0, prev - 1));
+    setSelected(notice);
+    setNoticeOpen(false);
+  }, []);
+
+  const toggleNotice = useCallback(() => {
+    if (noticeOpen) {
+      setNoticeOpen(false);
+      return;
+    }
+    setNoticeOpen(true);
+  }, [noticeOpen]);
 
   useSignalRNotice({
     enabled: Boolean(import.meta.env.SYSTEM_API),
     clientId,
     systemApiBaseUrl: import.meta.env.SYSTEM_API,
-    onEmergencyNotice: () => void refresh(),
+    onEmergencyNotice: () => {
+      const noticeService = new NoticeService();
+      void noticeService.getNoticesByStatus('SIREN', 'posting').then((list) => {
+        setNotices(list);
+        setUnreadCount(getUnreadNotices(list).length);
+      });
+    },
   });
-
-  const toggle = (e: React.MouseEvent<HTMLElement>) => {
-    // Capture currentTarget synchronously — the DOM nulls it out once the event
-    // finishes propagating, before a functional setState updater would run.
-    const target = e.currentTarget;
-    setAnchor((prev) => (prev ? null : target));
-    if (!open) {
-      localStorage.setItem(READ_KEY, new Date().toISOString());
-      setHasNew(false);
-    }
-  };
 
   return (
     <>
       <Box sx={{ position: 'relative', display: 'inline-flex' }}>
         <Box
           component="button"
-          onClick={toggle}
+          ref={btnRef}
+          onClick={toggleNotice}
           aria-label={t('appShell.notices.tooltip')}
           title={t('appShell.notices.tooltip')}
           sx={{
-            display: 'grid', placeItems: 'center', width: 32, height: 32, borderRadius: '8px',
-            background: open ? T.sf3 : T.sf, color: open ? T.tx : T.dm,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            width: '32px', height: '32px', borderRadius: '8px',
+            background: noticeOpen ? T.sf3 : T.sf, color: noticeOpen ? T.tx : T.dm,
             border: 'none', outline: 'none', cursor: CURSOR_POINTER, transition: '.14s',
             '&:hover': { background: T.sf3, color: T.tx },
           }}
         >
           <Icon name="bell" size={15} />
         </Box>
-        {hasNew && (
+        {unreadCount > 0 && (
           <Box
             sx={{
-              position: 'absolute', right: 5, top: 5, width: 7, height: 7, borderRadius: 999,
-              background: T.am, boxShadow: `0 0 0 2px ${T.sf}`, pointerEvents: 'none',
+              position: 'absolute', top: '-2px', right: '-2px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              minWidth: '14px', height: '14px', px: '2px',
+              background: '#E82C1F', border: '0.5px solid #F73529', borderRadius: '999px',
+              pointerEvents: 'none',
             }}
-          />
+          >
+            <Typography sx={{ fontSize: '9px', lineHeight: 1, letterSpacing: '0.5px', color: '#fff', fontWeight: 700 }}>
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </Typography>
+          </Box>
         )}
       </Box>
 
       <Popover
-        open={open}
-        anchorEl={anchor}
-        onClose={() => setAnchor(null)}
+        open={noticeOpen}
+        anchorEl={btnRef.current}
+        onClose={() => setNoticeOpen(false)}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
         transformOrigin={{ vertical: 'top', horizontal: 'right' }}
         PaperProps={{ sx: { mt: 1, width: 320, maxHeight: 420, border: `1px solid ${T.ln}`, borderRadius: 2 } }}
@@ -99,13 +121,7 @@ export function NoticeBell({ clientId }: { clientId: string }) {
         ) : (
           <List dense disablePadding>
             {notices.map((n) => (
-              <ListItemButton
-                key={n.nID}
-                onClick={() => {
-                  setSelected(n);
-                  setAnchor(null);
-                }}
-              >
+              <ListItemButton key={n.nID} onClick={() => handleNoticeRead(n)}>
                 <ListItemText
                   primary={n.title}
                   secondary={formatDistanceToNow(new Date(n.startDate), { addSuffix: true })}

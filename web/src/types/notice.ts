@@ -1,5 +1,5 @@
-/** Platform system notice (SYSTEM_API). Mirrors SSM_WEB's NoticeItem shape. */
-export type NoticeItem = {
+/** Platform system notice (SYSTEM_API). */
+export type Notice = {
   nID: number;
   title: string;
   content: string;

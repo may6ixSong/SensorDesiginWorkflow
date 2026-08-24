@@ -1,12 +1,12 @@
 import * as React from 'react';
 import * as signalR from '@microsoft/signalr';
-import type { NoticeItem } from '@/types/notice';
+import type { Notice } from '@/types/notice';
 
 type UseSignalRNoticeArgs = {
   enabled: boolean;
   clientId: string;
   systemApiBaseUrl: string;
-  onEmergencyNotice: (notice: NoticeItem) => void;
+  onEmergencyNotice: (notice: Notice) => void;
 };
 
 /** Real-time emergency notice push. No-ops entirely when systemApiBaseUrl is blank (dev). */
@@ -31,7 +31,7 @@ export function useSignalRNotice(args: UseSignalRNoticeArgs) {
 
     connection.on('emergencyNotice/SIREN', (data: unknown) => {
       const notice = Array.isArray(data) ? data[0] : data;
-      if (notice) onEmergencyNotice(notice as NoticeItem);
+      if (notice) onEmergencyNotice(notice as Notice);
     });
 
     const startConnection = async () => {
