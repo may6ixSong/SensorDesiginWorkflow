@@ -29,6 +29,10 @@ export class Ip {
   @Prop({ type: SchemaTypes.ObjectId, ref: 'Project', required: true, index: true })
   projectId: Types.ObjectId;
 
+  /** IP가 속한 설계 도메인. 빈 문자열이면 FE가 UNASSIGNED로 묶는다 */
+  @Prop({ default: '', trim: true, index: true })
+  domain: string;
+
   @Prop({ required: true, trim: true })
   name: string;
 
