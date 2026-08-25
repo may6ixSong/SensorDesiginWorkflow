@@ -8,7 +8,6 @@ import { buildTheme } from './theme/theme';
 import { ThemeModeProvider, useThemeMode } from './theme/ThemeModeContext';
 import { AuthProvider } from './app/providers/AuthProvider';
 import { PlatformPreferencesSync } from './components/layout/PlatformPreferencesSync';
-import { resolveOnlineStatus } from './utils/helper';
 import App from './App';
 import './i18n';
 
@@ -33,24 +32,20 @@ function MuiThemeBridge({ children }: { children: React.ReactNode }) {
   );
 }
 
-// Resolve online/offline (may probe SIREN's backend once for direct-IP access)
-// BEFORE first render, so every synchronous isOnLine() call in AuthProvider
-// sees a settled value.
-resolveOnlineStatus().finally(() => {
-  ReactDOM.createRoot(document.getElementById('root')!).render(
-    <React.StrictMode>
-      <ThemeModeProvider>
-        <AuthProvider>
-          <MuiThemeBridge>
-            <PlatformPreferencesSync />
-            <QueryClientProvider client={queryClient}>
-              <BrowserRouter>
-                <App />
-              </BrowserRouter>
-            </QueryClientProvider>
-          </MuiThemeBridge>
-        </AuthProvider>
-      </ThemeModeProvider>
-    </React.StrictMode>,
-  );
-});
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <ThemeModeProvider>
+      <AuthProvider>
+        <MuiThemeBridge>
+          <PlatformPreferencesSync />
+          <QueryClientProvider client={queryClient}>
+            <BrowserRouter>
+              <App />
+            </BrowserRouter>
+          </QueryClientProvider>
+        </MuiThemeBridge>
+      </AuthProvider>
+    </ThemeModeProvider>
+  </React.StrictMode>,
+);
+
