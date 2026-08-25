@@ -16,15 +16,10 @@ export interface SpacePalette {
   aurora: string;
   star: string;
   starBright: string;
-  /** 상단바/좌측 메뉴의 반투명 유리판. */
+  /** 상단바/좌측 메뉴의 반투명 유리판 — 화면에서 유일하게 남은 "패널" 크롬이다.
+   * 도메인/Phase는 판(plate)이 아예 없으므로 그쪽엔 배경색이 필요 없다. */
   panelBg: string;
   panelBorder: string;
-  /** island 판의 표면/테두리/그림자. */
-  plateBg: string;
-  plateBorder: string;
-  plateShadow: string;
-  /** island 아래에 깔리는 후광(떠 있는 느낌). */
-  plateGlow: string;
 }
 
 const SPACE_PALETTE: Record<'light' | 'dark', SpacePalette> = {
@@ -38,15 +33,9 @@ const SPACE_PALETTE: Record<'light' | 'dark', SpacePalette> = {
     starBright: 'rgba(255,255,255,.9)',
     panelBg: 'rgba(14,19,30,.78)',
     panelBorder: 'rgba(150,170,210,.16)',
-    plateBg: 'linear-gradient(165deg, rgba(28,36,52,.94), rgba(17,23,36,.92))',
-    plateBorder: 'rgba(150,175,215,.16)',
-    plateShadow: '0 42px 90px -28px rgba(0,0,0,.85), 0 10px 30px rgba(0,0,0,.5)',
-    plateGlow: 'radial-gradient(closest-side, rgba(120,170,240,.16), transparent 72%)',
   },
   light: {
-    // 판이 거의 흰색이라 바탕이 너무 밝으면 "떠 있는 판"으로 안 읽힌다 — 바탕을
-    // 한 단계 눌러 판/배경 대비를 확보한다.
-    wash: '#dce2ee',
+    wash: '#e9edf5',
     aurora:
       'radial-gradient(58% 40% at 18% 10%, rgba(12,154,131,.08), transparent 70%),'
       + 'radial-gradient(52% 44% at 86% 78%, rgba(88,73,207,.07), transparent 72%),'
@@ -56,10 +45,6 @@ const SPACE_PALETTE: Record<'light' | 'dark', SpacePalette> = {
     starBright: 'rgba(38,54,88,.5)',
     panelBg: 'rgba(255,255,255,.8)',
     panelBorder: 'rgba(20,32,47,.1)',
-    plateBg: 'linear-gradient(165deg, rgba(255,255,255,.97), rgba(243,246,251,.95))',
-    plateBorder: 'rgba(20,32,47,.1)',
-    plateShadow: '0 46px 90px -28px rgba(24,40,74,.5), 0 10px 28px rgba(24,40,74,.16)',
-    plateGlow: 'radial-gradient(closest-side, rgba(60,100,175,.2), transparent 72%)',
   },
 };
 
