@@ -1,4 +1,18 @@
-import { IsIn, IsMongoId, IsOptional, IsString, MinLength, IsArray, ArrayUnique } from 'class-validator';
+import { IsIn, IsInt, IsMongoId, IsOptional, IsString, Min, MinLength, IsArray, ArrayUnique } from 'class-validator';
+import { Type } from 'class-transformer';
+
+/** GET /deliverables/:id/download?major=1&minor=0 */
+export class DownloadVersionDto {
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  major: number;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  minor: number;
+}
 
 export class CreateDeliverableDto {
   @IsString()
@@ -35,8 +49,9 @@ export class UpdateRecvDto {
   @IsString()
   recvDept: string | null;
 
+  /** 수신 담당자의 KnoxID (api에는 users 컬렉션이 없다). */
   @IsOptional()
-  @IsMongoId()
+  @IsString()
   recvContact: string | null;
 
   /** 이 산출물을 받아야 하는 다른 Analog IP. recvDept(부서)와 별개 필드. */
@@ -56,14 +71,6 @@ export class UpdateScheduleDto {
   @ArrayUnique()
   @IsString({ each: true })
   phaseKeys: string[];
-}
-
-export class CreateUploadUrlDto {
-  @IsString()
-  fileName: string;
-
-  @IsString()
-  contentType: string;
 }
 
 export class AddVersionDto {
