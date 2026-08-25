@@ -1,8 +1,9 @@
 import { useMemo } from 'react';
 import { Box } from '@mui/material';
-import { HldReleaseDto, PhaseRef, UserDto } from '@/types/domain';
+import { HldReleaseDto, PhaseRef } from '@/types/domain';
 import { CanvasNode } from '@/lib/canvasModel';
 import { departmentName } from '@/shared/constants/departments';
+import { findDirectoryUser } from '@/shared/constants/mock-users';
 import { ModalShell } from '@/components/common/ModalShell';
 import { Badge } from '@/components/common/SirenButton';
 import { Card, Ey } from '@/components/common/Panel';
@@ -16,7 +17,6 @@ interface Props {
   releases: HldReleaseDto[];
   nodes: CanvasNode[];
   phases: PhaseRef[];
-  usersById: Map<string, UserDto>;
   selectedId: string | null;
   onSelect: (id: string) => void;
   onClose: () => void;
@@ -29,7 +29,7 @@ interface Props {
  * 단일 하이라이트로 표시한다 (설계서 3.10). 이 조인/diff는 FE에서 계산한다.
  */
 export function HldReleaseDialog({
-  ipName, releases, nodes, phases, usersById, selectedId, onSelect, onClose, onOpenRow,
+  ipName, releases, nodes, phases, selectedId, onSelect, onClose, onOpenRow,
 }: Props) {
   const sorted = useMemo(() => [...releases].sort((a, b) => (a.date < b.date ? 1 : -1)), [releases]);
 
@@ -62,7 +62,7 @@ export function HldReleaseDialog({
       : a.x - b.x,
   );
 
-  const by = usersById.get(cur.releasedBy);
+  const by = findDirectoryUser(cur.releasedBy);
 
   return (
     <ModalShell
@@ -99,8 +99,8 @@ export function HldReleaseDialog({
           <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <UserAvatar user={by} size={28} />
             <Box>
-              <Box sx={{ fontSize: 12.5, fontWeight: 600 }}>{by?.name ?? '—'}</Box>
-              <Box sx={{ fontSize: 11, color: T.dm2 }}>{by ? departmentName(by.department) : ''}</Box>
+              <Box sx={{ fontSize: 12.5, fontWeight: 600 }}>{by.name}</Box>
+              <Box sx={{ fontSize: 11, color: T.dm2 }}>{by.department ? departmentName(by.department) : ''}</Box>
             </Box>
           </Box>
           <Box sx={{ flex: 1, borderLeft: `1px solid ${T.ln}`, pl: '16px' }}>
