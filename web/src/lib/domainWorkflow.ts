@@ -1,0 +1,182 @@
+/**
+ * "Total workflow view"의 순수 데이터 모델 — 과제의 모든 IP를 도메인(Analog/Digital/
+ * APS…) 단위 영역으로 나누고, 같은 도메인 안에서만 IP↔IP 산출물 흐름을 잇는다.
+ *
+ * 도메인이 다른 handoff(예: Analog의 AA IP가 Digital의 BB IP에 준다)는 이 화면의
+ * 관심사가 아니다 — 각 도메인은 "그 도메인 시점"에서만 그려지므로 여기서는 아예
+ * 만들지 않는다(요청).
+ *
+ * React/DOM을 전혀 모르는 순수 함수만 모아 뒀다.
+ */
+import { DeliverableDto, IpDto } from '@/types/domain';
+
+export const UNASSIGNED_DOMAIN = 'UNASSIGNED';
+
+/** IP가 속한 도메인 — BE에 domain 필드가 아직 없는 데이터도 깨지지 않게 폴백을 둔다. */
+export function domainOf(ip: IpDto): string {
+  const raw = (ip.domain ?? '').trim();
+  return raw ? raw.toUpperCase() : UNASSIGNED_DOMAIN;
+}
+
+export interface StatusCounts {
+  released: number;
+  inProgress: number;
+  notSubmitted: number;
+  total: number;
+}
+
+export function statusOf(d: DeliverableDto): 'released' | 'inProgress' | 'notSubmitted' {
+  if (!d.versions.length) return 'notSubmitted';
+  return d.workingVersion ? 'inProgress' : 'released';
+}
+
+function emptyCounts(): StatusCounts {
+  return { released: 0, inProgress: 0, notSubmitted: 0, total: 0 };
+}
+
+function addCounts(a: StatusCounts, b: StatusCounts): StatusCounts {
+  return {
+    released: a.released + b.released,
+    inProgress: a.inProgress + b.inProgress,
+    notSubmitted: a.notSubmitted + b.notSubmitted,
+    total: a.total + b.total,
+  };
+}
+
+function countStatuses(items: DeliverableDto[]): StatusCounts {
+  const c = emptyCounts();
+  items.forEach((d) => {
+    c[statusOf(d)]++;
+    c.total++;
+  });
+  return c;
+}
+
+export interface DomainGroup {
+  key: string;
+  label: string;
+  color: string;
+  ips: IpDto[];
+  counts: StatusCounts;
+}
+
+/** 같은 도메인 안의 IP→IP 산출물 흐름(recvIpId) 하나를 요약한 것. */
+export interface DomainFlow {
+  id: string;
+  from: string;
+  to: string;
+  total: number;
+  released: number;
+  names: string[];
+}
+
+export interface DomainWorkflowModel {
+  domains: DomainGroup[];
+  /** 도메인 key → 그 도메인 안에서만 성립하는 흐름 목록. */
+  flowsByDomain: Map<string, DomainFlow[]>;
+  counts: StatusCounts;
+}
+
+/** 도메인 헤더/사이드바 강조색 — 채도가 있어 라이트/다크 배경 모두에서 식별된다. */
+const DOMAIN_PALETTE = [
+  '#0c9a83', '#5849cf', '#2563c9', '#ac6f08', '#c8352c',
+  '#3aa66b', '#b3521e', '#7a4fbf', '#0891b2', '#be185d',
+];
+
+function hashCode(s: string) {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+
+/** 화면에 같이 뜨는 도메인끼리는 색이 안 겹치게 — 해시가 같은 슬롯이면 다음 빈 슬롯으로. */
+function assignColors(keys: string[]): Map<string, string> {
+  const used = new Set<number>();
+  const out = new Map<string, string>();
+  keys.forEach((k) => {
+    const want = hashCode(k) % DOMAIN_PALETTE.length;
+    let slot = want;
+    for (let i = 0; i < DOMAIN_PALETTE.length && used.has(slot); i++) {
+      slot = (slot + 1) % DOMAIN_PALETTE.length;
+    }
+    used.add(slot);
+    out.set(k, DOMAIN_PALETTE[slot]);
+  });
+  return out;
+}
+
+/**
+ * IP 목록 + IP별 산출물(own)로 도메인 모델을 만든다.
+ * @param deliverablesByIp ipId → 그 IP가 주는 산출물(own). incoming은 반대편에서
+ *   이미 한 번 세므로 넣지 않는다(항로 중복 방지).
+ */
+export function buildDomainModel(
+  ips: IpDto[],
+  deliverablesByIp: Map<string, DeliverableDto[]>,
+): DomainWorkflowModel {
+  const grouped = new Map<string, IpDto[]>();
+  ips.forEach((ip) => {
+    const key = domainOf(ip);
+    const arr = grouped.get(key) ?? [];
+    arr.push(ip);
+    grouped.set(key, arr);
+  });
+
+  const domainKeys = [...grouped.keys()].sort((a, b) => {
+    if (a === UNASSIGNED_DOMAIN) return 1;
+    if (b === UNASSIGNED_DOMAIN) return -1;
+    const d = (grouped.get(b)?.length ?? 0) - (grouped.get(a)?.length ?? 0);
+    return d !== 0 ? d : a.localeCompare(b);
+  });
+  const colorOf = assignColors(domainKeys);
+
+  const ipDomain = new Map<string, string>();
+  ips.forEach((ip) => ipDomain.set(ip.id, domainOf(ip)));
+
+  const domains: DomainGroup[] = domainKeys.map((key) => {
+    const members = [...(grouped.get(key) ?? [])].sort((a, b) => a.name.localeCompare(b.name));
+    const counts = members.reduce(
+      (acc, ip) => addCounts(acc, countStatuses(deliverablesByIp.get(ip.id) ?? [])),
+      emptyCounts(),
+    );
+    return { key, label: key, color: colorOf.get(key) ?? DOMAIN_PALETTE[0], ips: members, counts };
+  });
+
+  const flowsByDomain = new Map<string, DomainFlow[]>();
+  deliverablesByIp.forEach((items, ipId) => {
+    const fromDomain = ipDomain.get(ipId);
+    if (!fromDomain) return;
+    const bucket = new Map<string, DomainFlow>();
+    (flowsByDomain.get(fromDomain) ?? []).forEach((f) => bucket.set(f.id, f));
+
+    items.forEach((d) => {
+      if (!d.recvIpId) return;
+      const toDomain = ipDomain.get(d.recvIpId);
+      // 도메인이 다르면(또는 이 지도에 없는 IP면) 이 화면에서는 아예 잇지 않는다.
+      if (!toDomain || toDomain !== fromDomain || d.recvIpId === ipId) return;
+      const id = `${ipId}->${d.recvIpId}`;
+      const cur = bucket.get(id) ?? { id, from: ipId, to: d.recvIpId, total: 0, released: 0, names: [] };
+      cur.total++;
+      if (statusOf(d) === 'released') cur.released++;
+      cur.names.push(d.name);
+      bucket.set(id, cur);
+    });
+
+    flowsByDomain.set(fromDomain, [...bucket.values()]);
+  });
+
+  return {
+    domains,
+    flowsByDomain,
+    counts: domains.reduce((acc, d) => addCounts(acc, d.counts), emptyCounts()),
+  };
+}
+
+export function withAlpha(hex: string, alpha: number) {
+  const h = hex.replace('#', '');
+  const n = parseInt(h.length === 3 ? h.split('').map((c) => c + c).join('') : h, 16);
+  const r = (n >> 16) & 255;
+  const g = (n >> 8) & 255;
+  const b = n & 255;
+  return `rgba(${r},${g},${b},${alpha})`;
+}
