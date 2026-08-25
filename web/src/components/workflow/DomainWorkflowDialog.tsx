@@ -52,6 +52,8 @@ interface Props {
   projectCode: string;
   phases: PhaseRef[];
   ips: IpDto[];
+  /** 과제에 등록된 도메인 목록 — IP가 아직 배정되지 않은 도메인도 빈 섹션으로 그린다. */
+  ipDomains: string[];
 }
 
 export function DomainWorkflowDialog(props: Props) {
@@ -80,7 +82,7 @@ function easeInOutCubic(t: number) {
 }
 
 function WorkflowBoard({
-  onClose, projectId, projectName, projectCode, phases, ips,
+  onClose, projectId, projectName, projectCode, phases, ips, ipDomains,
 }: Props) {
   const navigate = useNavigate();
   const pal = useSpacePalette();
@@ -115,7 +117,13 @@ function WorkflowBoard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ips, sig]);
 
-  const model: DomainWorkflowModel = useMemo(() => buildDomainModel(ips, byIp), [ips, byIp]);
+  // ipDomains는 배열 참조가 매 렌더 바뀔 수 있어 문자열로 눌러 의존성에 넣는다.
+  const domainSig = ipDomains.join('|');
+  const model: DomainWorkflowModel = useMemo(
+    () => buildDomainModel(ips, byIp, ipDomains),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [ips, byIp, domainSig],
+  );
   const totalRoutes = useMemo(
     () => [...model.flowsByDomain.values()].reduce((n, arr) => n + arr.length, 0),
     [model],
@@ -416,7 +424,20 @@ function DomainSection({
         <Box sx={{ flex: 1, height: '1px', background: `linear-gradient(90deg, ${withAlpha(domain.color, 0.55)}, transparent)` }} />
       </Box>
 
-      {/* ── 도메인 workflow 그리드 ── */}
+      {/* ── IP가 아직 없는 도메인 ──
+          그리드를 그리지 않는다. 행이 0개면 거터 셀의 gridRow가 'span 0'이 되는데
+          그건 유효한 CSS가 아니라 그리드 배치가 깨진다. 애초에 보여줄 행도 없다. */}
+      {domain.ips.length === 0 ? (
+        <Box
+          sx={{
+            border: `1px dashed ${withAlpha(domain.color, 0.4)}`, borderRadius: '12px',
+            background: withAlpha(domain.color, 0.04), padding: '22px 18px',
+            fontSize: 12.5, color: T.dm2, textAlign: 'center',
+          }}
+        >
+          No IPs assigned to this domain yet — set it on Project Information › Design domains.
+        </Box>
+      ) : (
       <Box
         sx={{
           border: `1px solid ${T.ln}`, borderRadius: '12px', background: T.sf, overflow: 'hidden', boxShadow: T.ss,
@@ -514,6 +535,7 @@ function DomainSection({
           </Box>
         </Box>
       </Box>
+      )}
     </Box>
   );
 }
