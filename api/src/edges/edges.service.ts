@@ -11,8 +11,8 @@ export class EdgesService {
     return this.model.find({ ipId }).exec();
   }
 
-  /** series 인스턴스 생성 시 회차 순서대로 자동 연결 (설계서 3.6). */
-  async createAutoChain(ipId: Types.ObjectId, orderedDeliverableIds: Types.ObjectId[]) {
+  /** series 인스턴스 생성 시 회차 순서대로 자동 연결 (설계서 3.6). isMock은 소속 IP에서 상속. */
+  async createAutoChain(ipId: Types.ObjectId, orderedDeliverableIds: Types.ObjectId[], isMock = false) {
     const docs = [];
     for (let i = 0; i < orderedDeliverableIds.length - 1; i++) {
       docs.push({
@@ -21,6 +21,7 @@ export class EdgesService {
         toId: orderedDeliverableIds[i + 1],
         bidirectional: false,
         auto: true,
+        isMock,
       });
     }
     if (docs.length) await this.model.insertMany(docs);
@@ -33,9 +34,11 @@ export class EdgesService {
       .exec();
   }
 
+  /** isMock은 소속 IP에서 상속받는다 (memos.replaceAllForIp와 동일한 이유). */
   async replaceAllForIp(
     ipId: string,
     edges: { id?: string; fromId: string; toId: string; bidirectional: boolean; auto?: boolean }[],
+    isMock = false,
   ) {
     await this.model.deleteMany({ ipId }).exec();
     if (!edges.length) return [];
@@ -45,12 +48,13 @@ export class EdgesService {
       toId: e.toId,
       bidirectional: e.bidirectional,
       auto: e.auto ?? false,
+      isMock,
     }));
     return this.model.insertMany(docs);
   }
 
-  createOne(ipId: string, fromId: string, toId: string, bidirectional: boolean) {
-    return this.model.create({ ipId, fromId, toId, bidirectional, auto: false });
+  createOne(ipId: string, fromId: string, toId: string, bidirectional: boolean, isMock = false) {
+    return this.model.create({ ipId, fromId, toId, bidirectional, auto: false, isMock });
   }
 
   deleteOne(edgeId: string) {
