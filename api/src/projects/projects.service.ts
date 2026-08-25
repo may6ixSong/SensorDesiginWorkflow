@@ -33,6 +33,85 @@ export class ProjectsService {
   }
 
   /**
+   * 이 과제의 IP 도메인 후보 목록을 통째로 교체한다.
+   *
+   * 정규화: 앞뒤 공백 제거 → 빈 값 제외 → 대소문자 무시 중복 제거(첫 표기를 남긴다).
+   * FE의 domainOf()가 대문자로 올려 묶으므로(web/src/lib/domainWorkflow.ts) 'Analog'와
+   * 'ANALOG'가 목록에 같이 있으면 화면에서 한 항성계로 합쳐져 목록과 어긋난다.
+   *
+   * 아직 IP가 붙어 있는 도메인은 지울 수 없다 - 지우면 그 IP의 domain 값만 목록에서
+   * 사라진 채 남아(orphan) 화면에는 계속 항성계로 뜨는데 목록에서는 안 보이게 된다.
+   */
+  async updateIpDomains(id: string, input: string[], actor: Actor) {
+    await this.assertManageAccess(id, actor);
+    const project = await this.findByIdOrThrow(id);
+
+    const next: string[] = [];
+    const seen = new Set<string>();
+    for (const raw of input) {
+      const name = raw.trim();
+      if (!name) continue;
+      const key = name.toUpperCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      next.push(name);
+    }
+
+    const removed = (project.ipDomains ?? []).filter((d) => !seen.has(d.trim().toUpperCase()));
+    if (removed.length > 0) {
+      const removedKeys = new Set(removed.map((d) => d.trim().toUpperCase()));
+      const ips = await this.ips.listAccessibleForProject(id, actor.knoxId);
+      const blocked = ips.filter((ip) => removedKeys.has((ip.domain ?? '').trim().toUpperCase()));
+      if (blocked.length > 0) {
+        throw new BadRequestException(
+          `Reassign these IPs before removing that domain: ${blocked.map((ip) => ip.name).join(', ')}`,
+        );
+      }
+    }
+
+    project.ipDomains = next;
+    await project.save();
+    await this.audit.log(actor.knoxId, 'PROJECT_IP_DOMAINS_UPDATE', 'project', project._id, {
+      ipDomains: next,
+    });
+    return this.findDetailOrThrow(id, actor.knoxId);
+  }
+
+  /**
+   * IP 하나를 이 과제의 도메인 중 하나에 배정한다. 빈 문자열이면 배정 해제.
+   *
+   * 라우트가 /ips/:ipId 가 아니라 /projects/:id/ips/:ipId/domain 인 이유: 후보 목록이
+   * 과제에 있어서 검증에 Project와 Ip 모델이 둘 다 필요한데, 그 둘을 함께 가진 곳은
+   * ProjectsController(ProjectsModule이 IpsModule을 import)뿐이다. 반대 방향으로 붙이면
+   * IpsModule에 Project 모델을 중복 등록해야 하고, 인메모리 모드에서 가짜 컬렉션이
+   * 두 개로 갈린다(src/database/model-registration.ts).
+   */
+  async updateIpDomain(id: string, ipId: string, domain: string, actor: Actor) {
+    await this.assertManageAccess(id, actor);
+    const project = await this.findByIdOrThrow(id);
+    const ip = await this.ips.findOrThrow(ipId);
+    if (ip.projectId.toString() !== project._id.toString()) {
+      throw new BadRequestException('That IP does not belong to this project.');
+    }
+
+    const wanted = domain.trim();
+    let resolved = '';
+    if (wanted) {
+      // 목록에 등록된 표기를 그대로 저장한다 - 사용자가 'analog'로 보내도 'Analog'로.
+      const match = (project.ipDomains ?? []).find(
+        (d) => d.trim().toUpperCase() === wanted.toUpperCase(),
+      );
+      if (!match) {
+        throw new BadRequestException(`'${wanted}' is not one of this project's design domains.`);
+      }
+      resolved = match.trim();
+    }
+
+    await this.ips.setDomain(ipId, resolved, actor);
+    return this.findDetailOrThrow(id, actor.knoxId);
+  }
+
+  /**
    * 마일스톤(Phase) 일정 수정 — label/start/end만 바꾼다. key/order는 산출물의
    * phaseKey·캔버스 레이아웃이 참조하므로 이 API로 추가/삭제/개명하지 않는다 -
    * 그래서 들어온 phases는 기존 key 집합과 정확히 일치해야 한다.
