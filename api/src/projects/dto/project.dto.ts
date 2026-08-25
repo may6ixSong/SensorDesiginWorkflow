@@ -12,6 +12,8 @@ export interface ProjectDetailDto {
   code: string;
   name: string;
   domain: string;
+  /** 이 과제의 IP가 고를 수 있는 설계 도메인 목록 — 과제 자신의 domain과는 다른 축이다. */
+  ipDomains: string[];
   status: string;
   phases: PhaseRef[];
   members: ProjectMemberDto[];
@@ -23,6 +25,7 @@ export function toProjectDetailDto(project: ProjectDocument): ProjectDetailDto {
     code: project.code,
     name: project.name,
     domain: project.domain,
+    ipDomains: [...(project.ipDomains ?? [])],
     status: project.status,
     phases: project.phases,
     members: project.members.map((m) => ({
