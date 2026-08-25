@@ -8,6 +8,8 @@ import { toProjectDetailDto } from './dto/project.dto';
 import { AddMemberDto } from './dto/add-member.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { UpdatePhasesDto } from './dto/update-phases.dto';
+import { UpdateIpDomainsDto } from './dto/update-ip-domains.dto';
+import { UpdateIpDomainDto } from './dto/update-ip-domain.dto';
 
 @Controller('projects')
 export class ProjectsController {
@@ -39,6 +41,32 @@ export class ProjectsController {
   @Patch(':id/phases')
   async updatePhases(@Param('id') id: string, @Body() body: UpdatePhasesDto, @CurrentActor() me: Actor) {
     const project = await this.projects.updatePhases(id, body.phases, me);
+    return { data: toProjectDetailDto(project) };
+  }
+
+  /**
+   * IP 도메인 후보 목록 교체. @Patch(':id')보다 위에 있어야 한다 - 아래에 두면
+   * ':id'가 'ip-domains'까지 먹어 이 라우트에 도달하지 못한다.
+   */
+  @Patch(':id/ip-domains')
+  async updateIpDomains(
+    @Param('id') id: string,
+    @Body() body: UpdateIpDomainsDto,
+    @CurrentActor() me: Actor,
+  ) {
+    const project = await this.projects.updateIpDomains(id, body.ipDomains, me);
+    return { data: toProjectDetailDto(project) };
+  }
+
+  /** IP 하나를 이 과제의 도메인에 배정 (빈 문자열이면 배정 해제). */
+  @Patch(':id/ips/:ipId/domain')
+  async updateIpDomain(
+    @Param('id') id: string,
+    @Param('ipId') ipId: string,
+    @Body() body: UpdateIpDomainDto,
+    @CurrentActor() me: Actor,
+  ) {
+    const project = await this.projects.updateIpDomain(id, ipId, body.domain, me);
     return { data: toProjectDetailDto(project) };
   }
 
