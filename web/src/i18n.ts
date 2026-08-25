@@ -19,7 +19,7 @@ i18n
     detection: {
       // Do NOT use 'navigator': the browser's UI language must not decide the
       // app language. Language comes from an explicit choice (querystring /
-      // localStorage) or the fallbackLng ('en'); online, AuthProvider then
+      // localStorage) or the fallbackLng ('en'); AuthProvider then
       // overrides it with the user's saved backend language.
       order: ['querystring', 'localStorage'],
       caches: ['localStorage'],
