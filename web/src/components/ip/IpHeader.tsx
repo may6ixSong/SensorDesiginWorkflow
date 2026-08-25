@@ -4,6 +4,8 @@ import { SirenButton } from '@/components/common/SirenButton';
 import { Icon } from '@/components/common/Icon';
 import { CURSOR_POINTER, T } from '@/theme/tokens';
 import { initials } from '@/components/common/Avatar';
+import { findDirectoryUser } from '@/shared/constants/mock-users';
+import { canEditIp } from '@/lib/access';
 
 interface IpHeaderProps {
   ip: IpDto;
@@ -18,7 +20,7 @@ interface IpHeaderProps {
  * ※ 이 헤더 디자인은 사용자 요청에 따라 기존 형태를 유지한다(목업으로 되돌리지 않음).
  */
 export function IpHeader({ ip, recv, onOpenPermissions, onOpenHld }: IpHeaderProps) {
-  const repOwner = ip.owners[0];
+  const repOwner = ip.owners.length ? findDirectoryUser(ip.owners[0]) : null;
   const extra = Math.max(0, ip.owners.length - 1 + ip.viewGrants.length);
 
   return (
@@ -39,9 +41,9 @@ export function IpHeader({ ip, recv, onOpenPermissions, onOpenHld }: IpHeaderPro
       </Box>
 
       <Chip
-        label={ip.myAccess === 'edit' ? 'Edit access' : 'View access'}
+        label={canEditIp(ip) ? 'Edit access' : 'View access'}
         size="small"
-        color={ip.myAccess === 'edit' ? 'primary' : 'default'}
+        color={canEditIp(ip) ? 'primary' : 'default'}
         variant="outlined"
       />
       {recv && (
@@ -58,11 +60,14 @@ export function IpHeader({ ip, recv, onOpenPermissions, onOpenHld }: IpHeaderPro
           sx={{ cursor: CURSOR_POINTER, px: 1, py: 0.5, borderRadius: 2, '&:hover': { bgcolor: T.sf2 } }}
         >
           <AvatarGroup max={4} sx={{ '& .MuiAvatar-root': { width: 24, height: 24, fontSize: 11 } }}>
-            {ip.owners.map((o) => (
-              <Avatar key={o.id} sx={{ bgcolor: o.color }}>
-                {initials(o.name)}
-              </Avatar>
-            ))}
+            {ip.owners.map((knoxId) => {
+              const o = findDirectoryUser(knoxId);
+              return (
+                <Avatar key={knoxId} sx={{ bgcolor: o.color }}>
+                  {initials(o.name)}
+                </Avatar>
+              );
+            })}
           </AvatarGroup>
           <Typography variant="caption">
             {repOwner?.name ?? 'No owner'} +{extra} more
