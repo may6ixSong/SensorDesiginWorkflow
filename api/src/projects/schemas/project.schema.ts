@@ -31,11 +31,13 @@ export const PhaseRefSchema = SchemaFactory.createForClass(PhaseRef);
  * 별개 개념이다. 이 프로젝트에 실제로 참여하는 인원을 부서별로 보여주기 위한
  * 정보성 명단이며, department는 부여 시점에 자유 입력(사용자의 실제 소속과
  * 다를 수 있음 — ViewGrant.department와 동일한 패턴).
+ *
+ * 사용자는 KnoxID 문자열로만 참조한다 (api에는 users 컬렉션이 없다).
  */
 @Schema({ _id: false })
 export class ProjectMember {
-  @Prop({ type: Types.ObjectId, ref: 'User', required: true })
-  userId: Types.ObjectId;
+  @Prop({ required: true, trim: true })
+  knoxId: string;
 
   @Prop({ required: true })
   department: string;
@@ -66,6 +68,14 @@ export class Project {
 
   @Prop({ type: [ProjectMemberSchema], default: [] })
   members: ProjectMember[];
+
+  /**
+   * 목업 시드가 만든 문서 표시 (MOCKUP_ENABLED). 사용자가 실제로 만든 데이터는 항상 false다.
+   * MOCKUP_ENABLED=false 로 바꾸고 재시작하면 isMock:true 문서만 일괄 삭제된다
+   * (src/database/seed-runner.service.ts) - 실제 데이터는 절대 건드리지 않는다.
+   */
+  @Prop({ default: false, index: true })
+  isMock: boolean;
 
   _id: Types.ObjectId;
 }
