@@ -1,40 +1,39 @@
 import { Body, Controller, Delete, Get, Param, Post, UseGuards } from '@nestjs/common';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { IpAccessGuard } from '../common/guards/ip-access.guard';
 import { IpAccess } from '../common/decorators/ip-access.decorator';
-import { CurrentUser } from '../auth/current-user.decorator';
-import { UserDocument } from '../users/schemas/user.schema';
+import { CurrentActor } from '../common/decorators/current-actor.decorator';
+import { Actor } from '../common/actor';
 import { IpsService } from './ips.service';
 import { toIpDto } from './dto/ip.dto';
 import { AddOwnerDto, AddViewGrantDto } from './dto/manage-access.dto';
 
-@UseGuards(JwtAuthGuard, IpAccessGuard)
+@UseGuards(IpAccessGuard)
 @Controller('ips')
 export class IpsController {
   constructor(private readonly ips: IpsService) {}
 
   @IpAccess('view')
   @Get(':ipId')
-  async getOne(@Param('ipId') ipId: string, @CurrentUser() me: UserDocument) {
-    const ip = await this.ips.findPopulatedOrThrow(ipId);
+  async getOne(@Param('ipId') ipId: string, @CurrentActor() me: Actor) {
+    const ip = await this.ips.findOrThrow(ipId);
     return { data: toIpDto(ip, me) };
   }
 
   @IpAccess('edit')
   @Post(':ipId/owners')
-  async addOwner(@Param('ipId') ipId: string, @Body() body: AddOwnerDto, @CurrentUser() me: UserDocument) {
-    const ip = await this.ips.addOwner(ipId, body.userId, me);
+  async addOwner(@Param('ipId') ipId: string, @Body() body: AddOwnerDto, @CurrentActor() me: Actor) {
+    const ip = await this.ips.addOwner(ipId, body.knoxId, body.department, me);
     return { data: toIpDto(ip, me) };
   }
 
   @IpAccess('edit')
-  @Delete(':ipId/owners/:userId')
+  @Delete(':ipId/owners/:knoxId')
   async removeOwner(
     @Param('ipId') ipId: string,
-    @Param('userId') userId: string,
-    @CurrentUser() me: UserDocument,
+    @Param('knoxId') knoxId: string,
+    @CurrentActor() me: Actor,
   ) {
-    const ip = await this.ips.removeOwner(ipId, userId, me);
+    const ip = await this.ips.removeOwner(ipId, knoxId, me);
     return { data: toIpDto(ip, me) };
   }
 
@@ -43,20 +42,20 @@ export class IpsController {
   async addViewGrant(
     @Param('ipId') ipId: string,
     @Body() body: AddViewGrantDto,
-    @CurrentUser() me: UserDocument,
+    @CurrentActor() me: Actor,
   ) {
-    const ip = await this.ips.addViewGrant(ipId, body.userId, body.department, me);
+    const ip = await this.ips.addViewGrant(ipId, body.knoxId, body.department, me);
     return { data: toIpDto(ip, me) };
   }
 
   @IpAccess('edit')
-  @Delete(':ipId/view-grants/:userId')
+  @Delete(':ipId/view-grants/:knoxId')
   async removeViewGrant(
     @Param('ipId') ipId: string,
-    @Param('userId') userId: string,
-    @CurrentUser() me: UserDocument,
+    @Param('knoxId') knoxId: string,
+    @CurrentActor() me: Actor,
   ) {
-    const ip = await this.ips.removeViewGrant(ipId, userId, me);
+    const ip = await this.ips.removeViewGrant(ipId, knoxId, me);
     return { data: toIpDto(ip, me) };
   }
 }
