@@ -1,95 +1,23 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { Deliverable, DeliverableDocument } from '../deliverables/schemas/deliverable.schema';
-import { IpDocument } from '../ips/schemas/ip.schema';
-import { Actor } from '../common/actor';
-import { ProjectsService } from '../projects/projects.service';
-import { MemosService } from '../memos/memos.service';
-import { EdgesService } from '../edges/edges.service';
-import { AuditService } from '../audit/audit.service';
-import { PutCanvasDto } from './dto/put-canvas.dto';
+import { Module } from '@nestjs/common';
+import { Ip, IpSchema } from '../ips/schemas/ip.schema';
+import { Deliverable, DeliverableSchema } from '../deliverables/schemas/deliverable.schema';
+import { registerModels } from '../database/model-registration';
+import { IpAccessGuard } from './guards/ip-access.guard';
+
+const Models = registerModels([
+  { name: Ip.name, schema: IpSchema },
+  { name: Deliverable.name, schema: DeliverableSchema },
+]);
 
 /**
- * 캔버스(레이아웃/연결) 일괄 PUT (설계서 5.5). 배치·Auto Fit·series 일정 변경은
- * 전부 FE 메모리에서 계산되고, BE는 좌표의 최소 유효성만 검사한 뒤 신뢰하고 저장한다.
- * 단 phaseKey가 실제 프로젝트 Phase 목록에 존재하는지는 검증한다.
+ * Ip/Deliverable 모델과 IpAccessGuard를 한 곳에서 등록해 공유한다 - 이 둘을 쓰는
+ * 모듈(ips, deliverables, hld, edges, memos, canvas)이 각자 다시 등록하지 않고
+ * CommonAccessModule만 import한다. IpAccessGuard가 두 모델을 모두 필요로 하기 때문에
+ * (src/common/guards/ip-access.guard.ts) 모델 등록과 가드 제공을 함께 묶는다.
  */
-@Injectable()
-export class CanvasService {
-  constructor(
-    @InjectModel(Deliverable.name) private readonly deliverableModel: Model<DeliverableDocument>,
-    private readonly projects: ProjectsService,
-    private readonly memos: MemosService,
-    private readonly edges: EdgesService,
-    private readonly audit: AuditService,
-  ) {}
-
-  async apply(ip: IpDocument, dto: PutCanvasDto, actor: Actor) {
-    const project = await this.projects.findByIdOrThrow(ip.projectId.toString());
-    const validPhaseKeys = new Set(project.phases.map((p) => p.key));
-
-    this.assertValidLayouts(dto);
-    for (const d of dto.deliverables) {
-      if (!validPhaseKeys.has(d.phaseKey)) {
-        throw new BadRequestException(`Unknown phase: ${d.phaseKey}`);
-      }
-    }
-    for (const m of dto.memos) {
-      if (!validPhaseKeys.has(m.phaseKey)) {
-        throw new BadRequestException(`Unknown phase: ${m.phaseKey}`);
-      }
-    }
-
-    await Promise.all(
-      dto.deliverables.map((d) =>
-        this.deliverableModel
-          .updateOne(
-            { _id: d.id, ipId: ip._id },
-            { $set: { layout: d.layout, phaseKey: d.phaseKey } },
-          )
-          .exec(),
-      ),
-    );
-
-    await this.memos.replaceAllForIp(
-      ip._id.toString(),
-      dto.memos.map((m) => ({
-        id: m.id,
-        phaseKey: m.phaseKey,
-        text: m.text,
-        layout: m.layout,
-        createdBy: actor.knoxId,
-      })),
-      ip.isMock,
-    );
-
-    await this.edges.replaceAllForIp(ip._id.toString(), dto.edges, ip.isMock);
-
-    await this.audit.log(actor.knoxId, 'LAYOUT_UPDATE', 'ip', ip._id, {
-      deliverableCount: dto.deliverables.length,
-      memoCount: dto.memos.length,
-      edgeCount: dto.edges.length,
-    });
-
-    return {
-      deliverables: await this.deliverableModel.find({ ipId: ip._id }).exec(),
-      memos: await this.memos.listForIp(ip._id.toString()),
-      edges: await this.edges.listForIp(ip._id.toString()),
-    };
-  }
-
-  private assertValidLayouts(dto: PutCanvasDto) {
-    // y는 위 방향 벽(top wall)을 없애 자유롭게 음수로 드래그할 수 있으므로 하한을
-    // 두지 않는다 - x(Phase 레인 좌측 경계)는 여전히 0 이상이어야 한다.
-    const isValid = (l: { x: number; y: number; w: number; h: number }) =>
-      l && l.x >= 0 && Number.isFinite(l.y) && l.w > 0 && l.h > 0;
-    for (const d of dto.deliverables) {
-      if (!isValid(d.layout)) throw new BadRequestException(`Invalid coordinates: ${d.id}`);
-    }
-    for (const m of dto.memos) {
-      if (!isValid(m.layout)) throw new BadRequestException('Memo coordinates are invalid.');
-      if (!m.text || m.text.length > 2000) throw new BadRequestException('Memo text length is invalid.');
-    }
-  }
-}
+@Module({
+  imports: [Models],
+  providers: [IpAccessGuard],
+  exports: [Models, IpAccessGuard],
+})
+export class CommonAccessModule {}
