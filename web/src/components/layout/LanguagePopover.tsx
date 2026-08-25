@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { Languages } from 'lucide-react';
 import { Popover, ToggleButton, ToggleButtonGroup } from '@mui/material';
-import { useAuth, OFFLINE_LANG_KEY, type Language } from '@/app/providers/AuthProvider';
+import { useAuth, type Language } from '@/app/providers/AuthProvider';
 import { updateUserInfo } from '@/service/user-service';
-import { isOnLine } from '@/utils/helper';
 import { HeaderIconButton } from '@/components/common/HeaderIconButton';
 import { T } from '@/theme/tokens';
 import { useTranslation } from 'react-i18next';
@@ -18,7 +17,6 @@ export function LanguagePopover() {
   const [anchor, setAnchor] = useState<null | HTMLElement>(null);
   const open = Boolean(anchor);
   const lang = (user?.Language ?? 'en') as Language;
-  const onLine = isOnLine();
 
   const toggle = (e: React.MouseEvent<HTMLElement>) => {
     // Capture currentTarget synchronously — the DOM nulls it out once the
@@ -37,13 +35,6 @@ export function LanguagePopover() {
     i18n.changeLanguage(next);
     updateUserPrefs('Language', next);
     close();
-
-    if (!onLine) {
-      // No backend offline: persist the explicit choice locally so it survives
-      // restarts (AuthProvider reads OFFLINE_LANG_KEY on boot).
-      localStorage.setItem(OFFLINE_LANG_KEY, next);
-      return;
-    }
 
     void updateUserInfo(user?.KnoxID ?? '', 'Language', next);
   };
