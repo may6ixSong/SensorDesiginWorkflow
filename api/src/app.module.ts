@@ -1,9 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ENV_FILE } from './config/env';
 import configuration from './config/configuration';
 import { DatabaseModule } from './database/database.module';
-import { AuthModule } from './auth/auth.module';
-import { UsersModule } from './users/users.module';
 import { ProjectsModule } from './projects/projects.module';
 import { IpsModule } from './ips/ips.module';
 import { DeliverablesModule } from './deliverables/deliverables.module';
@@ -16,10 +15,8 @@ import { AuditModule } from './audit/audit.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true, load: [configuration] }),
+    ConfigModule.forRoot({ isGlobal: true, envFilePath: ENV_FILE, load: [configuration] }),
     DatabaseModule,
-    AuthModule,
-    UsersModule,
     ProjectsModule,
     IpsModule,
     DeliverablesModule,
