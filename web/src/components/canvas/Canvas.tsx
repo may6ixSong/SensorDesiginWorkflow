@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Box } from '@mui/material';
-import { IpBriefDto, IpDto, PhaseRef, UserDto } from '@/types/domain';
+import { IpBriefDto, IpDto, PhaseRef } from '@/types/domain';
 import { useCanvasStore } from '@/store/canvasStore';
 import { toast } from '@/store/toastStore';
 import {
@@ -22,7 +22,6 @@ import { Legend } from './Legend';
 interface Props {
   ip: IpDto;
   phases: PhaseRef[];
-  usersById: Map<string, UserDto>;
   canEdit: boolean;
   /** origin==='incoming'인 노드를 열 때(읽기 전용 상세) 호출된다. */
   onOpenIncoming: (id: string) => void;
@@ -39,7 +38,7 @@ type Blk = CanvasNode | CanvasMemo;
  * 줌/팬, 자유 드래그 + Phase 벽 저항, grip 리사이즈, pin 연결, Phase 레인 폭 조절,
  * flow 하이라이트, Auto Fit 이 모두 여기서 완결된다 (설계서 3.7~3.9, 7.1).
  */
-export function Canvas({ ip, phases, usersById, canEdit, onOpenIncoming, ipDirectory, onSaveLayout }: Props) {
+export function Canvas({ ip, phases, canEdit, onOpenIncoming, ipDirectory, onSaveLayout }: Props) {
   const ipById = useMemo(() => new Map(ipDirectory.map((d) => [d.id, d])), [ipDirectory]);
   const vpRef = useRef<HTMLDivElement>(null);
   const cvRef = useRef<HTMLDivElement>(null);
@@ -633,7 +632,6 @@ export function Canvas({ ip, phases, usersById, canEdit, onOpenIncoming, ipDirec
               key={d.id}
               d={d}
               phase={phases.find((p) => p.key === d.phase)}
-              usersById={usersById}
               recvIp={d.recvIpId ? ipById.get(d.recvIpId) : undefined}
               edit={edit}
               canEdit={canEdit}
