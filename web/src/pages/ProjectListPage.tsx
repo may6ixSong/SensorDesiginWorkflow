@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react';
 import { Box } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
-import { ProjectDto, UserDto } from '@/types/domain';
+import { ProjectDto } from '@/types/domain';
 import { useProjects, useProjectIps } from '@/api/hooks/useProjects';
 import { AppShell } from '@/components/layout/AppShell';
 import { SirenButton } from '@/components/common/SirenButton';
 import { UserAvatar } from '@/components/common/Avatar';
+import { DirectoryUser, findDirectoryUser } from '@/shared/constants/mock-users';
 import { Icon } from '@/components/common/Icon';
 import { progressOf } from '@/lib/projectProgress';
 import { CURSOR_POINTER, FONT_DISPLAY, FONT_MONO, T } from '@/theme/tokens';
@@ -19,11 +20,15 @@ export function ProjectListPage() {
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>('All');
   const [view, setView] = useState<View>('grid');
 
-  // 목업 단계 — 프로젝트 카드는 한 개만 노출한다.
+  // 접근 가능한 과제를 전부 노출한다. (목업 단계에는 .slice(0,1)로 한 개만 보여주고
+  // 'Archived'는 항상 빈 목록이었다 — 실제 과제가 들어오면서 카드가 잘려 안 보였다.)
   const list = useMemo(() => {
-    const one = (projects ?? []).slice(0, 1);
-    if (filter === 'Archived') return [];
-    return one.filter((p) => `${p.code} ${p.name}`.toLowerCase().includes(q.trim().toLowerCase()));
+    const term = q.trim().toLowerCase();
+    return (projects ?? [])
+      .filter((p) =>
+        filter === 'All' ? true : filter === 'Active' ? p.status === 'ACTIVE' : p.status !== 'ACTIVE',
+      )
+      .filter((p) => `${p.code} ${p.name}`.toLowerCase().includes(term));
   }, [projects, q, filter]);
 
   return (
@@ -163,8 +168,8 @@ function ProjectCard({ project, view }: { project: ProjectDto; view: View }) {
   const { data: ips } = useProjectIps(project._id);
   const { pct, current, done, total } = progressOf(project.phases);
   const owners = useMemo(() => {
-    const seen = new Map<string, UserDto>();
-    (ips ?? []).flatMap((i) => i.owners).forEach((u) => seen.set(u.id, u));
+    const seen = new Map<string, DirectoryUser>();
+    (ips ?? []).flatMap((i) => i.owners).forEach((knoxId) => seen.set(knoxId, findDirectoryUser(knoxId)));
     return [...seen.values()];
   }, [ips]);
 
@@ -267,7 +272,7 @@ function ProjectCard({ project, view }: { project: ProjectDto; view: View }) {
       >
         <Box sx={{ display: 'flex' }}>
           {owners.slice(0, 4).map((u, i) => (
-            <Box key={u.id} sx={{ ml: i ? '-7px' : 0, borderRadius: '8px', border: `2px solid ${T.sf}`, display: 'flex' }}>
+            <Box key={u.knoxId} sx={{ ml: i ? '-7px' : 0, borderRadius: '8px', border: `2px solid ${T.sf}`, display: 'flex' }}>
               <UserAvatar user={u} size={24} />
             </Box>
           ))}
