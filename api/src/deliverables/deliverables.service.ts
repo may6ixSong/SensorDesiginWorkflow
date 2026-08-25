@@ -3,8 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Deliverable, DeliverableDocument } from './schemas/deliverable.schema';
 import { Ip, IpDocument } from '../ips/schemas/ip.schema';
-import { UserDocument } from '../users/schemas/user.schema';
-import { UsersService } from '../users/users.service';
+import { Actor } from '../common/actor';
 import { AuditService } from '../audit/audit.service';
 import { EdgesService } from '../edges/edges.service';
 import { RECEIVABLE_DEPARTMENT_IDS } from '../common/constants/departments';
@@ -21,7 +20,6 @@ export class DeliverablesService {
   constructor(
     @InjectModel(Deliverable.name) private readonly model: Model<DeliverableDocument>,
     @InjectModel(Ip.name) private readonly ipModel: Model<IpDocument>,
-    private readonly users: UsersService,
     private readonly audit: AuditService,
     private readonly edges: EdgesService,
   ) {}
@@ -56,7 +54,24 @@ export class DeliverablesService {
     return d;
   }
 
-  async create(ip: IpDocument, dto: CreateDeliverableDto, actor: UserDocument) {
+  /** 다음 업로드가 받을 버전 문자열(스토리지 키 경로용) - 업로드는 minor +1이다 (설계서 3.5). */
+  nextVersionLabel(d: DeliverableDocument): string {
+    const latest = d.versions[0];
+    return latest ? `${latest.major}.${latest.minor + 1}` : '0.1';
+  }
+
+  /**
+   * 다운로드 대상 버전을 찾는다. Edit 권한이 없으면 Release(major) 버전만 볼 수 있으므로
+   * 작업중(minor) 버전은 존재조차 하지 않는 것으로 취급한다 (설계서 6.1).
+   */
+  findVersionOrThrow(d: DeliverableDocument, major: number, minor: number, isEditor: boolean) {
+    const visible = isEditor ? d.versions : d.versions.filter((v) => v.kind === 'major');
+    const version = visible.find((v) => v.major === major && v.minor === minor);
+    if (!version) throw new NotFoundException('Version not found.');
+    return version;
+  }
+
+  async create(ip: IpDocument, dto: CreateDeliverableDto, actor: Actor) {
     const d = await this.model.create({
       projectId: ip.projectId,
       ipId: ip._id,
@@ -71,9 +86,11 @@ export class DeliverablesService {
       recvContact: null,
       layout: { x: 0, y: 0, w: 160, h: 82 },
       versions: [],
-      createdBy: actor._id,
+      createdBy: actor.knoxId,
+      // 목업 IP 아래 산출물은 목업으로 남긴다 - 플래그를 끌 때 IP와 함께 정리된다.
+      isMock: ip.isMock,
     });
-    await this.audit.log(actor._id, 'DELIVERABLE_CREATE', 'deliverable', d._id, { name: dto.name });
+    await this.audit.log(actor.knoxId, 'DELIVERABLE_CREATE', 'deliverable', d._id, { name: dto.name });
     return d;
   }
 
@@ -86,15 +103,19 @@ export class DeliverablesService {
     return d;
   }
 
-  async remove(id: string, actor: UserDocument) {
+  async remove(id: string, actor: Actor) {
     const d = await this.findOrThrow(id);
     await this.edges.deleteByDeliverableIds([d._id]);
     await d.deleteOne();
-    await this.audit.log(actor._id, 'DELIVERABLE_DELETE', 'deliverable', id, { name: d.name });
+    await this.audit.log(actor.knoxId, 'DELIVERABLE_DELETE', 'deliverable', id, { name: d.name });
   }
 
-  /** recvDept는 Analog 제외 5개 중 하나, recvContact는 반드시 그 부서 소속 (설계서 3.4, 4.6, BE 검증). */
-  async updateRecv(id: string, dto: UpdateRecvDto, actor: UserDocument) {
+  /**
+   * recvDept는 Analog 제외 5개 중 하나 (설계서 3.4, 4.6, BE 검증).
+   * recvContact는 KnoxID 문자열이며 "그 부서 소속인지"는 api가 조회할 수 없으므로
+   * recvDept가 함께 지정되었는지까지만 검증한다 - 소속 판정은 web(공통 플랫폼 조회)의 몫이다.
+   */
+  async updateRecv(id: string, dto: UpdateRecvDto, actor: Actor) {
     const d = await this.findOrThrow(id);
 
     if (dto.recvDept) {
@@ -103,11 +124,8 @@ export class DeliverablesService {
       }
     }
 
-    if (dto.recvContact) {
-      const contact = await this.users.findById(dto.recvContact);
-      if (!dto.recvDept || contact.department !== dto.recvDept) {
-        throw new BadRequestException('Recipient contact must belong to the recipient department.');
-      }
+    if (dto.recvContact && !dto.recvDept) {
+      throw new BadRequestException('A recipient department is required when a recipient contact is set.');
     }
 
     if (dto.recvIpId) {
@@ -122,11 +140,11 @@ export class DeliverablesService {
     }
 
     d.recvDept = dto.recvDept ?? null;
-    d.recvContact = dto.recvContact ? new Types.ObjectId(dto.recvContact) : null;
+    d.recvContact = dto.recvContact ?? null;
     d.recvIpId = dto.recvIpId ? new Types.ObjectId(dto.recvIpId) : null;
     d.sourceDept = dto.sourceDept?.trim() || null;
     await d.save();
-    await this.audit.log(actor._id, 'RECV_UPDATE', 'deliverable', d._id, {
+    await this.audit.log(actor.knoxId, 'RECV_UPDATE', 'deliverable', d._id, {
       recvDept: d.recvDept,
       recvContact: d.recvContact,
       recvIpId: d.recvIpId,
@@ -135,7 +153,7 @@ export class DeliverablesService {
   }
 
   /** 업로드 = minor +1 (최초는 v0.1) (설계서 3.5). */
-  async addVersion(id: string, dto: AddVersionDto, actor: UserDocument) {
+  async addVersion(id: string, dto: AddVersionDto, actor: Actor) {
     const d = await this.findOrThrow(id);
     if (d.network === 'OA' && !dto.storageKey) {
       throw new BadRequestException('OA-network deliverables require a storageKey.');
@@ -156,17 +174,17 @@ export class DeliverablesService {
       storageKey: dto.storageKey ?? null,
       hpcPath: dto.hpcPath ?? null,
       note: dto.note ?? '',
-      createdBy: actor._id,
+      createdBy: actor.knoxId,
       createdAt: new Date(),
     };
     d.versions.unshift(version as any);
     await d.save();
-    await this.audit.log(actor._id, 'VERSION_UPLOAD', 'deliverable', d._id, { major, minor });
+    await this.audit.log(actor.knoxId, 'VERSION_UPLOAD', 'deliverable', d._id, { major, minor });
     return d;
   }
 
   /** Release = major +1 · minor 0, 최신 업로드분을 그대로 릴리스로 승격 (설계서 3.5, 5.4). */
-  async release(id: string, dto: ReleaseDto, actor: UserDocument) {
+  async release(id: string, dto: ReleaseDto, actor: Actor) {
     const d = await this.findOrThrow(id);
     const latest = d.versions[0];
     if (!latest) {
@@ -181,12 +199,12 @@ export class DeliverablesService {
       storageKey: latest.storageKey,
       hpcPath: latest.hpcPath,
       note: dto.note ?? '',
-      createdBy: actor._id,
+      createdBy: actor.knoxId,
       createdAt: new Date(),
     };
     d.versions.unshift(version as any);
     await d.save();
-    await this.audit.log(actor._id, 'RELEASE', 'deliverable', d._id, { major });
+    await this.audit.log(actor.knoxId, 'RELEASE', 'deliverable', d._id, { major });
     return d;
   }
 
@@ -194,7 +212,7 @@ export class DeliverablesService {
    * Release 일정(series) 갱신 (설계서 3.6). 선택된 phaseKeys에 맞춰 인스턴스를
    * 생성/삭제하고, 최초 생성 시에만 회차 순서대로 auto edge를 연결한다.
    */
-  async updateSchedule(originId: string, phaseKeys: string[], actor: UserDocument) {
+  async updateSchedule(originId: string, phaseKeys: string[], actor: Actor) {
     const origin = await this.findOrThrow(originId);
     if (origin.series) {
       throw new BadRequestException('The release schedule can only be set on the original deliverable, not a series instance.');
@@ -239,7 +257,8 @@ export class DeliverablesService {
             h: origin.layout.h,
           },
           versions: [],
-          createdBy: actor._id,
+          createdBy: actor.knoxId,
+          isMock: origin.isMock,
         });
         created.push(instance);
       }
@@ -262,7 +281,7 @@ export class DeliverablesService {
 
     if (wasEmpty && created.length > 0) {
       const chain = [origin._id, ...remaining.map((r) => r._id)];
-      await this.edges.createAutoChain(origin.ipId, chain);
+      await this.edges.createAutoChain(origin.ipId, chain, origin.isMock);
     }
 
     return this.model.find({ $or: [{ _id: origin._id }, { series: origin._id }] }).exec();
