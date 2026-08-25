@@ -1,13 +1,12 @@
 import { DeliverableDocument, DeliverableVersion } from '../schemas/deliverable.schema';
 import { IpDocument } from '../../ips/schemas/ip.schema';
-import { UserDocument } from '../../users/schemas/user.schema';
+import { Actor } from '../../common/actor';
 
-function isEditor(ip: IpDocument, me: UserDocument): boolean {
-  const meId = me._id.toString();
-  return ip.owners.some((o) => o.toString() === meId);
+function isEditor(ip: IpDocument, me: Actor): boolean {
+  return ip.owners.includes(me.knoxId);
 }
 
-/** 목업의 MV(major,minor,kind,by,at,note,file) 형태로 내려준다. */
+/** 목업의 MV(major,minor,kind,by,at,note,file) 형태로 내려준다. by는 KnoxID다. */
 function toVersionDto(v: DeliverableVersion) {
   return {
     major: v.major,
@@ -15,7 +14,7 @@ function toVersionDto(v: DeliverableVersion) {
     kind: v.kind,
     file: v.hpcPath ?? v.fileName ?? '',
     note: v.note ?? '',
-    by: v.createdBy?.toString() ?? '',
+    by: v.createdBy ?? '',
     at: v.createdAt instanceof Date ? v.createdAt.toISOString() : String(v.createdAt),
   };
 }
@@ -28,7 +27,7 @@ function toVersionDto(v: DeliverableVersion) {
  * 그 외에는 Released(major)만. FE는 이 배열로 목업의 latA()/latR()/hasW()를
  * 그대로 계산하므로, 권한 없는 사용자에게는 작업중 버전이 존재조차 하지 않는다.
  */
-export function toDeliverableDto(d: DeliverableDocument, ip: IpDocument, me: UserDocument) {
+export function toDeliverableDto(d: DeliverableDocument, ip: IpDocument, me: Actor) {
   const isEdit = isEditor(ip, me);
   const all = d.versions ?? [];
   const visible = isEdit ? all : all.filter((v) => v.kind === 'major');
@@ -48,7 +47,7 @@ export function toDeliverableDto(d: DeliverableDocument, ip: IpDocument, me: Use
     seriesTotal: d.seriesTotal,
     layout: { x: d.layout.x, y: d.layout.y, w: d.layout.w, h: d.layout.h },
     recvDept: d.recvDept ?? null,
-    recvContact: d.recvContact ? d.recvContact.toString() : null,
+    recvContact: d.recvContact ?? null,
     recvIpId: d.recvIpId ? d.recvIpId.toString() : null,
     sourceDept: d.sourceDept ?? null,
     versions: visible.map(toVersionDto),
@@ -60,7 +59,7 @@ export function toDeliverableDto(d: DeliverableDocument, ip: IpDocument, me: Use
 }
 
 /** GET /deliverables/:id/versions - 가시성 규칙 적용된 버전 이력 (설계서 5.1, 3.5). */
-export function toVisibleVersions(d: DeliverableDocument, ip: IpDocument, me: UserDocument) {
+export function toVisibleVersions(d: DeliverableDocument, ip: IpDocument, me: Actor) {
   const isEdit = isEditor(ip, me);
   const versions = isEdit ? d.versions : d.versions.filter((v) => v.kind === 'major');
   return versions.map(toVersionDto);
@@ -88,7 +87,7 @@ export function toIncomingDeliverableDto(d: DeliverableDocument, sourceIp: IpDoc
     seriesTotal: d.seriesTotal,
     layout: { x: d.layout.x, y: d.layout.y, w: d.layout.w, h: d.layout.h },
     recvDept: d.recvDept ?? null,
-    recvContact: d.recvContact ? d.recvContact.toString() : null,
+    recvContact: d.recvContact ?? null,
     recvIpId: d.recvIpId ? d.recvIpId.toString() : null,
     sourceDept: null,
     versions: released ? [toVersionDto(released)] : [],
