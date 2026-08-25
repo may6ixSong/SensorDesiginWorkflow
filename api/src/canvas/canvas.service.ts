@@ -3,7 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Deliverable, DeliverableDocument } from '../deliverables/schemas/deliverable.schema';
 import { IpDocument } from '../ips/schemas/ip.schema';
-import { UserDocument } from '../users/schemas/user.schema';
+import { Actor } from '../common/actor';
 import { ProjectsService } from '../projects/projects.service';
 import { MemosService } from '../memos/memos.service';
 import { EdgesService } from '../edges/edges.service';
@@ -25,7 +25,7 @@ export class CanvasService {
     private readonly audit: AuditService,
   ) {}
 
-  async apply(ip: IpDocument, dto: PutCanvasDto, actor: UserDocument) {
+  async apply(ip: IpDocument, dto: PutCanvasDto, actor: Actor) {
     const project = await this.projects.findByIdOrThrow(ip.projectId.toString());
     const validPhaseKeys = new Set(project.phases.map((p) => p.key));
 
@@ -59,13 +59,14 @@ export class CanvasService {
         phaseKey: m.phaseKey,
         text: m.text,
         layout: m.layout,
-        createdBy: actor._id.toString(),
+        createdBy: actor.knoxId,
       })),
+      ip.isMock,
     );
 
-    await this.edges.replaceAllForIp(ip._id.toString(), dto.edges);
+    await this.edges.replaceAllForIp(ip._id.toString(), dto.edges, ip.isMock);
 
-    await this.audit.log(actor._id, 'LAYOUT_UPDATE', 'ip', ip._id, {
+    await this.audit.log(actor.knoxId, 'LAYOUT_UPDATE', 'ip', ip._id, {
       deliverableCount: dto.deliverables.length,
       memoCount: dto.memos.length,
       edgeCount: dto.edges.length,
