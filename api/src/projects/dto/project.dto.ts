@@ -1,9 +1,8 @@
 import { ProjectDocument, PhaseRef } from '../schemas/project.schema';
-import { UserDocument } from '../../users/schemas/user.schema';
-import { toUserDto, UserDto } from '../../users/dto/user.dto';
 
 export interface ProjectMemberDto {
-  user: UserDto;
+  /** KnoxID - 이름/부서/아바타는 web이 공통 플랫폼에서 조회한다. */
+  knoxId: string;
   department: string;
   addedAt: Date;
 }
@@ -18,7 +17,6 @@ export interface ProjectDetailDto {
   members: ProjectMemberDto[];
 }
 
-/** project.members.userId가 populate된 문서를 받는다고 가정 (설계서 4.4, IpDto.viewGrants와 동일 패턴). */
 export function toProjectDetailDto(project: ProjectDocument): ProjectDetailDto {
   return {
     _id: project._id.toString(),
@@ -27,12 +25,10 @@ export function toProjectDetailDto(project: ProjectDocument): ProjectDetailDto {
     domain: project.domain,
     status: project.status,
     phases: project.phases,
-    members: (project.members as any[])
-      .filter((m) => m.userId)
-      .map((m) => ({
-        user: toUserDto(m.userId as UserDocument),
-        department: m.department,
-        addedAt: m.addedAt,
-      })),
+    members: project.members.map((m) => ({
+      knoxId: m.knoxId,
+      department: m.department,
+      addedAt: m.addedAt,
+    })),
   };
 }
