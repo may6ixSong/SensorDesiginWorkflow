@@ -11,6 +11,7 @@ import {
   buildDomainModel, statusOf, withAlpha,
   DomainFlow, DomainGroup, DomainWorkflowModel, UNASSIGNED_DOMAIN,
 } from '@/lib/domainWorkflow';
+import { SpaceBackdrop, SpacePalette, useSpacePalette } from './spaceBackdrop';
 
 /* ──────────────────────────────────────────────────────────────────────────
  * Total workflow view — 과제의 모든 IP를 도메인별 영역으로 나눠 한 화면에서 보는
@@ -54,13 +55,18 @@ interface Props {
 }
 
 export function DomainWorkflowDialog(props: Props) {
+  const pal = useSpacePalette();
   return (
     <Dialog
       open={props.open}
       onClose={props.onClose}
       fullScreen
-      PaperProps={{ sx: { background: T.bg, overflow: 'hidden' } }}
+      PaperProps={{ sx: { background: pal.wash, overflow: 'hidden' } }}
     >
+      <style>{`
+        @keyframes wf-twinkle { 0%,100% { opacity:.3 } 50% { opacity:1 } }
+        @media (prefers-reduced-motion: reduce) { .wf-twinkle { animation: none !important; } }
+      `}</style>
       {props.open && <WorkflowBoard {...props} />}
     </Dialog>
   );
@@ -68,12 +74,19 @@ export function DomainWorkflowDialog(props: Props) {
 
 /* ══════════════════════════════════════════════════════════════ Board ═══ */
 
+/** easeInOutCubic — 시작·끝을 부드럽게 눌러주는 "카메라" 이징. */
+function easeInOutCubic(t: number) {
+  return t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
+}
+
 function WorkflowBoard({
   onClose, projectId, projectName, projectCode, phases, ips,
 }: Props) {
   const navigate = useNavigate();
+  const pal = useSpacePalette();
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const sectionRefs = useRef(new Map<string, HTMLDivElement>());
+  const scrollAnimRef = useRef<number | null>(null);
   const [activeDomain, setActiveDomain] = useState<string | null>(null);
 
   const sortedPhases = useMemo(() => [...phases].sort((a, b) => a.order - b.order), [phases]);
@@ -108,12 +121,37 @@ function WorkflowBoard({
     [model],
   );
 
+  /**
+   * 도메인 전환 — 브라우저 기본 smooth-scroll 대신 직접 이징을 건다. 거리에 비례해
+   * 지속시간을 늘려("멀수록 천천히 흘러가는") 카메라가 도메인 사이를 미끄러져
+   * 이동하는 느낌을 준다. 수동 스크롤(트랙패드/휠)은 건드리지 않는다 — 그건 즉각
+   * 반응해야 하니 네이티브 그대로 둔다.
+   */
   const scrollToDomain = useCallback((key: string) => {
     const el = sectionRefs.current.get(key);
     const container = scrollRef.current;
     if (!el || !container) return;
-    const top = el.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop;
-    container.scrollTo({ top: Math.max(0, top - 14), behavior: 'smooth' });
+    const targetTop = Math.max(
+      0,
+      el.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop - 14,
+    );
+    const startTop = container.scrollTop;
+    const delta = targetTop - startTop;
+    if (Math.abs(delta) < 1) return;
+
+    if (scrollAnimRef.current !== null) cancelAnimationFrame(scrollAnimRef.current);
+    const duration = Math.min(1100, Math.max(480, Math.abs(delta) * 0.55));
+    const t0 = performance.now();
+    const tick = (now: number) => {
+      const p = Math.min(1, (now - t0) / duration);
+      container.scrollTop = startTop + delta * easeInOutCubic(p);
+      scrollAnimRef.current = p < 1 ? requestAnimationFrame(tick) : null;
+    };
+    scrollAnimRef.current = requestAnimationFrame(tick);
+  }, []);
+
+  useEffect(() => () => {
+    if (scrollAnimRef.current !== null) cancelAnimationFrame(scrollAnimRef.current);
   }, []);
 
   /* 스크롤스파이 — 지금 화면 상단 근처에 걸린 섹션을 좌측 메뉴에서 강조한다. */
@@ -135,47 +173,52 @@ function WorkflowBoard({
   }, [model.domains.length]);
 
   return (
-    <Box sx={{ position: 'relative', width: '100%', height: '100%', display: 'flex', flexDirection: 'column', background: T.bg }}>
-      <TopBar
-        projectName={projectName}
-        projectCode={projectCode}
-        model={model}
-        totalRoutes={totalRoutes}
-        loading={loading}
-        onClose={onClose}
-      />
+    <Box sx={{ position: 'relative', width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <SpaceBackdrop scrollRef={scrollRef} />
 
-      <Box sx={{ flex: 1, display: 'flex', minHeight: 0 }}>
-        <DomainNav domains={model.domains} active={activeDomain} onPick={scrollToDomain} />
+      <Box sx={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <TopBar
+          projectName={projectName}
+          projectCode={projectCode}
+          model={model}
+          totalRoutes={totalRoutes}
+          loading={loading}
+          pal={pal}
+          onClose={onClose}
+        />
 
-        <Box ref={scrollRef} sx={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
-          <Box sx={{ maxWidth: 1520, mx: 'auto', px: '28px', py: '26px' }}>
-            {model.domains.map((d) => (
-              <DomainSection
-                key={d.key}
-                domain={d}
-                phases={sortedPhases}
-                deliverablesByIp={byIp}
-                flows={model.flowsByDomain.get(d.key) ?? []}
-                registerRef={(el) => {
-                  if (el) sectionRefs.current.set(d.key, el);
-                  else sectionRefs.current.delete(d.key);
-                }}
-                onOpenIp={(ipId) => { onClose(); navigate(`/details/${projectId}/${ipId}`); }}
-              />
-            ))}
+        <Box sx={{ flex: 1, display: 'flex', minHeight: 0 }}>
+          <DomainNav domains={model.domains} active={activeDomain} pal={pal} onPick={scrollToDomain} />
 
-            {!model.domains.length && (
-              <Box sx={{ padding: '60px 0', textAlign: 'center', color: T.dm2, fontSize: 13 }}>
-                이 과제에서 볼 수 있는 IP가 없습니다.
-              </Box>
-            )}
+          <Box ref={scrollRef} sx={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
+            <Box sx={{ maxWidth: 1520, mx: 'auto', px: '28px', py: '26px' }}>
+              {model.domains.map((d) => (
+                <DomainSection
+                  key={d.key}
+                  domain={d}
+                  phases={sortedPhases}
+                  deliverablesByIp={byIp}
+                  flows={model.flowsByDomain.get(d.key) ?? []}
+                  registerRef={(el) => {
+                    if (el) sectionRefs.current.set(d.key, el);
+                    else sectionRefs.current.delete(d.key);
+                  }}
+                  onOpenIp={(ipId) => { onClose(); navigate(`/details/${projectId}/${ipId}`); }}
+                />
+              ))}
 
-            {/* 마지막 도메인이 짧으면 컨테이너 바닥까지 채울 콘텐츠가 없어 그 섹션을
-                맨 위까지 스크롤할 수 없다 — 그러면 좌측 메뉴 클릭이 눈에 보이는
-                이동으로 이어지지 않는다. 뷰포트 높이만큼 여유 공간을 깔아 항상
-                끝까지 스크롤되게 한다. */}
-            {model.domains.length > 0 && <Box sx={{ height: 'calc(100vh - 260px)' }} />}
+              {!model.domains.length && (
+                <Box sx={{ padding: '60px 0', textAlign: 'center', color: T.dm2, fontSize: 13 }}>
+                  이 과제에서 볼 수 있는 IP가 없습니다.
+                </Box>
+              )}
+
+              {/* 마지막 도메인이 짧으면 컨테이너 바닥까지 채울 콘텐츠가 없어 그 섹션을
+                  맨 위까지 스크롤할 수 없다 — 그러면 좌측 메뉴 클릭이 눈에 보이는
+                  이동으로 이어지지 않는다. 뷰포트 높이만큼 여유 공간을 깔아 항상
+                  끝까지 스크롤되게 한다. */}
+              {model.domains.length > 0 && <Box sx={{ height: 'calc(100vh - 260px)' }} />}
+            </Box>
           </Box>
         </Box>
       </Box>
@@ -186,16 +229,17 @@ function WorkflowBoard({
 /* ══════════════════════════════════════════════════════════════ Chrome ═══ */
 
 function TopBar({
-  projectName, projectCode, model, totalRoutes, loading, onClose,
+  projectName, projectCode, model, totalRoutes, loading, pal, onClose,
 }: {
   projectName: string; projectCode: string; model: DomainWorkflowModel;
-  totalRoutes: number; loading: boolean; onClose: () => void;
+  totalRoutes: number; loading: boolean; pal: SpacePalette; onClose: () => void;
 }) {
   return (
     <Box
       sx={{
         flex: `0 0 ${TOPBAR_H}px`, display: 'flex', alignItems: 'center', gap: '16px',
-        padding: '0 18px', borderBottom: `1px solid ${T.ln}`, background: T.sf,
+        padding: '0 18px', borderBottom: `1px solid ${pal.panelBorder}`,
+        background: pal.panelBg, backdropFilter: 'blur(14px)',
       }}
     >
       <Box sx={{ display: 'flex', alignItems: 'center', gap: '9px' }}>
@@ -227,7 +271,7 @@ function TopBar({
         title="Close"
         sx={{
           display: 'inline-grid', placeItems: 'center', width: 30, height: 30, borderRadius: '8px',
-          border: `1px solid ${T.ln2}`, background: T.sf, color: T.tx, cursor: CURSOR_POINTER,
+          border: `1px solid ${T.ln2}`, background: 'transparent', color: T.tx, cursor: CURSOR_POINTER,
           '&:hover': { background: T.sf3 },
         }}
       >
@@ -247,12 +291,13 @@ function Stat({ label, value, tone }: { label: string; value: string | number; t
 }
 
 function DomainNav({
-  domains, active, onPick,
-}: { domains: DomainGroup[]; active: string | null; onPick: (key: string) => void }) {
+  domains, active, pal, onPick,
+}: { domains: DomainGroup[]; active: string | null; pal: SpacePalette; onPick: (key: string) => void }) {
   return (
     <Box
       sx={{
-        flex: `0 0 ${NAV_W}px`, borderRight: `1px solid ${T.ln}`, background: T.sf,
+        flex: `0 0 ${NAV_W}px`, borderRight: `1px solid ${pal.panelBorder}`,
+        background: pal.panelBg, backdropFilter: 'blur(14px)',
         overflowY: 'auto', padding: '14px 10px',
       }}
     >
