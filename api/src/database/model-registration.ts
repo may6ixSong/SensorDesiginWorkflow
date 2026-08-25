@@ -10,15 +10,18 @@ export interface ModelDef {
   populateRefs?: Record<string, string>;
 }
 
-/** MONGODB_URI가 설정되어 있을 때만 실제 DB에 연결한다 - 그 외에는 아무 것도 연결하지 않는다. */
+/**
+ * DB_CONNECTION(AES 암호문)과 AES_KEY가 둘 다 있을 때만 실제 DB에 연결한다 -
+ * 그 외에는 아무 것도 연결하지 않고 인메모리 목업으로 동작한다.
+ */
 export function isUsingRealDb(): boolean {
-  return Boolean(process.env.MONGODB_URI);
+  return Boolean(process.env.DB_CONNECTION) && Boolean(process.env.AES_KEY);
 }
 
 class InMemoryModelsModule {}
 
 /**
- * MONGODB_URI가 있으면 실제 MongooseModule.forFeature로 등록한다.
+ * DB_CONNECTION이 있으면 실제 MongooseModule.forFeature로 등록한다.
  * 없으면 실제 DB에 전혀 연결하지 않고, `@InjectModel(X.name)`이 찾는 것과 동일한
  * DI 토큰(getModelToken)에 순수 인메모리 페이크 모델을 등록한다 - 서비스 코드는
  * 두 모드에서 완전히 동일하게 동작한다.
