@@ -56,6 +56,50 @@ export function useUpdatePhases(projectId: string) {
   });
 }
 
+/**
+ * IP 도메인 후보 목록 교체 — 목록 전체를 보낸다(phases와 같은 방식).
+ * 아직 IP가 붙어 있는 도메인을 빼고 보내면 BE가 400으로 거절하며 해당 IP 이름을 알려준다.
+ */
+export function useUpdateIpDomains(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (ipDomains: string[]) => {
+      const res = await apiClient.patch<ApiEnvelope<ProjectDetailDto>>(
+        `/projects/${projectId}/ip-domains`,
+        { ipDomains },
+      );
+      return res.data.data;
+    },
+    onSuccess: (project) => {
+      qc.setQueryData(queryKeys.project(projectId), project);
+      qc.invalidateQueries({ queryKey: queryKeys.projects });
+    },
+  });
+}
+
+/**
+ * IP 하나를 이 과제의 도메인에 배정한다 (빈 문자열이면 배정 해제).
+ * projectIps를 반드시 무효화해야 한다 — 그 목록이 Total workflow view의 buildDomainModel
+ * 입력이라, 여기서 안 갱신하면 우주 지도의 항성계가 예전 도메인으로 남는다.
+ */
+export function useUpdateIpDomain(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ ipId, domain }: { ipId: string; domain: string }) => {
+      const res = await apiClient.patch<ApiEnvelope<ProjectDetailDto>>(
+        `/projects/${projectId}/ips/${ipId}/domain`,
+        { domain },
+      );
+      return { project: res.data.data, ipId };
+    },
+    onSuccess: ({ project, ipId }) => {
+      qc.setQueryData(queryKeys.project(projectId), project);
+      qc.invalidateQueries({ queryKey: queryKeys.projectIps(projectId) });
+      qc.invalidateQueries({ queryKey: queryKeys.ip(ipId) });
+    },
+  });
+}
+
 /** 과제 팀원(부서별 로스터) 추가 — 이 과제의 IP 중 하나라도 Edit 권한이 있어야 한다(BE 재검증). */
 export function useAddProjectMember(projectId: string) {
   const qc = useQueryClient();
