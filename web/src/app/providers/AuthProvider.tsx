@@ -5,23 +5,20 @@ import { addEventLog } from '../../service/event-log-service';
 import { useTranslation } from 'react-i18next';
 import { setApiKnoxId } from '../../api/client';
 
-// Ported verbatim from SSM_WEB's AuthProvider.tsx (service name swapped to SIREN
-// only where it names the service itself — cookie name, event name, storage
-// key). TODO: SSO 연동 지점 - 실제 IdP 연동 시 이 파일만 교체하면 된다.
+// Ported from SSM_WEB's AuthProvider.tsx (service name swapped to SIREN only
+// where it names the service itself — cookie name, event name).
+//
+// SSM_WEB과의 유일한 구조적 차이: offline 분기가 없다. SIREN은 offline 환경이
+// 없으므로 isOnLine()/Guest 사용자/OFFLINE_LANG_KEY를 모두 걷어냈다 - 언어·테마는
+// 항상 USER_GROUP_API에서 오고, 실패하면 User 클래스의 기본값('en'/'light')을 쓴다.
+//
+// TODO: SSO 연동 지점 - 실제 IdP 연동 시 이 파일만 교체하면 된다.
 
 let isAdminUser: boolean = false;
 export const isAdmin = () => isAdminUser;
 
 export type Language = 'ko' | 'en';
 export type Theme = 'dark' | 'light';
-
-/**
- * localStorage key for the language the user explicitly picked while offline.
- * Kept separate from i18next's auto-cached "i18nextLng" (which may hold the
- * browser's navigator language), so offline defaults to 'en' unless the user
- * has actively toggled the language themselves.
- */
-export const OFFLINE_LANG_KEY = 'siren_offline_lang';
 
 export class User {
   KnoxID = '';
@@ -93,8 +90,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, [user]);
 
   useEffect(() => {
-    // Read isOnLine() here (not at module load): resolveOnlineStatus() has
-    // settled by first render, including the direct-IP backend probe.
     if (isDev) {
       setUserSystemInfo(DEV_USER);
     }
