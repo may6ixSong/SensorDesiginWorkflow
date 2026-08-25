@@ -4,7 +4,7 @@ import { Model } from 'mongoose';
 import { HldRelease, HldReleaseDocument } from './schemas/hld-release.schema';
 import { Deliverable, DeliverableDocument } from '../deliverables/schemas/deliverable.schema';
 import { IpDocument } from '../ips/schemas/ip.schema';
-import { UserDocument } from '../users/schemas/user.schema';
+import { Actor } from '../common/actor';
 import { AuditService } from '../audit/audit.service';
 
 @Injectable()
@@ -23,7 +23,7 @@ export class HldService {
    * 현재 시점 Released(major) 산출물만 스냅샷으로 저장한다 (설계서 3.10, 4.9).
    * "현재 산출물 전체 목록과의 조인(공란 처리)"은 FE가 수행한다.
    */
-  async createRelease(ip: IpDocument, note: string | undefined, actor: UserDocument) {
+  async createRelease(ip: IpDocument, note: string | undefined, actor: Actor) {
     const deliverables = await this.deliverableModel.find({ ipId: ip._id }).exec();
     const items: Record<string, unknown> = {};
     for (const d of deliverables) {
@@ -44,12 +44,13 @@ export class HldService {
       ipId: ip._id,
       version,
       date: new Date().toISOString().slice(0, 10),
-      releasedBy: actor._id,
+      releasedBy: actor.knoxId,
       note: note ?? '',
       items,
+      isMock: ip.isMock,
     });
 
-    await this.audit.log(actor._id, 'HLD_RELEASE', 'ip', ip._id, { version });
+    await this.audit.log(actor.knoxId, 'HLD_RELEASE', 'ip', ip._id, { version });
     return hld;
   }
 }
