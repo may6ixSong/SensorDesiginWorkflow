@@ -23,6 +23,8 @@ export const AUDIT_ACTIONS = [
   'PROJECT_MEMBER_REMOVE',
   'PROJECT_UPDATE',
   'PROJECT_PHASES_UPDATE',
+  'PROJECT_IP_DOMAINS_UPDATE',
+  'IP_DOMAIN_SET',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
