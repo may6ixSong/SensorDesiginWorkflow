@@ -34,15 +34,17 @@ const SPACE_PALETTE: Record<'light' | 'dark', SpacePalette> = {
     panelBg: 'rgba(14,19,30,.78)',
     panelBorder: 'rgba(150,170,210,.16)',
   },
+  // 라이트 테마는 "우주"가 아니라 HomePage 라이트 테마(흰 배경 + 옅은 청회색
+  // aurora)를 그대로 가져온다 — 별/성운은 어두운 배경에서만 성립하는 은유라
+  // 밝은 화면에서 억지로 흉내 내면 지저분해질 뿐이다(요청). 별은 SpaceBackdrop이
+  // mode==='dark'일 때만 그린다.
   light: {
-    wash: '#e9edf5',
+    wash: '#f4f6f9',
     aurora:
-      'radial-gradient(58% 40% at 18% 10%, rgba(12,154,131,.08), transparent 70%),'
-      + 'radial-gradient(52% 44% at 86% 78%, rgba(88,73,207,.07), transparent 72%),'
-      + 'radial-gradient(44% 36% at 60% 44%, rgba(37,99,201,.05), transparent 70%)',
-    // 밝은 배경 위의 별은 "빛나는 점"이 아니라 옅은 잉크 반점이라 알파가 더 필요하다.
-    star: 'rgba(50,68,102,.32)',
-    starBright: 'rgba(38,54,88,.5)',
+      'radial-gradient(60% 50% at 28% 22%, rgba(92,124,158,.11), transparent 70%),'
+      + 'radial-gradient(55% 46% at 76% 72%, rgba(82,104,144,.09), transparent 72%)',
+    star: 'transparent',
+    starBright: 'transparent',
     panelBg: 'rgba(255,255,255,.8)',
     panelBorder: 'rgba(20,32,47,.1)',
   },
@@ -77,6 +79,7 @@ const FIELD_H = 1500;
  */
 export function SpaceBackdrop({ camX, camY, camZ }: { camX: number; camY: number; camZ: number }) {
   const pal = useSpacePalette();
+  const { mode } = useThemeMode();
   const layers = useMemo(
     () => [
       { stars: seededStars(11, 150, FIELD_W, FIELD_H), p: 0.03, s: 1, bright: false },
@@ -91,7 +94,7 @@ export function SpaceBackdrop({ camX, camY, camZ }: { camX: number; camY: number
   return (
     <Box sx={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', background: pal.wash }}>
       <Box sx={{ position: 'absolute', inset: 0, background: pal.aurora }} />
-      {layers.map((l, i) => (
+      {mode === 'dark' && layers.map((l, i) => (
         <Box
           key={i}
           sx={{ position: 'absolute', inset: '-25%', willChange: 'transform' }}

@@ -1,10 +1,9 @@
 /**
- * "Total workflow view"의 순수 데이터 모델 — 과제의 모든 IP를 도메인(Analog/Digital/
- * APS…) 단위 영역으로 나누고, 같은 도메인 안에서만 IP↔IP 산출물 흐름을 잇는다.
- *
- * 도메인이 다른 handoff(예: Analog의 AA IP가 Digital의 BB IP에 준다)는 이 화면의
- * 관심사가 아니다 — 각 도메인은 "그 도메인 시점"에서만 그려지므로 여기서는 아예
- * 만들지 않는다(요청).
+ * Design Workflow view의 순수 데이터 모델 — 과제의 모든 IP를 도메인(Analog/Digital/
+ * APS…) 단위 영역으로 나눈다. IP↔IP(도메인을 넘나드는) 산출물 handoff는 이 화면의
+ * 관심사가 아니다 — 주고/받는 두 IP 입장에서는 "같은 산출물" 하나일 뿐이라 별도
+ * 연결선이 필요 없다는 게 이 화면의 전제다(요청). 대신 같은 IP 안의 산출물↔산출물
+ * flow(EdgeDto)는 web/src/lib/designWorkflowLayout.ts가 와이어로 그린다.
  *
  * 도메인 섹션 목록은 IP가 가진 도메인 + `knownDomains`(= 과제에 등록된 Project.ipDomains)의
  * 합집합이다. 그래서 아직 IP가 배정되지 않은 도메인도 빈 섹션으로 자리를 잡는다 —
@@ -64,20 +63,8 @@ export interface DomainGroup {
   counts: StatusCounts;
 }
 
-/** 같은 도메인 안의 IP→IP 산출물 흐름(recvIpId) 하나를 요약한 것. */
-export interface DomainFlow {
-  id: string;
-  from: string;
-  to: string;
-  total: number;
-  released: number;
-  names: string[];
-}
-
 export interface DomainWorkflowModel {
   domains: DomainGroup[];
-  /** 도메인 key → 그 도메인 안에서만 성립하는 흐름 목록. */
-  flowsByDomain: Map<string, DomainFlow[]>;
   counts: StatusCounts;
 }
 
@@ -143,9 +130,6 @@ export function buildDomainModel(
   });
   const colorOf = assignColors(domainKeys);
 
-  const ipDomain = new Map<string, string>();
-  ips.forEach((ip) => ipDomain.set(ip.id, domainOf(ip)));
-
   const domains: DomainGroup[] = domainKeys.map((key) => {
     const members = [...(grouped.get(key) ?? [])].sort((a, b) => a.name.localeCompare(b.name));
     const counts = members.reduce(
@@ -155,32 +139,8 @@ export function buildDomainModel(
     return { key, label: key, color: colorOf.get(key) ?? DOMAIN_PALETTE[0], ips: members, counts };
   });
 
-  const flowsByDomain = new Map<string, DomainFlow[]>();
-  deliverablesByIp.forEach((items, ipId) => {
-    const fromDomain = ipDomain.get(ipId);
-    if (!fromDomain) return;
-    const bucket = new Map<string, DomainFlow>();
-    (flowsByDomain.get(fromDomain) ?? []).forEach((f) => bucket.set(f.id, f));
-
-    items.forEach((d) => {
-      if (!d.recvIpId) return;
-      const toDomain = ipDomain.get(d.recvIpId);
-      // 도메인이 다르면(또는 이 지도에 없는 IP면) 이 화면에서는 아예 잇지 않는다.
-      if (!toDomain || toDomain !== fromDomain || d.recvIpId === ipId) return;
-      const id = `${ipId}->${d.recvIpId}`;
-      const cur = bucket.get(id) ?? { id, from: ipId, to: d.recvIpId, total: 0, released: 0, names: [] };
-      cur.total++;
-      if (statusOf(d) === 'released') cur.released++;
-      cur.names.push(d.name);
-      bucket.set(id, cur);
-    });
-
-    flowsByDomain.set(fromDomain, [...bucket.values()]);
-  });
-
   return {
     domains,
-    flowsByDomain,
     counts: domains.reduce((acc, d) => addCounts(acc, d.counts), emptyCounts()),
   };
 }

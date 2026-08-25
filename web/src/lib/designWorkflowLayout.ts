@@ -6,15 +6,18 @@
  * 값은 전부 월드 좌표(px)이고, 카메라(translate+scale)가 그 위에 얹힌다.
  *
  * 구조:
- *   Domain = 우주에 떠 있는 거대한 판(island) 하나.
+ *   Domain = 우주의 한 구역 하나.
  *     └ 세로: IP 한 줄(row), 가로: Phase 한 칸(column).
  *       └ 각 칸에 그 IP가 그 Phase에 가진 산출물 블록이 쌓인다.
- *   같은 도메인 안의 IP↔IP 산출물 흐름은 라벨 열과 Phase 열 사이 거터에 곡선으로.
+ *   와이어(wire) = 같은 IP 안에서 산출물끼리 연결된 flow(EdgeDto, fromId/toId가
+ *   모두 그 IP의 산출물) — IP를 벗어나는 연결(recvIpId로 다른 IP에 주는 것)은
+ *   여기서 다루지 않는다(요청). 산출물을 주고/받는 두 IP 입장에서는 "같은 산출물"
+ *   하나일 뿐이라 굳이 두 IP 사이를 잇는 별도 표현이 필요 없다는 판단.
  *
  * DOM 측정은 하지 않는다 — 행 높이가 island마다 고정이라 전부 해석적으로 나온다.
  */
-import { DeliverableDto, IpDto, PhaseRef } from '@/types/domain';
-import { DomainFlow, DomainGroup, statusOf } from './domainWorkflow';
+import { DeliverableDto, EdgeDto, IpDto, PhaseRef } from '@/types/domain';
+import { DomainGroup, statusOf } from './domainWorkflow';
 
 /* ── 월드 좌표 상수 ── */
 export const LABEL_W = 236;
@@ -64,17 +67,15 @@ export interface PhaseColLayout {
   state: 'past' | 'current' | 'upcoming';
 }
 
-export interface FlowLayout {
+/** 같은 IP 안의 산출물 두 개를 잇는 아주 얇은 선 — island 기준 상대 좌표. */
+export interface WireLink {
   id: string;
-  /** island 기준 상대 좌표의 SVG path. */
-  d: string;
-  color: string;
-  width: number;
-  title: string;
-  /** 화살촉 끝점 + 방향(라디안). */
-  tipX: number;
-  tipY: number;
-  tipAngle: number;
+  fromId: string;
+  toId: string;
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
 }
 
 export interface IslandLayout {
@@ -91,10 +92,9 @@ export interface IslandLayout {
   rowH: number;
   cols: PhaseColLayout[];
   rows: IpRowLayout[];
-  flows: FlowLayout[];
+  wires: WireLink[];
   released: number;
   total: number;
-  empty: boolean;
 }
 
 export interface WorldLayout {
@@ -111,14 +111,16 @@ function phaseState(p: PhaseRef, now: number): PhaseColLayout['state'] {
 /**
  * 도메인 그룹 + Phase + 산출물로 월드 전체 배치를 만든다.
  * island는 세로로 쌓이고, 각 island의 행 높이는 그 island에서 한 칸에 가장 많이 쌓인
- * 산출물 수로 결정된다(도메인마다 다르되 island 안에서는 균일 — 거터 곡선을 해석적으로
- * 그릴 수 있게 하는 전제다).
+ * 산출물 수로 결정된다(도메인마다 다르되 island 안에서는 균일).
+ *
+ * @param edgesByIp ipId → 그 IP 안의 산출물↔산출물 flow(EdgeDto). fromId/toId는
+ *   항상 같은 IP의 산출물이므로 island 하나 안에서 좌표를 바로 찾을 수 있다.
  */
 export function buildWorldLayout(
   domains: DomainGroup[],
   phases: PhaseRef[],
   deliverablesByIp: Map<string, DeliverableDto[]>,
-  flowsByDomain: Map<string, DomainFlow[]>,
+  edgesByIp: Map<string, EdgeDto[]>,
   now = Date.now(),
 ): WorldLayout {
   const gridW = LABEL_W + GUTTER_W + phases.length * PHASE_W;
@@ -153,8 +155,9 @@ export function buildWorldLayout(
     }));
     const colX = new Map(cols.map((c) => [c.phase.key, c.x]));
 
-    /* 3) IP 행 + 블록. */
+    /* 3) IP 행 + 블록. 동시에 산출물 id → 중심 좌표 맵을 쌓아 4)에서 와이어를 잇는다. */
     const contentY = ISLAND_HEAD_H + PHASE_HEAD_H;
+    const centerOf = new Map<string, { x: number; y: number }>();
     const rows: IpRowLayout[] = perIp.map(({ ip, byPhase }, ri) => {
       const rowY = contentY + ri * rowH;
       const blocks: BlockNode[] = [];
@@ -168,49 +171,29 @@ export function buildWorldLayout(
           const status = statusOf(d);
           if (status === 'released') released++;
           total++;
-          blocks.push({
-            id: d.id,
-            name: d.name,
-            docType: d.docType,
-            status,
-            x: cx + 12,
-            y: rowY + ROW_PAD + k * (BLOCK_H + BLOCK_GAP),
-            w: PHASE_W - 24,
-            h: BLOCK_H,
-          });
+          const x = cx + 12;
+          const y = rowY + ROW_PAD + k * (BLOCK_H + BLOCK_GAP);
+          const w = PHASE_W - 24;
+          const h = BLOCK_H;
+          blocks.push({ id: d.id, name: d.name, docType: d.docType, status, x, y, w, h });
+          centerOf.set(d.id, { x: x + w / 2, y: y + h / 2 });
         });
       });
 
-      // byPhase를 못 도는 산출물(존재하지 않는 phaseKey)도 total에는 세지 않았으므로
-      // 화면 합계와 블록 수가 항상 일치한다.
       return { ip, y: rowY, h: rowH, blocks, released, total };
     });
 
-    /* 4) 거터 곡선 — 같은 도메인 안의 IP→IP 흐름. */
-    const rowIndex = new Map(domain.ips.map((ip, i) => [ip.id, i]));
-    const ipById = new Map(domain.ips.map((ip) => [ip.id, ip]));
-    const gutterX = ISLAND_PAD + LABEL_W;
-    const flows: FlowLayout[] = (flowsByDomain.get(domain.key) ?? []).flatMap((f) => {
-      const fromIdx = rowIndex.get(f.from);
-      const toIdx = rowIndex.get(f.to);
-      const fromIp = ipById.get(f.from);
-      if (fromIdx === undefined || toIdx === undefined || !fromIp) return [];
-      const y0 = contentY + fromIdx * rowH + rowH / 2;
-      const y1 = contentY + toIdx * rowH + rowH / 2;
-      const bulge = gutterX + Math.min(GUTTER_W - 10, 18 + Math.abs(toIdx - fromIdx) * 13);
-      const x0 = gutterX + 4;
-      // 종점 접선은 제어점 → 끝점 방향이라 곡선 끝에서 수평(-x)에 가깝다.
-      return [{
-        id: f.id,
-        d: `M${x0},${y0} C${bulge},${y0} ${bulge},${y1} ${x0},${y1}`,
-        color: fromIp.color || '#0c9a83',
-        width: Math.min(4.5, 1.6 + f.total * 0.55),
-        title: `${f.total} deliverable${f.total > 1 ? 's' : ''} (${f.released} released)\n${f.names.slice(0, 4).join(', ')}${f.names.length > 4 ? '…' : ''}`,
-        tipX: x0,
-        tipY: y1,
-        tipAngle: Math.PI, // 왼쪽을 향해 꽂힌다
-      }];
-    });
+    /* 4) 와이어 — 같은 IP 안의 산출물↔산출물 flow만. IP를 벗어나는 연결은 만들지
+       않는다: recvIpId로 다른 IP에 주는 산출물도 "같은 문서"일 뿐이라 두 IP 사이에
+       별도 선을 그릴 필요가 없다는 게 이 화면의 전제다. */
+    const wires: WireLink[] = domain.ips.flatMap((ip) => (
+      (edgesByIp.get(ip.id) ?? []).flatMap((e) => {
+        const a = centerOf.get(e.fromId);
+        const b = centerOf.get(e.toId);
+        if (!a || !b) return [];
+        return [{ id: e._id, fromId: e.fromId, toId: e.toId, x1: a.x, y1: a.y, x2: b.x, y2: b.y }];
+      })
+    ));
 
     const bodyH = Math.max(rowH, rows.length * rowH);
     const islandH = contentY + (rows.length ? bodyH : 120) + ISLAND_PAD;
@@ -228,10 +211,9 @@ export function buildWorldLayout(
       rowH,
       cols,
       rows,
-      flows,
+      wires,
       released: domain.counts.released,
       total: domain.counts.total,
-      empty: rows.length === 0,
     });
 
     cursorY += islandH + ISLAND_GAP;
@@ -245,4 +227,27 @@ export function buildWorldLayout(
     islands,
     bounds: { x: minX, y: 0, w: maxX - minX, h: maxY },
   };
+}
+
+/**
+ * 클릭한 산출물 기준 flow 연결 집합 — IP 캔버스의 connectedSet(canvasModel.ts)과
+ * 같은 규칙(양방향 BFS)이다. EdgeDto가 fromId/toId를 쓰는 것만 다르다.
+ */
+export function connectedDeliverables(id: string, edges: EdgeDto[]): Set<string> {
+  const seen = new Set([id]);
+  let q = [id];
+  while (q.length) {
+    const c = q.shift()!;
+    edges.forEach((e) => {
+      if (e.toId === c && !seen.has(e.fromId)) { seen.add(e.fromId); q.push(e.fromId); }
+    });
+  }
+  q = [id];
+  while (q.length) {
+    const c = q.shift()!;
+    edges.forEach((e) => {
+      if (e.fromId === c && !seen.has(e.toId)) { seen.add(e.toId); q.push(e.toId); }
+    });
+  }
+  return seen;
 }
