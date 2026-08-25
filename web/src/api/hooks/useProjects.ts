@@ -2,13 +2,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient, ApiEnvelope } from '../client';
 import { queryKeys } from '../queryKeys';
 import { IpBriefDto, IpDto, PhaseRef, ProjectDetailDto, ProjectDto } from '@/types/domain';
-import { useAuthStore } from '@/store/authStore';
 
 export function useProjects() {
-  const isAuthed = Boolean(useAuthStore((s) => s.token));
   return useQuery({
     queryKey: queryKeys.projects,
-    enabled: isAuthed,
     queryFn: async () => {
       const res = await apiClient.get<ApiEnvelope<ProjectDto[]>>('/projects');
       return res.data.data;
@@ -63,7 +60,7 @@ export function useUpdatePhases(projectId: string) {
 export function useAddProjectMember(projectId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (payload: { userId: string; department: string }) => {
+    mutationFn: async (payload: { knoxId: string; department: string }) => {
       const res = await apiClient.post<ApiEnvelope<ProjectDetailDto>>(`/projects/${projectId}/members`, payload);
       return res.data.data;
     },
@@ -74,8 +71,8 @@ export function useAddProjectMember(projectId: string) {
 export function useRemoveProjectMember(projectId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (userId: string) => {
-      const res = await apiClient.delete<ApiEnvelope<ProjectDetailDto>>(`/projects/${projectId}/members/${userId}`);
+    mutationFn: async (knoxId: string) => {
+      const res = await apiClient.delete<ApiEnvelope<ProjectDetailDto>>(`/projects/${projectId}/members/${knoxId}`);
       return res.data.data;
     },
     onSuccess: (project) => qc.setQueryData(queryKeys.project(projectId), project),
