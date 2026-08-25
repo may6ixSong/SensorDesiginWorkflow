@@ -24,16 +24,17 @@ import { useHldReleases } from '@/api/hooks/useHld';
 import { useUsers } from '@/api/hooks/useUsers';
 import { usePutCanvas } from '@/api/hooks/useCanvas';
 import { useCanvasStore } from '@/store/canvasStore';
-import { useAuthStore } from '@/store/authStore';
+import { useAuth } from '@/app/providers/AuthProvider';
 import { toast } from '@/store/toastStore';
 import { placeIncomingNodes, placeInLane, toCanvasEdge, toCanvasMemo, toCanvasNode } from '@/lib/canvasModel';
 import { DeliverableDto, PhaseRef } from '@/types/domain';
 import { T } from '@/theme/tokens';
+import { canEditIp } from '@/lib/access';
 
 export function BoardPage() {
   const { projectId, ipId } = useParams<{ projectId: string; ipId: string }>();
   const navigate = useNavigate();
-  const me = useAuthStore((s) => s.user);
+  const { user: me } = useAuth();
 
   const { data: projects } = useProjects();
   const { data: phases } = useProjectPhases(projectId);
@@ -110,8 +111,7 @@ export function BoardPage() {
     s.bumpBlocks();
   }, [ipId, deliverables, incoming, memos, edges, phases, st]);
 
-  const usersById = useMemo(() => new Map((users ?? []).map((u) => [u.id, u])), [users]);
-  const isOwner = ip?.myAccess === 'edit';
+  const isOwner = canEditIp(ip); // Admin(Group==='Admin')은 owner가 아니어도 편집 가능
   const canEdit = !!isOwner && !recv; // 목업 canEd()
   const own = !!isOwner && !recv; // 목업 own = isOwn(ip) && !S.recv
 
@@ -225,7 +225,7 @@ export function BoardPage() {
               No viewable IP
             </Typography>
             <Typography sx={{ fontSize: 13, color: T.dm, lineHeight: 1.8 }}>
-              {me?.name} has no access to this project's Analog IPs.
+              {me?.Name || me?.KnoxID} has no access to this project's Analog IPs.
             </Typography>
           </Box>
         </Box>
@@ -240,7 +240,6 @@ export function BoardPage() {
           <Canvas
             ip={ip}
             phases={phaseList}
-            usersById={usersById}
             canEdit={canEdit}
             onOpenIncoming={(id) => st.getState().setIncomingId(id)}
             ipDirectory={ipDirectory ?? []}
@@ -251,7 +250,6 @@ export function BoardPage() {
             <DeliverableDialog
               node={openNode}
               phases={phaseList}
-              usersById={usersById}
               users={users ?? []}
               own={own}
               ipDirectory={ipDirectory ?? []}
@@ -285,6 +283,14 @@ export function BoardPage() {
                 );
               }}
               onUpload={({ file, note, net, type }) => {
+                // TODO: OA 업로드는 2단계 플로우여야 한다 —
+                //   1) POST /deliverables/:id/upload (multipart/form-data, 파일 필드명 "file")
+                //      → { data: { storageKey, fileName } }   (api/hooks/useDeliverables.ts의 useUploadFile)
+                //   2) POST /deliverables/:id/versions 에 그 storageKey/fileName 전달
+                // 지금은 DeliverableDialog의 업로드 UI가 실제 <input type="file">이 아니라
+                // "파일 이름 문자열" 입력이라 보낼 File 객체가 없다. 파일 선택 UI가 생기면
+                // useUploadFile()을 먼저 호출하고 그 응답의 storageKey로 아래 addVersion을
+                // 호출하도록 바꿀 것. (HPC는 hpcPath만 쓰므로 그대로 둔다.)
                 addVersion.mutate(
                   {
                     id: openNode.id,
@@ -340,7 +346,6 @@ export function BoardPage() {
             <IncomingDeliverableDialog
               d={incomingNode}
               phases={phaseList}
-              usersById={usersById}
               onClose={() => st.getState().setIncomingId(null)}
             />
           )}
@@ -351,7 +356,6 @@ export function BoardPage() {
               releases={hlds ?? []}
               nodes={nodes}
               phases={phaseList}
-              usersById={usersById}
               selectedId={hldSel}
               onSelect={(id) => st.getState().setHldSel(id)}
               onClose={() => st.getState().setHldDlg(false)}
@@ -383,18 +387,18 @@ export function BoardPage() {
               users={users ?? []}
               own={!!isOwner}
               onClose={() => st.getState().setOwnerDlg(false)}
-              onAddOwner={(id) =>
-                addOwner.mutate(id, {
+              onAddOwner={(knoxId, department) =>
+                addOwner.mutate({ knoxId, department }, {
                   onSuccess: () => toast('Edit access added'),
                   onError: (e: any) =>
                     toast(e?.response?.data?.message ?? 'Failed to add'),
                 })
               }
-              onRemoveOwner={(id) => removeOwner.mutate(id)}
-              onAddViewGrant={(userId, department) =>
-                addViewGrant.mutate({ userId, department }, { onSuccess: () => toast('View access added') })
+              onRemoveOwner={(knoxId) => removeOwner.mutate(knoxId)}
+              onAddViewGrant={(knoxId, department) =>
+                addViewGrant.mutate({ knoxId, department }, { onSuccess: () => toast('View access added') })
               }
-              onRemoveViewGrant={(id) => removeViewGrant.mutate(id)}
+              onRemoveViewGrant={(knoxId) => removeViewGrant.mutate(knoxId)}
             />
           )}
 
