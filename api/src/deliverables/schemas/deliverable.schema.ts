@@ -1,5 +1,8 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, Types, SchemaTypes } from 'mongoose';
+// @Prop의 런타임 type은 반드시 SchemaTypes.ObjectId를 쓴다 - Types.ObjectId(값 클래스)를 주면
+// Mongoose가 Mixed 경로를 만들고, Mixed는 캐스팅을 하지 않아 문자열 id 필터가 전부 0건이 된다.
+// (필드의 TypeScript 타입으로서의 Types.ObjectId는 그대로 쓴다.)
 
 export type VersionKind = 'major' | 'minor';
 export type NetworkKind = 'OA' | 'HPC';
@@ -43,8 +46,9 @@ export class DeliverableVersion {
   @Prop({ default: '' })
   note: string;
 
-  @Prop({ type: Types.ObjectId, ref: 'User', required: true })
-  createdBy: Types.ObjectId;
+  /** 업로드한 사용자의 KnoxID (api에는 users 컬렉션이 없다 - src/common/actor.ts). */
+  @Prop({ required: true, trim: true })
+  createdBy: string;
 
   @Prop({ default: () => new Date() })
   createdAt: Date;
@@ -55,10 +59,10 @@ export type DeliverableDocument = Deliverable & Document;
 
 @Schema({ timestamps: true })
 export class Deliverable {
-  @Prop({ type: Types.ObjectId, ref: 'Project', required: true, index: true })
+  @Prop({ type: SchemaTypes.ObjectId, ref: 'Project', required: true, index: true })
   projectId: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'Ip', required: true, index: true })
+  @Prop({ type: SchemaTypes.ObjectId, ref: 'Ip', required: true, index: true })
   ipId: Types.ObjectId;
 
   @Prop({ required: true })
@@ -74,7 +78,7 @@ export class Deliverable {
   network: NetworkKind;
 
   /** null이면 원본. 회차 인스턴스는 원본의 _id를 담는다 (설계서 3.6, 4.6). */
-  @Prop({ type: Types.ObjectId, ref: 'Deliverable', default: null })
+  @Prop({ type: SchemaTypes.ObjectId, ref: 'Deliverable', default: null })
   series: Types.ObjectId | null;
 
   @Prop({ default: 1 })
@@ -87,15 +91,17 @@ export class Deliverable {
   @Prop({ type: String, default: null })
   recvDept: string | null;
 
-  @Prop({ type: Types.ObjectId, ref: 'User', default: null })
-  recvContact: Types.ObjectId | null;
+  /** 수신 담당자의 KnoxID. recvDept 소속이어야 하지만 api는 소속을 조회할 수 없으므로
+   * 요청이 함께 보낸 recvDept 값만 검증한다 (설계서 3.4, 4.6). */
+  @Prop({ type: String, default: null })
+  recvContact: string | null;
 
   /**
    * 이 산출물을 받아야 하는 다른 IP. recvDept(부서)와 별개로, Analog IP끼리
    * 서로 주고받는 산출물(예: BGR_REF → PLL_MAIN)을 표현한다. 설정되면 그 IP의
    * 보드에 "Incoming from other IPs" 섹션으로 노출되며, Release된 버전만 보인다.
    */
-  @Prop({ type: Types.ObjectId, ref: 'Ip', default: null })
+  @Prop({ type: SchemaTypes.ObjectId, ref: 'Ip', default: null })
   recvIpId: Types.ObjectId | null;
 
   /**
@@ -116,8 +122,17 @@ export class Deliverable {
   @Prop({ type: [DeliverableVersionSchema], default: [] })
   versions: DeliverableVersion[];
 
-  @Prop({ type: Types.ObjectId, ref: 'User', required: true })
-  createdBy: Types.ObjectId;
+  /** 산출물을 만든 사용자의 KnoxID. */
+  @Prop({ required: true, trim: true })
+  createdBy: string;
+
+  /**
+   * 목업 시드가 만든 문서 표시 (MOCKUP_ENABLED). 사용자가 실제로 만든 데이터는 항상 false다.
+   * MOCKUP_ENABLED=false 로 바꾸고 재시작하면 isMock:true 문서만 일괄 삭제된다
+   * (src/database/seed-runner.service.ts) - 실제 데이터는 절대 건드리지 않는다.
+   */
+  @Prop({ default: false, index: true })
+  isMock: boolean;
 
   _id: Types.ObjectId;
 }
