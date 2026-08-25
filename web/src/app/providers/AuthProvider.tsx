@@ -1,9 +1,9 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { isOnLine } from '../../utils/helper';
 import Cookies from 'js-cookie';
 import axios from 'axios';
 import { addEventLog } from '../../service/event-log-service';
 import { useTranslation } from 'react-i18next';
+import { setApiKnoxId } from '../../api/client';
 
 // Ported verbatim from SSM_WEB's AuthProvider.tsx (service name swapped to SIREN
 // only where it names the service itself — cookie name, event name, storage
@@ -76,13 +76,6 @@ const DEV_USER: ADSSOResponse = {
   deptname_en: 'Sensor Development Team(S.LSI)'
 };
 const isDev = import.meta.env.ENVIRONMENT === 'dev';
-const Guest_USER: ADSSOResponse = {
-  loginid: 'Guest',
-  deptname: 'guest user',
-  deptname_en: 'guest user',
-  username: 'Guest',
-  username_en: 'Guest'
-};
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
@@ -102,24 +95,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     // Read isOnLine() here (not at module load): resolveOnlineStatus() has
     // settled by first render, including the direct-IP backend probe.
-    if (!isOnLine()) {
-      const guestUser = new User();
-      guestUser.setUserInfoFromADSSOResponse(Guest_USER);
-
-      // Offline has no backend to supply the user's language, and the i18n
-      // LanguageDetector otherwise falls back to the browser's navigator
-      // language (often 'ko'). Force the Guest default ('en') unless the user
-      // has explicitly chosen a language via the offline toggle (stored under
-      // OFFLINE_LANG_KEY — distinct from i18next's auto-cached navigator value).
-      const savedLang = localStorage.getItem(OFFLINE_LANG_KEY);
-      const offlineLang: Language = savedLang === "ko" || savedLang === "en" ? savedLang : guestUser.Language;
-      guestUser.Language = offlineLang;
-      i18n.changeLanguage(offlineLang);
-
-      setUser(guestUser);
-      openGate(true);
-    }
-    else if (isDev) {
+    if (isDev) {
       setUserSystemInfo(DEV_USER);
     }
     else {
@@ -139,6 +115,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const setUserSystemInfo = async (userInfo: ADSSOResponse) => {
     const user: User = new User();
     user.setUserInfoFromADSSOResponse(userInfo);
+    // SIREN api는 X-Knox-Id 헤더로만 호출자를 식별한다.
+    setApiKnoxId(user.KnoxID);
 
     try {
       const url = `${import.meta.env.USER_GROUP_API}/user/Information/${userInfo.loginid}`;
