@@ -7,13 +7,14 @@ import { AuditAction, AuditLog, AuditLogDocument } from './schemas/audit-log.sch
 export class AuditService {
   constructor(@InjectModel(AuditLog.name) private readonly model: Model<AuditLogDocument>) {}
 
+  /** actor는 X-Knox-Id 헤더에서 온 KnoxID다 (api에는 users 컬렉션이 없다). */
   log(
-    actorId: Types.ObjectId | string,
+    actorKnoxId: string,
     action: AuditAction,
     targetType: string,
     targetId: Types.ObjectId | string,
     meta: Record<string, unknown> = {},
   ) {
-    return this.model.create({ actorId, action, targetType, targetId, meta, at: new Date() });
+    return this.model.create({ actorKnoxId, action, targetType, targetId, meta, at: new Date() });
   }
 }
