@@ -185,11 +185,24 @@ export function buildDomainModel(
   };
 }
 
-export function withAlpha(hex: string, alpha: number) {
+function hexToRgb(hex: string): [number, number, number] {
   const h = hex.replace('#', '');
   const n = parseInt(h.length === 3 ? h.split('').map((c) => c + c).join('') : h, 16);
-  const r = (n >> 16) & 255;
-  const g = (n >> 8) & 255;
-  const b = n & 255;
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+export function withAlpha(hex: string, alpha: number) {
+  const [r, g, b] = hexToRgb(hex);
   return `rgba(${r},${g},${b},${alpha})`;
 }
+
+/** hex를 target 쪽으로 amt(0..1)만큼 섞는다 — 구체(sphere) 음영 계산용. */
+export function mixHex(hex: string, target: string, amt: number): string {
+  const a = hexToRgb(hex);
+  const b = hexToRgb(target);
+  const m = a.map((v, i) => Math.round(v + (b[i] - v) * amt));
+  return `#${m.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+}
+
+export function lighten(hex: string, amt: number) { return mixHex(hex, '#ffffff', amt); }
+export function darken(hex: string, amt: number) { return mixHex(hex, '#050914', amt); }

@@ -7,7 +7,8 @@ import { queryKeys } from '@/api/queryKeys';
 import { DeliverableDto, DeliverablesListResponse, IpDto, PhaseRef } from '@/types/domain';
 import { DocIcon, Icon } from '@/components/common/Icon';
 import { CURSOR_POINTER, FONT_MONO, T } from '@/theme/tokens';
-import { buildDomainModel, withAlpha, DomainWorkflowModel, UNASSIGNED_DOMAIN } from '@/lib/domainWorkflow';
+import { buildDomainModel, withAlpha, lighten, darken, DomainWorkflowModel, UNASSIGNED_DOMAIN } from '@/lib/domainWorkflow';
+import { useThemeMode } from '@/theme/ThemeModeContext';
 import {
   buildWorldLayout, BlockNode, IslandLayout, WorldLayout,
   GUTTER_W, ISLAND_HEAD_H, ISLAND_PAD, LABEL_W, PHASE_HEAD_H,
@@ -42,6 +43,16 @@ const STATUS_COLOR = {
   inProgress: T.am,
   notSubmitted: T.dm2,
 } as const;
+
+/**
+ * 산출물 블록을 실제 3D 구체(sphere)로 음영 처리하려면 lighten()/darken()에 넘길
+ * "진짜 hex"가 필요하다 — T.tl 등은 CSS 변수 문자열이라 색상 연산이 안 된다
+ * (index.html의 :root / [data-theme='dark'] 값과 정확히 맞춘 사본).
+ */
+const STATUS_HEX: Record<'light' | 'dark', Record<'released' | 'inProgress' | 'notSubmitted', string>> = {
+  light: { released: '#0c9a83', inProgress: '#ac6f08', notSubmitted: '#8b99ab' },
+  dark: { released: '#2ee6c5', inProgress: '#f0b84e', notSubmitted: '#6b7891' },
+};
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
@@ -93,6 +104,8 @@ function WorkflowStage({
 }: Props) {
   const navigate = useNavigate();
   const pal = useSpacePalette();
+  const { mode } = useThemeMode();
+  const statusHex = STATUS_HEX[mode];
   const vpRef = useRef<HTMLDivElement | null>(null);
   const [size, setSize] = useState({ w: 1200, h: 800 });
   const [cam, setCam] = useState<Camera>({ x: 0, y: 0, z: 0.4 });
@@ -347,6 +360,7 @@ function WorkflowStage({
                 key={island.key}
                 island={island}
                 pal={pal}
+                statusHex={statusHex}
                 detail={detail}
                 dimmed={Boolean(focusedDomain) && focusedDomain !== island.key}
                 onOpenIp={openIp}
@@ -372,9 +386,10 @@ function WorkflowStage({
 /* ═════════════════════════════════════════════════════════════ Island ═══ */
 
 function Island({
-  island, pal, detail, dimmed, onOpenIp,
+  island, pal, statusHex, detail, dimmed, onOpenIp,
 }: {
-  island: IslandLayout; pal: SpacePalette; detail: boolean; dimmed: boolean;
+  island: IslandLayout; pal: SpacePalette; statusHex: Record<'released' | 'inProgress' | 'notSubmitted', string>;
+  detail: boolean; dimmed: boolean;
   onOpenIp: (ipId: string) => void;
 }) {
   const label = island.key === UNASSIGNED_DOMAIN ? 'Unassigned' : island.label;
@@ -391,6 +406,18 @@ function Island({
         transition: 'opacity .45s',
       }}
     >
+      {/* 도메인 성운 — 초안 우주 뷰의 항성계 후광을 다시 가져왔다. 판 자체보다 훨씬
+          크게, 아주 옅게 깔아 "이 영역이 그 도메인의 우주 구역"이라는 걸 배경에서부터
+          드러낸다. blur로 뭉갠 큰 원이라 카메라를 당겨도 각지지 않는다. */}
+      <Box
+        sx={{
+          position: 'absolute', left: '50%', top: '46%', width: island.w * 1.7, height: island.w * 1.7,
+          transform: 'translate(-50%, -50%)', borderRadius: '50%', pointerEvents: 'none',
+          background: `radial-gradient(circle, ${withAlpha(island.color, 0.16)} 0%, ${withAlpha(island.color, 0.05)} 45%, transparent 72%)`,
+          filter: 'blur(18px)',
+        }}
+      />
+
       {/* 판 아래 후광 — 공중에 뜬 물체의 접지감을 대신한다. */}
       <Box
         sx={{
@@ -548,7 +575,7 @@ function Island({
 
                 {/* 산출물 블록 */}
                 {row.blocks.map((b, i) => (
-                  <DeliverableBlock key={b.id} b={b} pal={pal} detail={detail} index={i} />
+                  <DeliverableBlock key={b.id} b={b} hex={statusHex[b.status]} detail={detail} index={i} />
                 ))}
               </Box>
             ))}
@@ -581,10 +608,21 @@ function Island({
   );
 }
 
+/**
+ * 산출물 = 초안 우주 뷰의 "행성"을 그대로 다시 쓴 것 — 카드가 아니라 실제로 광원이
+ * 있는 구체다. 배경은 두 겹의 radial-gradient로 만든다: 위쪽은 하이라이트(광원),
+ * 아래쪽은 lighten→base→darken 그라디언트로 둥근 음영을 준다. bob 애니메이션이 얹혀
+ * 정지 화면에서도 공중에 떠 있는 게 읽힌다.
+ */
 function DeliverableBlock({
-  b, pal, detail, index,
-}: { b: BlockNode; pal: SpacePalette; detail: boolean; index: number }) {
-  const color = STATUS_COLOR[b.status];
+  b, hex, detail, index,
+}: { b: BlockNode; hex: string; detail: boolean; index: number }) {
+  const d = Math.min(b.h, 46);
+  const sphereBg = [
+    `radial-gradient(circle at 30% 24%, ${withAlpha('#ffffff', 0.95)}, ${withAlpha('#ffffff', 0)} 42%)`,
+    `radial-gradient(circle at 42% 38%, ${lighten(hex, 0.55)} 0%, ${hex} 55%, ${darken(hex, 0.55)} 100%)`,
+  ].join(',');
+
   return (
     <Box
       style={{ left: b.x, top: b.y, width: b.w, height: b.h }}
@@ -594,32 +632,41 @@ function DeliverableBlock({
         className="dw-bob"
         style={{ animationDelay: `${(index % 5) * 0.55}s` }}
         sx={{
-          width: '100%', height: '100%', display: 'flex', alignItems: 'center', gap: '9px',
-          padding: '0 12px 0 0', borderRadius: '11px', overflow: 'hidden',
-          // 줌아웃 상태에서는 이름이 어차피 안 읽히므로 블록 자체를 상태색 막대로 바꾼다 —
-          // 그러면 전체 조망이 "과제 전체 릴리즈 상태 지도"로 읽힌다.
-          background: detail ? pal.plateBg : color,
-          border: `1px solid ${detail ? pal.plateBorder : 'transparent'}`,
-          boxShadow: pal.plateShadow,
+          width: '100%', height: '100%', display: 'flex', alignItems: 'center', gap: '10px',
           animation: 'dw-bob 5.5s ease-in-out infinite',
         }}
         title={`${b.name}\n${b.status === 'released' ? 'Released' : b.status === 'inProgress' ? 'In progress' : 'Not submitted'}`}
       >
-        {detail && (
-          <>
-            <Box sx={{ alignSelf: 'stretch', width: 5, background: color, flex: '0 0 auto' }} />
-            <Box sx={{ color: T.dm, flex: '0 0 auto', display: 'flex' }}>
-              <DocIcon type={b.docType} size={15} />
-            </Box>
+        {/* 구체 — 위 하이라이트 + 아래 그라디언트 음영 + 은은한 발광. */}
+        <Box
+          sx={{
+            position: 'relative', width: d, height: d, borderRadius: '50%', flex: '0 0 auto',
+            background: sphereBg,
+            boxShadow: `0 0 ${d * 0.6}px ${withAlpha(hex, 0.55)}, 0 3px 8px ${withAlpha('#000000', 0.35)}`,
+          }}
+        >
+          {detail && (
             <Box
               sx={{
-                fontSize: 13, fontWeight: 500, color: T.tx, flex: 1, minWidth: 0,
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                position: 'absolute', inset: 0, display: 'grid', placeItems: 'center',
+                color: withAlpha('#ffffff', 0.92), filter: 'drop-shadow(0 1px 2px rgba(0,0,0,.5))',
               }}
             >
-              {b.name}
+              <DocIcon type={b.docType} size={Math.round(d * 0.42)} />
             </Box>
-          </>
+          )}
+        </Box>
+
+        {detail && (
+          <Box
+            sx={{
+              fontSize: 13, fontWeight: 500, color: T.tx, flex: 1, minWidth: 0,
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              textShadow: `0 1px 3px ${withAlpha('#000000', 0.25)}`,
+            }}
+          >
+            {b.name}
+          </Box>
         )}
       </Box>
     </Box>
