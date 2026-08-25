@@ -3,7 +3,6 @@ import LightModeRoundedIcon from '@mui/icons-material/LightModeRounded';
 import { useAuth, type Theme } from '@/app/providers/AuthProvider';
 import { useThemeMode } from '@/theme/ThemeModeContext';
 import { updateUserInfo } from '@/service/user-service';
-import { isOnLine } from '@/utils/helper';
 import { HeaderIconButton } from '@/components/common/HeaderIconButton';
 
 /**
@@ -16,16 +15,10 @@ import { HeaderIconButton } from '@/components/common/HeaderIconButton';
 export function ThemeTogglePlatform() {
   const { mode, toggle } = useThemeMode();
   const { user, updateUserPrefs } = useAuth();
-  const onLine = isOnLine();
 
   const onToggleTheme = async () => {
     const next: Theme = mode === 'dark' ? 'light' : 'dark';
     toggle();
-
-    if (!onLine) {
-      updateUserPrefs('Theme', next);
-      return;
-    }
 
     const result = await updateUserInfo(user?.KnoxID ?? '', 'Theme', next);
     if (result) {
