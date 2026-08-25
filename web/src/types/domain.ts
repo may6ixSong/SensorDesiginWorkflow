@@ -1,14 +1,8 @@
-import { DepartmentId } from '@/shared/constants/departments';
-
-export interface UserDto {
-  id: string;
-  empNo: string;
-  name: string;
-  email: string;
-  department: DepartmentId;
-  /** 아바타 배경색 (목업 USERS[].color) */
-  color: string;
-}
+/**
+ * api/는 사용자를 KnoxID 문자열로만 표현한다 — 이름/부서/색 등 사용자 정보는
+ * 전사 공통 플랫폼(USER_GROUP_API)의 소유이고, web이 knoxId로 해석한다.
+ * shared/constants/mock-users.ts의 findDirectoryUser()를 참고.
+ */
 
 export interface PhaseRef {
   key: string;
@@ -29,7 +23,7 @@ export interface ProjectDto {
 
 /** 과제 단위 부서별 팀원 로스터 항목 — IP owners/viewGrants(접근 권한)와는 별개의 정보성 명단. */
 export interface ProjectMemberDto {
-  user: UserDto;
+  knoxId: string;
   department: string;
   addedAt: string;
 }
@@ -40,7 +34,7 @@ export interface ProjectDetailDto extends ProjectDto {
 }
 
 export interface ViewGrantDto {
-  user: UserDto;
+  knoxId: string;
   department: string;
   grantedAt: string;
 }
@@ -51,7 +45,8 @@ export interface IpDto {
   name: string;
   description: string;
   color: string;
-  owners: UserDto[];
+  /** Edit 권한자의 knoxId 목록 — [0]이 Primary Owner. */
+  owners: string[];
   viewGrants: ViewGrantDto[];
   myAccess: 'edit' | 'view';
 }
@@ -72,6 +67,7 @@ export interface DeliverableVersionDto {
   kind: VersionKind;
   file: string;
   note: string;
+  /** 업로드/Release를 수행한 사용자의 knoxId. */
   by: string;
   at: string;
 }
@@ -96,6 +92,7 @@ export interface DeliverableDto {
   seriesTotal: number;
   layout: Layout;
   recvDept: string | null;
+  /** 수신 담당자의 knoxId. */
   recvContact: string | null;
   /** 이 산출물을 받아야 하는 다른 Analog IP — 설정되면 그 IP 보드에 Incoming으로 노출된다. */
   recvIpId: string | null;
