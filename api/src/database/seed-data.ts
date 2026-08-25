@@ -7,7 +7,6 @@
  *   좌표(x,y)도 목업 seedXY()와 동일한 공식으로 계산한다.
  */
 import { Model, Types } from 'mongoose';
-import { UserDocument } from '../users/schemas/user.schema';
 import { ProjectDocument } from '../projects/schemas/project.schema';
 import { IpDocument } from '../ips/schemas/ip.schema';
 import { DeliverableDocument } from '../deliverables/schemas/deliverable.schema';
@@ -16,7 +15,6 @@ import { EdgeDocument } from '../edges/schemas/edge.schema';
 import { HldReleaseDocument } from '../hld/schemas/hld-release.schema';
 
 export interface SeedModels {
-  User: Model<UserDocument>;
   Project: Model<ProjectDocument>;
   Ip: Model<IpDocument>;
   Deliverable: Model<DeliverableDocument>;
@@ -41,18 +39,23 @@ const LANE_PAD = 68;
 const DEFAULT_PW = Math.round((NW + LANE_PAD * 2) * 2 * 0.72);
 const snp = (v: number) => Math.round(v / GRID) * GRID;
 
-/* ── 목업 COM_PH ── */
+/* ── 목업 COM_PH ──
+ * order는 PhaseRef 스키마의 필수 필드이고 FE가 마일스톤 정렬 기준으로 쓴다
+ * (web: MilestoneIpBoard/projectProgress가 a.order - b.order로 정렬).
+ * 예전엔 이 배열에 order가 없어서 실제 DB 모드에서 Project 검증이 실패했고,
+ * 인메모리 모드에서는 검증이 없어 NaN 정렬(=배열 순서)로 우연히 맞아 보였다.
+ * id는 seedXY()/PHASE_INDEX 조회용 목업 잔재로, PhaseRef 스키마에는 없어 저장 시 버려진다. */
 const COM_PH = [
-  { id: 'KO', key: 'KO', label: 'Kick-off', start: '2026-01-05', end: '2026-02-16' },
-  { id: 'ML1', key: 'ML1', label: 'Milestone 1', start: '2026-02-16', end: '2026-03-16' },
-  { id: 'AR', key: 'AR', label: 'Architecture Review', start: '2026-03-16', end: '2026-04-13' },
-  { id: 'ML2', key: 'ML2', label: 'Milestone 2', start: '2026-04-13', end: '2026-05-25' },
-  { id: 'ML3', key: 'ML3', label: 'Milestone 3', start: '2026-05-25', end: '2026-06-22' },
-  { id: 'MDR', key: 'MDR', label: 'Mid Design Review', start: '2026-06-22', end: '2026-07-20' },
-  { id: 'ML4', key: 'ML4', label: 'Milestone 4', start: '2026-07-20', end: '2026-08-31' },
-  { id: 'FDR', key: 'FDR', label: 'Final Design Review', start: '2026-08-31', end: '2026-09-21' },
-  { id: 'MTO', key: 'MTO', label: 'Mask Tape-out', start: '2026-09-21', end: '2026-10-12' },
-  { id: 'FABOUT', key: 'Fab out', label: 'Fab Out', start: '2026-10-12', end: '2026-12-21' },
+  { id: 'KO', key: 'KO', label: 'Kick-off', start: '2026-01-05', end: '2026-02-16', order: 0 },
+  { id: 'ML1', key: 'ML1', label: 'Milestone 1', start: '2026-02-16', end: '2026-03-16', order: 1 },
+  { id: 'AR', key: 'AR', label: 'Architecture Review', start: '2026-03-16', end: '2026-04-13', order: 2 },
+  { id: 'ML2', key: 'ML2', label: 'Milestone 2', start: '2026-04-13', end: '2026-05-25', order: 3 },
+  { id: 'ML3', key: 'ML3', label: 'Milestone 3', start: '2026-05-25', end: '2026-06-22', order: 4 },
+  { id: 'MDR', key: 'MDR', label: 'Mid Design Review', start: '2026-06-22', end: '2026-07-20', order: 5 },
+  { id: 'ML4', key: 'ML4', label: 'Milestone 4', start: '2026-07-20', end: '2026-08-31', order: 6 },
+  { id: 'FDR', key: 'FDR', label: 'Final Design Review', start: '2026-08-31', end: '2026-09-21', order: 7 },
+  { id: 'MTO', key: 'MTO', label: 'Mask Tape-out', start: '2026-09-21', end: '2026-10-12', order: 8 },
+  { id: 'FABOUT', key: 'Fab out', label: 'Fab Out', start: '2026-10-12', end: '2026-12-21', order: 9 },
 ];
 // id와 key가 다른 항목(FABOUT/'Fab out')도 있어 둘 다로 조회 가능하게 인덱싱한다.
 const PHASE_INDEX: Record<string, number> = Object.fromEntries(
@@ -75,17 +78,25 @@ const at = (s: string) => new Date(s.replace(' ', 'T') + ':00');
 
 type MockUserKey = 'u1' | 'u2' | 'u3' | 'u4' | 'u5' | 'u6' | 'u7' | 'u8';
 
-/* ── 목업 USERS ── */
-const MOCK_USERS: { key: MockUserKey; empNo: string; name: string; dept: string; color: string }[] = [
-  { key: 'u1', empNo: '20180114', name: 'Sunwoo Kim', dept: 'analog', color: '#0c9a83' },
-  { key: 'u2', empNo: '20190233', name: 'Jihoon Park', dept: 'analog', color: '#5849cf' },
-  { key: 'u3', empNo: '20200591', name: 'Sumin Lee', dept: 'digital', color: '#2563c9' },
-  { key: 'u4', empNo: '20170842', name: 'Hayoon Jung', dept: 'solution', color: '#ac6f08' },
-  { key: 'u5', empNo: '20210377', name: 'Dain Choi', dept: 'pte', color: '#c8352c' },
-  { key: 'u6', empNo: '20160925', name: 'Sehun Oh', dept: 'analog', color: '#3aa66b' },
-  { key: 'u7', empNo: '20220148', name: 'Jiyeon Han', dept: 'aps', color: '#b3521e' },
-  { key: 'u8', empNo: '20150663', name: 'Dahyun Ryu', dept: 'pipd', color: '#7a4fbf' },
-];
+/* ── 목업 사용자 ──
+ * api는 users 컬렉션을 갖지 않으므로(src/common/actor.ts) 사용자는 KnoxID 문자열로만
+ * 참조된다. 이 매핑은 목업 데이터를 KnoxID로 옮기기 위한 것일 뿐 DB에 저장되지 않는다.
+ * 이름/부서/아바타색은 web의 목업 디렉터리(web/src/shared/constants/mock-users.ts)에 있고,
+ * 실서비스에서는 공통 플랫폼(USER_GROUP_API)이 그 역할을 한다.
+ *
+ * u1 = 'sdp.op' - web AuthProvider의 개발용 DEV_USER와 동일한 KnoxID여야 한다.
+ * 그렇지 않으면 개발 중 로그인한 사용자가 어떤 IP의 owner도 아니어서 화면이 비어 보인다.
+ */
+const KNOX: Record<MockUserKey, string> = {
+  u1: 'sdp.op',
+  u2: 'jihoon.park',
+  u3: 'sumin.lee',
+  u4: 'hayoon.jung',
+  u5: 'dain.choi',
+  u6: 'sehun.oh',
+  u7: 'jiyeon.han',
+  u8: 'dahyun.ryu',
+};
 
 /* ── 목업 ITEMS (versions: [major,minor,kind,by,at,note,file]) ── */
 type MockVer = [number, number, 'major' | 'minor', MockUserKey, string, string, string];
@@ -303,49 +314,39 @@ const MOCK_HLDS: { id:string; ip:string; ver:string; date:string; by:MockUserKey
 
 export async function seedDatabase(models: SeedModels): Promise<void> {
   const {
-    User: UserModel, Project: ProjectModel, Ip: IpModel,
+    Project: ProjectModel, Ip: IpModel,
     Deliverable: DeliverableModel, Memo: MemoModel,
     Edge: EdgeModel, HldRelease: HldReleaseModel,
   } = models;
 
+  // 목업 문서만 지운다 (isMock:true). 실제 DB에 붙은 상태로도 안전하게 재실행할 수 있어야
+  // 하므로 deleteMany({})는 절대 쓰지 않는다 - 사용자가 만든 데이터를 날려버린다.
   await Promise.all([
-    UserModel.deleteMany({}), ProjectModel.deleteMany({}), IpModel.deleteMany({}),
-    DeliverableModel.deleteMany({}), MemoModel.deleteMany({}),
-    EdgeModel.deleteMany({}), HldReleaseModel.deleteMany({}),
+    ProjectModel.deleteMany({ isMock: true }), IpModel.deleteMany({ isMock: true }),
+    DeliverableModel.deleteMany({ isMock: true }), MemoModel.deleteMany({ isMock: true }),
+    EdgeModel.deleteMany({ isMock: true }), HldReleaseModel.deleteMany({ isMock: true }),
   ]);
 
-  /* ── Users ── */
-  const userDocs = await UserModel.insertMany(
-    MOCK_USERS.map((u) => ({
-      empNo: u.empNo,
-      name: u.name,
-      email: `${u.key}@example.com`,
-      department: u.dept,
-      color: u.color,
-      isActive: true,
-    })),
-  );
-  const U: Record<string, Types.ObjectId> = {};
-  MOCK_USERS.forEach((u, i) => (U[u.key] = userDocs[i]._id));
+  const U = KNOX;
 
   /* ── Projects (Phase는 두 과제 공통) ──
    * members: 과제 단위 부서별 팀원 로스터 (Project Info 페이지) — IP owners/viewGrants
    * (접근 권한)와는 별개의 정보성 명단이라 여기 department는 실제 소속과 다를 수 있다. */
   const p1 = await ProjectModel.create({
-    code: 'CIS-A7', name: '50MP Mobile CIS', domain: 'ANALOG', phases: COM_PH, status: 'ACTIVE',
+    code: 'CIS-A7', name: '50MP Mobile CIS', domain: 'ANALOG', phases: COM_PH, status: 'ACTIVE', isMock: true,
     // 일부러 u7/u8은 비워둔다 - "부서별 멤버 추가" UI를 실제로 시연/검증할 후보가 남아있어야
     // 하고, APS/PI-PD 카드가 빈 상태(empty state) 렌더링도 함께 보여주기 때문.
     members: [
-      { userId: U.u1, department: 'analog', addedAt: new Date('2026-01-05') },
-      { userId: U.u2, department: 'analog', addedAt: new Date('2026-01-05') },
-      { userId: U.u6, department: 'analog', addedAt: new Date('2026-01-06') },
-      { userId: U.u3, department: 'digital', addedAt: new Date('2026-01-07') },
-      { userId: U.u4, department: 'solution', addedAt: new Date('2026-01-08') },
-      { userId: U.u5, department: 'pte', addedAt: new Date('2026-01-08') },
+      { knoxId: U.u1, department: 'analog', addedAt: new Date('2026-01-05') },
+      { knoxId: U.u2, department: 'analog', addedAt: new Date('2026-01-05') },
+      { knoxId: U.u6, department: 'analog', addedAt: new Date('2026-01-06') },
+      { knoxId: U.u3, department: 'digital', addedAt: new Date('2026-01-07') },
+      { knoxId: U.u4, department: 'solution', addedAt: new Date('2026-01-08') },
+      { knoxId: U.u5, department: 'pte', addedAt: new Date('2026-01-08') },
     ],
   });
   const p2 = await ProjectModel.create({
-    code: 'CIS-B3', name: '8MP Automotive CIS', domain: 'ANALOG', phases: COM_PH, status: 'ACTIVE',
+    code: 'CIS-B3', name: '8MP Automotive CIS', domain: 'ANALOG', phases: COM_PH, status: 'ACTIVE', isMock: true,
   });
 
   /* ── IPs ── */
@@ -353,46 +354,52 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
     projectId: p1._id, name: 'PLL_MAIN', description: 'Main clock generation PLL',
     owners: [U.u1],
     viewGrants: [
-      { userId: U.u3, department: 'digital', grantedAt: new Date() },
-      { userId: U.u5, department: 'pte', grantedAt: new Date() },
+      { knoxId: U.u3, department: 'digital', grantedAt: new Date() },
+      { knoxId: U.u5, department: 'pte', grantedAt: new Date() },
     ],
     color: '#0c9a83',
+    isMock: true,
   });
   const ip2 = await IpModel.create({
     projectId: p1._id, name: 'LDO_CORE', description: 'Core power regulator',
     owners: [U.u1],
-    viewGrants: [{ userId: U.u4, department: 'solution', grantedAt: new Date() }],
+    viewGrants: [{ knoxId: U.u4, department: 'solution', grantedAt: new Date() }],
     color: '#5849cf',
+    isMock: true,
   });
   const ip3 = await IpModel.create({
     projectId: p1._id, name: 'ADC_RAMP', description: 'Ramp-type column ADC',
     owners: [U.u2],
     viewGrants: [
-      { userId: U.u5, department: 'pte', grantedAt: new Date() },
-      { userId: U.u3, department: 'digital', grantedAt: new Date() },
+      { knoxId: U.u5, department: 'pte', grantedAt: new Date() },
+      { knoxId: U.u3, department: 'digital', grantedAt: new Date() },
     ],
     color: '#2563c9',
+    isMock: true,
   });
   const ip4 = await IpModel.create({
     projectId: p1._id, name: 'BGR_REF', description: 'Bandgap voltage reference',
     owners: [U.u1],
-    viewGrants: [{ userId: U.u5, department: 'pte', grantedAt: new Date() }],
+    viewGrants: [{ knoxId: U.u5, department: 'pte', grantedAt: new Date() }],
     color: '#d97706',
+    isMock: true,
   });
   const ip5 = await IpModel.create({
     projectId: p1._id, name: 'TG_DRIVER', description: 'Timing generator output driver',
     owners: [U.u2],
-    viewGrants: [{ userId: U.u3, department: 'digital', grantedAt: new Date() }],
+    viewGrants: [{ knoxId: U.u3, department: 'digital', grantedAt: new Date() }],
     color: '#0891b2',
+    isMock: true,
   });
   const ip6 = await IpModel.create({
     projectId: p1._id, name: 'COMP_BLOCK', description: 'ADC comparator block',
     owners: [U.u2],
     viewGrants: [
-      { userId: U.u5, department: 'pte', grantedAt: new Date() },
-      { userId: U.u3, department: 'digital', grantedAt: new Date() },
+      { knoxId: U.u5, department: 'pte', grantedAt: new Date() },
+      { knoxId: U.u3, department: 'digital', grantedAt: new Date() },
     ],
     color: '#be185d',
+    isMock: true,
   });
   const IPID: Record<string, Types.ObjectId> = {
     ip1: ip1._id, ip2: ip2._id, ip3: ip3._id, ip4: ip4._id, ip5: ip5._id, ip6: ip6._id,
@@ -430,6 +437,7 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
         createdAt: at(when),
       })),
       createdBy: U[m.versions[0]?.[3] ?? 'u1'],
+      isMock: true,
     });
   }
 
@@ -441,6 +449,7 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
       text: n.text,
       layout: seedXY(n.phase, n.row, MW, MH),
       createdBy: U.u1,
+      isMock: true,
     });
   }
 
@@ -454,6 +463,7 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
         toId: DID[e.to],
         bidirectional: false, // 목업과 동일하게 역방향 쌍으로 양방향을 표현한다
         auto: e.auto ?? false,
+        isMock: true,
       };
     }),
   );
@@ -477,12 +487,13 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
       releasedBy: U[h.by],
       note: h.note,
       items,
+      isMock: true,
     });
   }
 
   // eslint-disable-next-line no-console
   console.log(
-    `Seed complete (mockup v15 baseline): users=${MOCK_USERS.length}, projects=2, ips=6, ` +
+    `Seed complete (mockup v15 baseline): projects=2, ips=6, ` +
       `deliverables=${MOCK_ITEMS.length}, memos=${MOCK_NOTES.length}, edges=${MOCK_EDGES.length}, hlds=${MOCK_HLDS.length}`,
   );
 }
