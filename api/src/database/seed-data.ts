@@ -39,6 +39,14 @@ const LANE_PAD = 68;
 const DEFAULT_PW = Math.round((NW + LANE_PAD * 2) * 2 * 0.72);
 const snp = (v: number) => Math.round(v / GRID) * GRID;
 
+/* ── 목업 IP 도메인 후보 ──
+ * Project.ipDomains에 들어가는 "그 과제에서 고를 수 있는 설계 도메인" 목록이다.
+ * 전사 고정 상수가 아니라 과제마다 편집하는 데이터이므로 common/constants가 아니라
+ * 시드에만 둔다 (DEPARTMENTS처럼 FE/BE 중복 정의하지 않는다).
+ * 목업 IP 7개는 전부 아날로그 회로 블록이라 실제 성격대로 Analog 하나에 몰려 있다 -
+ * 나머지 8개는 IP가 붙지 않은 빈 도메인으로, Total workflow view에서 빈 항성계로 뜬다. */
+const IP_DOMAINS = ['Analog', 'Digital', 'ISP', 'APS', 'FW', 'PM', 'PTE', 'Security', 'ACI'];
+
 /* ── 목업 COM_PH ──
  * order는 PhaseRef 스키마의 필수 필드이고 FE가 마일스톤 정렬 기준으로 쓴다
  * (web: MilestoneIpBoard/projectProgress가 a.order - b.order로 정렬).
@@ -333,7 +341,8 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
    * members: 과제 단위 부서별 팀원 로스터 (Project Info 페이지) — IP owners/viewGrants
    * (접근 권한)와는 별개의 정보성 명단이라 여기 department는 실제 소속과 다를 수 있다. */
   const p1 = await ProjectModel.create({
-    code: 'CIS-A7', name: '50MP Mobile CIS', domain: 'ANALOG', phases: COM_PH, status: 'ACTIVE', isMock: true,
+    code: 'CIS-A7', name: '50MP Mobile CIS', domain: 'ANALOG', ipDomains: IP_DOMAINS,
+    phases: COM_PH, status: 'ACTIVE', isMock: true,
     // 일부러 u7/u8은 비워둔다 - "부서별 멤버 추가" UI를 실제로 시연/검증할 후보가 남아있어야
     // 하고, APS/PI-PD 카드가 빈 상태(empty state) 렌더링도 함께 보여주기 때문.
     members: [
@@ -346,12 +355,13 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
     ],
   });
   const p2 = await ProjectModel.create({
-    code: 'CIS-B3', name: '8MP Automotive CIS', domain: 'ANALOG', phases: COM_PH, status: 'ACTIVE', isMock: true,
+    code: 'CIS-B3', name: '8MP Automotive CIS', domain: 'ANALOG', ipDomains: IP_DOMAINS,
+    phases: COM_PH, status: 'ACTIVE', isMock: true,
   });
 
   /* ── IPs ── */
   const ip1 = await IpModel.create({
-    projectId: p1._id, name: 'PLL_MAIN', description: 'Main clock generation PLL',
+    projectId: p1._id, name: 'PLL_MAIN', domain: 'Analog', description: 'Main clock generation PLL',
     owners: [U.u1],
     viewGrants: [
       { knoxId: U.u3, department: 'digital', grantedAt: new Date() },
@@ -361,14 +371,14 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
     isMock: true,
   });
   const ip2 = await IpModel.create({
-    projectId: p1._id, name: 'LDO_CORE', description: 'Core power regulator',
+    projectId: p1._id, name: 'LDO_CORE', domain: 'Analog', description: 'Core power regulator',
     owners: [U.u1],
     viewGrants: [{ knoxId: U.u4, department: 'solution', grantedAt: new Date() }],
     color: '#5849cf',
     isMock: true,
   });
   const ip3 = await IpModel.create({
-    projectId: p1._id, name: 'ADC_RAMP', description: 'Ramp-type column ADC',
+    projectId: p1._id, name: 'ADC_RAMP', domain: 'Analog', description: 'Ramp-type column ADC',
     owners: [U.u2],
     viewGrants: [
       { knoxId: U.u5, department: 'pte', grantedAt: new Date() },
@@ -378,21 +388,21 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
     isMock: true,
   });
   const ip4 = await IpModel.create({
-    projectId: p1._id, name: 'BGR_REF', description: 'Bandgap voltage reference',
+    projectId: p1._id, name: 'BGR_REF', domain: 'Analog', description: 'Bandgap voltage reference',
     owners: [U.u1],
     viewGrants: [{ knoxId: U.u5, department: 'pte', grantedAt: new Date() }],
     color: '#d97706',
     isMock: true,
   });
   const ip5 = await IpModel.create({
-    projectId: p1._id, name: 'TG_DRIVER', description: 'Timing generator output driver',
+    projectId: p1._id, name: 'TG_DRIVER', domain: 'Analog', description: 'Timing generator output driver',
     owners: [U.u2],
     viewGrants: [{ knoxId: U.u3, department: 'digital', grantedAt: new Date() }],
     color: '#0891b2',
     isMock: true,
   });
   const ip6 = await IpModel.create({
-    projectId: p1._id, name: 'COMP_BLOCK', description: 'ADC comparator block',
+    projectId: p1._id, name: 'COMP_BLOCK', domain: 'Analog', description: 'ADC comparator block',
     owners: [U.u2],
     viewGrants: [
       { knoxId: U.u5, department: 'pte', grantedAt: new Date() },
