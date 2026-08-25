@@ -4,6 +4,8 @@ import { Actor } from '../../common/actor';
 export interface IpDto {
   id: string;
   projectId: string;
+  /** IP가 속한 설계 도메인. 권한과 무관하게 view 권한자에게도 그대로 보인다. */
+  domain: string;
   name: string;
   description: string;
   color: string;
@@ -21,6 +23,7 @@ export function toIpDto(ip: IpDocument, me: Actor): IpDto {
   return {
     id: ip._id.toString(),
     projectId: ip.projectId.toString(),
+    domain: ip.domain,
     name: ip.name,
     description: ip.description,
     color: ip.color,
