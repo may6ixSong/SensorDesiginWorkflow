@@ -1,6 +1,7 @@
 import { Box } from '@mui/material';
-import { DeliverableDto, PhaseRef, UserDto } from '@/types/domain';
+import { DeliverableDto, PhaseRef } from '@/types/domain';
 import { fmtAt } from '@/lib/canvasModel';
+import { findDirectoryUser } from '@/shared/constants/mock-users';
 import { ModalShell } from '@/components/common/ModalShell';
 import { Badge, SirenButton } from '@/components/common/SirenButton';
 import { Card, Ey } from '@/components/common/Panel';
@@ -12,7 +13,6 @@ import { FONT_MONO, T } from '@/theme/tokens';
 interface Props {
   d: DeliverableDto | null;
   phases: PhaseRef[];
-  usersById: Map<string, UserDto>;
   onClose: () => void;
 }
 
@@ -22,11 +22,11 @@ interface Props {
  * 자체가 BE에서 그렇게 필터링돼 온다) — 이 규칙은 조회자가 우연히 sourceIp의
  * owner여도 예외 없이 적용된다(BE toIncomingDeliverableDto 참고).
  */
-export function IncomingDeliverableDialog({ d, phases, usersById, onClose }: Props) {
+export function IncomingDeliverableDialog({ d, phases, onClose }: Props) {
   if (!d) return null;
   const ph = phases.find((p) => p.key === d.phaseKey);
   const rel = d.releasedVersion;
-  const by = rel ? usersById.get(rel.by) : undefined;
+  const by = rel ? findDirectoryUser(rel.by) : undefined;
 
   return (
     <ModalShell
