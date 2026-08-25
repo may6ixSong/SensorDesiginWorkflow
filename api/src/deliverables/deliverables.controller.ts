@@ -1,30 +1,47 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  NotFoundException,
+  Param,
+  Patch,
+  Post,
+  Query,
+  StreamableFile,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { IpAccessGuard } from '../common/guards/ip-access.guard';
 import { IpAccess } from '../common/decorators/ip-access.decorator';
-import { CurrentUser } from '../auth/current-user.decorator';
+import { CurrentActor } from '../common/decorators/current-actor.decorator';
 import { CurrentIp } from '../common/decorators/current-ip.decorator';
-import { UserDocument } from '../users/schemas/user.schema';
+import { Actor } from '../common/actor';
 import { IpDocument } from '../ips/schemas/ip.schema';
+import { AuditService } from '../audit/audit.service';
 import { DeliverablesService } from './deliverables.service';
 import { StorageService } from '../storage/storage.service';
 import { toDeliverableDto, toIncomingDeliverableDto, toVisibleVersions } from './dto/deliverable.dto';
 import {
   AddVersionDto,
   CreateDeliverableDto,
-  CreateUploadUrlDto,
+  DownloadVersionDto,
   ReleaseDto,
   UpdateDeliverableDto,
   UpdateRecvDto,
   UpdateScheduleDto,
 } from './dto/deliverable-crud.dto';
 
-@UseGuards(JwtAuthGuard, IpAccessGuard)
+@UseGuards(IpAccessGuard)
 @Controller()
 export class DeliverablesController {
   constructor(
     private readonly deliverables: DeliverablesService,
     private readonly storage: StorageService,
+    private readonly audit: AuditService,
   ) {}
 
   /**
@@ -34,7 +51,7 @@ export class DeliverablesController {
    */
   @IpAccess('view')
   @Get('ips/:ipId/deliverables')
-  async listForIp(@Param('ipId') ipId: string, @CurrentIp() ip: IpDocument, @CurrentUser() me: UserDocument) {
+  async listForIp(@Param('ipId') ipId: string, @CurrentIp() ip: IpDocument, @CurrentActor() me: Actor) {
     const [list, incoming] = await Promise.all([
       this.deliverables.listForIp(ipId),
       this.deliverables.listIncomingForIp(ipId),
@@ -51,7 +68,7 @@ export class DeliverablesController {
     @Param('ipId') ipId: string,
     @Body() dto: CreateDeliverableDto,
     @CurrentIp() ip: IpDocument,
-    @CurrentUser() me: UserDocument,
+    @CurrentActor() me: Actor,
   ) {
     const d = await this.deliverables.create(ip, dto, me);
     return { data: toDeliverableDto(d, ip, me) };
@@ -63,7 +80,7 @@ export class DeliverablesController {
     @Param('id') id: string,
     @Body() dto: UpdateDeliverableDto,
     @CurrentIp() ip: IpDocument,
-    @CurrentUser() me: UserDocument,
+    @CurrentActor() me: Actor,
   ) {
     const d = await this.deliverables.update(id, dto);
     return { data: toDeliverableDto(d, ip, me) };
@@ -71,7 +88,7 @@ export class DeliverablesController {
 
   @IpAccess('edit')
   @Delete('deliverables/:id')
-  async remove(@Param('id') id: string, @CurrentUser() me: UserDocument) {
+  async remove(@Param('id') id: string, @CurrentActor() me: Actor) {
     await this.deliverables.remove(id, me);
     return { data: { id } };
   }
@@ -82,7 +99,7 @@ export class DeliverablesController {
     @Param('id') id: string,
     @Body() dto: UpdateRecvDto,
     @CurrentIp() ip: IpDocument,
-    @CurrentUser() me: UserDocument,
+    @CurrentActor() me: Actor,
   ) {
     const d = await this.deliverables.updateRecv(id, dto, me);
     return { data: toDeliverableDto(d, ip, me) };
@@ -94,7 +111,7 @@ export class DeliverablesController {
     @Param('id') id: string,
     @Body() dto: UpdateScheduleDto,
     @CurrentIp() ip: IpDocument,
-    @CurrentUser() me: UserDocument,
+    @CurrentActor() me: Actor,
   ) {
     const list = await this.deliverables.updateSchedule(id, dto.phaseKeys, me);
     return { data: list.map((d) => toDeliverableDto(d, ip, me)) };
@@ -102,24 +119,73 @@ export class DeliverablesController {
 
   @IpAccess('view')
   @Get('deliverables/:id/versions')
-  async versions(@Param('id') id: string, @CurrentIp() ip: IpDocument, @CurrentUser() me: UserDocument) {
+  async versions(@Param('id') id: string, @CurrentIp() ip: IpDocument, @CurrentActor() me: Actor) {
     const d = await this.deliverables.findOrThrow(id);
     return { data: toVisibleVersions(d, ip, me) };
   }
 
+  /**
+   * OA망 파일 업로드. API가 바이트를 직접 받아 S3에 올린다(SFM_API와 동일한 중계 방식).
+   * 업로드만 하고 버전은 만들지 않는다 - FE는 반환된 storageKey로 이어서
+   * POST /deliverables/:id/versions 를 호출한다.
+   */
   @IpAccess('edit')
-  @Post('deliverables/:id/upload-url')
-  async uploadUrl(@Param('id') id: string, @Body() dto: CreateUploadUrlDto, @CurrentIp() ip: IpDocument) {
+  @Post('deliverables/:id/upload')
+  @UseInterceptors(FileInterceptor('file'))
+  async upload(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+    @CurrentIp() ip: IpDocument,
+    @CurrentActor() me: Actor,
+  ) {
+    if (!file) {
+      throw new BadRequestException('A file is required (multipart form field "file").');
+    }
     const d = await this.deliverables.findOrThrow(id);
-    const nextMinor = (d.versions[0]?.minor ?? 0) + 1;
     const storageKey = this.storage.buildStorageKey(
       ip._id.toString(),
       d._id.toString(),
-      `${d.versions[0]?.major ?? 0}.${nextMinor}`,
-      dto.fileName,
+      this.deliverables.nextVersionLabel(d),
+      file.originalname,
     );
-    const result = await this.storage.createPresignedUpload(storageKey, dto.contentType);
-    return { data: result };
+    await this.storage.upload(storageKey, file.buffer, {
+      originalname: file.originalname,
+      uploader: me.knoxId,
+    });
+    return { data: { storageKey, fileName: file.originalname } };
+  }
+
+  /**
+   * OA망 파일 다운로드. Edit 권한이 없으면 Release(major) 버전만 받을 수 있다 (설계서 6.1).
+   * HPC망 산출물은 파일이 아니라 경로(hpcPath)만 갖고 있으므로 다운로드 대상이 아니다.
+   */
+  @IpAccess('view')
+  @Get('deliverables/:id/download')
+  async download(
+    @Param('id') id: string,
+    @Query() query: DownloadVersionDto,
+    @CurrentIp() ip: IpDocument,
+    @CurrentActor() me: Actor,
+  ): Promise<StreamableFile> {
+    const d = await this.deliverables.findOrThrow(id);
+    const isEditor = ip.owners.includes(me.knoxId);
+    const version = this.deliverables.findVersionOrThrow(d, query.major, query.minor, isEditor);
+    if (!version.storageKey) {
+      throw new BadRequestException('This version has no stored file (HPC-network deliverables share a path only).');
+    }
+
+    const body = await this.storage.download(version.storageKey);
+    if (!body) throw new NotFoundException('The stored file could not be found.');
+
+    await this.audit.log(me.knoxId, 'FILE_DOWNLOAD', 'deliverable', d._id, {
+      major: version.major,
+      minor: version.minor,
+    });
+
+    return new StreamableFile(body, {
+      type: 'application/octet-stream',
+      disposition: `attachment; filename="${encodeURIComponent(version.fileName)}"`,
+    });
   }
 
   @IpAccess('edit')
@@ -128,7 +194,7 @@ export class DeliverablesController {
     @Param('id') id: string,
     @Body() dto: AddVersionDto,
     @CurrentIp() ip: IpDocument,
-    @CurrentUser() me: UserDocument,
+    @CurrentActor() me: Actor,
   ) {
     const d = await this.deliverables.addVersion(id, dto, me);
     return { data: toDeliverableDto(d, ip, me) };
@@ -140,7 +206,7 @@ export class DeliverablesController {
     @Param('id') id: string,
     @Body() dto: ReleaseDto,
     @CurrentIp() ip: IpDocument,
-    @CurrentUser() me: UserDocument,
+    @CurrentActor() me: Actor,
   ) {
     const d = await this.deliverables.release(id, dto, me);
     return { data: toDeliverableDto(d, ip, me) };
