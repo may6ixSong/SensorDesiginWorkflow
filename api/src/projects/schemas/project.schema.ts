@@ -60,6 +60,15 @@ export class Project {
   @Prop({ default: 'ANALOG' })
   domain: string;
 
+  /**
+   * 이 과제의 IP가 고를 수 있는 설계 도메인 후보 목록 (Ip.domain에 들어갈 값).
+   * 위 domain(과제 자신의 분류)과는 다른 축이다 - 이쪽은 과제마다 자유롭게 편집하는
+   * 목록이라 DEPARTMENTS 같은 전사 고정 상수로 두지 않는다
+   * (PATCH /projects/:id/ip-domains, ProjectsService.updateIpDomains).
+   */
+  @Prop({ type: [String], default: [] })
+  ipDomains: string[];
+
   @Prop({ type: [PhaseRefSchema], default: [] })
   phases: PhaseRef[];
 
