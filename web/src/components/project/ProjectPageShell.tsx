@@ -11,6 +11,7 @@ import { EditProjectDialog } from '@/components/dialogs/EditProjectDialog';
 import { progressOf } from '@/lib/projectProgress';
 import { toast } from '@/store/toastStore';
 import { FONT_DISPLAY, FONT_MONO, T } from '@/theme/tokens';
+import { canManageProject } from '@/lib/access';
 
 const TABS = [
   { to: '', label: 'Information', icon: 'info' as const },
@@ -35,7 +36,7 @@ export function ProjectPageShell({ children }: Props) {
   const [editOpen, setEditOpen] = useState(false);
   const [editErr, setEditErr] = useState<string | null>(null);
 
-  const own = useMemo(() => (ips ?? []).some((ip) => ip.myAccess === 'edit'), [ips]);
+  const own = useMemo(() => canManageProject(ips), [ips]);
   const { pct, current, done, total } = useMemo(
     () => progressOf(project?.phases ?? []),
     [project?.phases],
