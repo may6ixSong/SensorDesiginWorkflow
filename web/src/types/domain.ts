@@ -31,6 +31,13 @@ export interface ProjectMemberDto {
 /** Project Information 페이지용 상세 — 목록용 ProjectDto에 팀원 로스터가 더해진 것. */
 export interface ProjectDetailDto extends ProjectDto {
   members: ProjectMemberDto[];
+  /**
+   * 이 과제의 IP가 고를 수 있는 설계 도메인 목록 (IpDto.domain에 들어갈 값).
+   * 과제 자신의 분류인 ProjectDto.domain과는 다른 축이다. 과제마다 편집하는 데이터라
+   * DEPARTMENTS 같은 고정 상수가 아니다 (PATCH /projects/:id/ip-domains).
+   * IP가 하나도 없는 도메인도 Total workflow view에서 빈 항성계로 뜬다.
+   */
+  ipDomains: string[];
 }
 
 export interface ViewGrantDto {
@@ -49,7 +56,7 @@ export interface IpDto {
    * IP가 속한 설계 도메인(예: 'PLL', 'POWER', 'ADC'). Total workflow view가 이 값으로
    * 화면 영역 자체를 항성계 단위로 갈라 놓는다. BE가 아직 필드를 안 내려주는 데이터도
    * 있으므로 optional이고, 비어 있으면 UNASSIGNED 도메인으로 묶인다
-   * (web/src/lib/workflowUniverse.ts의 domainOf()).
+   * (web/src/lib/domainWorkflow.ts의 domainOf()).
    */
   domain?: string | null;
   /** Edit 권한자의 knoxId 목록 — [0]이 Primary Owner. */
