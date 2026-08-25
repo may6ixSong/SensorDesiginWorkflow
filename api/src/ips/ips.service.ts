@@ -51,6 +51,25 @@ export class IpsService {
   }
 
   /**
+   * IP의 설계 도메인을 바꾼다. 빈 문자열은 "도메인 미지정"(FE에서 UNASSIGNED)으로 허용한다.
+   *
+   * 이 값이 과제의 후보 목록(Project.ipDomains) 안에 있는지는 여기서 검증하지 않는다 -
+   * IpsModule에는 Project 모델이 없고, 여기에 등록하면 인메모리 모드에서 별개의 가짜
+   * 컬렉션이 하나 더 생겨 버린다(src/database/model-registration.ts). 그래서 목록 검증은
+   * 두 모델을 모두 가진 ProjectsService.updateIpDomain이 하고, 이 메서드는 쓰기만 한다.
+   */
+  async setDomain(ipId: string, domain: string, actor: Actor) {
+    const ip = await this.findOrThrow(ipId);
+    const before = ip.domain ?? '';
+    if (before !== domain) {
+      ip.domain = domain;
+      await ip.save();
+      await this.audit.log(actor.knoxId, 'IP_DOMAIN_SET', 'ip', ip._id, { before, after: domain });
+    }
+    return this.findOrThrow(ipId);
+  }
+
+  /**
    * Edit 권한(owners)은 반드시 Analog 부서 소속만 가능 (설계서 3.3, 4.5, 7.2).
    * api는 사용자의 소속을 조회할 수 없으므로 요청이 함께 보낸 department로 검증한다.
    */
