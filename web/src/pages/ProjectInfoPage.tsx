@@ -5,6 +5,7 @@ import { ProjectPageShell } from '@/components/project/ProjectPageShell';
 import { MilestoneIpBoard } from '@/components/project/MilestoneIpBoard';
 import { EditMilestonesDialog } from '@/components/dialogs/EditMilestonesDialog';
 import { DomainWorkflowDialog } from '@/components/workflow/DomainWorkflowDialog';
+import { DesignDomainsSection } from '@/components/project/DesignDomainsSection';
 import { useUpdatePhases } from '@/api/hooks/useProjects';
 import { SirenButton } from '@/components/common/SirenButton';
 import { Icon } from '@/components/common/Icon';
@@ -15,24 +16,33 @@ export function ProjectInfoPage() {
   return (
     <ProjectPageShell>
       {({ project, ips, own }) => (
-        <MilestonesSection
-          projectId={project._id}
-          projectName={project.name}
-          projectCode={project.code}
-          phases={project.phases}
-          ips={ips}
-          own={own}
-        />
+        <>
+          <MilestonesSection
+            projectId={project._id}
+            projectName={project.name}
+            projectCode={project.code}
+            phases={project.phases}
+            ips={ips}
+            own={own}
+            ipDomains={project.ipDomains ?? []}
+          />
+          <DesignDomainsSection
+            projectId={project._id}
+            ipDomains={project.ipDomains ?? []}
+            ips={ips}
+            own={own}
+          />
+        </>
       )}
     </ProjectPageShell>
   );
 }
 
 function MilestonesSection({
-  projectId, projectName, projectCode, phases, ips, own,
+  projectId, projectName, projectCode, phases, ips, own, ipDomains,
 }: {
   projectId: string; projectName: string; projectCode: string;
-  phases: PhaseRef[]; ips: IpDto[]; own: boolean;
+  phases: PhaseRef[]; ips: IpDto[]; own: boolean; ipDomains: string[];
 }) {
   const updatePhases = useUpdatePhases(projectId);
   const [editOpen, setEditOpen] = useState(false);
@@ -68,6 +78,7 @@ function MilestonesSection({
         projectCode={projectCode}
         phases={phases}
         ips={ips}
+        ipDomains={ipDomains}
       />
 
       {editOpen && (
