@@ -4,7 +4,7 @@ import { IpDto, PhaseRef } from '@/types/domain';
 import { ProjectPageShell } from '@/components/project/ProjectPageShell';
 import { MilestoneIpBoard } from '@/components/project/MilestoneIpBoard';
 import { EditMilestonesDialog } from '@/components/dialogs/EditMilestonesDialog';
-import { DomainWorkflowDialog } from '@/components/workflow/DomainWorkflowDialog';
+import { DesignWorkflowDialog } from '@/components/workflow/DesignWorkflowDialog';
 import { DesignDomainsSection } from '@/components/project/DesignDomainsSection';
 import { useUpdatePhases } from '@/api/hooks/useProjects';
 import { SirenButton } from '@/components/common/SirenButton';
@@ -60,7 +60,7 @@ function MilestonesSection({
         </Box>
         <Box sx={{ flex: 1 }} />
         <SirenButton variant="on" onClick={() => setWorkflowOpen(true)}>
-          <Icon name="grid" /> Total workflow
+          <Icon name="grid" /> Design workflow
         </SirenButton>
         {own && (
           <SirenButton onClick={() => { setEditErr(null); setEditOpen(true); }}>
@@ -70,7 +70,7 @@ function MilestonesSection({
       </Box>
       <MilestoneIpBoard projectId={projectId} phases={phases} ips={ips} />
 
-      <DomainWorkflowDialog
+      <DesignWorkflowDialog
         open={workflowOpen}
         onClose={() => setWorkflowOpen(false)}
         projectId={projectId}

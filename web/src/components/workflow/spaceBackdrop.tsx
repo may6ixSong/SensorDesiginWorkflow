@@ -1,46 +1,65 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useMemo } from 'react';
 import { Box } from '@mui/material';
 import { useThemeMode } from '@/theme/ThemeModeContext';
 
 /**
- * Total workflow view 전용 "적당히 우주스러운" 배경 — HomePage의 aurora/grid 패턴
- * (theme별 rgba를 명시하는 PALETTE 방식)을 그대로 따른다. 도메인 카드 자체는 항상
- * 불투명(T.sf)이라 데이터 가독성엔 영향이 없고, 카드 사이 여백·상단바·좌측 메뉴에만
- * 옅은 오로라 + 별 점이 비친다.
+ * Design Workflow view의 "적당히 우주스러운" 배경 — HomePage의 aurora 배경과 같은
+ * 방식(useThemeMode() + theme별 명시적 rgba 팔레트)을 따른다.
+ *
+ * 카메라(translate+scale)를 따라 시차(parallax)로 움직인다. 별 레이어는 카메라
+ * 이동량의 일부만 따라가고 줌에는 아주 약하게만 반응해서, 판이 움직일 때 배경이
+ * "훨씬 먼 곳"처럼 느리게 흐른다.
  */
 export interface SpacePalette {
-  /** 페이지 바탕 — Dialog Paper와 보드 루트가 함께 쓴다. */
+  /** 페이지 바탕. */
   wash: string;
   aurora: string;
   star: string;
   starBright: string;
-  /** 상단바/좌측 메뉴의 반투명 유리판 배경. */
+  /** 상단바/좌측 메뉴의 반투명 유리판. */
   panelBg: string;
   panelBorder: string;
+  /** island 판의 표면/테두리/그림자. */
+  plateBg: string;
+  plateBorder: string;
+  plateShadow: string;
+  /** island 아래에 깔리는 후광(떠 있는 느낌). */
+  plateGlow: string;
 }
 
 const SPACE_PALETTE: Record<'light' | 'dark', SpacePalette> = {
   dark: {
-    wash: '#0a0d15',
+    wash: '#070a12',
     aurora:
-      'radial-gradient(58% 44% at 20% 12%, rgba(46,230,197,.06), transparent 70%),'
-      + 'radial-gradient(54% 48% at 84% 80%, rgba(154,139,255,.055), transparent 72%)',
-    star: 'rgba(210,225,255,.5)',
-    starBright: 'rgba(255,255,255,.85)',
-    panelBg: 'rgba(16,20,30,.74)',
-    panelBorder: 'rgba(150,170,210,.14)',
+      'radial-gradient(58% 40% at 18% 10%, rgba(46,230,197,.07), transparent 70%),'
+      + 'radial-gradient(52% 44% at 86% 78%, rgba(154,139,255,.065), transparent 72%),'
+      + 'radial-gradient(44% 36% at 60% 44%, rgba(74,163,255,.045), transparent 70%)',
+    star: 'rgba(210,225,255,.55)',
+    starBright: 'rgba(255,255,255,.9)',
+    panelBg: 'rgba(14,19,30,.78)',
+    panelBorder: 'rgba(150,170,210,.16)',
+    plateBg: 'linear-gradient(165deg, rgba(28,36,52,.94), rgba(17,23,36,.92))',
+    plateBorder: 'rgba(150,175,215,.16)',
+    plateShadow: '0 42px 90px -28px rgba(0,0,0,.85), 0 10px 30px rgba(0,0,0,.5)',
+    plateGlow: 'radial-gradient(closest-side, rgba(120,170,240,.16), transparent 72%)',
   },
   light: {
-    wash: '#eef1f7',
+    // 판이 거의 흰색이라 바탕이 너무 밝으면 "떠 있는 판"으로 안 읽힌다 — 바탕을
+    // 한 단계 눌러 판/배경 대비를 확보한다.
+    wash: '#dce2ee',
     aurora:
-      'radial-gradient(58% 44% at 20% 12%, rgba(12,154,131,.07), transparent 70%),'
-      + 'radial-gradient(54% 48% at 84% 80%, rgba(88,73,207,.06), transparent 72%)',
-    // 라이트 배경 위 별은 밝은 점이 아니라 옅은 잉크 반점처럼 보여야 해서, 다크보다
-    // 알파를 훨씬 높게 잡는다 — 그래야 "은은하게라도 우주" 정도로 눈에 들어온다.
-    star: 'rgba(50,68,102,.34)',
-    starBright: 'rgba(38,54,88,.55)',
-    panelBg: 'rgba(255,255,255,.74)',
-    panelBorder: 'rgba(20,32,47,.09)',
+      'radial-gradient(58% 40% at 18% 10%, rgba(12,154,131,.08), transparent 70%),'
+      + 'radial-gradient(52% 44% at 86% 78%, rgba(88,73,207,.07), transparent 72%),'
+      + 'radial-gradient(44% 36% at 60% 44%, rgba(37,99,201,.05), transparent 70%)',
+    // 밝은 배경 위의 별은 "빛나는 점"이 아니라 옅은 잉크 반점이라 알파가 더 필요하다.
+    star: 'rgba(50,68,102,.32)',
+    starBright: 'rgba(38,54,88,.5)',
+    panelBg: 'rgba(255,255,255,.8)',
+    panelBorder: 'rgba(20,32,47,.1)',
+    plateBg: 'linear-gradient(165deg, rgba(255,255,255,.97), rgba(243,246,251,.95))',
+    plateBorder: 'rgba(20,32,47,.1)',
+    plateShadow: '0 46px 90px -28px rgba(24,40,74,.5), 0 10px 28px rgba(24,40,74,.16)',
+    plateGlow: 'radial-gradient(closest-side, rgba(60,100,175,.2), transparent 72%)',
   },
 };
 
@@ -49,17 +68,8 @@ export function useSpacePalette(): SpacePalette {
   return useMemo(() => SPACE_PALETTE[mode], [mode]);
 }
 
-interface Star {
-  id: number;
-  x: number;
-  y: number;
-  r: number;
-  o: number;
-  delay: number;
-}
-
-/** 결정적 PRNG(mulberry32) — 새로고침해도 별자리가 안 바뀐다. */
-function seededStars(seed: number, count: number, w: number, h: number): Star[] {
+/** 결정적 PRNG(mulberry32) — 새로고침해도 별자리가 그대로다. */
+function seededStars(seed: number, count: number, w: number, h: number) {
   let t = seed >>> 0;
   const rnd = () => {
     t = (t + 0x6d2b79f5) >>> 0;
@@ -68,66 +78,57 @@ function seededStars(seed: number, count: number, w: number, h: number): Star[] 
     return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
   };
   return Array.from({ length: count }, (_, i) => ({
-    id: i, x: rnd() * w, y: rnd() * h, r: 0.5 + rnd() * 1.1, o: 0.3 + rnd() * 0.5, delay: rnd() * 6,
+    id: i, x: rnd() * w, y: rnd() * h, r: 0.5 + rnd() * 1.2, o: 0.3 + rnd() * 0.55, delay: rnd() * 7,
   }));
 }
 
-const FIELD_W = 1600;
-const FIELD_H = 1400;
+const FIELD_W = 2200;
+const FIELD_H = 1500;
 
 /**
- * 뷰포트 크기의 고정 배경 — 스크롤 콘텐츠(도메인 섹션들)와는 별개로 보드 루트에
- * 딱 한 번만 깔린다. 스크롤에 따라 아주 살짝(수 %) 시차 이동해 "천천히 흘러가는"
- * 느낌만 준다 — 콘텐츠를 따라 크게 움직이면 오히려 산만해지므로 진폭은 작게 유지.
+ * 카메라를 따라 시차로 흐르는 별 배경.
+ * @param camX,camY 카메라 translate(px) — 레이어마다 계수를 달리해 깊이를 만든다.
+ * @param camZ 카메라 배율 — 별은 아주 약하게만(1에 수렴) 반응시켜 멀리 있는 느낌을 유지.
  */
-export function SpaceBackdrop({ scrollRef }: { scrollRef: React.RefObject<HTMLElement> }) {
+export function SpaceBackdrop({ camX, camY, camZ }: { camX: number; camY: number; camZ: number }) {
   const pal = useSpacePalette();
-  const layerA = useRef<HTMLDivElement | null>(null);
-  const layerB = useRef<HTMLDivElement | null>(null);
-  const starsA = useMemo(() => seededStars(11, 70, FIELD_W, FIELD_H), []);
-  const starsB = useMemo(() => seededStars(29, 30, FIELD_W, FIELD_H), []);
-
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    let raf = 0;
-    const onScroll = () => {
-      if (raf) return;
-      raf = requestAnimationFrame(() => {
-        raf = 0;
-        const t = el.scrollTop;
-        if (layerA.current) layerA.current.style.transform = `translate3d(0, ${-t * 0.025}px, 0)`;
-        if (layerB.current) layerB.current.style.transform = `translate3d(0, ${-t * 0.06}px, 0)`;
-      });
-    };
-    el.addEventListener('scroll', onScroll, { passive: true });
-    return () => { el.removeEventListener('scroll', onScroll); if (raf) cancelAnimationFrame(raf); };
-  }, [scrollRef]);
+  const layers = useMemo(
+    () => [
+      { stars: seededStars(11, 150, FIELD_W, FIELD_H), p: 0.03, s: 1, bright: false },
+      { stars: seededStars(29, 70, FIELD_W, FIELD_H), p: 0.075, s: 1.35, bright: false },
+      { stars: seededStars(47, 26, FIELD_W, FIELD_H), p: 0.14, s: 1.9, bright: true },
+    ],
+    [],
+  );
+  // 줌이 변해도 별 크기는 거의 그대로 — 1에서 살짝만 벗어나게 눌러 준다.
+  const starScale = 1 + (camZ - 1) * 0.12;
 
   return (
-    <Box sx={{ position: 'absolute', inset: 0, zIndex: 0, overflow: 'hidden', pointerEvents: 'none', background: pal.wash }}>
+    <Box sx={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', background: pal.wash }}>
       <Box sx={{ position: 'absolute', inset: 0, background: pal.aurora }} />
-      <Box ref={layerA} sx={{ position: 'absolute', inset: '-12% 0', willChange: 'transform' }}>
-        <svg width="100%" height="124%" viewBox={`0 0 ${FIELD_W} ${FIELD_H}`} preserveAspectRatio="xMidYMin slice">
-          {starsA.map((s) => <circle key={s.id} cx={s.x} cy={s.y} r={s.r} fill={pal.star} opacity={s.o} />)}
-        </svg>
-      </Box>
-      <Box ref={layerB} sx={{ position: 'absolute', inset: '-12% 0', willChange: 'transform' }}>
-        <svg width="100%" height="124%" viewBox={`0 0 ${FIELD_W} ${FIELD_H}`} preserveAspectRatio="xMidYMin slice">
-          {starsB.map((s) => (
-            <circle
-              key={s.id}
-              cx={s.x}
-              cy={s.y}
-              r={s.r * 1.5}
-              fill={pal.starBright}
-              opacity={s.o * 0.7}
-              className="wf-twinkle"
-              style={{ animationDelay: `${s.delay}s` }}
-            />
-          ))}
-        </svg>
-      </Box>
+      {layers.map((l, i) => (
+        <Box
+          key={i}
+          sx={{ position: 'absolute', inset: '-25%', willChange: 'transform' }}
+          style={{ transform: `translate3d(${camX * l.p}px, ${camY * l.p}px, 0) scale(${starScale})` }}
+        >
+          <svg width="100%" height="100%" viewBox={`0 0 ${FIELD_W} ${FIELD_H}`} preserveAspectRatio="xMidYMid slice">
+            {l.stars.map((s) => (
+              <circle
+                key={s.id}
+                cx={s.x}
+                cy={s.y}
+                r={s.r * l.s}
+                fill={l.bright ? pal.starBright : pal.star}
+                opacity={s.o}
+                {...(l.bright
+                  ? { className: 'dw-twinkle', style: { animationDelay: `${s.delay}s` } }
+                  : {})}
+              />
+            ))}
+          </svg>
+        </Box>
+      ))}
     </Box>
   );
 }
