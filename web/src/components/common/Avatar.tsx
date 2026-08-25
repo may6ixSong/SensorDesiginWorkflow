@@ -1,5 +1,5 @@
 import { Box } from '@mui/material';
-import { UserDto } from '@/types/domain';
+import { DirectoryUser } from '@/shared/constants/mock-users';
 import { T } from '@/theme/tokens';
 
 /** "Sunwoo Kim" → "SK" — first letter of up to the first two space-separated words. */
@@ -11,7 +11,7 @@ export function initials(name: string | undefined | null): string {
 }
 
 /** User avatar chip — background is the user's assigned color, label is their initials. */
-export function UserAvatar({ user, size = 26 }: { user?: UserDto | null; size?: number }) {
+export function UserAvatar({ user, size = 26 }: { user?: DirectoryUser | null; size?: number }) {
   return (
     <Box
       component="span"
