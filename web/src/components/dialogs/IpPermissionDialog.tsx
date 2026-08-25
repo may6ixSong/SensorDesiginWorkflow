@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Box } from '@mui/material';
-import { IpDto, UserDto } from '@/types/domain';
+import { IpDto } from '@/types/domain';
 import { DEPARTMENTS, departmentName } from '@/shared/constants/departments';
+import { DirectoryUser, findDirectoryUser } from '@/shared/constants/mock-users';
 import { ModalShell } from '@/components/common/ModalShell';
 import { SirenButton, Chip } from '@/components/common/SirenButton';
 import { Card, Ey, Field, Row, SelectInput } from '@/components/common/Panel';
@@ -11,13 +12,14 @@ import { T } from '@/theme/tokens';
 
 interface Props {
   ip: IpDto;
-  users: UserDto[];
+  users: DirectoryUser[];
   own: boolean;
   onClose: () => void;
-  onAddOwner: (userId: string) => void;
-  onRemoveOwner: (userId: string) => void;
-  onAddViewGrant: (userId: string, department: string) => void;
-  onRemoveViewGrant: (userId: string) => void;
+  /** api/는 사용자를 조회할 수 없으므로 department도 함께 보낸다 (BE가 'analog'인지 재검증). */
+  onAddOwner: (knoxId: string, department: string) => void;
+  onRemoveOwner: (knoxId: string) => void;
+  onAddViewGrant: (knoxId: string, department: string) => void;
+  onRemoveViewGrant: (knoxId: string) => void;
 }
 
 /**
@@ -27,12 +29,13 @@ interface Props {
 export function IpPermissionDialog({
   ip, users, own, onClose, onAddOwner, onRemoveOwner, onAddViewGrant, onRemoveViewGrant,
 }: Props) {
-  const primary = ip.owners[0];
+  const owners = ip.owners.map(findDirectoryUser);
+  const primary = owners[0];
   const analogCandidates = users.filter(
-    (u) => u.department === 'analog' && !ip.owners.some((o) => o.id === u.id),
+    (u) => u.department === 'analog' && !ip.owners.includes(u.knoxId),
   );
   const viewCandidates = users.filter(
-    (u) => !ip.owners.some((o) => o.id === u.id) && !ip.viewGrants.some((g) => g.user.id === u.id),
+    (u) => !ip.owners.includes(u.knoxId) && !ip.viewGrants.some((g) => g.knoxId === u.knoxId),
   );
 
   const [ownerSel, setOwnerSel] = useState('');
@@ -66,8 +69,8 @@ export function IpPermissionDialog({
 
       <Card sx={{ mb: '12px' }}>
         <Ey sx={{ mb: '9px' }}>Edit access — Analog department only</Ey>
-        {ip.owners.map((o, i) => (
-          <Box key={o.id} sx={{ display: 'flex', alignItems: 'center', gap: '9px', padding: '7px 0', borderBottom: `1px solid ${T.ln}` }}>
+        {owners.map((o, i) => (
+          <Box key={o.knoxId} sx={{ display: 'flex', alignItems: 'center', gap: '9px', padding: '7px 0', borderBottom: `1px solid ${T.ln}` }}>
             <UserAvatar user={o} size={26} />
             <Box sx={{ flex: 1 }}>
               <Box sx={{ fontSize: 13, fontWeight: 500, display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -77,7 +80,7 @@ export function IpPermissionDialog({
               <Box sx={{ fontSize: 11, color: T.dm2 }}>{departmentName(o.department)}</Box>
             </Box>
             {own && i > 0 && (
-              <SirenButton variant="ghost" onClick={() => onRemoveOwner(o.id)}>
+              <SirenButton variant="ghost" onClick={() => onRemoveOwner(o.knoxId)}>
                 <Icon name="trash" />
               </SirenButton>
             )}
@@ -87,12 +90,12 @@ export function IpPermissionDialog({
           <Row sx={{ mt: '10px' }}>
             <Field label="Add Analog member" sx={{ flex: 1, mb: 0 }}>
               <SelectInput
-                value={ownerSel || analogCandidates[0]?.id || ''}
+                value={ownerSel || analogCandidates[0]?.knoxId || ''}
                 onChange={setOwnerSel}
                 disabled={!analogCandidates.length}
                 options={
                   analogCandidates.length
-                    ? analogCandidates.map((u) => ({ value: u.id, label: u.name }))
+                    ? analogCandidates.map((u) => ({ value: u.knoxId, label: u.name }))
                     : [{ value: '', label: 'No eligible members' }]
                 }
               />
@@ -101,8 +104,8 @@ export function IpPermissionDialog({
               <SirenButton
                 disabled={!analogCandidates.length}
                 onClick={() => {
-                  const u = ownerSel || analogCandidates[0]?.id;
-                  if (u) onAddOwner(u);
+                  const u = ownerSel || analogCandidates[0]?.knoxId;
+                  if (u) onAddOwner(u, 'analog');
                 }}
               >
                 <Icon name="plus" /> Add
@@ -115,20 +118,23 @@ export function IpPermissionDialog({
       <Card>
         <Ey sx={{ mb: '9px' }}>View access — any department</Ey>
         {ip.viewGrants.length ? (
-          ip.viewGrants.map((g) => (
-            <Box key={g.user.id} sx={{ display: 'flex', alignItems: 'center', gap: '9px', padding: '7px 0', borderBottom: `1px solid ${T.ln}` }}>
-              <UserAvatar user={g.user} size={26} />
-              <Box sx={{ flex: 1 }}>
-                <Box sx={{ fontSize: 13, fontWeight: 500 }}>{g.user.name}</Box>
-                <Box sx={{ fontSize: 11, color: T.dm2 }}>Position: {departmentName(g.department)}</Box>
+          ip.viewGrants.map((g) => {
+            const gu = findDirectoryUser(g.knoxId);
+            return (
+              <Box key={g.knoxId} sx={{ display: 'flex', alignItems: 'center', gap: '9px', padding: '7px 0', borderBottom: `1px solid ${T.ln}` }}>
+                <UserAvatar user={gu} size={26} />
+                <Box sx={{ flex: 1 }}>
+                  <Box sx={{ fontSize: 13, fontWeight: 500 }}>{gu.name}</Box>
+                  <Box sx={{ fontSize: 11, color: T.dm2 }}>Position: {departmentName(g.department)}</Box>
+                </Box>
+                {own && (
+                  <SirenButton variant="ghost" onClick={() => onRemoveViewGrant(g.knoxId)}>
+                    <Icon name="trash" />
+                  </SirenButton>
+                )}
               </Box>
-              {own && (
-                <SirenButton variant="ghost" onClick={() => onRemoveViewGrant(g.user.id)}>
-                  <Icon name="trash" />
-                </SirenButton>
-              )}
-            </Box>
-          ))
+            );
+          })
         ) : (
           <Box sx={{ fontSize: 12.5, color: T.dm2 }}>No one has view access yet.</Box>
         )}
@@ -137,12 +143,12 @@ export function IpPermissionDialog({
             <Row sx={{ mt: '10px' }}>
               <Field label="Target" sx={{ flex: 1, mb: 0 }}>
                 <SelectInput
-                  value={viewUser || viewCandidates[0]?.id || ''}
+                  value={viewUser || viewCandidates[0]?.knoxId || ''}
                   onChange={setViewUser}
                   disabled={!viewCandidates.length}
                   options={
                     viewCandidates.length
-                      ? viewCandidates.map((u) => ({ value: u.id, label: u.name }))
+                      ? viewCandidates.map((u) => ({ value: u.knoxId, label: u.name }))
                       : [{ value: '', label: 'No eligible members' }]
                   }
                 />
@@ -158,7 +164,7 @@ export function IpPermissionDialog({
                 <SirenButton
                   disabled={!viewCandidates.length}
                   onClick={() => {
-                    const u = viewUser || viewCandidates[0]?.id;
+                    const u = viewUser || viewCandidates[0]?.knoxId;
                     if (u) onAddViewGrant(u, viewDept);
                   }}
                 >
