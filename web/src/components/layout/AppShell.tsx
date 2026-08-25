@@ -38,9 +38,9 @@ const NAV_LABEL = 'Project List';
  *
  * Right-side chrome (language/theme/notices/profile) mirrors SSM_WEB's
  * TopAppBar, wired to the platform AuthProvider (ADSSO / dev fixed admin) and
- * the common-platform APIs. Who is "logged in" for SIREN's own dept-based
- * permissions (project/IP ownership) is unrelated plumbing — see
- * store/authStore.ts + api/hooks/useAuth.ts — and unaffected by this.
+ * the common-platform APIs. The same ADSSO identity drives SIREN's own
+ * dept-based permissions — api/는 X-Knox-Id 헤더로만 호출자를 식별한다
+ * (api/client.ts의 setApiKnoxId).
  */
 export function AppShell({
   projects, projectId, onChangeProject,
