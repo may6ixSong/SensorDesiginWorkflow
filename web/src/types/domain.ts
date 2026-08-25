@@ -45,6 +45,13 @@ export interface IpDto {
   name: string;
   description: string;
   color: string;
+  /**
+   * IP가 속한 설계 도메인(예: 'PLL', 'POWER', 'ADC'). Total workflow view가 이 값으로
+   * 화면 영역 자체를 항성계 단위로 갈라 놓는다. BE가 아직 필드를 안 내려주는 데이터도
+   * 있으므로 optional이고, 비어 있으면 UNASSIGNED 도메인으로 묶인다
+   * (web/src/lib/workflowUniverse.ts의 domainOf()).
+   */
+  domain?: string | null;
   /** Edit 권한자의 knoxId 목록 — [0]이 Primary Owner. */
   owners: string[];
   viewGrants: ViewGrantDto[];
