@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Box } from '@mui/material';
-import { IpBriefDto, PhaseRef, UserDto } from '@/types/domain';
+import { IpBriefDto, PhaseRef } from '@/types/domain';
 import { CanvasNode, VersionView, fmtAt, hasW, latA, latR, stOf, vstr } from '@/lib/canvasModel';
 import { useCanvasStore } from '@/store/canvasStore';
+import { useDownloadVersion } from '@/api/hooks/useDeliverables';
 import { toast } from '@/store/toastStore';
 import { DEPARTMENTS, RECEIVABLE_DEPARTMENTS, departmentName } from '@/shared/constants/departments';
+import { DirectoryUser, findDirectoryUser } from '@/shared/constants/mock-users';
 import { ModalShell } from '@/components/common/ModalShell';
 import { SirenButton, Badge, Chip } from '@/components/common/SirenButton';
 import { Card, Ey, Field, Row, SelectInput, TextInput } from '@/components/common/Panel';
@@ -15,8 +17,8 @@ import { CURSOR_POINTER, FONT_MONO, T } from '@/theme/tokens';
 interface Props {
   node: CanvasNode | null;
   phases: PhaseRef[];
-  usersById: Map<string, UserDto>;
-  users: UserDto[];
+  /** recvContact 후보 (목업 사용자 디렉토리). */
+  users: DirectoryUser[];
   /** 목업 own = isOwn(ip) && !S.recv */
   own: boolean;
   /** 수신 IP 셀렉트 박스용 — 과제 소속 IP 전체(id/name/color). */
@@ -34,7 +36,7 @@ interface Props {
 
 /** 목업 renderModal()의 산출물 상세 — 개요 / 버전 이력 / 전달 3탭 */
 export function DeliverableDialog({
-  node: d, phases, usersById, users, own, ipDirectory, onClose,
+  node: d, phases, users, own, ipDirectory, onClose,
   onSaveInfo, onUpload, onRelease, onSaveRecv, onAddLink, onUnlink,
 }: Props) {
   const tab = useCanvasStore((s) => s.tab);
@@ -98,9 +100,9 @@ export function DeliverableDialog({
           onAddLink={onAddLink} onUnlink={onUnlink}
         />
       )}
-      {tab === 'versions' && <VersionsTab d={d} usersById={usersById} />}
+      {tab === 'versions' && <VersionsTab d={d} />}
       {tab === 'recv' && (
-        <RecvTab d={d} own={own} users={users} usersById={usersById} ipDirectory={ipDirectory} onSave={onSaveRecv} />
+        <RecvTab d={d} own={own} users={users} ipDirectory={ipDirectory} onSave={onSaveRecv} />
       )}
     </ModalShell>
   );
@@ -118,6 +120,8 @@ function OverviewTab({
   const rel = latR(d);
   const work = hasW(d) ? latA(d) : null;
   const cur = own ? latA(d)?.file : rel?.file;
+  // GET /deliverables/:id/download?major=&minor= — api/가 파일 바이트를 직접 중계한다.
+  const download = useDownloadVersion();
 
   const sid = d.series || d.id;
   const seriesPhases = useMemo(
@@ -330,7 +334,16 @@ function OverviewTab({
               <Icon name="copy" /> Copy path
             </SirenButton>
           ) : (
-            <SirenButton disabled={!rel} onClick={() => toast('Downloads will be available once storage is connected')}>
+            <SirenButton
+              disabled={!rel || download.isPending}
+              onClick={() => {
+                if (!rel) return;
+                download.mutate(
+                  { id: d.id, major: rel.major, minor: rel.minor, fileName: rel.file },
+                  { onError: () => toast('Download failed') },
+                );
+              }}
+            >
               <Icon name="dn" /> Download file
             </SirenButton>
           )}
@@ -386,7 +399,7 @@ function OverviewTab({
 }
 
 /* ── 버전 이력 탭 ── */
-function VersionsTab({ d, usersById }: { d: CanvasNode; usersById: Map<string, UserDto> }) {
+function VersionsTab({ d }: { d: CanvasNode }) {
   const list = d.versions;
   if (!list.length) {
     return <Card sx={{ color: T.dm2, fontSize: 12 }}>No versions yet.</Card>;
@@ -420,7 +433,7 @@ function VersionsTab({ d, usersById }: { d: CanvasNode; usersById: Map<string, U
           </Box>
           <Box sx={{ fontSize: 12, color: T.dm, mt: '4px' }}>{v.note}</Box>
           <Box sx={{ fontFamily: FONT_MONO, fontSize: 10, color: T.dm2, mt: '4px', wordBreak: 'break-all' }}>
-            {v.file || '(none)'} · {usersById.get(v.by)?.name ?? '—'} · {fmtAt(v.at)}
+            {v.file || '(none)'} · {findDirectoryUser(v.by).name} · {fmtAt(v.at)}
           </Box>
         </Box>
       ))}
@@ -430,10 +443,10 @@ function VersionsTab({ d, usersById }: { d: CanvasNode; usersById: Map<string, U
 
 /* ── 전달 탭 ── */
 function RecvTab({
-  d, own, users, usersById, ipDirectory, onSave,
+  d, own, users, ipDirectory, onSave,
 }: {
-  d: CanvasNode; own: boolean; users: UserDto[];
-  usersById: Map<string, UserDto>; ipDirectory: IpBriefDto[]; onSave: Props['onSaveRecv'];
+  d: CanvasNode; own: boolean; users: DirectoryUser[];
+  ipDirectory: IpBriefDto[]; onSave: Props['onSaveRecv'];
 }) {
   const [dept, setDept] = useState(d.recvDept ?? '');
   const [contact, setContact] = useState(d.recvContact ?? '');
@@ -458,8 +471,8 @@ function RecvTab({
               <Badge color={T.dm} bg={T.sf2} borderColor={T.ln}>{departmentName(d.recvDept)}</Badge>
               {d.recvContact && (
                 <>
-                  <UserAvatar user={usersById.get(d.recvContact)} size={24} />
-                  <Box sx={{ fontSize: 13 }}>{usersById.get(d.recvContact)?.name}</Box>
+                  <UserAvatar user={findDirectoryUser(d.recvContact)} size={24} />
+                  <Box sx={{ fontSize: 13 }}>{findDirectoryUser(d.recvContact).name}</Box>
                 </>
               )}
             </Box>
@@ -513,7 +526,7 @@ function RecvTab({
               onChange={setContact}
               options={[
                 { value: '', label: 'Not set' },
-                ...contacts.map((u) => ({ value: u.id, label: `${u.name} · ${departmentName(u.department)}` })),
+                ...contacts.map((u) => ({ value: u.knoxId, label: `${u.name} · ${departmentName(u.department)}` })),
               ]}
             />
           </Field>
