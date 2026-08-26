@@ -29,15 +29,23 @@ export const ISLAND_PAD = 26;
 export const BLOCK_H = 48;
 export const BLOCK_GAP = 11;
 export const ROW_PAD = 12;
-export const MIN_ROW_H = 76;
+export const MIN_ROW_H = 88;
 /** island 사이 여백 — 넉넉해야 "판과 판 사이 빈 우주"를 지나가는 느낌이 난다. */
 export const ISLAND_GAP = 300;
 /** island를 좌우로 살짝 엇갈리게 두어 표 같지 않고 떠 있는 느낌을 준다. */
 const STAGGER = 84;
-/** 산출물 배치를 격자에서 살짝 흩뜨리는 범위(px) — 표처럼 각 잡히지 않고 성기게
- * 떠 있는 느낌을 준다. Phase/IP 소속(칸 자체)은 안 바뀌니 정보는 그대로 읽힌다. */
-const JITTER_X = 15;
-const JITTER_Y = 7;
+/** 산출물 배치를 흩뜨리는 범위(px). 세로(JITTER_Y)는 좁게 잡아야 한다 — 라벨이
+ * 옆으로 길게 뜨는 구조라, 세로로 너무 흔들면 위·아래 산출물 이름끼리 겹친다.
+ * 가로(JITTER_X)는 그 제약이 없어 훨씬 크게 흩어도 안전하다. */
+const JITTER_X = 30;
+const JITTER_Y = 4;
+/** 크기(depth)가 큰(=가까운) 산출물일수록 칸 안에서 살짝 아래로, 작은(=먼)
+ * 산출물은 살짝 위로 — 원근감을 "노이즈"가 아니라 일관된 규칙으로 준다. */
+const DEPTH_TILT = 6;
+/** IP 행이 phase를 가로지르며 오르내리는 물결의 진폭(px) — 행이 자로 잰 듯
+ * 수평이면 결국 표로 읽힌다. 행 경계(rowY/rowH)나 라벨 위치는 그대로 두고
+ * 그 안의 산출물 배치에만 쓴다. */
+const ROW_WAVE = 13;
 
 /** FNV-1a 32bit 해시 — 항상 같은 입력에 같은 값(새로고침해도 배치가 그대로). */
 function hash32(s: string): number {
@@ -65,9 +73,9 @@ export interface BlockNode {
   y: number;
   w: number;
   h: number;
-  /** 순수 시각적 크기 배율(0.85~1.18) — 격자를 벗어나는 "자유분방한" 배치가
-   * 입체감도 있어 보이도록 산출물마다 살짝 다른 크기로 흩어 준다. 레이아웃
-   * 계산(행 높이 등)에는 관여하지 않는, 그리는 단계에서만 쓰는 값. */
+  /** 순수 시각적 크기 배율(0.85~1.15) — 크게/작게 섞어서 "가까이/멀리" 있는
+   * 것처럼 입체감을 준다. 레이아웃 계산(행 높이 등)에는 관여하지 않는, 그리는
+   * 단계에서만 쓰는 값. */
   depth: number;
 }
 
@@ -195,12 +203,19 @@ export function buildWorldLayout(
       state: phaseState(p, now),
     }));
     const colX = new Map(cols.map((c) => [c.phase.key, c.x]));
+    const colIndexOf = new Map(cols.map((c, i) => [c.phase.key, i]));
 
     /* 3) IP 행 + 블록. 동시에 산출물 id → 중심 좌표 맵을 쌓아 4)에서 와이어를 잇는다. */
     const contentY = ISLAND_HEAD_H + PHASE_HEAD_H;
     const centerOf = new Map<string, { x: number; y: number }>();
     const rows: IpRowLayout[] = perIp.map(({ ip, byPhase }, ri) => {
       const rowY = contentY + ri * rowH;
+      // 행이 phase를 가로지르며 오르내리게 — 칸마다 고정된 오프셋이 아니라
+      // sin 곡선을 태워서, 같은 행 안에서도 phase가 바뀔 때마다 자연스럽게
+      // 흐른다. rowY/rowH(행 경계)는 그대로 두고 그 안의 산출물 배치에만
+      // 적용하는 순수 렌더링 오프셋이라 라벨/음영 계산은 안 바뀐다. 위상
+      // (rowPhase)을 행마다 다르게 둬서 모든 행이 같은 박자로 출렁이지 않게 한다.
+      const rowPhase = rand01(`row:${ip.id}`) * Math.PI * 2;
       const blocks: BlockNode[] = [];
       let released = 0;
       let total = 0;
@@ -208,17 +223,30 @@ export function buildWorldLayout(
       byPhase.forEach((items, phaseKey) => {
         const cx = colX.get(phaseKey);
         if (cx === undefined) return; // 과제 Phase 목록에 없는 값이면 그리지 않는다
+        const n = items.length;
+        const ci = colIndexOf.get(phaseKey) ?? 0;
+        const colWave = Math.sin(ci * 1.35 + rowPhase) * ROW_WAVE;
         items.forEach((d, k) => {
           const status = statusOf(d);
           if (status === 'released') released++;
           total++;
-          // 격자에서 살짝 흩뜨려 표처럼 각 잡히지 않게 — 소속 칸(phase/IP)은 그대로라
-          // 정보는 안 바뀐다. depth는 순수 시각 크기(구체 반지름)라 이 흩뜨림에도
-          // 쓴다: 화면에 실제로 뜨는 구체 중심에 와이어 끝을 정확히 물리려면 필요하다.
-          const depth = 0.85 + rand01(`${d.id}:depth`) * 0.33;
+          // depth는 순수 시각 크기(구체 반지름)다 — 크게(가까이)/작게(멀리) 섞어
+          // 원근감을 준다. 화면에 실제로 뜨는 구체 중심에 와이어 끝을 정확히
+          // 물리려면 배치 계산에도 이 반지름이 필요하다.
+          const depth = 0.85 + rand01(`${d.id}:depth`) * 0.3;
+          const depthNorm = (depth - 0.85) / 0.3;
+          // 세로는 원래의 한 줄 쌓기(k번째 칸)를 그대로 쓴다 — 라벨이 옆으로
+          // 길게 뜨기 때문에 세로 순서가 흔들리면 이름끼리 겹친다. 대신 그 안에서
+          // "가까운 건 살짝 아래로, 먼 건 살짝 위로" + 행 물결 + 아주 약한 지터로
+          // 자로 잰 격자처럼 보이지 않게 한다. 가로는 이 제약이 없어 크게 흩는다.
+          const bandY = rowY + ROW_PAD + k * (BLOCK_H + BLOCK_GAP);
           const x = cx + 12 + (rand01(`${d.id}:x`) - 0.5) * 2 * JITTER_X;
-          const y = rowY + ROW_PAD + k * (BLOCK_H + BLOCK_GAP) + (rand01(`${d.id}:y`) - 0.5) * 2 * JITTER_Y;
-          const w = PHASE_W - 24;
+          const y = n <= 1
+            ? rowY + ROW_PAD + (rowH - ROW_PAD * 2 - BLOCK_H) / 2 + colWave
+            : bandY + colWave + (0.5 - depthNorm) * DEPTH_TILT + (rand01(`${d.id}:y`) - 0.5) * 2 * JITTER_Y;
+          // 오른쪽으로 흩어진 블록이라도 라벨이 다음 phase 경계를 넘어가지 않게,
+          // 남은 폭만큼만 박스를 준다(라벨은 어차피 overflow:ellipsis로 잘린다).
+          const w = Math.max(90, cx + PHASE_W - 12 - x);
           const h = BLOCK_H;
           blocks.push({ id: d.id, name: d.name, docType: d.docType, status, x, y, w, h, depth });
           const r = Math.min(h, 46) * depth * 0.5;

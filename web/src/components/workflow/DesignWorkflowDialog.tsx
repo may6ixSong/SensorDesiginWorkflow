@@ -96,10 +96,9 @@ export function DesignWorkflowDialog(props: Props) {
     >
       <style>{`
         @keyframes dw-twinkle { 0%,100% { opacity:.3 } 50% { opacity:1 } }
-        @keyframes dw-bob { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-5px) } }
         @keyframes dw-rise { from { opacity:0; transform: translateY(10px) } to { opacity:1; transform:none } }
         @media (prefers-reduced-motion: reduce) {
-          .dw-twinkle, .dw-bob { animation: none !important; }
+          .dw-twinkle { animation: none !important; }
         }
       `}</style>
       {props.open && <WorkflowStage {...props} />}
@@ -644,13 +643,12 @@ function DomainZone({
             </Box>
 
             {/* 산출물 블록 — 진짜 3D 구체. */}
-            {row.blocks.map((b, i) => (
+            {row.blocks.map((b) => (
               <DeliverableBlock
                 key={b.id}
                 b={b}
                 hex={statusHex[b.status]}
                 detail={detail}
-                index={i}
                 selected={!!hlSet && hlSet.has(b.id)}
                 faded={!!hlSet && !hlSet.has(b.id)}
                 onSelect={onSelectBlock}
@@ -673,10 +671,11 @@ function DomainZone({
 }
 
 /**
- * 별이 흐린 배경 위에서도 박스 없이 읽히도록 대비를 깔아 주는 래퍼.
- * 예전엔 blur 14px짜리 그림자를 둘러서 텍스트 테두리가 번져 보였다("빛번짐") —
- * 대비는 블러가 아니라 촘촘한 1px 겹침으로 만든다: 글자 뒤에 살짝 어긋난
- * 그림자 4개를 딱 붙여 깔면 배경이 밝든 어둡든 테두리가 또렷하게 갈린다.
+ * 별이 흐린 배경 위에서도 박스 없이 읽히도록 대비를 살짝만 깔아 주는 래퍼.
+ * blur 14px짜리 그림자는 테두리가 번져 보였고("빛번짐"), 그걸 4방향 1px
+ * 그림자로 둘러싸 봤더니 이번엔 잉크 번지듯 두꺼워 보였다 — 결국 둘 다
+ * "글자 자체를 두껍게 만드는" 접근이라 문제였다. 그림자는 딱 하나, 아주
+ * 작은 블러로 아래쪽에만 살짝 깔아 글자 두께에는 손대지 않는다.
  */
 function Halo({ children, sx, style, className }: { children: React.ReactNode; sx?: object; style?: React.CSSProperties; className?: string }) {
   return (
@@ -684,7 +683,7 @@ function Halo({ children, sx, style, className }: { children: React.ReactNode; s
       className={className}
       style={style}
       sx={{
-        textShadow: '0 1px 1px rgba(0,0,0,.7), 0 -1px 1px rgba(0,0,0,.7), 1px 0 1px rgba(0,0,0,.7), -1px 0 1px rgba(0,0,0,.7)',
+        textShadow: '0 1px 1.5px rgba(0,0,0,.55)',
         ...sx,
       }}
     >
@@ -696,16 +695,17 @@ function Halo({ children, sx, style, className }: { children: React.ReactNode; s
 /**
  * 산출물 = 초안 우주 뷰의 "행성"을 그대로 다시 쓴 것 — 카드가 아니라 실제로 광원이
  * 있는 구체다. 배경은 두 겹의 radial-gradient로 만든다: 위쪽은 하이라이트(광원),
- * 아래쪽은 lighten→base→darken 그라디언트로 둥근 음영을 준다. bob 애니메이션이 얹혀
- * 정지 화면에서도 공중에 떠 있는 게 읽힌다.
+ * 아래쪽은 lighten→base→darken 그라디언트로 둥근 음영을 준다. 계속 움직이는
+ * bob 애니메이션은 쓰지 않는다 — 화면 하나에 수십 개가 동시에 흔들리면 멀미가
+ * 난다는 피드백이 있었다; 정지 상태에서도 그라디언트 음영만으로 입체감은 충분하다.
  *
  * 클릭하면 같은 IP 안에서 flow(EdgeDto)로 연결된 산출물들이 함께 밝아지고
  * (selected) 나머지는 흐려진다(faded) — IP 캔버스와 같은 규칙.
  */
 function DeliverableBlock({
-  b, hex, detail, index, selected, faded, onSelect,
+  b, hex, detail, selected, faded, onSelect,
 }: {
-  b: BlockNode; hex: string; detail: boolean; index: number;
+  b: BlockNode; hex: string; detail: boolean;
   selected: boolean; faded: boolean; onSelect: (id: string) => void;
 }) {
   const d = Math.min(b.h, 46) * b.depth;
@@ -725,12 +725,7 @@ function DeliverableBlock({
       }}
     >
       <Box
-        className="dw-bob"
-        style={{ animationDelay: `${(index % 5) * 0.55}s` }}
-        sx={{
-          width: '100%', height: '100%', display: 'flex', alignItems: 'center', gap: '10px',
-          animation: 'dw-bob 5.5s ease-in-out infinite',
-        }}
+        sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', gap: '10px' }}
         title={`${b.name}\n${b.status === 'released' ? 'Released' : b.status === 'inProgress' ? 'In progress' : 'Not submitted'}`}
       >
         {/* 구체 — 위 하이라이트 + 아래 그라디언트 음영 + 은은한 발광. */}
