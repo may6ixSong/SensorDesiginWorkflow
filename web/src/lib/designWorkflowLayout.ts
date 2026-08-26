@@ -27,13 +27,31 @@ export const PHASE_HEAD_H = 62;
 export const ISLAND_HEAD_H = 104;
 export const ISLAND_PAD = 26;
 export const BLOCK_H = 48;
-export const BLOCK_GAP = 9;
+export const BLOCK_GAP = 11;
 export const ROW_PAD = 12;
 export const MIN_ROW_H = 76;
 /** island 사이 여백 — 넉넉해야 "판과 판 사이 빈 우주"를 지나가는 느낌이 난다. */
 export const ISLAND_GAP = 300;
 /** island를 좌우로 살짝 엇갈리게 두어 표 같지 않고 떠 있는 느낌을 준다. */
 const STAGGER = 84;
+/** 산출물 배치를 격자에서 살짝 흩뜨리는 범위(px) — 표처럼 각 잡히지 않고 성기게
+ * 떠 있는 느낌을 준다. Phase/IP 소속(칸 자체)은 안 바뀌니 정보는 그대로 읽힌다. */
+const JITTER_X = 15;
+const JITTER_Y = 7;
+
+/** FNV-1a 32bit 해시 — 항상 같은 입력에 같은 값(새로고침해도 배치가 그대로). */
+function hash32(s: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return h >>> 0;
+}
+/** [0,1) 결정적 의사난수. */
+function rand01(seed: string): number {
+  return hash32(seed) / 4294967296;
+}
 
 export type BlockStatus = 'released' | 'inProgress' | 'notSubmitted';
 
@@ -47,6 +65,10 @@ export interface BlockNode {
   y: number;
   w: number;
   h: number;
+  /** 순수 시각적 크기 배율(0.85~1.18) — 격자를 벗어나는 "자유분방한" 배치가
+   * 입체감도 있어 보이도록 산출물마다 살짝 다른 크기로 흩어 준다. 레이아웃
+   * 계산(행 높이 등)에는 관여하지 않는, 그리는 단계에서만 쓰는 값. */
+  depth: number;
 }
 
 export interface IpRowLayout {
@@ -67,15 +89,34 @@ export interface PhaseColLayout {
   state: 'past' | 'current' | 'upcoming';
 }
 
-/** 같은 IP 안의 산출물 두 개를 잇는 아주 얇은 선 — island 기준 상대 좌표. */
+/** 같은 IP 안의 산출물 두 개를 잇는 아주 얇은 선 — island 기준 상대 좌표.
+ * 직선이 아니라 완만한 S자 곡선(적분 기호 느낌)이라, 같은 칸에 세로로 쌓인
+ * 산출물들 사이를 이어도 그 사이에 낀 다른 산출물을 뚫고 지나가지 않고 옆으로
+ * 비켜 간다 — path는 미리 계산해 둔 SVG path data("d" 속성)다. */
 export interface WireLink {
   id: string;
   fromId: string;
   toId: string;
-  x1: number;
-  y1: number;
-  x2: number;
-  y2: number;
+  path: string;
+}
+
+/** 두 점을 잇는 완만한 S자 베지어 — 직선이면 중간에 낀 다른 산출물을 그대로
+ * 관통해 버린다(특히 같은 phase 칸에 세로로 쌓인 경우). 진행 방향에 수직으로
+ * 살짝 배부르게 휘어 옆으로 비켜 가게 하고, 어느 쪽으로 휠지는 id 해시로
+ * 정해 매번 같은 모양이 나오되 와이어마다 자연스럽게 갈리게 한다. */
+function wirePath(id: string, x1: number, y1: number, x2: number, y2: number): string {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const dist = Math.hypot(dx, dy) || 1;
+  const px = -dy / dist;
+  const py = dx / dist;
+  const bend = Math.min(64, Math.max(18, dist * 0.24));
+  const sign = rand01(`${id}:bend`) < 0.5 ? 1 : -1;
+  const c1x = x1 + dx * 0.33 + px * bend * sign;
+  const c1y = y1 + dy * 0.33 + py * bend * sign;
+  const c2x = x1 + dx * 0.67 - px * bend * sign;
+  const c2y = y1 + dy * 0.67 - py * bend * sign;
+  return `M ${x1} ${y1} C ${c1x} ${c1y} ${c2x} ${c2y} ${x2} ${y2}`;
 }
 
 export interface IslandLayout {
@@ -171,12 +212,17 @@ export function buildWorldLayout(
           const status = statusOf(d);
           if (status === 'released') released++;
           total++;
-          const x = cx + 12;
-          const y = rowY + ROW_PAD + k * (BLOCK_H + BLOCK_GAP);
+          // 격자에서 살짝 흩뜨려 표처럼 각 잡히지 않게 — 소속 칸(phase/IP)은 그대로라
+          // 정보는 안 바뀐다. depth는 순수 시각 크기(구체 반지름)라 이 흩뜨림에도
+          // 쓴다: 화면에 실제로 뜨는 구체 중심에 와이어 끝을 정확히 물리려면 필요하다.
+          const depth = 0.85 + rand01(`${d.id}:depth`) * 0.33;
+          const x = cx + 12 + (rand01(`${d.id}:x`) - 0.5) * 2 * JITTER_X;
+          const y = rowY + ROW_PAD + k * (BLOCK_H + BLOCK_GAP) + (rand01(`${d.id}:y`) - 0.5) * 2 * JITTER_Y;
           const w = PHASE_W - 24;
           const h = BLOCK_H;
-          blocks.push({ id: d.id, name: d.name, docType: d.docType, status, x, y, w, h });
-          centerOf.set(d.id, { x: x + w / 2, y: y + h / 2 });
+          blocks.push({ id: d.id, name: d.name, docType: d.docType, status, x, y, w, h, depth });
+          const r = Math.min(h, 46) * depth * 0.5;
+          centerOf.set(d.id, { x: x + r, y: y + h / 2 });
         });
       });
 
@@ -191,7 +237,7 @@ export function buildWorldLayout(
         const a = centerOf.get(e.fromId);
         const b = centerOf.get(e.toId);
         if (!a || !b) return [];
-        return [{ id: e._id, fromId: e.fromId, toId: e.toId, x1: a.x, y1: a.y, x2: b.x, y2: b.y }];
+        return [{ id: e._id, fromId: e.fromId, toId: e.toId, path: wirePath(e._id, a.x, a.y, b.x, b.y) }];
       })
     ));
 

@@ -557,6 +557,51 @@ function DomainZone({
         );
       })}
 
+      {/* ── 와이어: 같은 IP 안의 산출물↔산출물 flow만 — 아주 얇은 곡선으로 이어져
+          있다는 느낌만 준다. IP 행(구체)보다 먼저 그려서 구체가 그 위를 덮게
+          한다 — 그래야 선이 산출물을 뚫고 지나가는 게 아니라 산출물 뒤로
+          숨었다 나오는 것처럼 보인다. 직선 대신 완만한 S자 곡선(적분 기호
+          느낌)을 쓰는 것도 같은 이유: 같은 칸에 세로로 쌓인 산출물 사이를
+          이어도 그 사이에 낀 다른 산출물을 그대로 관통하지 않고 옆으로 비켜
+          간다. 클릭해서 고른 것과 양끝이 다 걸리는 와이어만 밝게 + 흐르는
+          점선으로 살아난다(IP 캔버스의 flowdash와 같은 애니메이션). ── */}
+      {island.wires.length > 0 && (
+        <Box
+          component="svg"
+          style={{ left: 0, top: 0, width: island.w, height: bodyH }}
+          sx={{ position: 'absolute', overflow: 'visible', pointerEvents: 'none' }}
+        >
+          {island.wires.map((w) => {
+            const on = !!hlSet && hlSet.has(w.fromId) && hlSet.has(w.toId);
+            const wireOpacity = hlSet ? (on ? 1 : 0.06) : 1;
+            return (
+              <g key={w.id} opacity={wireOpacity} style={{ transition: 'opacity .3s' }}>
+                <path
+                  d={w.path}
+                  fill="none"
+                  stroke={on ? hlColor ?? T.tl : T.dm2}
+                  strokeWidth={on ? 1.6 : 1}
+                  opacity={on ? 0.9 : 0.32}
+                  strokeLinecap="round"
+                />
+                {on && (
+                  <path
+                    d={w.path}
+                    fill="none"
+                    stroke={hlColor ?? T.tl}
+                    strokeWidth={2.2}
+                    strokeLinecap="round"
+                    strokeDasharray="9 10"
+                    opacity={0.85}
+                    style={{ animation: 'flowdash .65s linear infinite' }}
+                  />
+                )}
+              </g>
+            );
+          })}
+        </Box>
+      )}
+
       {/* ── IP 행: 박스 없이 점 + 이름만 떠 있는 라벨. ── */}
       {island.rows.map((row) => {
         const rowOpacity = hlSet ? (row.ip.id === hlOwnerIpId ? 1 : 0.28) : 1;
@@ -615,44 +660,6 @@ function DomainZone({
         );
       })}
 
-      {/* ── 와이어: 같은 IP 안의 산출물↔산출물 flow만 — 아주 얇은 선으로 이어져
-          있다는 느낌만 준다. 클릭해서 고른 것과 양끝이 다 걸리는 와이어만 밝게
-          + 흐르는 점선으로 살아난다(IP 캔버스의 flowdash와 같은 애니메이션). ── */}
-      {island.wires.length > 0 && (
-        <Box
-          component="svg"
-          style={{ left: 0, top: 0, width: island.w, height: bodyH }}
-          sx={{ position: 'absolute', overflow: 'visible', pointerEvents: 'none' }}
-        >
-          {island.wires.map((w) => {
-            const on = !!hlSet && hlSet.has(w.fromId) && hlSet.has(w.toId);
-            const wireOpacity = hlSet ? (on ? 1 : 0.06) : 1;
-            return (
-              <g key={w.id} opacity={wireOpacity} style={{ transition: 'opacity .3s' }}>
-                <line
-                  x1={w.x1} y1={w.y1} x2={w.x2} y2={w.y2}
-                  stroke={on ? hlColor ?? T.tl : T.dm2}
-                  strokeWidth={on ? 1.6 : 1}
-                  opacity={on ? 0.9 : 0.32}
-                  strokeLinecap="round"
-                />
-                {on && (
-                  <line
-                    x1={w.x1} y1={w.y1} x2={w.x2} y2={w.y2}
-                    stroke={hlColor ?? T.tl}
-                    strokeWidth={2.2}
-                    strokeLinecap="round"
-                    strokeDasharray="9 10"
-                    opacity={0.85}
-                    style={{ animation: 'flowdash .65s linear infinite' }}
-                  />
-                )}
-              </g>
-            );
-          })}
-        </Box>
-      )}
-
       {/* 마지막 도메인 다음엔 우주를 닫는 대시 라인 하나(라벨 없음) — 스케치의
           맨 마지막 "----" 줄과 같다. */}
       {isLast && (
@@ -665,14 +672,19 @@ function DomainZone({
   );
 }
 
-/** 별이 흐린 배경 위에서도 박스 없이 읽히도록 은은한 halo(text-shadow)를 까는 래퍼. */
+/**
+ * 별이 흐린 배경 위에서도 박스 없이 읽히도록 대비를 깔아 주는 래퍼.
+ * 예전엔 blur 14px짜리 그림자를 둘러서 텍스트 테두리가 번져 보였다("빛번짐") —
+ * 대비는 블러가 아니라 촘촘한 1px 겹침으로 만든다: 글자 뒤에 살짝 어긋난
+ * 그림자 4개를 딱 붙여 깔면 배경이 밝든 어둡든 테두리가 또렷하게 갈린다.
+ */
 function Halo({ children, sx, style, className }: { children: React.ReactNode; sx?: object; style?: React.CSSProperties; className?: string }) {
   return (
     <Box
       className={className}
       style={style}
       sx={{
-        textShadow: '0 1px 2px rgba(0,0,0,.55), 0 0 14px rgba(0,0,0,.45)',
+        textShadow: '0 1px 1px rgba(0,0,0,.7), 0 -1px 1px rgba(0,0,0,.7), 1px 0 1px rgba(0,0,0,.7), -1px 0 1px rgba(0,0,0,.7)',
         ...sx,
       }}
     >
@@ -696,7 +708,7 @@ function DeliverableBlock({
   b: BlockNode; hex: string; detail: boolean; index: number;
   selected: boolean; faded: boolean; onSelect: (id: string) => void;
 }) {
-  const d = Math.min(b.h, 46);
+  const d = Math.min(b.h, 46) * b.depth;
   const sphereBg = [
     `radial-gradient(circle at 30% 24%, ${withAlpha('#ffffff', 0.95)}, ${withAlpha('#ffffff', 0)} 42%)`,
     `radial-gradient(circle at 42% 38%, ${lighten(hex, 0.55)} 0%, ${hex} 55%, ${darken(hex, 0.55)} 100%)`,
