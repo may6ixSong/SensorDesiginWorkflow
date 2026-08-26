@@ -22,7 +22,10 @@ import { DeliverableDto, EdgeDto, Milestone, WorkflowDto } from '@/types/domain'
 import { DAY_MS, DateRange, dayMs, rangeOf, ratioIn } from './schedule';
 import { DomainGroup, statusOf } from './domainWorkflow';
 
-/* ── 월드 좌표 상수 ── */
+/* ── 월드 좌표 상수 ──
+ * 한 workflow에 보통 20~30개의 산출물이 몰린다 — 그래서 "기본 간격"이 아니라
+ * "그 정도 밀도에서도 안 겹치는 간격"을 기준으로 잡는다. 실제 행 높이는
+ * buildWorldLayout이 각 행의 실제 lane 개수를 보고 그때그때 더 넓혀 준다. */
 /** 하루당 가로 픽셀 — 1년이면 대략 1100px. */
 export const PX_PER_DAY = 3;
 export const MIN_AXIS_W = 1200;
@@ -32,28 +35,33 @@ export const LABEL_W = 250;
 export const UNSCHEDULED_W = 190;
 /** 축 오른쪽 여백. */
 export const TAIL_W = 140;
-/** workflow 한 줄의 높이. 산출물 이름표가 옆으로 길게 뜨므로 넉넉해야 읽힌다. */
-export const ROW_H = 172;
+/** workflow 한 줄의 최소 높이 — 산출물이 몇 개 안 되는 행의 바닥값이다. */
+export const ROW_H = 260;
+/** 같은 도메인 안, 서로 다른 workflow 행 사이의 추가 여백(행 자체 높이 위에 더해진다). */
+const ROW_GAP = 70;
 /** 도메인 그룹 사이 여백 — 넉넉해야 "구역이 갈린다"는 느낌이 난다. */
-export const DOMAIN_GAP = 230;
+export const DOMAIN_GAP = 320;
 /** 도메인 헤더(이름 + 문턱선)가 차지하는 높이. */
 export const DOMAIN_HEAD_H = 84;
-/** 산출물 구체의 기본 지름. */
-export const BLOCK_D = 34;
+/** 산출물 구체의 기본 지름 — 카드보다 확실히 "구체"로 읽히도록 예전보다 키웠다. */
+export const BLOCK_D = 42;
 /** z(깊이) 진폭 — ±이 값 안에서 흩어진다. 순수하게 보기 위한 축이다. */
-export const Z_SPREAD = 260;
-/** 같은 행에서 x가 가까운 것들을 세로로 벌리는 간격. */
-const STACK_Y = 40;
-/**
- * 같은 행 안에서 "가깝다"고 볼 x 폭. 산출물은 구체 + 옆으로 뻗는 이름표라 가로
- * 점유폭이 넓다 — 이 값이 좁으면 x가 조금만 달라도 같은 높이에 놓여 이름표가 서로
- * 겹친다. 이름표 최대 폭(BLOCK_LABEL_W)과 맞춰 둔다.
- */
-const BUCKET_W = 190;
-/** 산출물 이름표의 최대 폭 — 레이아웃(BUCKET_W)과 렌더가 같은 값을 봐야 한다. */
+export const Z_SPREAD = 300;
+/** 같은 행에서 x가 가까운 것들을 세로로 벌리는 간격 — 구체 지름보다 확실히 커야 겹치지 않는다. */
+const STACK_Y = 64;
+/** 같은 스택의 위아래 끝과 옆 행 사이에 남겨 둘 여유. */
+const STACK_PAD = 34;
+/** 산출물 이름표의 최대 폭 — 레이아웃과 렌더가 같은 값을 봐야 한다. */
 export const BLOCK_LABEL_W = 175;
+/**
+ * 같은 행에서 두 산출물이 "같은 줄에 있어도 겹치지 않는" 최소 x 간격.
+ * 산출물은 구체(중심에서 반지름만큼) + 오른쪽으로 뻗는 이름표(BLOCK_LABEL_W)를
+ * 차지한다 — 그래서 필요한 간격은 "가장 큰 구체 지름 + 이름표 폭 + 여유"다.
+ * 이 값보다 x가 가까운 것들만 세로로 갈라 준다(아래 lane 배정 참고).
+ */
+const MIN_GAP_X = BLOCK_D * 1.3 + 14 + BLOCK_LABEL_W;
 /** x 지터 — 같은 날짜에 끝나는 산출물이 완전히 겹쳐 한 점으로 보이지 않게. */
-const JITTER_X = 14;
+const JITTER_X = 20;
 
 /** FNV-1a 32bit 해시 — 항상 같은 입력에 같은 값(새로고침해도 배치가 그대로). */
 function hash32(s: string): number {
@@ -203,12 +211,13 @@ export function buildWorldLayout(
     const contentY = zoneTop + DOMAIN_HEAD_H;
     const centerOf = new Map<string, { x: number; y: number }>();
 
-    const rows: WorkflowRowLayout[] = domain.workflows.map((workflow, ri) => {
-      const rowY = contentY + ri * ROW_H + ROW_H / 2;
+    let rowCursorY = contentY;
+    const rows: WorkflowRowLayout[] = domain.workflows.map((workflow) => {
       const phaseById = new Map((workflow.phases ?? []).map((p) => [p.id, p]));
       const items = deliverablesByWorkflow.get(workflow.id) ?? [];
 
-      // 같은 x에 몰린 것들을 세로로 살짝 벌리기 위해, 먼저 x를 계산해 버킷으로 묶는다.
+      // x를 먼저 계산한다 — 실제 필요한 만큼만 세로로 갈라 주려면(아래 lane 배정) x가
+      // 먼저 있어야 한다.
       const withX = items.map((d) => {
         const phase = phaseById.get(d.phaseId) ?? null;
         const orphan = !phase;
@@ -216,26 +225,45 @@ export function buildWorldLayout(
         const jitter = (rand01(`${d.id}:x`) - 0.5) * 2 * JITTER_X;
         return { d, phase, orphan, x: baseX + jitter };
       });
-      const bucketOf = (x: number) => Math.round(x / BUCKET_W);
-      const bucketCount = new Map<number, number>();
-      withX.forEach((it) => {
-        const b = bucketOf(it.x);
-        bucketCount.set(b, (bucketCount.get(b) ?? 0) + 1);
+
+      /*
+       * lane 배정(그리디 구간 배치) — 모듈러 버킹 대신 "실제로 겹칠 만큼 가까운가"를
+       * 직접 본다. x 오름차순으로 훑으면서, 그 lane에 마지막으로 놓인 산출물과 MIN_GAP_X
+       * 이상 떨어져 있는 lane을 찾아 재사용하고, 없으면 새 lane을 연다. 버킷 경계에 걸려
+       * 실제로는 가까운데 다른 버킷으로 갈라지는 문제도, 날짜가 똑같지 않아도 가까우면
+       * 겹치는 문제도 이 방식으로 한 번에 해결된다.
+       */
+      const byX = [...withX].sort((a, b) => a.x - b.x);
+      const laneLastX: number[] = [];
+      const laneOf = new Map<string, number>();
+      byX.forEach((it) => {
+        let lane = laneLastX.findIndex((lastX) => it.x - lastX >= MIN_GAP_X);
+        if (lane === -1) { lane = laneLastX.length; laneLastX.push(it.x); }
+        else laneLastX[lane] = it.x;
+        laneOf.set(it.d.id, lane);
       });
-      const bucketSeen = new Map<number, number>();
+      // lane 0 → 행 중심, 1 → 위, 2 → 아래, 3 → 더 위, 4 → 더 아래 … 지그재그로 배정해
+      // 적게 갈릴 때는 중심 근처에, 많이 갈릴 때만 위아래로 넓게 퍼지게 한다.
+      const offsetForLane = (lane: number) => (
+        lane === 0 ? 0 : (lane % 2 === 1 ? -1 : 1) * Math.ceil(lane / 2) * STACK_Y
+      );
+      const withOffset = withX.map((it) => ({ ...it, relY: offsetForLane(laneOf.get(it.d.id)!) }));
+      // 이 행에서 가장 많이 갈린 lane 기준으로 필요한 반높이 — 그보다 작으면 최소
+      // 높이(ROW_H/2)를 쓴다. 그래서 산출물이 몇 개 안 되는 행은 예전처럼 컴팩트하고,
+      // 20~30개가 몰린 행만 알아서 넓어져 위아래 행을 침범하지 않는다.
+      const maxAbsRel = withOffset.reduce((m, it) => Math.max(m, Math.abs(it.relY)), 0);
+      const rowHalfH = Math.max(ROW_H / 2, maxAbsRel + BLOCK_D / 2 + STACK_PAD);
+      const rowH = rowHalfH * 2;
+      const rowY = rowCursorY + rowHalfH;
+      rowCursorY += rowH + ROW_GAP;
 
       let released = 0;
       let orphans = 0;
-      const blocks: BlockNode[] = withX.map(({ d, phase, orphan, x }) => {
+      const blocks: BlockNode[] = withOffset.map(({ d, phase, orphan, x, relY }) => {
         const status = statusOf(d);
         if (status === 'released') released++;
         if (orphan) orphans++;
-        const b = bucketOf(x);
-        const n = bucketCount.get(b) ?? 1;
-        const k = bucketSeen.get(b) ?? 0;
-        bucketSeen.set(b, k + 1);
-        // 같은 버킷의 것들을 행 중심 기준 위아래로 대칭 분산.
-        const y = rowY + (k - (n - 1) / 2) * STACK_Y;
+        const y = rowY + relY;
         // z는 순수하게 "떠 있는 느낌"을 위한 축 — 데이터와 무관한 결정적 난수다.
         const z = (rand01(`${d.id}:z`) - 0.5) * 2 * Z_SPREAD;
         // 가까운 것(z>0)이 조금 더 크게 — perspective가 처리하지만, 지름 자체도
@@ -261,7 +289,9 @@ export function buildWorldLayout(
       })
     ));
 
-    const zoneH = DOMAIN_HEAD_H + Math.max(1, rows.length) * ROW_H;
+    // rowCursorY는 각 행이 실제로 차지한 높이(꽉 찬 스택 포함)를 다 더한 값이라
+    // 산출물이 몰린 행이 있어도 도메인 구역이 그만큼 넓어져 다음 도메인을 침범하지 않는다.
+    const zoneH = rows.length > 0 ? rowCursorY - ROW_GAP - zoneTop : DOMAIN_HEAD_H + ROW_H;
     zones.push({
       key: domain.key,
       label: domain.label,

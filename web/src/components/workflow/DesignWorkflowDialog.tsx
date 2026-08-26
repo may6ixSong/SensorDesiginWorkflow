@@ -423,9 +423,22 @@ function WorkflowStage({
         >
           <SpaceBackdrop camX={cam.x} camY={cam.y} camZ={cam.z} />
 
-          {/* 카메라 레이어 — 여기부터 아래로는 opacity/filter를 걸면 3D가 평면으로 눌린다. */}
+          {/*
+           * 카메라 레이어 — 여기부터 아래로는 opacity/filter를 걸면 3D가 평면으로 눌린다.
+           *
+           * pointerEvents: 'none'이 핵심이다 — preserve-3d 안에서는 z가 다른 자손들이
+           * 실제 깊이 순으로 히트테스트된다. 이 레이어 자체는 z=0 평면에 background 없이
+           * 걸쳐 있을 뿐인데, pointerEvents를 안 끄면 카메라보다 더 안쪽(z<0)으로 밀려난
+           * 구체 위에서 클릭이 이 투명한 평면에 먼저 잡혀버려 씹힌다(산출물의 대략 절반이
+           * Z_SPREAD 때문에 음수 z를 갖는다 — 그만큼의 산출물이 클릭 불가 상태였다).
+           * 실제 클릭을 받는 버튼(구체, workflow 라벨)은 전부 pointerEvents: 'auto'를
+           * 직접 켜 두므로, 여기서 끄더라도 그 자손들까지 막히지는 않는다.
+           */}
           <Box
-            sx={{ position: 'absolute', inset: 0, transformOrigin: '0 0', willChange: 'transform', transformStyle: 'preserve-3d' }}
+            sx={{
+              position: 'absolute', inset: 0, transformOrigin: '0 0', willChange: 'transform',
+              transformStyle: 'preserve-3d', pointerEvents: 'none',
+            }}
             style={{ transform: `translate3d(${cam.x}px, ${cam.y}px, 0) scale(${cam.z})` }}
           >
             <TimeAxis world={world} top={world.bounds.y} bottom={worldBottom} detail={detail} />
@@ -737,10 +750,19 @@ function DeliverableBlock({
   b: BlockNode; hex: string; detail: boolean;
   selected: boolean; opacity: number; onSelect: (id: string) => void;
 }) {
+  /*
+   * 원이 아니라 진짜 광원 받은 구체로 읽히려면 하이라이트 하나로는 부족하다 —
+   * (1) 작고 강한 정반사 하이라이트, (2) 그 반대편(빛이 안 닿는 쪽)의 core shadow,
+   * (3) 바닥에서 살짝 튕겨 오르는 약한 반사광까지 세 겹을 얹어야 "구"의 명암비가 산다.
+   * blend mode로 겹쳐야 밑에 깔린 색상(hex)이 흐려지지 않는다.
+   */
   const sphereBg = [
-    `radial-gradient(circle at 30% 24%, ${withAlpha('#ffffff', 0.95)}, ${withAlpha('#ffffff', 0)} 42%)`,
-    `radial-gradient(circle at 42% 38%, ${lighten(hex, 0.55)} 0%, ${hex} 55%, ${darken(hex, 0.55)} 100%)`,
+    `radial-gradient(circle at 27% 22%, #ffffff 0%, ${withAlpha('#ffffff', 0)} 34%)`,
+    `radial-gradient(circle at 70% 80%, ${withAlpha('#ffffff', 0.4)} 0%, ${withAlpha('#ffffff', 0)} 24%)`,
+    `radial-gradient(circle at 68% 74%, ${withAlpha('#000000', 0.55)} 0%, ${withAlpha('#000000', 0)} 48%)`,
+    `radial-gradient(circle at 40% 36%, ${lighten(hex, 0.5)} 0%, ${hex} 46%, ${darken(hex, 0.65)} 100%)`,
   ].join(',');
+  const sphereBlend = 'screen, screen, multiply, normal';
 
   return (
     <Box
@@ -764,10 +786,13 @@ function DeliverableBlock({
         sx={{
           position: 'relative', borderRadius: '50%', flex: '0 0 auto',
           background: sphereBg,
+          backgroundBlendMode: sphereBlend,
           border: b.orphan ? `2px dashed ${withAlpha('#ffffff', 0.75)}` : 'none',
+          // inset shadow = 구체 표면이 빛에서 멀어지는 쪽으로 꺾이는 곡률감(terminator).
+          // 바깥 glow/contact shadow와 같이 있어야 "떠 있는 구"가 완성된다.
           boxShadow: selected
-            ? `0 0 0 2.5px #fff, 0 0 ${b.d * 0.85}px ${withAlpha(hex, 0.75)}, 0 3px 8px ${withAlpha('#000000', 0.35)}`
-            : `0 0 ${b.d * 0.5}px ${withAlpha(hex, 0.42)}, 0 3px 8px ${withAlpha('#000000', 0.35)}`,
+            ? `inset -${b.d * 0.16}px -${b.d * 0.18}px ${b.d * 0.3}px ${withAlpha('#000000', 0.4)}, 0 0 0 2.5px #fff, 0 0 ${b.d * 0.85}px ${withAlpha(hex, 0.75)}, 0 ${b.d * 0.18}px ${b.d * 0.3}px ${withAlpha('#000000', 0.4)}`
+            : `inset -${b.d * 0.16}px -${b.d * 0.18}px ${b.d * 0.3}px ${withAlpha('#000000', 0.4)}, 0 0 ${b.d * 0.5}px ${withAlpha(hex, 0.42)}, 0 ${b.d * 0.18}px ${b.d * 0.3}px ${withAlpha('#000000', 0.4)}`,
           transition: 'box-shadow .2s',
         }}
       >
