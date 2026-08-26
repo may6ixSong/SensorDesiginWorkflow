@@ -29,7 +29,7 @@ export class CanvasDeliverableInput {
   layout: CanvasLayoutInput;
 
   @IsString()
-  phaseKey: string;
+  phaseId: string;
 }
 
 export class CanvasMemoInput {
@@ -38,7 +38,7 @@ export class CanvasMemoInput {
   id?: string;
 
   @IsString()
-  phaseKey: string;
+  phaseId: string;
 
   @IsString()
   text: string;

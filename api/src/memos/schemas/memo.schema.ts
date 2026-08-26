@@ -10,11 +10,11 @@ export type MemoDocument = Memo & Document;
 /** 버전 관리 대상이 아닌 설명용 블록. Edit 권한자에게만 노출 (설계서 4.7, 6.3). */
 @Schema({ timestamps: true })
 export class Memo {
-  @Prop({ type: SchemaTypes.ObjectId, ref: 'Ip', required: true, index: true })
-  ipId: Types.ObjectId;
+  @Prop({ type: SchemaTypes.ObjectId, ref: 'Workflow', required: true, index: true })
+  workflowId: Types.ObjectId;
 
   @Prop({ required: true })
-  phaseKey: string;
+  phaseId: string;
 
   @Prop({ required: true })
   text: string;

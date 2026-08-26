@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { CircularProgress, Stack } from '@mui/material';
-import { useProjects, useProjectIps } from '@/api/hooks/useProjects';
+import { useProjects, useProjectWorkflows } from '@/api/hooks/useProjects';
 
 /**
  * "/details" → 접근 가능한 첫 과제/IP의 보드로 리다이렉트 (설계서 7.1 라우팅).
@@ -15,7 +15,7 @@ export function DetailsRedirect() {
   const { projectId: routeProjectId } = useParams<{ projectId?: string }>();
   const { data: projects, isLoading: projectsLoading, isFetching: projectsFetching } = useProjects();
   const targetProjectId = routeProjectId ?? projects?.[0]?._id;
-  const { data: ips, isLoading: ipsLoading } = useProjectIps(targetProjectId);
+  const { data: workflows, isLoading: ipsLoading } = useProjectWorkflows(targetProjectId);
 
   useEffect(() => {
     if (projectsLoading) return;
@@ -28,17 +28,17 @@ export function DetailsRedirect() {
     }
 
     if (ipsLoading) return;
-    if (!ips?.length) {
+    if (!workflows?.length) {
       navigate('/no-access', { replace: true });
       return;
     }
-    navigate(`/details/${targetProjectId}/${ips[0].id}`, { replace: true });
+    navigate(`/details/${targetProjectId}/${workflows[0].id}`, { replace: true });
   }, [
     projectsLoading,
     projectsFetching,
     projects,
     ipsLoading,
-    ips,
+    workflows,
     targetProjectId,
     routeProjectId,
     navigate,

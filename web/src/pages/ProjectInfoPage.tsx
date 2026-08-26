@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { Box } from '@mui/material';
-import { IpDto, PhaseRef } from '@/types/domain';
+import { Milestone, WorkflowDto } from '@/types/domain';
 import { ProjectPageShell } from '@/components/project/ProjectPageShell';
-import { MilestoneIpBoard } from '@/components/project/MilestoneIpBoard';
+import { ProjectTimeline } from '@/components/project/ProjectTimeline';
 import { EditMilestonesDialog } from '@/components/dialogs/EditMilestonesDialog';
 import { DesignWorkflowDialog } from '@/components/workflow/DesignWorkflowDialog';
 import { DesignDomainsSection } from '@/components/project/DesignDomainsSection';
-import { useUpdatePhases } from '@/api/hooks/useProjects';
+import { useUpdateMilestones } from '@/api/hooks/useProjects';
 import { SirenButton } from '@/components/common/SirenButton';
 import { Icon } from '@/components/common/Icon';
 import { toast } from '@/store/toastStore';
@@ -15,21 +15,22 @@ import { T } from '@/theme/tokens';
 export function ProjectInfoPage() {
   return (
     <ProjectPageShell>
-      {({ project, ips, own }) => (
+      {({ project, workflows, own }) => (
         <>
           <MilestonesSection
             projectId={project._id}
             projectName={project.name}
             projectCode={project.code}
-            phases={project.phases}
-            ips={ips}
+            milestones={project.milestones}
+            workflows={workflows}
             own={own}
-            ipDomains={project.ipDomains ?? []}
+            workflowDomains={project.workflowDomains ?? []}
           />
           <DesignDomainsSection
             projectId={project._id}
-            ipDomains={project.ipDomains ?? []}
-            ips={ips}
+            workflowDomains={project.workflowDomains ?? []}
+            milestones={project.milestones}
+            workflows={workflows}
             own={own}
           />
         </>
@@ -38,13 +39,19 @@ export function ProjectInfoPage() {
   );
 }
 
+/**
+ * 과제 공통 일정(마일스톤) + 그 날짜축 위에 얹은 workflow별 일정.
+ *
+ * 여기서 고치는 것은 오직 과제 마일스톤이다 — workflow의 phase는 그 workflow의 보드에서
+ * 고친다(phase가 workflow 소유 데이터이기 때문). 그래서 버튼 이름도 "Edit milestones"다.
+ */
 function MilestonesSection({
-  projectId, projectName, projectCode, phases, ips, own, ipDomains,
+  projectId, projectName, projectCode, milestones, workflows, own, workflowDomains,
 }: {
   projectId: string; projectName: string; projectCode: string;
-  phases: PhaseRef[]; ips: IpDto[]; own: boolean; ipDomains: string[];
+  milestones: Milestone[]; workflows: WorkflowDto[]; own: boolean; workflowDomains: string[];
 }) {
-  const updatePhases = useUpdatePhases(projectId);
+  const updateMilestones = useUpdateMilestones(projectId);
   const [editOpen, setEditOpen] = useState(false);
   const [editErr, setEditErr] = useState<string | null>(null);
   const [workflowOpen, setWorkflowOpen] = useState(false);
@@ -53,9 +60,9 @@ function MilestonesSection({
     <>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: '10px', mb: '12px' }}>
         <Box sx={{ fontSize: 15, fontWeight: 700, letterSpacing: '-.01em' }}>
-          Milestones
+          Schedule
           <Box component="span" sx={{ fontWeight: 400, color: T.dm2, ml: '7px', fontSize: 13 }}>
-            IP status across every phase
+            project milestones and every workflow's own plan, on one date axis
           </Box>
         </Box>
         <Box sx={{ flex: 1 }} />
@@ -64,11 +71,11 @@ function MilestonesSection({
         </SirenButton>
         {own && (
           <SirenButton onClick={() => { setEditErr(null); setEditOpen(true); }}>
-            <Icon name="edit" /> Edit schedule
+            <Icon name="calendar" /> Edit milestones
           </SirenButton>
         )}
       </Box>
-      <MilestoneIpBoard projectId={projectId} phases={phases} ips={ips} />
+      <ProjectTimeline projectId={projectId} milestones={milestones} workflows={workflows} />
 
       <DesignWorkflowDialog
         open={workflowOpen}
@@ -76,21 +83,21 @@ function MilestonesSection({
         projectId={projectId}
         projectName={projectName}
         projectCode={projectCode}
-        phases={phases}
-        ips={ips}
-        ipDomains={ipDomains}
+        milestones={milestones}
+        workflows={workflows}
+        workflowDomains={workflowDomains}
       />
 
       {editOpen && (
         <EditMilestonesDialog
-          phases={phases}
-          saving={updatePhases.isPending}
+          milestones={milestones}
+          saving={updateMilestones.isPending}
           error={editErr}
           onClose={() => setEditOpen(false)}
           onSave={(next) => {
             setEditErr(null);
-            updatePhases.mutate(next, {
-              onSuccess: () => { setEditOpen(false); toast('Milestone schedule updated'); },
+            updateMilestones.mutate(next, {
+              onSuccess: () => { setEditOpen(false); toast('Project milestones updated'); },
               onError: (e: any) => setEditErr(e?.response?.data?.message ?? 'Failed to save'),
             });
           }}

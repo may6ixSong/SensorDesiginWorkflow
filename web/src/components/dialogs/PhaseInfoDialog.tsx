@@ -1,5 +1,6 @@
 import { Box } from '@mui/material';
-import { PhaseRef } from '@/types/domain';
+import { WorkflowPhase } from '@/types/domain';
+import { spanDays, spanState, shortDate } from '@/lib/schedule';
 import { CanvasNode, latR, stOf } from '@/lib/canvasModel';
 import { ModalShell } from '@/components/common/ModalShell';
 import { Badge } from '@/components/common/SirenButton';
@@ -8,24 +9,22 @@ import { DocIcon } from '@/components/common/Icon';
 import { CURSOR_POINTER, FONT_MONO, T } from '@/theme/tokens';
 
 interface Props {
-  ipName: string;
-  phase: PhaseRef;
+  workflowName: string;
+  phase: WorkflowPhase;
   nodes: CanvasNode[];
   onClose: () => void;
   onOpenRow: (id: string) => void;
 }
 
-/** 목업 phInfoH() — Phase 정보 (읽기 전용, 설계서 3.2) */
-export function PhaseInfoDialog({ ipName, phase: p, nodes, onClose, onOpenRow }: Props) {
-  const ds = nodes.filter((d) => d.phase === p.key).sort((a, b) => a.x - b.x);
-  const days = Math.max(1, Math.round((+new Date(p.end) - +new Date(p.start)) / 864e5));
-  const t = new Date();
-  const st = new Date(p.start);
-  const en = new Date(p.end);
-  const state =
-    t < st ? { t: 'Upcoming', c: T.dm, b: T.sf2, d: T.ln }
-    : t > en ? { t: 'Done', c: T.dm, b: T.sf2, d: T.ln }
-    : { t: 'In progress', c: T.tl, b: T.tl2, d: T.tl3 };
+/** phase 하나의 정보 (읽기 전용). 여기 이름은 이 workflow가 정한 표기일 뿐 과제 마일스톤이 아니다. */
+export function PhaseInfoDialog({ workflowName, phase: p, nodes, onClose, onOpenRow }: Props) {
+  const ds = nodes.filter((d) => d.phase === p.id).sort((a, b) => a.x - b.x);
+  const days = spanDays(p);
+  const state = {
+    upcoming: { t: 'Upcoming', c: T.dm, b: T.sf2, d: T.ln },
+    past: { t: 'Done', c: T.dm, b: T.sf2, d: T.ln },
+    current: { t: 'In progress', c: T.tl, b: T.tl2, d: T.tl3 },
+  }[spanState(p)];
   const rel = ds.filter((d) => latR(d)).length;
 
   const stat = (label: string, value: string, color?: string) => (
@@ -42,10 +41,12 @@ export function PhaseInfoDialog({ ipName, phase: p, nodes, onClose, onOpenRow }:
       width={600}
       header={
         <>
-          <Ey>{ipName} · PHASE</Ey>
+          <Ey>{workflowName} · PHASE</Ey>
           <Box sx={{ fontSize: 19, fontWeight: 700, mt: '2px', display: 'flex', alignItems: 'center', gap: '9px' }}>
-            <Box component="span" sx={{ fontFamily: FONT_MONO }}>{p.key}</Box>
-            <Box component="span" sx={{ fontSize: 14, fontWeight: 400, color: T.dm }}>{p.label}</Box>
+            <Box component="span" sx={{ fontFamily: FONT_MONO }}>{p.name}</Box>
+            <Box component="span" sx={{ fontSize: 13, fontWeight: 400, color: T.dm, fontFamily: FONT_MONO }}>
+              {shortDate(p.start)} → {shortDate(p.end)}
+            </Box>
             <Badge color={state.c} bg={state.b} borderColor={state.d}>{state.t}</Badge>
           </Box>
         </>

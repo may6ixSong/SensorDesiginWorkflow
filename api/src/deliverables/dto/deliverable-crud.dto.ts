@@ -20,7 +20,7 @@ export class CreateDeliverableDto {
   name: string;
 
   @IsString()
-  phaseKey: string;
+  phaseId: string;
 
   @IsString()
   docType: string;
@@ -54,10 +54,10 @@ export class UpdateRecvDto {
   @IsString()
   recvContact: string | null;
 
-  /** 이 산출물을 받아야 하는 다른 Analog IP. recvDept(부서)와 별개 필드. */
+  /** 이 산출물을 받아야 하는 다른 Analog Workflow. recvDept(부서)와 별개 필드. */
   @IsOptional()
   @IsMongoId()
-  recvIpId: string | null;
+  recvWorkflowId: string | null;
 
   /** 이 시스템에 없는 외부 부서로부터 받았음을 나타내는 자유 텍스트 (예: "Foundry"). */
   @IsOptional()
@@ -70,7 +70,7 @@ export class UpdateScheduleDto {
   @IsArray()
   @ArrayUnique()
   @IsString({ each: true })
-  phaseKeys: string[];
+  phaseIds: string[];
 }
 
 export class AddVersionDto {

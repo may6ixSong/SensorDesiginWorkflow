@@ -10,14 +10,14 @@ import { useCanvasStore } from '@/store/canvasStore';
  * 항상 Release 버전만 담겨 온다. refetchInterval로 다른 IP가 release()한 결과를
  * 화면을 벗어나지 않아도 짧은 주기 안에 반영한다("바로 업데이트"의 목업 근사).
  */
-export function useDeliverables(ipId: string | undefined) {
+export function useDeliverables(workflowId: string | undefined) {
   const isEditing = useCanvasStore((s) => s.edit);
   return useQuery({
-    queryKey: queryKeys.deliverables(ipId ?? ''),
-    enabled: Boolean(ipId) && !isEditing,
+    queryKey: queryKeys.deliverables(workflowId ?? ''),
+    enabled: Boolean(workflowId) && !isEditing,
     refetchInterval: isEditing ? false : 8000,
     queryFn: async () => {
-      const res = await apiClient.get<DeliverablesListResponse>(`/ips/${ipId}/deliverables`);
+      const res = await apiClient.get<DeliverablesListResponse>(`/workflows/${workflowId}/deliverables`);
       return res.data;
     },
   });
@@ -34,8 +34,8 @@ export function useDeliverableVersions(id: string | undefined) {
   });
 }
 
-function invalidateDeliverables(qc: ReturnType<typeof useQueryClient>, ipId: string) {
-  qc.invalidateQueries({ queryKey: queryKeys.deliverables(ipId) });
+function invalidateDeliverables(qc: ReturnType<typeof useQueryClient>, workflowId: string) {
+  qc.invalidateQueries({ queryKey: queryKeys.deliverables(workflowId) });
 }
 
 /**
@@ -47,85 +47,85 @@ function invalidateDeliverables(qc: ReturnType<typeof useQueryClient>, ipId: str
  */
 function invalidateAllDeliverables(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({
-    predicate: (query) => query.queryKey[0] === 'ips' && query.queryKey[2] === 'deliverables',
+    predicate: (query) => query.queryKey[0] === 'workflows' && query.queryKey[2] === 'deliverables',
   });
 }
 
-export function useCreateDeliverable(ipId: string) {
+export function useCreateDeliverable(workflowId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (payload: { name: string; phaseKey: string; docType: string; network: 'OA' | 'HPC' }) => {
-      const res = await apiClient.post<ApiEnvelope<DeliverableDto>>(`/ips/${ipId}/deliverables`, payload);
+    mutationFn: async (payload: { name: string; phaseId: string; docType: string; network: 'OA' | 'HPC' }) => {
+      const res = await apiClient.post<ApiEnvelope<DeliverableDto>>(`/workflows/${workflowId}/deliverables`, payload);
       return res.data.data;
     },
-    onSuccess: () => invalidateDeliverables(qc, ipId),
+    onSuccess: () => invalidateDeliverables(qc, workflowId),
   });
 }
 
-export function useUpdateDeliverable(ipId: string) {
+export function useUpdateDeliverable(workflowId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, ...patch }: { id: string; name?: string; docType?: string; network?: 'OA' | 'HPC' }) => {
       const res = await apiClient.patch<ApiEnvelope<DeliverableDto>>(`/deliverables/${id}`, patch);
       return res.data.data;
     },
-    onSuccess: () => invalidateDeliverables(qc, ipId),
+    onSuccess: () => invalidateDeliverables(qc, workflowId),
   });
 }
 
-export function useDeleteDeliverable(ipId: string) {
+export function useDeleteDeliverable(workflowId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
       await apiClient.delete(`/deliverables/${id}`);
       return id;
     },
-    onSuccess: () => invalidateDeliverables(qc, ipId),
+    onSuccess: () => invalidateDeliverables(qc, workflowId),
   });
 }
 
 /**
  * BE가 recvDept(Analog 제외)와 recvContact.department===recvDept를 다시 검증한다 (설계서 3.4).
- * recvIpId는 이 산출물을 받아야 하는 다른 Analog IP — 설정하면 그 IP의 보드에
+ * recvIpId는 이 산출물을 받아야 하는 다른 Analog workflow — 설정하면 그 IP의 보드에
  * Incoming으로 즉시 노출된다.
  */
-export function useUpdateRecv(ipId: string) {
+export function useUpdateRecv(workflowId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({
-      id, recvDept, recvContact, recvIpId, sourceDept,
+      id, recvDept, recvContact, recvWorkflowId, sourceDept,
     }: {
-      id: string; recvDept: string | null; recvContact: string | null; recvIpId?: string | null;
+      id: string; recvDept: string | null; recvContact: string | null; recvWorkflowId?: string | null;
       sourceDept?: string | null;
     }) => {
       const res = await apiClient.patch<ApiEnvelope<DeliverableDto>>(`/deliverables/${id}/recv`, {
         recvDept,
         recvContact,
-        recvIpId,
+        recvWorkflowId,
         sourceDept,
       });
       return res.data.data;
     },
     onSuccess: () => {
-      invalidateDeliverables(qc, ipId);
+      invalidateDeliverables(qc, workflowId);
       invalidateAllDeliverables(qc);
     },
   });
 }
 
 /** Release 일정(series) 갱신 (설계서 3.6). */
-export function useUpdateSchedule(ipId: string) {
+export function useUpdateSchedule(workflowId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, phaseKeys }: { id: string; phaseKeys: string[] }) => {
+    mutationFn: async ({ id, phaseIds }: { id: string; phaseIds: string[] }) => {
       const res = await apiClient.patch<ApiEnvelope<DeliverableDto[]>>(`/deliverables/${id}/schedule`, {
-        phaseKeys,
+        phaseIds,
       });
       return res.data.data;
     },
     onSuccess: () => {
-      invalidateDeliverables(qc, ipId);
-      qc.invalidateQueries({ queryKey: queryKeys.edges(ipId) });
+      invalidateDeliverables(qc, workflowId);
+      qc.invalidateQueries({ queryKey: queryKeys.edges(workflowId) });
     },
   });
 }
@@ -181,7 +181,7 @@ export function useDownloadVersion() {
   });
 }
 
-export function useAddVersion(ipId: string) {
+export function useAddVersion(workflowId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({
@@ -198,7 +198,7 @@ export function useAddVersion(ipId: string) {
       return res.data.data;
     },
     onSuccess: (d) => {
-      invalidateDeliverables(qc, ipId);
+      invalidateDeliverables(qc, workflowId);
       qc.invalidateQueries({ queryKey: queryKeys.deliverableVersions(d.id) });
     },
   });
@@ -207,9 +207,9 @@ export function useAddVersion(ipId: string) {
 /**
  * Release는 major 버전을 올려 recvDept/recvIpId로 지정된 수신자에게 새 버전을
  * 노출시키는 행위이므로, 이 IP뿐 아니라 모든 IP의 deliverables 쿼리를 무효화해
- * 수신 측 IP 보드가 열려 있어도(또는 다음에 열 때) 즉시 최신 Release 버전이 보이게 한다.
+ * 수신 측 workflow 보드가 열려 있어도(또는 다음에 열 때) 즉시 최신 Release 버전이 보이게 한다.
  */
-export function useRelease(ipId: string) {
+export function useRelease(workflowId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, note }: { id: string; note?: string }) => {
@@ -217,7 +217,7 @@ export function useRelease(ipId: string) {
       return res.data.data;
     },
     onSuccess: (d) => {
-      invalidateDeliverables(qc, ipId);
+      invalidateDeliverables(qc, workflowId);
       invalidateAllDeliverables(qc);
       qc.invalidateQueries({ queryKey: queryKeys.deliverableVersions(d.id) });
     },

@@ -2,22 +2,25 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Project, ProjectDocument } from './schemas/project.schema';
-import { IpsService } from '../ips/ips.service';
+import { WorkflowsService } from '../workflows/workflows.service';
 import { AuditService } from '../audit/audit.service';
 import { Actor } from '../common/actor';
 import { isValidDepartment } from '../common/constants/departments';
+import { normalizeSchedule } from '../common/schedule';
+import { Milestone } from './schemas/project.schema';
+import { CreateWorkflowDto } from '../workflows/dto/workflow-crud.dto';
 
 @Injectable()
 export class ProjectsService {
   constructor(
     @InjectModel(Project.name) private readonly model: Model<ProjectDocument>,
-    private readonly ips: IpsService,
+    private readonly workflows: WorkflowsService,
     private readonly audit: AuditService,
   ) {}
 
-  /** 접근 가능한 과제 목록 = 하나 이상의 IP에 Edit/View 권한이 있는 과제 (설계서 5.1). */
+  /** 접근 가능한 과제 목록 = 하나 이상의 workflow에 Edit/View 권한이 있는 과제 (설계서 5.1). */
   async listAccessibleForUser(knoxId: string) {
-    const projectIds = await this.ips.distinctAccessibleProjectIds(knoxId);
+    const projectIds = await this.workflows.distinctAccessibleProjectIds(knoxId);
     return this.model.find({ _id: { $in: projectIds } }).sort({ code: 1 }).exec();
   }
 
@@ -27,22 +30,46 @@ export class ProjectsService {
     return project;
   }
 
-  async getPhases(id: string) {
+  async getMilestones(id: string) {
     const project = await this.findByIdOrThrow(id);
-    return project.phases;
+    return project.milestones ?? [];
   }
 
   /**
-   * 이 과제의 IP 도메인 후보 목록을 통째로 교체한다.
+   * 이 과제 도메인 아래에 workflow를 새로 만든다. phase는 이 과제의 마일스톤 복사본으로
+   * 시작한다(WorkflowsService.create) — 그래서 이 라우트가 ProjectsController에 있다:
+   * 마일스톤을 아는 곳은 Project 모델을 가진 여기뿐이다.
+   */
+  async createWorkflow(id: string, dto: CreateWorkflowDto, actor: Actor) {
+    await this.assertManageAccess(id, actor);
+    const project = await this.findByIdOrThrow(id);
+
+    const wanted = dto.domain.trim();
+    let resolved = '';
+    if (wanted) {
+      const match = (project.workflowDomains ?? []).find(
+        (d) => d.trim().toUpperCase() === wanted.toUpperCase(),
+      );
+      if (!match) {
+        throw new BadRequestException(`'${wanted}' is not one of this project's design domains.`);
+      }
+      resolved = match.trim();
+    }
+
+    return this.workflows.create(project._id, project.milestones ?? [], { ...dto, domain: resolved }, actor);
+  }
+
+  /**
+   * 이 과제의 Workflow 도메인 후보 목록을 통째로 교체한다.
    *
    * 정규화: 앞뒤 공백 제거 → 빈 값 제외 → 대소문자 무시 중복 제거(첫 표기를 남긴다).
    * FE의 domainOf()가 대문자로 올려 묶으므로(web/src/lib/domainWorkflow.ts) 'Analog'와
    * 'ANALOG'가 목록에 같이 있으면 화면에서 한 항성계로 합쳐져 목록과 어긋난다.
    *
-   * 아직 IP가 붙어 있는 도메인은 지울 수 없다 - 지우면 그 IP의 domain 값만 목록에서
-   * 사라진 채 남아(orphan) 화면에는 계속 항성계로 뜨는데 목록에서는 안 보이게 된다.
+   * 아직 workflow가 붙어 있는 도메인은 지울 수 없다 - 지우면 그 workflow의 domain 값만 목록에서
+   * 사라진 채 남아(orphan) 화면에는 계속 도메인으로 뜨는데 목록에서는 안 보이게 된다.
    */
-  async updateIpDomains(id: string, input: string[], actor: Actor) {
+  async updateWorkflowDomains(id: string, input: string[], actor: Actor) {
     await this.assertManageAccess(id, actor);
     const project = await this.findByIdOrThrow(id);
 
@@ -57,48 +84,48 @@ export class ProjectsService {
       next.push(name);
     }
 
-    const removed = (project.ipDomains ?? []).filter((d) => !seen.has(d.trim().toUpperCase()));
+    const removed = (project.workflowDomains ?? []).filter((d) => !seen.has(d.trim().toUpperCase()));
     if (removed.length > 0) {
       const removedKeys = new Set(removed.map((d) => d.trim().toUpperCase()));
-      const ips = await this.ips.listAccessibleForProject(id, actor.knoxId);
-      const blocked = ips.filter((ip) => removedKeys.has((ip.domain ?? '').trim().toUpperCase()));
+      const workflows = await this.workflows.listAccessibleForProject(id, actor.knoxId);
+      const blocked = workflows.filter((workflow) => removedKeys.has((workflow.domain ?? '').trim().toUpperCase()));
       if (blocked.length > 0) {
         throw new BadRequestException(
-          `Reassign these IPs before removing that domain: ${blocked.map((ip) => ip.name).join(', ')}`,
+          `Reassign these Workflows before removing that domain: ${blocked.map((workflow) => workflow.name).join(', ')}`,
         );
       }
     }
 
-    project.ipDomains = next;
+    project.workflowDomains = next;
     await project.save();
-    await this.audit.log(actor.knoxId, 'PROJECT_IP_DOMAINS_UPDATE', 'project', project._id, {
-      ipDomains: next,
+    await this.audit.log(actor.knoxId, 'PROJECT_WORKFLOW_DOMAINS_UPDATE', 'project', project._id, {
+      workflowDomains: next,
     });
     return this.findDetailOrThrow(id, actor.knoxId);
   }
 
   /**
-   * IP 하나를 이 과제의 도메인 중 하나에 배정한다. 빈 문자열이면 배정 해제.
+   * Workflow 하나를 이 과제의 도메인 중 하나에 배정한다. 빈 문자열이면 배정 해제.
    *
-   * 라우트가 /ips/:ipId 가 아니라 /projects/:id/ips/:ipId/domain 인 이유: 후보 목록이
-   * 과제에 있어서 검증에 Project와 Ip 모델이 둘 다 필요한데, 그 둘을 함께 가진 곳은
+   * 라우트가 /workflows/:workflowId 가 아니라 /projects/:id/workflows/:workflowId/domain 인 이유: 후보 목록이
+   * 과제에 있어서 검증에 Project와 Workflow 모델이 둘 다 필요한데, 그 둘을 함께 가진 곳은
    * ProjectsController(ProjectsModule이 IpsModule을 import)뿐이다. 반대 방향으로 붙이면
    * IpsModule에 Project 모델을 중복 등록해야 하고, 인메모리 모드에서 가짜 컬렉션이
    * 두 개로 갈린다(src/database/model-registration.ts).
    */
-  async updateIpDomain(id: string, ipId: string, domain: string, actor: Actor) {
+  async updateWorkflowDomain(id: string, workflowId: string, domain: string, actor: Actor) {
     await this.assertManageAccess(id, actor);
     const project = await this.findByIdOrThrow(id);
-    const ip = await this.ips.findOrThrow(ipId);
-    if (ip.projectId.toString() !== project._id.toString()) {
-      throw new BadRequestException('That IP does not belong to this project.');
+    const workflow = await this.workflows.findOrThrow(workflowId);
+    if (workflow.projectId.toString() !== project._id.toString()) {
+      throw new BadRequestException('That Workflow does not belong to this project.');
     }
 
     const wanted = domain.trim();
     let resolved = '';
     if (wanted) {
       // 목록에 등록된 표기를 그대로 저장한다 - 사용자가 'analog'로 보내도 'Analog'로.
-      const match = (project.ipDomains ?? []).find(
+      const match = (project.workflowDomains ?? []).find(
         (d) => d.trim().toUpperCase() === wanted.toUpperCase(),
       );
       if (!match) {
@@ -107,54 +134,41 @@ export class ProjectsService {
       resolved = match.trim();
     }
 
-    await this.ips.setDomain(ipId, resolved, actor);
+    await this.workflows.setDomain(workflowId, resolved, actor);
     return this.findDetailOrThrow(id, actor.knoxId);
   }
 
   /**
-   * 마일스톤(Phase) 일정 수정 — label/start/end만 바꾼다. key/order는 산출물의
-   * phaseKey·캔버스 레이아웃이 참조하므로 이 API로 추가/삭제/개명하지 않는다 -
-   * 그래서 들어온 phases는 기존 key 집합과 정확히 일치해야 한다.
+   * 과제 마일스톤(공통 일정) 목록을 통째로 교체한다 — 추가/삭제/개명/재일정 전부 가능하다.
+   *
+   * 예전 Phase와 달리 산출물이 이 id를 직접 가리키지 않는다: 산출물은 workflow의 phase를
+   * 가리키고, workflow phase는 생성 시 마일스톤을 "복사"한 별개 id다(WorkflowsService.
+   * copyMilestonesToPhases). 그래서 여기서 마일스톤을 지워도 산출물이 고아가 되지 않고,
+   * 이미 만들어진 workflow의 일정도 따라 바뀌지 않는다.
    */
-  async updatePhases(id: string, updates: { key: string; label: string; start: string; end: string }[], actor: Actor) {
+  async updateMilestones(
+    id: string,
+    updates: { id?: string; name: string; start: string; end: string }[],
+    actor: Actor,
+  ) {
     await this.assertManageAccess(id, actor);
     const project = await this.findByIdOrThrow(id);
 
-    const existingKeys = new Set(project.phases.map((p) => p.key));
-    const updateKeys = new Set(updates.map((p) => p.key));
-    if (existingKeys.size !== updateKeys.size || [...existingKeys].some((k) => !updateKeys.has(k))) {
-      throw new BadRequestException('Milestones cannot be added or removed here — only the schedule can change.');
-    }
-    const byKey = new Map(updates.map((p) => [p.key, p]));
-    for (const p of project.phases) {
-      const u = byKey.get(p.key)!;
-      const start = new Date(u.start);
-      const end = new Date(u.end);
-      if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
-        throw new BadRequestException(`Invalid date for milestone ${p.key}.`);
-      }
-      if (start.getTime() >= end.getTime()) {
-        throw new BadRequestException(`${p.key}: start date must be before the end date.`);
-      }
-      if (!u.label.trim()) {
-        throw new BadRequestException(`${p.key}: label cannot be empty.`);
-      }
-    }
-
-    project.phases = project.phases.map((p) => {
-      const u = byKey.get(p.key)!;
-      return { key: p.key, order: p.order, label: u.label.trim(), start: u.start, end: u.end };
-    });
+    project.milestones = normalizeSchedule(updates, 'Milestone', 'ms', (m) => {
+      throw new BadRequestException(m);
+    }) as Milestone[];
 
     await project.save();
-    await this.audit.log(actor.knoxId, 'PROJECT_PHASES_UPDATE', 'project', project._id, {});
+    await this.audit.log(actor.knoxId, 'PROJECT_MILESTONES_UPDATE', 'project', project._id, {
+      milestoneCount: project.milestones.length,
+    });
     return this.findDetailOrThrow(id, actor.knoxId);
   }
 
   /**
    * Project Information 페이지 상세 조회. 개인 접근 권한으로 막지 않는다 - 어떤 과제를
-   * 보여줄지는 web이 사용자 Group(Admin이면 super)과 IP의 owners/viewGrants로 판단한다
-   * (2026-08-25 결정, src/common/guards/ip-access.guard.ts 참고).
+   * 보여줄지는 web이 사용자 Group(Admin이면 super)과 workflow의 owners/viewGrants로 판단한다
+   * (2026-08-25 결정, src/common/guards/workflow-access.guard.ts 참고).
    * members는 KnoxID만 담으므로 populate 없이 그대로 내려간다.
    */
   async findDetailOrThrow(id: string, _knoxId: string) {
@@ -165,7 +179,7 @@ export class ProjectsService {
 
   /**
    * 과제 열람 게이트 - 현재는 아무것도 막지 않는다. 추후 토큰 인증이 들어오면
-   * 여기와 IpAccessGuard 두 곳만 되살리면 서버 차단이 복구된다.
+   * 여기와 WorkflowAccessGuard 두 곳만 되살리면 서버 차단이 복구된다.
    */
   async assertViewAccess(id: string, _knoxId: string) {
     await this.findByIdOrThrow(id);
@@ -176,7 +190,7 @@ export class ProjectsService {
     await this.findByIdOrThrow(id);
   }
 
-  /** 과제 메타데이터(이름/코드/도메인/상태) 수정 — Phase는 읽기 전용이라 여기서 다루지 않는다. */
+  /** 과제 메타데이터(이름/코드/도메인/상태) 수정 — 마일스톤은 updateMilestones가 따로 다룬다. */
   async updateProject(
     id: string,
     dto: { name?: string; code?: string; domain?: string; status?: string },
@@ -201,7 +215,7 @@ export class ProjectsService {
     return this.findDetailOrThrow(id, actor.knoxId);
   }
 
-  /** 과제 팀원 명단(부서별 로스터)에 인원을 추가한다 — IP owners/viewGrants(접근 권한)와는 별개 개념. */
+  /** 과제 팀원 명단(부서별 로스터)에 인원을 추가한다 — Workflow owners/viewGrants(접근 권한)와는 별개 개념. */
   async addMember(id: string, knoxId: string, department: string, actor: Actor) {
     if (!isValidDepartment(department)) {
       throw new BadRequestException('Unknown department.');

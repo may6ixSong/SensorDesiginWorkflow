@@ -4,7 +4,7 @@ import { ENV_FILE } from './config/env';
 import configuration from './config/configuration';
 import { DatabaseModule } from './database/database.module';
 import { ProjectsModule } from './projects/projects.module';
-import { IpsModule } from './ips/ips.module';
+import { WorkflowsModule } from './workflows/workflows.module';
 import { DeliverablesModule } from './deliverables/deliverables.module';
 import { MemosModule } from './memos/memos.module';
 import { EdgesModule } from './edges/edges.module';
@@ -18,7 +18,7 @@ import { AuditModule } from './audit/audit.module';
     ConfigModule.forRoot({ isGlobal: true, envFilePath: ENV_FILE, load: [configuration] }),
     DatabaseModule,
     ProjectsModule,
-    IpsModule,
+    WorkflowsModule,
     DeliverablesModule,
     MemosModule,
     EdgesModule,

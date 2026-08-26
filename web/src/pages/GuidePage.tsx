@@ -13,7 +13,7 @@ const SECTIONS: Section[] = [
     key: 'BOARD',
     title: 'Deliverable board',
     body: [
-      'Each IP has one board. Deliverables are laid out left to right across the project phases (Kick-off → Fab Out), and arrows between them show which deliverable feeds which.',
+      'Each workflow has one board. Deliverables are laid out left to right across the project phases (Kick-off → Fab Out), and arrows between them show which deliverable feeds which.',
       'Scroll to zoom, drag empty space to pan. The board never zooms out past the point where it fills the viewport.',
     ],
   },
@@ -21,7 +21,7 @@ const SECTIONS: Section[] = [
     key: 'EDIT',
     title: 'Editing the layout',
     body: [
-      'Only Analog owners of the IP can edit. Press the pencil in the bottom-left toolbox to enter edit mode; the check mark saves and exits, the arrow discards every change made in that session.',
+      'Only Analog owners of the workflow can edit. Press the pencil in the bottom-left toolbox to enter edit mode; the check mark saves and exits, the arrow discards every change made in that session.',
       'Drag a block to move it. Pushing it across a phase boundary takes a little force, so a block will not change phase by accident. Drag the bottom-right corner to resize, and use the right-hand pin to draw a link to another deliverable.',
     ],
   },
@@ -29,7 +29,7 @@ const SECTIONS: Section[] = [
     key: 'VERSIONS',
     title: 'Versions and releases',
     body: [
-      'Uploading a working copy bumps the minor version and stays visible only to the IP owners. Release promotes it to the next major version, and that is the version recipient departments see.',
+      'Uploading a working copy bumps the minor version and stays visible only to the workflow owners. Release promotes it to the next major version, and that is the version recipient departments see.',
       'The Recipient-dept view toggle in the top bar shows the board exactly as a receiving department sees it — working copies disappear.',
     ],
   },
@@ -37,7 +37,7 @@ const SECTIONS: Section[] = [
     key: 'HLD',
     title: 'HLD release',
     body: [
-      'An HLD release is a snapshot of every deliverable version in the IP at one moment. Open it from the button on the IP header.',
+      'An HLD release is a snapshot of every deliverable version in the workflow at one moment. Open it from the button on the workflow header.',
       'Rows whose version changed since the previous HLD are highlighted, so a reviewer can see what actually moved between two snapshots.',
     ],
   },
@@ -46,7 +46,7 @@ const SECTIONS: Section[] = [
     title: 'Access',
     body: [
       'Edit access is limited to the Analog department; the primary owner cannot be removed. View access can be granted to anyone, and the position recorded with the grant is what the deliverable handoff list maps to.',
-      'An IP you have neither Edit nor View access to does not appear in the IP selector at all.',
+      'An workflow you have neither Edit nor View access to does not appear in the workflow selector at all.',
     ],
   },
 ];

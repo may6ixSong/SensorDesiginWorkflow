@@ -1,17 +1,17 @@
 import { Controller, Get, Param, UseGuards } from '@nestjs/common';
-import { IpAccessGuard } from '../common/guards/ip-access.guard';
-import { IpAccess } from '../common/decorators/ip-access.decorator';
+import { WorkflowAccessGuard } from '../common/guards/workflow-access.guard';
+import { WorkflowAccess } from '../common/decorators/workflow-access.decorator';
 import { EdgesService } from './edges.service';
 
-@UseGuards(IpAccessGuard)
-@Controller('ips/:ipId/edges')
+@UseGuards(WorkflowAccessGuard)
+@Controller('workflows/:workflowId/edges')
 export class EdgesController {
   constructor(private readonly edges: EdgesService) {}
 
-  @IpAccess('view')
+  @WorkflowAccess('view')
   @Get()
-  async list(@Param('ipId') ipId: string) {
-    const edges = await this.edges.listForIp(ipId);
+  async list(@Param('workflowId') workflowId: string) {
+    const edges = await this.edges.listForWorkflow(workflowId);
     return { data: edges };
   }
 }

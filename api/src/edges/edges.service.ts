@@ -7,16 +7,16 @@ import { Edge, EdgeDocument } from './schemas/edge.schema';
 export class EdgesService {
   constructor(@InjectModel(Edge.name) private readonly model: Model<EdgeDocument>) {}
 
-  listForIp(ipId: string) {
-    return this.model.find({ ipId }).exec();
+  listForWorkflow(workflowId: string) {
+    return this.model.find({ workflowId }).exec();
   }
 
-  /** series 인스턴스 생성 시 회차 순서대로 자동 연결 (설계서 3.6). isMock은 소속 IP에서 상속. */
-  async createAutoChain(ipId: Types.ObjectId, orderedDeliverableIds: Types.ObjectId[], isMock = false) {
+  /** series 인스턴스 생성 시 회차 순서대로 자동 연결 (설계서 3.6). isMock은 소속 workflow에서 상속. */
+  async createAutoChain(workflowId: Types.ObjectId, orderedDeliverableIds: Types.ObjectId[], isMock = false) {
     const docs = [];
     for (let i = 0; i < orderedDeliverableIds.length - 1; i++) {
       docs.push({
-        ipId,
+        workflowId,
         fromId: orderedDeliverableIds[i],
         toId: orderedDeliverableIds[i + 1],
         bidirectional: false,
@@ -34,16 +34,16 @@ export class EdgesService {
       .exec();
   }
 
-  /** isMock은 소속 IP에서 상속받는다 (memos.replaceAllForIp와 동일한 이유). */
-  async replaceAllForIp(
-    ipId: string,
+  /** isMock은 소속 workflow에서 상속받는다 (memos.replaceAllForWorkflow와 동일한 이유). */
+  async replaceAllForWorkflow(
+    workflowId: string,
     edges: { id?: string; fromId: string; toId: string; bidirectional: boolean; auto?: boolean }[],
     isMock = false,
   ) {
-    await this.model.deleteMany({ ipId }).exec();
+    await this.model.deleteMany({ workflowId }).exec();
     if (!edges.length) return [];
     const docs = edges.map((e) => ({
-      ipId,
+      workflowId,
       fromId: e.fromId,
       toId: e.toId,
       bidirectional: e.bidirectional,
@@ -53,8 +53,8 @@ export class EdgesService {
     return this.model.insertMany(docs);
   }
 
-  createOne(ipId: string, fromId: string, toId: string, bidirectional: boolean, isMock = false) {
-    return this.model.create({ ipId, fromId, toId, bidirectional, auto: false, isMock });
+  createOne(workflowId: string, fromId: string, toId: string, bidirectional: boolean, isMock = false) {
+    return this.model.create({ workflowId, fromId, toId, bidirectional, auto: false, isMock });
   }
 
   deleteOne(edgeId: string) {

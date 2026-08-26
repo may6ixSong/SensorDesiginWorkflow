@@ -62,11 +62,11 @@ export class Deliverable {
   @Prop({ type: SchemaTypes.ObjectId, ref: 'Project', required: true, index: true })
   projectId: Types.ObjectId;
 
-  @Prop({ type: SchemaTypes.ObjectId, ref: 'Ip', required: true, index: true })
-  ipId: Types.ObjectId;
+  @Prop({ type: SchemaTypes.ObjectId, ref: 'Workflow', required: true, index: true })
+  workflowId: Types.ObjectId;
 
   @Prop({ required: true })
-  phaseKey: string;
+  phaseId: string;
 
   @Prop({ required: true, trim: true })
   name: string;
@@ -97,18 +97,18 @@ export class Deliverable {
   recvContact: string | null;
 
   /**
-   * 이 산출물을 받아야 하는 다른 IP. recvDept(부서)와 별개로, Analog IP끼리
-   * 서로 주고받는 산출물(예: BGR_REF → PLL_MAIN)을 표현한다. 설정되면 그 IP의
-   * 보드에 "Incoming from other IPs" 섹션으로 노출되며, Release된 버전만 보인다.
+   * 이 산출물을 받아야 하는 다른 workflow. recvDept(부서)와 별개로, workflow끼리
+   * 서로 주고받는 산출물(예: BGR_REF → PLL_MAIN)을 표현한다. 설정되면 그 workflow의
+   * 보드에 "Incoming from other workflows" 섹션으로 노출되며, Release된 버전만 보인다.
    */
-  @Prop({ type: SchemaTypes.ObjectId, ref: 'Ip', default: null })
-  recvIpId: Types.ObjectId | null;
+  @Prop({ type: SchemaTypes.ObjectId, ref: 'Workflow', default: null })
+  recvWorkflowId: Types.ObjectId | null;
 
   /**
-   * 이 산출물이 실제로는 이 시스템에 들어오지 않은 외부 부서(IP도 아니고 이 앱의
+   * 이 산출물이 실제로는 이 시스템에 들어오지 않은 외부 부서(workflow도 아니고 이 앱의
    * 사용자 조직도 아닌 곳, 예: 파운드리/외주 업체)로부터 받은 것임을 표시하는
-   * 자유 텍스트. recvIpId(시스템 내 다른 IP로부터 수신)와 달리, 이 값이 설정된
-   * 산출물은 여전히 ipId가 가리키는 이 IP의 "own" 산출물이다 — 그래서 위치·Phase
+   * 자유 텍스트. recvWorkflowId(시스템 내 다른 workflow로부터 수신)와 달리, 이 값이 설정된
+   * 산출물은 여전히 workflowId가 가리키는 이 workflow의 "own" 산출물이다 — 그래서 위치·phase
    * 배치(series 포함)를 own 산출물과 완전히 동일하게 자유롭게 편집할 수 있다.
    * 오직 표시(캔버스 배지·상세 "Received from")만 다르다.
    */
@@ -138,6 +138,6 @@ export class Deliverable {
 }
 
 export const DeliverableSchema = SchemaFactory.createForClass(Deliverable);
-DeliverableSchema.index({ ipId: 1, phaseKey: 1 });
+DeliverableSchema.index({ workflowId: 1, phaseId: 1 });
 DeliverableSchema.index({ series: 1 });
-DeliverableSchema.index({ recvIpId: 1 });
+DeliverableSchema.index({ recvWorkflowId: 1 });

@@ -6,7 +6,7 @@ export type IconName =
   | 'word' | 'excel' | 'path' | 'lock' | 'eye' | 'edit' | 'check' | 'plus' | 'x'
   | 'up' | 'dn' | 'send' | 'shield' | 'users' | 'trash' | 'note' | 'copy'
   | 'pan' | 'grid' | 'undo' | 'expand' | 'fit' | 'hist' | 'link' | 'search' | 'list'
-  | 'sun' | 'moon' | 'globe' | 'book' | 'info' | 'flag' | 'bell';
+  | 'sun' | 'moon' | 'globe' | 'book' | 'info' | 'warn' | 'flag' | 'bell' | 'calendar';
 
 const P: Record<IconName, { d: string; s: number }> = {
   word: { s: 14, d: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/>' },
@@ -39,7 +39,9 @@ const P: Record<IconName, { d: string; s: number }> = {
   moon: { s: 14, d: '<path d="M20.5 14.5A8.5 8.5 0 1 1 9.5 3.5a7 7 0 0 0 11 11z"/>' },
   globe: { s: 14, d: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a15 15 0 0 1 0 18a15 15 0 0 1 0-18z"/>' },
   book: { s: 14, d: '<path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v16H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 20.5A2.5 2.5 0 0 1 6.5 18H20v4H6.5A2.5 2.5 0 0 1 4 19.5z"/>' },
+  warn: { s: 14, d: '<path d="M10.3 3.9 1.8 18.4A2 2 0 0 0 3.5 21.4h17a2 2 0 0 0 1.7-3l-8.5-14.5a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>' },
   info: { s: 14, d: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>' },
+  calendar: { s: 14, d: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>' },
   flag: { s: 13, d: '<path d="M4 22V4"/><path d="M4 4h13l-2.5 4L17 12H4"/>' },
   bell: { s: 14, d: '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>' },
 };

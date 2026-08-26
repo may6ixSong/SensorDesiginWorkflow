@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Box } from '@mui/material';
-import { IpBriefDto, PhaseRef } from '@/types/domain';
-import { CanvasNode, VersionView, fmtAt, hasW, latA, latR, stOf, vstr } from '@/lib/canvasModel';
+import { WorkflowBriefDto, WorkflowPhase } from '@/types/domain';
+import { shortDate } from '@/lib/schedule';
+import { CanvasNode, VersionView, fmtAt, hasW, isOrphanPhase, latA, latR, stOf, vstr } from '@/lib/canvasModel';
 import { useCanvasStore } from '@/store/canvasStore';
 import { useDownloadVersion } from '@/api/hooks/useDeliverables';
 import { toast } from '@/store/toastStore';
-import { DEPARTMENTS, RECEIVABLE_DEPARTMENTS, departmentName } from '@/shared/constants/departments';
+import { RECEIVABLE_DEPARTMENTS, departmentName } from '@/shared/constants/departments';
 import { DirectoryUser, findDirectoryUser } from '@/shared/constants/mock-users';
 import { ModalShell } from '@/components/common/ModalShell';
 import { SirenButton, Badge, Chip } from '@/components/common/SirenButton';
@@ -16,28 +17,31 @@ import { CURSOR_POINTER, FONT_MONO, T } from '@/theme/tokens';
 
 interface Props {
   node: CanvasNode | null;
-  phases: PhaseRef[];
+  phases: WorkflowPhase[];
   /** recvContact 후보 (목업 사용자 디렉토리). */
   users: DirectoryUser[];
-  /** 목업 own = isOwn(ip) && !S.recv */
+  /** 목업 own = isOwn(workflow) && !S.recv */
   own: boolean;
-  /** 수신 IP 셀렉트 박스용 — 과제 소속 IP 전체(id/name/color). */
-  ipDirectory: IpBriefDto[];
+  /** 수신 workflow 셀렉트 박스용 — 과제 소속 workflow 전체(id/name/color). */
+  workflowDirectory: WorkflowBriefDto[];
   onClose: () => void;
-  onSaveInfo: (p: { name: string; net: 'OA' | 'HPC'; type: string; phaseKeys: string[] }) => void;
+  onSaveInfo: (p: { name: string; net: 'OA' | 'HPC'; type: string; phaseIds: string[] }) => void;
   onUpload: (p: { file: string; note: string; net: 'OA' | 'HPC'; type: string }) => void;
   onRelease: () => void;
   onSaveRecv: (p: {
-    recvDept: string | null; recvContact: string | null; recvIpId: string | null; sourceDept: string | null;
+    recvDept: string | null; recvContact: string | null; recvWorkflowId: string | null; sourceDept: string | null;
   }) => void;
-  onAddLink: (toId: string) => void;
-  onUnlink: (edgeId: string) => void;
 }
 
-/** 목업 renderModal()의 산출물 상세 — 개요 / 버전 이력 / 전달 3탭 */
+/**
+ * 산출물 상세 — 개요 / 버전 이력 / 전달 3탭.
+ *
+ * flow(연결)는 여기서 만들거나 지우지 않는다(사용자 요청) — 연결은 캔버스에서 pin을 끌어
+ * 잇는 것으로만 하고, 이 화면에는 "무엇과 이어져 있는지" 읽기 전용 목록만 남긴다.
+ */
 export function DeliverableDialog({
-  node: d, phases, users, own, ipDirectory, onClose,
-  onSaveInfo, onUpload, onRelease, onSaveRecv, onAddLink, onUnlink,
+  node: d, phases, users, own, workflowDirectory, onClose,
+  onSaveInfo, onUpload, onRelease, onSaveRecv,
 }: Props) {
   const tab = useCanvasStore((s) => s.tab);
   const setTab = useCanvasStore((s) => s.setTab);
@@ -45,7 +49,8 @@ export function DeliverableDialog({
   const edges = useCanvasStore((s) => s.edges);
 
   if (!d) return null;
-  const ph = phases.find((p) => p.key === d.phase);
+  const ph = phases.find((p) => p.id === d.phase);
+  const orphan = isOrphanPhase(phases, d.phase);
   const st = stOf(d);
 
   return (
@@ -59,9 +64,12 @@ export function DeliverableDialog({
             <DocIcon type={d.type} />
           </Box>
           <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Ey>{ph ? `${ph.key} · ${ph.label}` : ''}</Ey>
+            <Ey>{ph ? `${ph.name} · ${shortDate(ph.start)} → ${shortDate(ph.end)}` : 'No release schedule'}</Ey>
             <Box sx={{ fontSize: 18, fontWeight: 700, mt: '3px' }}>{d.name}</Box>
           </Box>
+          {orphan && (
+            <Badge color={T.rd} bg={T.rd2} borderColor={T.rd3} sx={{ mt: '6px' }}>Schedule lost</Badge>
+          )}
           <Badge color={st.c} bg={st.bg} borderColor={st.bd} sx={{ mt: '6px' }}>{st.lb}</Badge>
           <Badge
             color={d.net === 'HPC' ? T.hp : T.dm}
@@ -97,12 +105,11 @@ export function DeliverableDialog({
         <OverviewTab
           d={d} phases={phases} own={own} nodes={nodes} edges={edges}
           onSaveInfo={onSaveInfo} onUpload={onUpload} onRelease={onRelease}
-          onAddLink={onAddLink} onUnlink={onUnlink}
         />
       )}
       {tab === 'versions' && <VersionsTab d={d} />}
       {tab === 'recv' && (
-        <RecvTab d={d} own={own} users={users} ipDirectory={ipDirectory} onSave={onSaveRecv} />
+        <RecvTab d={d} own={own} users={users} workflowDirectory={workflowDirectory} onSave={onSaveRecv} />
       )}
     </ModalShell>
   );
@@ -110,12 +117,12 @@ export function DeliverableDialog({
 
 /* ── 개요 탭 ── */
 function OverviewTab({
-  d, phases, own, nodes, edges, onSaveInfo, onUpload, onRelease, onAddLink, onUnlink,
+  d, phases, own, nodes, edges, onSaveInfo, onUpload, onRelease,
 }: {
-  d: CanvasNode; phases: PhaseRef[]; own: boolean;
+  d: CanvasNode; phases: WorkflowPhase[]; own: boolean;
   nodes: CanvasNode[]; edges: ReturnType<typeof useCanvasStore.getState>['edges'];
   onSaveInfo: Props['onSaveInfo']; onUpload: Props['onUpload'];
-  onRelease: Props['onRelease']; onAddLink: Props['onAddLink']; onUnlink: Props['onUnlink'];
+  onRelease: Props['onRelease'];
 }) {
   const rel = latR(d);
   const work = hasW(d) ? latA(d) : null;
@@ -134,6 +141,7 @@ function OverviewTab({
   const [type, setType] = useState(d.type);
   const [picked, setPicked] = useState<Set<string>>(new Set(seriesPhases));
   const [nameErr, setNameErr] = useState(false);
+  const [schedErr, setSchedErr] = useState('');
 
   useEffect(() => {
     setName(d.name); setNet(d.net); setType(d.type); setPicked(new Set(seriesPhases));
@@ -148,28 +156,31 @@ function OverviewTab({
 
   const outs = edges.filter((e) => e.from === d.id);
   const ins = edges.filter((e) => e.to === d.id);
-  // 받은 산출물(origin==='incoming')로는 링크할 수 없다 — 그건 다른 IP 소유라
-  // "내가 그 IP에 준다"는 방향이 되어 의미가 반대가 된다. 그 방향은 캔버스에서
-  // incoming 노드의 pin을 직접 끌어 own 노드로 연결하면 된다.
-  const linkable = nodes.filter(
-    (x) => x.id !== d.id && x.origin !== 'incoming' && !edges.some((e) => e.from === d.id && e.to === x.id),
+
+  // 이 산출물(또는 같은 series의 회차)이 지금 살아 있는 phase 중 어디에도 안 걸려 있으면
+  // "일정 유실" 상태다 — 사라진 phase를 가리키고 있다는 뜻이다.
+  const orphan = isOrphanPhase(phases, d.phase);
+  const livePicked = useMemo(
+    () => new Set([...picked].filter((id) => phases.some((p) => p.id === id))),
+    [picked, phases],
   );
-  const [lkTgt, setLkTgt] = useState('');
 
   const togglePick = (k: string) => {
     setPicked((prev) => {
       const n = new Set(prev);
-      if (n.has(k)) {
-        if (n.size <= 1) return n; // 최소 1개 유지 (목업과 동일)
-        n.delete(k);
-      } else n.add(k);
+      if (n.has(k)) n.delete(k);
+      else n.add(k);
       return n;
     });
   };
 
   const submitInfo = () => {
     if (!name.trim()) { setNameErr(true); return; }
-    onSaveInfo({ name: name.trim(), net, type: net === 'HPC' ? 'path' : type, phaseKeys: [...picked] });
+    if (!livePicked.size) { setSchedErr('Pick at least one phase — an artifact with no phase has no release schedule.'); return; }
+    setSchedErr('');
+    // 사라진 phase의 id는 보내지 않는다 — 서버가 거절하기도 하고, 여기서 일정을 다시
+    // 고르는 것이 곧 "유실 상태를 푸는" 행위이기 때문이다.
+    onSaveInfo({ name: name.trim(), net, type: net === 'HPC' ? 'path' : type, phaseIds: [...livePicked] });
   };
 
   const submitUpload = () => {
@@ -184,7 +195,7 @@ function OverviewTab({
   const edgeRow = (e: { id: string; from: string; to: string }, dir: 'in' | 'out') => {
     const other = nodes.find((x) => x.id === (dir === 'out' ? e.to : e.from));
     if (!other) return null;
-    const op = phases.find((p) => p.key === other.phase);
+    const op = phases.find((p) => p.id === other.phase);
     return (
       <Box key={e.id} sx={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 0', borderBottom: `1px solid ${T.ln}` }}>
         <Box component="span" sx={{ fontFamily: FONT_MONO, fontSize: 11, color: T.dm2, width: 52 }}>
@@ -194,10 +205,9 @@ function OverviewTab({
           {other.name}
           {other.seriesTotal > 1 && <Seq>{other.seriesIdx}/{other.seriesTotal}</Seq>}
         </Box>
-        <Box component="span" sx={{ fontFamily: FONT_MONO, fontSize: 10.5, color: T.dm2 }}>{op?.key ?? '—'}</Box>
-        <SirenButton variant="ghost" title="Unlink" onClick={() => onUnlink(e.id)}>
-          <Icon name="trash" />
-        </SirenButton>
+        <Box component="span" sx={{ fontFamily: FONT_MONO, fontSize: 10.5, color: op ? T.dm2 : T.rd }}>
+          {op?.name ?? 'no schedule'}
+        </Box>
       </Box>
     );
   };
@@ -230,73 +240,75 @@ function OverviewTab({
                 />
               </Field>
             </Row>
-            <Field label="Release schedule">
+            <Field label="Release schedule — every phase of this workflow this artifact is due in">
+              {orphan && (
+                <Box
+                  sx={{
+                    display: 'flex', alignItems: 'flex-start', gap: '7px', fontSize: 11.5, color: T.rd,
+                    background: T.rd2, border: `1px solid ${T.rd3}`, borderRadius: '8px',
+                    padding: '8px 10px', mb: '8px', lineHeight: 1.6,
+                  }}
+                >
+                  <Box component="span" sx={{ mt: '1px' }}><Icon name="warn" size={12} /></Box>
+                  The phase this artifact was on no longer exists in this workflow's schedule. It kept its
+                  place on the canvas, but it has no release date until you pick one below.
+                </Box>
+              )}
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
                 {phases.map((p) => (
                   <Box
-                    key={p.key}
+                    key={p.id}
                     component="button"
                     type="button"
-                    onClick={() => togglePick(p.key)}
+                    title={`${shortDate(p.start)} → ${shortDate(p.end)}`}
+                    onClick={() => togglePick(p.id)}
                     sx={{
                       fontFamily: FONT_MONO, fontSize: 11, fontWeight: 600, padding: '5px 10px',
                       borderRadius: '7px', transition: '.14s', cursor: CURSOR_POINTER,
-                      background: picked.has(p.key) ? T.tl2 : T.sf,
-                      border: `1px solid ${picked.has(p.key) ? T.tl : T.ln2}`,
-                      color: picked.has(p.key) ? T.tl : T.dm,
-                      '&:hover': { background: picked.has(p.key) ? T.tl2 : T.sf3 },
+                      background: picked.has(p.id) ? T.tl2 : T.sf,
+                      border: `1px solid ${picked.has(p.id) ? T.tl : T.ln2}`,
+                      color: picked.has(p.id) ? T.tl : T.dm,
+                      '&:hover': { background: picked.has(p.id) ? T.tl2 : T.sf3 },
                     }}
                   >
-                    {p.key}
+                    {p.name}
                   </Box>
                 ))}
+                {!phases.length && (
+                  <Box sx={{ fontSize: 12, color: T.rd }}>
+                    This workflow has no phases — add a schedule first.
+                  </Box>
+                )}
               </Box>
+              {schedErr && <Box sx={{ fontSize: 11, color: T.rd, mt: '7px' }}>{schedErr}</Box>}
             </Field>
             <SirenButton variant="primary" onClick={submitInfo}>
               <Icon name="check" /> Save
             </SirenButton>
           </Card>
 
-          <Card sx={{ mb: '12px' }}>
-            <Ey sx={{ mb: '9px', display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <Icon name="link" /> Flow links
-            </Ey>
-            {ins.length + outs.length === 0 ? (
-              <Box sx={{ fontSize: 12, color: T.dm2, pb: '8px' }}>No linked deliverables.</Box>
-            ) : (
-              <>
-                {ins.map((e) => edgeRow(e, 'in'))}
-                {outs.map((e) => edgeRow(e, 'out'))}
-              </>
-            )}
-            <Row sx={{ mt: '10px' }}>
-              <Field label="Link to next deliverable" sx={{ flex: 1, mb: 0 }}>
-                <SelectInput
-                  value={lkTgt || linkable[0]?.id || ''}
-                  onChange={setLkTgt}
-                  disabled={!linkable.length}
-                  options={
-                    linkable.length
-                      ? linkable.map((x) => ({
-                          value: x.id,
-                          label: `${x.name}${x.seriesTotal > 1 ? ` (${x.seriesIdx}/${x.seriesTotal})` : ''} · ${phases.find((p) => p.key === x.phase)?.key ?? ''}`,
-                        }))
-                      : [{ value: '', label: 'No linkable deliverables' }]
-                  }
-                />
-              </Field>
-              <Box sx={{ display: 'flex', alignItems: 'flex-end' }}>
-                <SirenButton
-                  disabled={!linkable.length}
-                  onClick={() => { const t = lkTgt || linkable[0]?.id; if (t) onAddLink(t); }}
-                >
-                  <Icon name="plus" /> Link
-                </SirenButton>
-              </Box>
-            </Row>
-          </Card>
         </>
       )}
+
+      {/* Flow links — 읽기 전용이다. 연결을 만들거나 지우는 것은 캔버스에서 pin을 끌어
+          잇는 방법 하나뿐이다(사용자 요청). 여기서는 무엇과 이어져 있는지만 보여 준다. */}
+      <Card sx={{ mb: '12px' }}>
+        <Ey sx={{ mb: '9px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+          <Icon name="link" /> Flow links
+        </Ey>
+        {ins.length + outs.length === 0 ? (
+          <Box sx={{ fontSize: 12, color: T.dm2 }}>Not linked to anything yet.</Box>
+        ) : (
+          <>
+            {ins.map((e) => edgeRow(e, 'in'))}
+            {outs.map((e) => edgeRow(e, 'out'))}
+          </>
+        )}
+        <Box sx={{ fontSize: 11, color: T.dm2, mt: '9px' }}>
+          Links are drawn on the canvas only: in edit mode, click an artifact's right-hand pin and then the
+          target artifact to connect, or click a link's ✕ handle to remove it.
+        </Box>
+      </Card>
 
       <Row sx={{ mb: '12px' }}>
         <Card sx={{ flex: 1 }}>
@@ -312,7 +324,7 @@ function OverviewTab({
             {own ? (work ? vstr(work) : 'None') : <Icon name="lock" />}
           </Box>
           <Box sx={{ fontSize: 11, color: T.dm2, mt: '3px' }}>
-            {own ? (work ? fmtAt(work.at) : 'No changes since release') : 'IP owners only'}
+            {own ? (work ? fmtAt(work.at) : 'No changes since release') : 'workflow owners only'}
           </Box>
         </Card>
       </Row>
@@ -372,7 +384,7 @@ function OverviewTab({
                 value={file}
                 onChange={(v) => { setFile(v); setErr(''); }}
                 error={!!err}
-                placeholder={fNet === 'HPC' ? '/vwp/cis_a7/<ip>/...' : 'spec_draft.docx'}
+                placeholder={fNet === 'HPC' ? '/vwp/cis_a7/<workflow>/...' : 'spec_draft.docx'}
               />
             </Field>
           </Row>
@@ -443,23 +455,23 @@ function VersionsTab({ d }: { d: CanvasNode }) {
 
 /* ── 전달 탭 ── */
 function RecvTab({
-  d, own, users, ipDirectory, onSave,
+  d, own, users, workflowDirectory, onSave,
 }: {
   d: CanvasNode; own: boolean; users: DirectoryUser[];
-  ipDirectory: IpBriefDto[]; onSave: Props['onSaveRecv'];
+  workflowDirectory: WorkflowBriefDto[]; onSave: Props['onSaveRecv'];
 }) {
   const [dept, setDept] = useState(d.recvDept ?? '');
   const [contact, setContact] = useState(d.recvContact ?? '');
-  const [recvIp, setRecvIp] = useState(d.recvIpId ?? '');
+  const [recvWorkflow, setRecvIp] = useState(d.recvWorkflowId ?? '');
   const [sourceDept, setSourceDept] = useState(d.sourceDept ?? '');
   useEffect(() => {
-    setDept(d.recvDept ?? ''); setContact(d.recvContact ?? ''); setRecvIp(d.recvIpId ?? '');
+    setDept(d.recvDept ?? ''); setContact(d.recvContact ?? ''); setRecvIp(d.recvWorkflowId ?? '');
     setSourceDept(d.sourceDept ?? '');
   }, [d.id]); // eslint-disable-line
 
-  const ipById = new Map(ipDirectory.map((ip) => [ip.id, ip]));
-  const otherIps = ipDirectory.filter((ip) => ip.id !== d.ip);
-  const recvIpInfo = d.recvIpId ? ipById.get(d.recvIpId) : undefined;
+  const workflowById = new Map(workflowDirectory.map((workflow) => [workflow.id, workflow]));
+  const otherIps = workflowDirectory.filter((workflow) => workflow.id !== d.workflow);
+  const recvIpInfo = d.recvWorkflowId ? workflowById.get(d.recvWorkflowId) : undefined;
 
   if (!own) {
     return (
@@ -481,14 +493,14 @@ function RecvTab({
           )}
         </Card>
         <Card sx={{ mb: '12px' }}>
-          <Ey sx={{ mb: '9px' }}>Recipient IP</Ey>
+          <Ey sx={{ mb: '9px' }}>Recipient workflow</Ey>
           {recvIpInfo ? (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: '9px', padding: '9px 0' }}>
               <Box sx={{ width: 9, height: 9, borderRadius: '50%', background: recvIpInfo.color }} />
               <Box sx={{ fontSize: 13 }}>{recvIpInfo.name}</Box>
             </Box>
           ) : (
-            <Box sx={{ fontSize: 12.5, color: T.dm2 }}>No recipient IP set.</Box>
+            <Box sx={{ fontSize: 12.5, color: T.dm2 }}>No recipient workflow set.</Box>
           )}
         </Card>
         <Card>
@@ -534,18 +546,18 @@ function RecvTab({
       </Card>
 
       <Card sx={{ mb: '12px' }}>
-        <Ey sx={{ mb: '9px' }}>Recipient IP</Ey>
+        <Ey sx={{ mb: '9px' }}>Recipient workflow</Ey>
         <Box sx={{ fontSize: 11.5, color: T.dm2, mb: '9px' }}>
-          Set another Analog IP that should receive this deliverable — it'll show up on that
-          IP's board as "Incoming from other IPs", showing only the version you release.
+          Set another Analog workflow that should receive this deliverable — it'll show up on that
+          workflow's board as "Incoming from other workflows", showing only the version you release.
         </Box>
-        <Field label="IP" sx={{ mb: 0 }}>
+        <Field label="workflow" sx={{ mb: 0 }}>
           <SelectInput
-            value={recvIp}
+            value={recvWorkflow}
             onChange={setRecvIp}
             options={[
               { value: '', label: 'Not set' },
-              ...otherIps.map((ip) => ({ value: ip.id, label: ip.name })),
+              ...otherIps.map((workflow) => ({ value: workflow.id, label: workflow.name })),
             ]}
           />
         </Field>
@@ -566,7 +578,7 @@ function RecvTab({
       <SirenButton
         variant="primary"
         onClick={() => onSave({
-          recvDept: dept || null, recvContact: contact || null, recvIpId: recvIp || null,
+          recvDept: dept || null, recvContact: contact || null, recvWorkflowId: recvWorkflow || null,
           sourceDept: sourceDept.trim() || null,
         })}
       >

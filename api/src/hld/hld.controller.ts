@@ -1,34 +1,34 @@
 import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
-import { IpAccessGuard } from '../common/guards/ip-access.guard';
-import { IpAccess } from '../common/decorators/ip-access.decorator';
+import { WorkflowAccessGuard } from '../common/guards/workflow-access.guard';
+import { WorkflowAccess } from '../common/decorators/workflow-access.decorator';
 import { CurrentActor } from '../common/decorators/current-actor.decorator';
-import { CurrentIp } from '../common/decorators/current-ip.decorator';
+import { CurrentWorkflow } from '../common/decorators/current-workflow.decorator';
 import { Actor } from '../common/actor';
-import { IpDocument } from '../ips/schemas/ip.schema';
+import { WorkflowDocument } from '../workflows/schemas/workflow.schema';
 import { HldService } from './hld.service';
 import { CreateHldReleaseDto } from './dto/hld.dto';
 
-@UseGuards(IpAccessGuard)
-@Controller('ips/:ipId/hld-releases')
+@UseGuards(WorkflowAccessGuard)
+@Controller('workflows/:workflowId/hld-releases')
 export class HldController {
   constructor(private readonly hld: HldService) {}
 
-  @IpAccess('view')
+  @WorkflowAccess('view')
   @Get()
-  async list(@Param('ipId') ipId: string) {
-    const list = await this.hld.listForIp(ipId);
+  async list(@Param('workflowId') workflowId: string) {
+    const list = await this.hld.listForWorkflow(workflowId);
     return { data: list };
   }
 
-  @IpAccess('edit')
+  @WorkflowAccess('edit')
   @Post()
   async create(
-    @Param('ipId') _ipId: string,
+    @Param('workflowId') _workflowId: string,
     @Body() dto: CreateHldReleaseDto,
-    @CurrentIp() ip: IpDocument,
+    @CurrentWorkflow() workflow: WorkflowDocument,
     @CurrentActor() me: Actor,
   ) {
-    const hld = await this.hld.createRelease(ip, dto.note, me);
+    const hld = await this.hld.createRelease(workflow, dto.note, me);
     return { data: hld };
   }
 }

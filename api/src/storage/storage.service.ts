@@ -51,9 +51,9 @@ export class StorageService {
     return this.client;
   }
 
-  /** `{prefix}/{ipId}/{deliverableId}/{version}/{uuid}-{fileName}` */
-  buildStorageKey(ipId: string, deliverableId: string, version: string, fileName: string): string {
-    const key = `${ipId}/${deliverableId}/${version}/${randomUUID()}-${fileName}`;
+  /** `{prefix}/{workflowId}/{deliverableId}/{version}/{uuid}-{fileName}` */
+  buildStorageKey(workflowId: string, deliverableId: string, version: string, fileName: string): string {
+    const key = `${workflowId}/${deliverableId}/${version}/${randomUUID()}-${fileName}`;
     return this.prefix ? `${this.prefix}/${key}` : key;
   }
 

@@ -2,8 +2,9 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Deliverable, DeliverableDocument } from './schemas/deliverable.schema';
-import { Ip, IpDocument } from '../ips/schemas/ip.schema';
+import { Workflow, WorkflowDocument } from '../workflows/schemas/workflow.schema';
 import { Actor } from '../common/actor';
+import { sortSchedule } from '../common/schedule';
 import { AuditService } from '../audit/audit.service';
 import { EdgesService } from '../edges/edges.service';
 import { RECEIVABLE_DEPARTMENT_IDS } from '../common/constants/departments';
@@ -19,31 +20,31 @@ import {
 export class DeliverablesService {
   constructor(
     @InjectModel(Deliverable.name) private readonly model: Model<DeliverableDocument>,
-    @InjectModel(Ip.name) private readonly ipModel: Model<IpDocument>,
+    @InjectModel(Workflow.name) private readonly workflowModel: Model<WorkflowDocument>,
     private readonly audit: AuditService,
     private readonly edges: EdgesService,
   ) {}
 
-  listForIp(ipId: string) {
-    return this.model.find({ ipId }).sort({ phaseKey: 1, 'layout.x': 1 }).exec();
+  listForWorkflow(workflowId: string) {
+    return this.model.find({ workflowId }).sort({ phaseId: 1, 'layout.x': 1 }).exec();
   }
 
   /**
-   * 다른 IP가 recvIpId로 이 ipId를 지정한 산출물들 = "Incoming from other IPs".
-   * 각 산출물을 준 IP(sourceIp) 문서를 함께 묶어 반환한다 (설계서에 없는 신규 기능).
+   * 다른 workflow가 recvWorkflowId로 이 workflowId를 지정한 산출물들 = "Incoming from other workflows".
+   * 각 산출물을 준 Workflow(sourceWorkflow) 문서를 함께 묶어 반환한다 (설계서에 없는 신규 기능).
    */
-  async listIncomingForIp(ipId: string): Promise<{ deliverable: DeliverableDocument; sourceIp: IpDocument }[]> {
-    const list = await this.model.find({ recvIpId: ipId }).sort({ phaseKey: 1, 'layout.x': 1 }).exec();
+  async listIncomingForWorkflow(workflowId: string): Promise<{ deliverable: DeliverableDocument; sourceWorkflow: WorkflowDocument }[]> {
+    const list = await this.model.find({ recvWorkflowId: workflowId }).sort({ phaseId: 1, 'layout.x': 1 }).exec();
     if (!list.length) return [];
 
-    const sourceIpIds = Array.from(new Set(list.map((d) => d.ipId.toString())));
-    const sourceIps = await this.ipModel.find({ _id: { $in: sourceIpIds } }).exec();
-    const ipById = new Map(sourceIps.map((ip) => [ip._id.toString(), ip]));
+    const sourceWorkflowIds = Array.from(new Set(list.map((d) => d.workflowId.toString())));
+    const sourceWorkflows = await this.workflowModel.find({ _id: { $in: sourceWorkflowIds } }).exec();
+    const ipById = new Map(sourceWorkflows.map((workflow) => [workflow._id.toString(), workflow]));
 
-    const result: { deliverable: DeliverableDocument; sourceIp: IpDocument }[] = [];
+    const result: { deliverable: DeliverableDocument; sourceWorkflow: WorkflowDocument }[] = [];
     for (const deliverable of list) {
-      const sourceIp = ipById.get(deliverable.ipId.toString());
-      if (sourceIp) result.push({ deliverable, sourceIp });
+      const sourceWorkflow = ipById.get(deliverable.workflowId.toString());
+      if (sourceWorkflow) result.push({ deliverable, sourceWorkflow });
     }
     return result;
   }
@@ -71,11 +72,11 @@ export class DeliverablesService {
     return version;
   }
 
-  async create(ip: IpDocument, dto: CreateDeliverableDto, actor: Actor) {
+  async create(workflow: WorkflowDocument, dto: CreateDeliverableDto, actor: Actor) {
     const d = await this.model.create({
-      projectId: ip.projectId,
-      ipId: ip._id,
-      phaseKey: dto.phaseKey,
+      projectId: workflow.projectId,
+      workflowId: workflow._id,
+      phaseId: dto.phaseId,
       name: dto.name,
       docType: dto.docType,
       network: dto.network,
@@ -87,8 +88,8 @@ export class DeliverablesService {
       layout: { x: 0, y: 0, w: 160, h: 82 },
       versions: [],
       createdBy: actor.knoxId,
-      // 목업 IP 아래 산출물은 목업으로 남긴다 - 플래그를 끌 때 IP와 함께 정리된다.
-      isMock: ip.isMock,
+      // 목업 workflow 아래 산출물은 목업으로 남긴다 - 플래그를 끌 때 workflow와 함께 정리된다.
+      isMock: workflow.isMock,
     });
     await this.audit.log(actor.knoxId, 'DELIVERABLE_CREATE', 'deliverable', d._id, { name: dto.name });
     return d;
@@ -128,26 +129,26 @@ export class DeliverablesService {
       throw new BadRequestException('A recipient department is required when a recipient contact is set.');
     }
 
-    if (dto.recvIpId) {
-      if (dto.recvIpId === d.ipId.toString()) {
-        throw new BadRequestException('A deliverable cannot list its own IP as the recipient IP.');
+    if (dto.recvWorkflowId) {
+      if (dto.recvWorkflowId === d.workflowId.toString()) {
+        throw new BadRequestException('A deliverable cannot list its own Workflow as the recipient Workflow.');
       }
-      const targetIp = await this.ipModel.findById(dto.recvIpId).exec();
-      if (!targetIp) throw new NotFoundException('Recipient IP not found.');
+      const targetIp = await this.workflowModel.findById(dto.recvWorkflowId).exec();
+      if (!targetIp) throw new NotFoundException('Recipient Workflow not found.');
       if (targetIp.projectId.toString() !== d.projectId.toString()) {
-        throw new BadRequestException('Recipient IP must belong to the same project.');
+        throw new BadRequestException('Recipient Workflow must belong to the same project.');
       }
     }
 
     d.recvDept = dto.recvDept ?? null;
     d.recvContact = dto.recvContact ?? null;
-    d.recvIpId = dto.recvIpId ? new Types.ObjectId(dto.recvIpId) : null;
+    d.recvWorkflowId = dto.recvWorkflowId ? new Types.ObjectId(dto.recvWorkflowId) : null;
     d.sourceDept = dto.sourceDept?.trim() || null;
     await d.save();
     await this.audit.log(actor.knoxId, 'RECV_UPDATE', 'deliverable', d._id, {
       recvDept: d.recvDept,
       recvContact: d.recvContact,
-      recvIpId: d.recvIpId,
+      recvWorkflowId: d.recvWorkflowId,
     });
     return d;
   }
@@ -209,24 +210,57 @@ export class DeliverablesService {
   }
 
   /**
-   * Release 일정(series) 갱신 (설계서 3.6). 선택된 phaseKeys에 맞춰 인스턴스를
+   * Release 일정(series) 갱신 (설계서 3.6). 선택된 phaseIds에 맞춰 인스턴스를
    * 생성/삭제하고, 최초 생성 시에만 회차 순서대로 auto edge를 연결한다.
+   * phaseId는 이 workflow가 자기 것으로 가진 phase여야 한다 — 과제 마일스톤이 아니다.
+   *
+   * ★ 원본(origin)의 phaseId가 요청 목록에 없으면 원본을 **첫 번째 phase로 옮긴다**.
+   *   이게 "일정을 잃은 산출물을 다시 배치하는" 유일한 경로다: 유실된 산출물은 원본의
+   *   phaseId가 사라진 phase를 가리키는 상태라, 원본을 그대로 두고 인스턴스만 만들면
+   *   원본은 영원히 유실로 남고 같은 이름의 산출물만 하나 더 생긴다(실측 확인).
+   *   좌표(layout)는 건드리지 않는다 — 옮긴 것은 일정이지 캔버스 위치가 아니다.
    */
-  async updateSchedule(originId: string, phaseKeys: string[], actor: Actor) {
+  async updateSchedule(
+    workflow: WorkflowDocument,
+    originId: string,
+    phaseIds: string[],
+    actor: Actor,
+  ) {
     const origin = await this.findOrThrow(originId);
+    const validPhaseIds = new Set((workflow.phases ?? []).map((p) => p.id));
+    // 유실된(=지금 목록에 없는) phase는 새 일정으로 고를 수 없다. 원본이 지금 유실
+    // 상태라면 그 phaseId는 그대로 두는 것만 허용한다 — 유실 표시를 유지한 채
+    // 다른 회차만 손볼 수 있어야 하기 때문이다.
+    for (const id of phaseIds) {
+      if (!validPhaseIds.has(id) && id !== origin.phaseId) {
+        throw new BadRequestException(`Unknown phase: ${id}`);
+      }
+    }
     if (origin.series) {
       throw new BadRequestException('The release schedule can only be set on the original deliverable, not a series instance.');
     }
 
+    // 요청 목록을 이 workflow의 일정 순서(시작일 오름차순)로 세운다 — 원본이 가져갈
+    // "첫 번째 phase"가 그 순서의 맨 앞이어야 회차 번호와 캔버스의 좌→우가 일치한다.
+    const order = new Map(sortSchedule(workflow.phases ?? []).map((p, i) => [p.id, i]));
+    const requested = Array.from(new Set(phaseIds)).sort(
+      (a, b) => (order.get(a) ?? Number.MAX_SAFE_INTEGER) - (order.get(b) ?? Number.MAX_SAFE_INTEGER),
+    );
+
+    if (requested.length && !requested.includes(origin.phaseId)) {
+      origin.phaseId = requested[0];
+      await origin.save();
+    }
+
     const existing = await this.model.find({ series: origin._id }).sort({ seriesIdx: 1 }).exec();
-    const existingByPhase = new Map(existing.map((e) => [e.phaseKey, e]));
-    // 원본(origin) 자신이 이미 자신의 phaseKey를 차지하고 있으므로, 그 Phase는
-    // series 인스턴스로 다시 만들면 안 된다 - 그렇지 않으면 원본과 같은 Phase에
+    const existingByPhase = new Map(existing.map((e) => [e.phaseId, e]));
+    // 원본(origin) 자신이 이미 자신의 phaseId를 차지하고 있으므로, 그 phase는
+    // series 인스턴스로 다시 만들면 안 된다 - 그렇지 않으면 원본과 같은 phase에
     // 중복 인스턴스가 생긴다(실측 확인된 버그).
-    const uniquePhaseKeys = Array.from(new Set(phaseKeys)).filter((k) => k !== origin.phaseKey);
+    const uniquePhaseKeys = requested.filter((k) => k !== origin.phaseId);
 
     // 선택 해제된 Phase의 인스턴스 삭제 + 관련 edge 정리
-    const toDelete = existing.filter((e) => !uniquePhaseKeys.includes(e.phaseKey));
+    const toDelete = existing.filter((e) => !uniquePhaseKeys.includes(e.phaseId));
     if (toDelete.length) {
       await this.edges.deleteByDeliverableIds(toDelete.map((e) => e._id));
       await this.model.deleteMany({ _id: { $in: toDelete.map((e) => e._id) } }).exec();
@@ -234,12 +268,12 @@ export class DeliverablesService {
 
     const wasEmpty = existing.length === toDelete.length; // 이번에 처음 회차가 생기는지
     const created: DeliverableDocument[] = [];
-    for (const phaseKey of uniquePhaseKeys) {
-      if (!existingByPhase.has(phaseKey)) {
+    for (const phaseId of uniquePhaseKeys) {
+      if (!existingByPhase.has(phaseId)) {
         const instance = await this.model.create({
           projectId: origin.projectId,
-          ipId: origin.ipId,
-          phaseKey,
+          workflowId: origin.workflowId,
+          phaseId,
           name: origin.name,
           docType: origin.docType,
           network: origin.network,
@@ -248,7 +282,7 @@ export class DeliverablesService {
           seriesTotal: uniquePhaseKeys.length,
           recvDept: origin.recvDept,
           recvContact: origin.recvContact,
-          recvIpId: origin.recvIpId,
+          recvWorkflowId: origin.recvWorkflowId,
           sourceDept: origin.sourceDept,
           layout: {
             x: origin.layout.x + 40,
@@ -281,7 +315,7 @@ export class DeliverablesService {
 
     if (wasEmpty && created.length > 0) {
       const chain = [origin._id, ...remaining.map((r) => r._id)];
-      await this.edges.createAutoChain(origin.ipId, chain, origin.isMock);
+      await this.edges.createAutoChain(origin.workflowId, chain, origin.isMock);
     }
 
     return this.model.find({ $or: [{ _id: origin._id }, { series: origin._id }] }).exec();
