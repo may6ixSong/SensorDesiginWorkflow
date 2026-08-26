@@ -5,7 +5,7 @@ import { Model } from 'mongoose';
 import { isUsingRealDb } from './model-registration';
 import { seedDatabase } from './seed-data';
 import { ProjectDocument } from '../projects/schemas/project.schema';
-import { IpDocument } from '../ips/schemas/ip.schema';
+import { WorkflowDocument } from '../workflows/schemas/workflow.schema';
 import { DeliverableDocument } from '../deliverables/schemas/deliverable.schema';
 import { MemoDocument } from '../memos/schemas/memo.schema';
 import { EdgeDocument } from '../edges/schemas/edge.schema';
@@ -34,7 +34,7 @@ export class SeedRunnerService implements OnModuleInit {
   constructor(
     private readonly config: ConfigService,
     @Inject(getModelToken('Project')) private readonly projectModel: Model<ProjectDocument>,
-    @Inject(getModelToken('Ip')) private readonly ipModel: Model<IpDocument>,
+    @Inject(getModelToken('Workflow')) private readonly workflowModel: Model<WorkflowDocument>,
     @Inject(getModelToken('Deliverable')) private readonly deliverableModel: Model<DeliverableDocument>,
     @Inject(getModelToken('Memo')) private readonly memoModel: Model<MemoDocument>,
     @Inject(getModelToken('Edge')) private readonly edgeModel: Model<EdgeDocument>,
@@ -45,7 +45,7 @@ export class SeedRunnerService implements OnModuleInit {
   private get mockModels(): Model<any>[] {
     return [
       this.projectModel,
-      this.ipModel,
+      this.workflowModel,
       this.deliverableModel,
       this.memoModel,
       this.edgeModel,
@@ -79,7 +79,7 @@ export class SeedRunnerService implements OnModuleInit {
     try {
       await seedDatabase({
         Project: this.projectModel,
-        Ip: this.ipModel,
+        Workflow: this.workflowModel,
         Deliverable: this.deliverableModel,
         Memo: this.memoModel,
         Edge: this.edgeModel,

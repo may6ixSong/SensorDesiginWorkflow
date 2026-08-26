@@ -2,7 +2,7 @@ import { Logger, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ProjectSchema } from '../projects/schemas/project.schema';
-import { IpSchema } from '../ips/schemas/ip.schema';
+import { WorkflowSchema } from '../workflows/schemas/workflow.schema';
 import { DeliverableSchema } from '../deliverables/schemas/deliverable.schema';
 import { MemoSchema } from '../memos/schemas/memo.schema';
 import { EdgeSchema } from '../edges/schemas/edge.schema';
@@ -14,7 +14,7 @@ const logger = new Logger('DatabaseModule');
 
 const ALL_MODELS: ModelDef[] = [
   { name: 'Project', schema: ProjectSchema },
-  { name: 'Ip', schema: IpSchema },
+  { name: 'Workflow', schema: WorkflowSchema },
   { name: 'Deliverable', schema: DeliverableSchema },
   { name: 'Memo', schema: MemoSchema },
   { name: 'Edge', schema: EdgeSchema },

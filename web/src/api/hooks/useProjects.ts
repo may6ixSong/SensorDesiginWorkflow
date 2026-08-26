@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient, ApiEnvelope } from '../client';
 import { queryKeys } from '../queryKeys';
-import { IpBriefDto, IpDto, PhaseRef, ProjectDetailDto, ProjectDto } from '@/types/domain';
+import { WorkflowBriefDto, WorkflowDto, Milestone, ProjectDetailDto, ProjectDto } from '@/types/domain';
 
 export function useProjects() {
   return useQuery({
@@ -13,7 +13,7 @@ export function useProjects() {
   });
 }
 
-/** Project Information 페이지용 상세(phases + 부서별 팀원 로스터). */
+/** Project Information 페이지용 상세(마일스톤 + 부서별 팀원 로스터). */
 export function useProject(projectId: string | undefined) {
   return useQuery({
     queryKey: queryKeys.project(projectId ?? ''),
@@ -25,7 +25,7 @@ export function useProject(projectId: string | undefined) {
   });
 }
 
-/** 과제 메타데이터(이름/코드/도메인/상태) 수정 — Phase는 읽기 전용이라 여기서 다루지 않는다. */
+/** 과제 메타데이터(이름/코드/도메인/상태) 수정 — 마일스톤은 useUpdateMilestones가 따로 다룬다. */
 export function useUpdateProject(projectId: string) {
   const qc = useQueryClient();
   return useMutation({
@@ -40,33 +40,43 @@ export function useUpdateProject(projectId: string) {
   });
 }
 
-/** 마일스톤 일정(label/start/end) 수정 — key/order는 이 API로 바꾸지 않는다. */
-export function useUpdatePhases(projectId: string) {
+/**
+ * 과제 공통 일정(마일스톤) 목록 교체 — 추가/삭제/개명/재일정 전부 가능하다. id를 비워
+ * 보내면 새 마일스톤이다.
+ *
+ * 이미 만들어진 workflow의 phase는 여기서 바꿔도 따라 바뀌지 않는다 — workflow는 생성
+ * 시점에 마일스톤을 "복사"해 자기 것으로 들고 있기 때문이다(사용자 선택: 완전 소유).
+ * 과제 일정에 다시 맞추고 싶으면 그 workflow에서 "Reset to project milestones"를 쓴다.
+ */
+export function useUpdateMilestones(projectId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (phases: { key: string; label: string; start: string; end: string }[]) => {
-      const res = await apiClient.patch<ApiEnvelope<ProjectDetailDto>>(`/projects/${projectId}/phases`, { phases });
+    mutationFn: async (milestones: { id?: string; name: string; start: string; end: string }[]) => {
+      const res = await apiClient.patch<ApiEnvelope<ProjectDetailDto>>(
+        `/projects/${projectId}/milestones`,
+        { milestones },
+      );
       return res.data.data;
     },
     onSuccess: (project) => {
       qc.setQueryData(queryKeys.project(projectId), project);
-      qc.invalidateQueries({ queryKey: queryKeys.projectPhases(projectId) });
+      qc.invalidateQueries({ queryKey: queryKeys.projectMilestones(projectId) });
       qc.invalidateQueries({ queryKey: queryKeys.projects });
     },
   });
 }
 
 /**
- * IP 도메인 후보 목록 교체 — 목록 전체를 보낸다(phases와 같은 방식).
- * 아직 IP가 붙어 있는 도메인을 빼고 보내면 BE가 400으로 거절하며 해당 IP 이름을 알려준다.
+ * workflow 도메인 후보 목록 교체 — 목록 전체를 보낸다(phases와 같은 방식).
+ * 아직 IP가 붙어 있는 도메인을 빼고 보내면 BE가 400으로 거절하며 해당 workflow 이름을 알려준다.
  */
-export function useUpdateIpDomains(projectId: string) {
+export function useUpdateWorkflowDomains(projectId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (ipDomains: string[]) => {
+    mutationFn: async (workflowDomains: string[]) => {
       const res = await apiClient.patch<ApiEnvelope<ProjectDetailDto>>(
-        `/projects/${projectId}/ip-domains`,
-        { ipDomains },
+        `/projects/${projectId}/workflow-domains`,
+        { workflowDomains },
       );
       return res.data.data;
     },
@@ -78,29 +88,29 @@ export function useUpdateIpDomains(projectId: string) {
 }
 
 /**
- * IP 하나를 이 과제의 도메인에 배정한다 (빈 문자열이면 배정 해제).
+ * workflow 하나를 이 과제의 도메인에 배정한다 (빈 문자열이면 배정 해제).
  * projectIps를 반드시 무효화해야 한다 — 그 목록이 Total workflow view의 buildDomainModel
  * 입력이라, 여기서 안 갱신하면 우주 지도의 항성계가 예전 도메인으로 남는다.
  */
-export function useUpdateIpDomain(projectId: string) {
+export function useUpdateWorkflowDomain(projectId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ ipId, domain }: { ipId: string; domain: string }) => {
+    mutationFn: async ({ workflowId, domain }: { workflowId: string; domain: string }) => {
       const res = await apiClient.patch<ApiEnvelope<ProjectDetailDto>>(
-        `/projects/${projectId}/ips/${ipId}/domain`,
+        `/projects/${projectId}/workflows/${workflowId}/domain`,
         { domain },
       );
-      return { project: res.data.data, ipId };
+      return { project: res.data.data, workflowId };
     },
-    onSuccess: ({ project, ipId }) => {
+    onSuccess: ({ project, workflowId }) => {
       qc.setQueryData(queryKeys.project(projectId), project);
-      qc.invalidateQueries({ queryKey: queryKeys.projectIps(projectId) });
-      qc.invalidateQueries({ queryKey: queryKeys.ip(ipId) });
+      qc.invalidateQueries({ queryKey: queryKeys.projectWorkflows(projectId) });
+      qc.invalidateQueries({ queryKey: queryKeys.workflow(workflowId) });
     },
   });
 }
 
-/** 과제 팀원(부서별 로스터) 추가 — 이 과제의 IP 중 하나라도 Edit 권한이 있어야 한다(BE 재검증). */
+/** 과제 팀원(부서별 로스터) 추가 — 이 과제의 workflow 중 하나라도 Edit 권한이 있어야 한다(BE 재검증). */
 export function useAddProjectMember(projectId: string) {
   const qc = useQueryClient();
   return useMutation({
@@ -123,40 +133,61 @@ export function useRemoveProjectMember(projectId: string) {
   });
 }
 
-/** 캔버스가 사용하는 조회용 Phase 목록 — 일정 수정은 useUpdatePhases 참고. */
-export function useProjectPhases(projectId: string | undefined) {
+/** 과제 공통 일정(마일스톤) 조회 — 수정은 useUpdateMilestones 참고. */
+export function useProjectMilestones(projectId: string | undefined) {
   return useQuery({
-    queryKey: queryKeys.projectPhases(projectId ?? ''),
+    queryKey: queryKeys.projectMilestones(projectId ?? ''),
     enabled: Boolean(projectId),
     queryFn: async () => {
-      const res = await apiClient.get<ApiEnvelope<PhaseRef[]>>(`/projects/${projectId}/phases`);
-      return res.data.data;
-    },
-  });
-}
-
-/** Edit 또는 View 권한이 있는 IP만 반환 (설계서 5.1). */
-export function useProjectIps(projectId: string | undefined) {
-  return useQuery({
-    queryKey: queryKeys.projectIps(projectId ?? ''),
-    enabled: Boolean(projectId),
-    queryFn: async () => {
-      const res = await apiClient.get<ApiEnvelope<IpDto[]>>(`/projects/${projectId}/ips`);
+      const res = await apiClient.get<ApiEnvelope<Milestone[]>>(`/projects/${projectId}/milestones`);
       return res.data.data;
     },
   });
 }
 
 /**
- * 과제 소속 IP 전체를 가볍게(id/name/color) 반환한다 — 개인 접근 권한과 무관하게
- * 산출물의 "수신 IP"를 지정하는 셀렉트 박스에서 쓴다.
+ * 도메인 아래에 workflow를 새로 만든다 — phase는 서버가 이 과제의 마일스톤을 복사해
+ * 채워 준다(사용자 요청: "default로는 과제의 milestone이 들어가고"). 만든 사람이 곧
+ * 대표 담당자가 되므로 바로 편집할 수 있다.
  */
-export function useProjectIpDirectory(projectId: string | undefined) {
+export function useCreateWorkflow(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: { name: string; domain: string; description?: string; color?: string }) => {
+      const res = await apiClient.post<ApiEnvelope<WorkflowDto>>(`/projects/${projectId}/workflows`, payload);
+      return res.data.data;
+    },
+    onSuccess: (workflow) => {
+      qc.setQueryData(queryKeys.workflow(workflow.id), workflow);
+      qc.invalidateQueries({ queryKey: queryKeys.projectWorkflows(projectId) });
+      qc.invalidateQueries({ queryKey: queryKeys.projectWorkflowDirectory(projectId) });
+      qc.invalidateQueries({ queryKey: queryKeys.project(projectId) });
+    },
+  });
+}
+
+/** Edit 또는 View 권한이 있는 workflow만 반환 (설계서 5.1). */
+export function useProjectWorkflows(projectId: string | undefined) {
   return useQuery({
-    queryKey: queryKeys.projectIpDirectory(projectId ?? ''),
+    queryKey: queryKeys.projectWorkflows(projectId ?? ''),
     enabled: Boolean(projectId),
     queryFn: async () => {
-      const res = await apiClient.get<ApiEnvelope<IpBriefDto[]>>(`/projects/${projectId}/ip-directory`);
+      const res = await apiClient.get<ApiEnvelope<WorkflowDto[]>>(`/projects/${projectId}/workflows`);
+      return res.data.data;
+    },
+  });
+}
+
+/**
+ * 과제 소속 workflow 전체를 가볍게(id/name/color) 반환한다 — 개인 접근 권한과 무관하게
+ * 산출물의 "수신 workflow"를 지정하는 셀렉트 박스에서 쓴다.
+ */
+export function useProjectWorkflowDirectory(projectId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.projectWorkflowDirectory(projectId ?? ''),
+    enabled: Boolean(projectId),
+    queryFn: async () => {
+      const res = await apiClient.get<ApiEnvelope<WorkflowBriefDto[]>>(`/projects/${projectId}/workflow-directory`);
       return res.data.data;
     },
   });

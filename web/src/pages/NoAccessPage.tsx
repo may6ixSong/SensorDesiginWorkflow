@@ -6,7 +6,7 @@ export function NoAccessPage() {
     <Stack alignItems="center" justifyContent="center" sx={{ height: '100vh' }} spacing={1}>
       <Typography variant="h6">No access</Typography>
       <Typography variant="body2" color="text.secondary">
-        You don't have Edit or View access to this IP. Ask an administrator for access.
+        You don't have Edit or View access to this workflow. Ask an administrator for access.
       </Typography>
     </Stack>
   );

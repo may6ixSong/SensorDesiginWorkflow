@@ -4,41 +4,46 @@ import { useNavigate } from 'react-router-dom';
 import { useQueries } from '@tanstack/react-query';
 import { apiClient, ApiEnvelope } from '@/api/client';
 import { queryKeys } from '@/api/queryKeys';
-import { DeliverableDto, DeliverablesListResponse, EdgeDto, IpDto, PhaseRef } from '@/types/domain';
+import { DeliverableDto, DeliverablesListResponse, EdgeDto, Milestone, WorkflowDto } from '@/types/domain';
 import { DocIcon, Icon } from '@/components/common/Icon';
 import { CURSOR_POINTER, FONT_MONO, T } from '@/theme/tokens';
 import { buildDomainModel, withAlpha, lighten, darken, DomainWorkflowModel, UNASSIGNED_DOMAIN } from '@/lib/domainWorkflow';
 import { useThemeMode } from '@/theme/ThemeModeContext';
 import {
-  buildWorldLayout, connectedDeliverables, BlockNode, IslandLayout, WorldLayout,
-  GUTTER_W, ISLAND_PAD, LABEL_W, PHASE_HEAD_H,
+  buildWorldLayout, connectedDeliverables, BlockNode, DomainZoneLayout, WorldLayout,
+  BLOCK_LABEL_W, DOMAIN_HEAD_H, LABEL_W, UNSCHEDULED_W,
 } from '@/lib/designWorkflowLayout';
 import { SpaceBackdrop, SpacePalette, useSpacePalette } from './spaceBackdrop';
 
 /* ──────────────────────────────────────────────────────────────────────────
- * Design Workflow — 과제 전체를 하나의 우주로 펼쳐 보는 뷰(초안 우주 뷰의 재현).
+ * Design Workflow — 과제 전체를 하나의 3D 우주로 펼쳐 보는 뷰.
  *
- * 중요한 원칙: 아무것도 가두지 않는다. Domain도, Phase도 사각형 판/카드/테두리로
- * 감싸지 않는다 — 하나의 연속된 우주 공간 안에서 도메인끼리는 아주 옅은 대시 선
- * (가로 threshold) 하나로만 구분되고, 그 안의 Phase끼리도 아주 옅은 대시 선(세로)
- * 으로만 구분된다. 이 선들은 "그 너머에 다른 영역이 있다"는 표시일 뿐 무언가를
- * 감싸는 프레임이 아니다 — 그래서 도메인 영역의 왼쪽·오른쪽·아래는 아예 선이 없다.
+ * 축의 의미가 고정돼 있다(사용자 요청):
+ *   x = 시간(날짜). 산출물은 자기 phase의 종료일 위치에 놓인다. 도메인이 달라도,
+ *       workflow마다 일정이 달라도 같은 날짜면 같은 x다.
+ *   y = workflow 한 줄. 도메인끼리는 큰 간격으로 떨어진다.
+ *   z = 자유. 깊이는 결정적 해시로 흩뿌리며 아무 데이터도 뜻하지 않는다 — 산출물이
+ *       표의 셀이 아니라 "우주에 떠 있는 행성"으로 보이게 하는 축이다.
  *
- *   Domain  = 우주의 한 구역. 성운(흐린 색 구름)으로 영역감만 주고, 시작점에 옅은
- *             가로 대시 라인 + 라벨이 뜬다(박스 없음).
- *   IP      = 그 구역 안에서 이름이 떠 있는 한 줄. 라벨도 박스 없이 점 + 텍스트.
- *   산출물   = 실제 광원이 있는 3D 구체(sphere) — 카드가 아니다. lighten→base→darken
- *             그라디언트 음영 + 발광 + bob 애니메이션.
- *   흐름     = 같은 도메인 안의 IP↔IP 산출물 핸드오프만 곡선으로.
+ * 중요한 원칙: 아무것도 가두지 않는다. 도메인도, 마일스톤도 사각형 판/카드/테두리로
+ * 감싸지 않는다 — 도메인은 옅은 가로 대시 문턱 하나로만 구분되고, 과제 마일스톤은
+ * x축 전체를 세로로 가로지르는 아주 옅은 밴드로만 깔린다.
  *
- * 조작은 IP 캔버스와 동일하다 — 휠=줌(커서 기준), 드래그=시점 이동. 스크롤바는 없다.
- * 좌측 메뉴에서 도메인을 고르면 카메라가 그 구역까지 부드럽게 날아간다.
+ * 3D는 CSS perspective로 만든다: 뷰포트에 perspective를, 카메라 레이어에
+ * transform-style: preserve-3d를 걸고 각 산출물이 translate3d(x, y, z)로 놓인다.
+ * ★ 그래서 중간 래퍼에 opacity/filter를 걸면 안 된다 — 그 순간 3D가 평면으로 눌린다.
+ *   흐림 처리는 전부 잎(leaf) 요소에 직접 준다.
+ *
+ * 조작은 workflow 캔버스와 동일하다 — 휠=줌(커서 기준), 드래그=시점 이동. 좌측
+ * 메뉴에서 도메인을 고르면 카메라가 그 구역까지 부드럽게 날아간다.
  * ────────────────────────────────────────────────────────────────────────── */
 
 const NAV_W = 224;
 const TOPBAR_H = 60;
-const Z_MIN = 0.09;
+const Z_MIN = 0.08;
 const Z_MAX = 1.9;
+/** CSS perspective 거리(px) — 클수록 원근이 약해진다. */
+const PERSPECTIVE = 1600;
 
 const STATUS_COLOR = {
   released: T.tl,
@@ -47,13 +52,11 @@ const STATUS_COLOR = {
 } as const;
 
 /**
- * 산출물 블록을 실제 3D 구체(sphere)로 음영 처리하려면 lighten()/darken()에 넘길
- * "진짜 hex"가 필요하다 — T.tl 등은 CSS 변수 문자열이라 색상 연산이 안 된다
- * (index.html의 :root / [data-theme='dark'] 값이 출발점이다).
+ * 산출물 구체를 음영 처리하려면 lighten()/darken()에 넘길 "진짜 hex"가 필요하다 —
+ * T.tl 등은 CSS 변수 문자열이라 색상 연산이 안 된다.
  *
  * 다크 테마의 released/inProgress는 앱 전역 토큰(형광 teal·amber) 그대로 쓰면 구체
- * 특유의 하이라이트+발광이 겹쳐 눈이 부시다 — 이 화면 전용으로만 살짝 눌러 쓴다
- * (darken()은 domainWorkflow.ts, 이미 hex 연산 유틸이 있어 재사용).
+ * 특유의 하이라이트+발광이 겹쳐 눈이 부시다 — 이 화면 전용으로만 살짝 눌러 쓴다.
  */
 const STATUS_HEX: Record<'light' | 'dark', Record<'released' | 'inProgress' | 'notSubmitted', string>> = {
   light: { released: '#0c9a83', inProgress: '#ac6f08', notSubmitted: '#8b99ab' },
@@ -63,6 +66,8 @@ const STATUS_HEX: Record<'light' | 'dark', Record<'released' | 'inProgress' | 'n
     notSubmitted: darken('#6b7891', 0.1),
   },
 };
+/** 일정을 잃은 산출물의 색 — 상태와 무관하게 이 색으로 덮어써서 즉시 눈에 띄게 한다. */
+const ORPHAN_HEX = { light: '#c8352c', dark: '#c9564e' };
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
@@ -79,10 +84,11 @@ interface Props {
   projectId: string;
   projectName: string;
   projectCode: string;
-  phases: PhaseRef[];
-  ips: IpDto[];
-  /** 과제에 등록된 도메인 목록 — IP가 아직 배정되지 않은 도메인도 빈 판으로 그린다. */
-  ipDomains: string[];
+  /** 과제 공통 일정 — x축 배경 밴드이자 날짜축 범위의 일부다. */
+  milestones: Milestone[];
+  workflows: WorkflowDto[];
+  /** 과제에 등록된 도메인 목록 — 도메인 모델을 만들 때 빈 도메인도 알아보기 위해 쓴다. */
+  workflowDomains: string[];
 }
 
 export function DesignWorkflowDialog(props: Props) {
@@ -109,115 +115,111 @@ export function DesignWorkflowDialog(props: Props) {
 /* ══════════════════════════════════════════════════════════════ Stage ═══ */
 
 function WorkflowStage({
-  onClose, projectId, projectName, projectCode, phases, ips, ipDomains,
+  onClose, projectId, projectName, projectCode, milestones, workflows, workflowDomains,
 }: Props) {
   const navigate = useNavigate();
   const pal = useSpacePalette();
   const { mode } = useThemeMode();
   const statusHex = STATUS_HEX[mode];
+  const orphanHex = ORPHAN_HEX[mode];
   const vpRef = useRef<HTMLDivElement | null>(null);
   const [size, setSize] = useState({ w: 1200, h: 800 });
   const [cam, setCam] = useState<Camera>({ x: 0, y: 0, z: 0.4 });
   const camRef = useRef(cam);
   camRef.current = cam;
-  /** 좌측 메뉴 강조용 — 카메라가 어느 판 위에 있는지(근접도)로 자동 갱신된다. */
+  /** 좌측 메뉴 강조용 — 카메라가 어느 구역 위에 있는지(근접도)로 자동 갱신된다. */
   const [activeDomain, setActiveDomain] = useState<string | null>(null);
   /**
-   * 다른 판을 흐리게 할지 — 메뉴에서 "명시적으로 고른" 경우에만 켠다.
-   * 근접도(activeDomain)로 흐리게 하면 전체 보기에서도 가운데 판만 남고 나머지가
+   * 다른 구역을 흐리게 할지 — 메뉴에서 "명시적으로 고른" 경우에만 켠다.
+   * 근접도(activeDomain)로 흐리게 하면 전체 보기에서도 가운데 구역만 남고 나머지가
    * 흐려져 버린다(전체를 보라고 만든 화면인데 정작 전체가 안 보인다).
    */
   const [focusedDomain, setFocusedDomain] = useState<string | null>(null);
-  /** 클릭한 산출물 — 같은 IP 안에서 flow로 연결된 것들만 하이라이트한다. */
+  /** 클릭한 산출물 — 같은 workflow 안에서 flow로 연결된 것들만 하이라이트한다. */
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const fittedRef = useRef(false);
 
-  const sortedPhases = useMemo(() => [...phases].sort((a, b) => a.order - b.order), [phases]);
-
-  /* 모든 IP의 산출물 — 캐시 키가 IP 보드와 같아 이미 열어본 IP는 즉시 뜬다. */
+  /* 모든 workflow의 산출물 — 캐시 키가 보드와 같아 이미 열어본 workflow는 즉시 뜬다. */
   const results = useQueries({
-    queries: ips.map((ip) => ({
-      queryKey: queryKeys.deliverables(ip.id),
+    queries: workflows.map((w) => ({
+      queryKey: queryKeys.deliverables(w.id),
       staleTime: 15_000,
       queryFn: async () => {
-        const res = await apiClient.get<DeliverablesListResponse>(`/ips/${ip.id}/deliverables`);
+        const res = await apiClient.get<DeliverablesListResponse>(`/workflows/${w.id}/deliverables`);
         return res.data;
       },
     })),
   });
   const sig = results.map((r) => `${r.status}:${r.dataUpdatedAt}`).join('|');
-  const { byIp, loading } = useMemo(() => {
+  const { byWorkflow, loading } = useMemo(() => {
     const m = new Map<string, DeliverableDto[]>();
     let anyLoading = false;
-    ips.forEach((ip, i) => {
+    workflows.forEach((w, i) => {
       const data = results[i]?.data;
-      m.set(ip.id, data?.data ?? []);
+      m.set(w.id, data?.data ?? []);
       if (!data) anyLoading = true;
     });
-    return { byIp: m, loading: anyLoading };
+    return { byWorkflow: m, loading: anyLoading };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ips, sig]);
+  }, [workflows, sig]);
 
-  /* 같은 IP 안의 산출물↔산출물 flow(EdgeDto) — IP 캔버스와 같은 쿼리 키를 써서
-     캐시를 공유한다. IP를 벗어나는 연결은 다루지 않는다(요청) — 그래서 flow가
-     아니라 이 IP 하나로 스코프가 끝나는 "와이어"만 있으면 된다. */
+  /* 같은 workflow 안의 산출물↔산출물 flow(EdgeDto) — 보드와 같은 쿼리 키를 써서 캐시를 공유한다. */
   const edgeResults = useQueries({
-    queries: ips.map((ip) => ({
-      queryKey: queryKeys.edges(ip.id),
+    queries: workflows.map((w) => ({
+      queryKey: queryKeys.edges(w.id),
       staleTime: 15_000,
       queryFn: async () => {
-        const res = await apiClient.get<ApiEnvelope<EdgeDto[]>>(`/ips/${ip.id}/edges`);
+        const res = await apiClient.get<ApiEnvelope<EdgeDto[]>>(`/workflows/${w.id}/edges`);
         return res.data.data;
       },
     })),
   });
   const edgeSig = edgeResults.map((r) => `${r.status}:${r.dataUpdatedAt}`).join('|');
-  const edgesByIp = useMemo(() => {
+  const edgesByWorkflow = useMemo(() => {
     const m = new Map<string, EdgeDto[]>();
-    ips.forEach((ip, i) => m.set(ip.id, edgeResults[i]?.data ?? []));
+    workflows.forEach((w, i) => m.set(w.id, edgeResults[i]?.data ?? []));
     return m;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ips, edgeSig]);
+  }, [workflows, edgeSig]);
 
-  /** 산출물 id → 그걸 소유한 IP id — 클릭한 산출물이 어느 IP의 edge 그래프를
-   * 타야 하는지 찾는 용도. */
-  const deliverableIpMap = useMemo(() => {
+  /** 산출물 id → 소유 workflow id — 클릭한 산출물이 어느 edge 그래프를 타야 하는지 찾는 용도. */
+  const deliverableOwner = useMemo(() => {
     const m = new Map<string, string>();
-    byIp.forEach((items, ipId) => items.forEach((d) => m.set(d.id, ipId)));
+    byWorkflow.forEach((items, wid) => items.forEach((d) => m.set(d.id, wid)));
     return m;
-  }, [byIp]);
+  }, [byWorkflow]);
 
-  const domainSig = ipDomains.join('|');
+  const domainSig = workflowDomains.join('|');
   const model: DomainWorkflowModel = useMemo(
-    () => buildDomainModel(ips, byIp, ipDomains),
+    () => buildDomainModel(workflows, byWorkflow, workflowDomains),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [ips, byIp, domainSig],
+    [workflows, byWorkflow, domainSig],
   );
-  /** IP가 하나도 없는 도메인은 이 화면에서 아예 존재하지 않는 것처럼 — 영역도,
-   * 문턱 선도, 좌측 메뉴 항목도 만들지 않는다(요청). */
+  /** workflow가 하나도 없는 도메인은 이 화면에서 아예 존재하지 않는 것처럼 다룬다. */
   const nonEmptyDomains = useMemo(
-    () => model.domains.filter((d) => d.ips.length > 0),
+    () => model.domains.filter((d) => d.workflows.length > 0),
     [model.domains],
   );
   const world: WorldLayout = useMemo(
-    () => buildWorldLayout(nonEmptyDomains, sortedPhases, byIp, edgesByIp),
-    [nonEmptyDomains, sortedPhases, byIp, edgesByIp],
+    () => buildWorldLayout(nonEmptyDomains, milestones, byWorkflow, edgesByWorkflow),
+    [nonEmptyDomains, milestones, byWorkflow, edgesByWorkflow],
   );
   const totalWires = useMemo(
-    () => world.islands.reduce((n, i) => n + i.wires.length, 0),
+    () => world.zones.reduce((n, z) => n + z.wires.length, 0),
+    [world],
+  );
+  const totalOrphans = useMemo(
+    () => world.zones.reduce((n, z) => n + z.rows.reduce((k, r) => k + r.orphans, 0), 0),
     [world],
   );
 
-  const hlOwnerIpId = selectedId ? deliverableIpMap.get(selectedId) ?? null : null;
+  const hlOwner = selectedId ? deliverableOwner.get(selectedId) ?? null : null;
   const hlSet = useMemo(() => {
-    if (!selectedId || !hlOwnerIpId) return null;
-    return connectedDeliverables(selectedId, edgesByIp.get(hlOwnerIpId) ?? []);
-  }, [selectedId, hlOwnerIpId, edgesByIp]);
+    if (!selectedId || !hlOwner) return null;
+    return connectedDeliverables(selectedId, edgesByWorkflow.get(hlOwner) ?? []);
+  }, [selectedId, hlOwner, edgesByWorkflow]);
 
-  /** 클릭한 산출물과 같은 컴포넌트가 아니면 사라지는 게 아니라 흐려진다 — IP
-   * 캔버스에서 블록을 클릭했을 때와 같은 규칙(설계서 3.9의 connectedSet). 다시
-   * 클릭하면 해제, 배경(빈 우주)을 클릭해도 해제된다. */
   const onSelectBlock = useCallback((id: string) => {
     setSelectedId((cur) => (cur === id ? null : id));
   }, []);
@@ -234,13 +236,13 @@ function WorkflowStage({
     return () => ro.disconnect();
   }, []);
 
-  /* ── 카메라 비행 ── */
+  /* ── 카메라 비행 — 좌측 메뉴에서 도메인을 고를 때의 "부드러운 이동"이 여기다. ── */
   const flightRef = useRef<number | null>(null);
   const flyTo = useCallback((target: Camera, ms?: number) => {
     if (flightRef.current !== null) cancelAnimationFrame(flightRef.current);
     const from = camRef.current;
     const dist = Math.hypot(target.x - from.x, target.y - from.y);
-    // 멀수록 오래 — "판과 판 사이를 가로질러 간다"는 느낌이 나게.
+    // 멀수록 오래 — "구역과 구역 사이를 가로질러 간다"는 느낌이 나게.
     const dur = ms ?? clamp(520 + dist * 0.28, 520, 1500);
     const t0 = performance.now();
     const tick = (now: number) => {
@@ -266,9 +268,9 @@ function WorkflowStage({
     [size.w, size.h],
   );
 
-  /* 처음 열렸을 때(그리고 데이터가 들어와 판 크기가 확정될 때) 전체를 한 화면에. */
+  /* 처음 열렸을 때(그리고 데이터가 들어와 크기가 확정될 때) 전체를 한 화면에. */
   useEffect(() => {
-    if (fittedRef.current || !world.islands.length) return;
+    if (fittedRef.current || !world.zones.length) return;
     if (size.w <= 240) return;
     fittedRef.current = true;
     setCam(frameRect(world.bounds, 1.16));
@@ -279,10 +281,10 @@ function WorkflowStage({
     flyTo(frameRect(world.bounds, 1.16));
   }, [flyTo, frameRect, world.bounds]);
 
-  const focusIsland = useCallback((island: IslandLayout) => {
-    setFocusedDomain(island.key);
-    flyTo(frameRect({ x: island.x, y: island.y, w: island.w, h: island.h }, 1.1));
-  }, [flyTo, frameRect]);
+  const focusZone = useCallback((zone: DomainZoneLayout) => {
+    setFocusedDomain(zone.key);
+    flyTo(frameRect({ x: world.bounds.x, y: zone.y, w: world.bounds.w, h: zone.h }, 1.08));
+  }, [flyTo, frameRect, world.bounds]);
 
   const zoomBy = useCallback((factor: number) => {
     const c = camRef.current;
@@ -351,35 +353,34 @@ function WorkflowStage({
   }, [dragging]);
 
   /** 드래그 끝에 딸려 오는 click은 선택으로 치지 않는다. */
-  const openIp = useCallback((ipId: string) => {
+  const openWorkflow = useCallback((id: string) => {
     if (movedRef.current) return;
     onClose();
-    navigate(`/details/${projectId}/${ipId}`);
+    navigate(`/details/${projectId}/${id}`);
   }, [navigate, onClose, projectId]);
 
-  /** 배경(빈 우주) 클릭 → 하이라이트 해제. 구체 클릭은 자기 핸들러에서
-   * stopPropagation하므로 여기까지 안 올라온다. */
   const onViewportClick = useCallback(() => {
     if (movedRef.current) return;
     setSelectedId(null);
   }, []);
 
-  /* 카메라가 어느 판 위에 있는지 → 좌측 메뉴 강조(스크롤스파이 대응물). */
+  /* 카메라가 어느 구역 위에 있는지 → 좌측 메뉴 강조. */
   useEffect(() => {
-    if (!world.islands.length) return;
+    if (!world.zones.length) return;
     const midY = (size.h / 2 - cam.y) / cam.z;
     let best: string | null = null;
     let bestDist = Infinity;
-    world.islands.forEach((i) => {
-      const c = i.y + i.h / 2;
+    world.zones.forEach((z) => {
+      const c = z.y + z.h / 2;
       const d = Math.abs(c - midY);
-      if (d < bestDist) { bestDist = d; best = i.key; }
+      if (d < bestDist) { bestDist = d; best = z.key; }
     });
     setActiveDomain(best);
-  }, [cam, world.islands, size.h]);
+  }, [cam, world.zones, size.h]);
 
   /** 줌이 낮으면 블록 글자가 어차피 안 읽히므로 접는다(LOD). */
   const detail = cam.z > 0.34;
+  const worldBottom = world.bounds.y + world.bounds.h;
 
   return (
     <Box sx={{ position: 'relative', width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -387,8 +388,9 @@ function WorkflowStage({
         projectName={projectName}
         projectCode={projectCode}
         model={model}
-        domainCount={world.islands.length}
+        domainCount={world.zones.length}
         totalWires={totalWires}
+        totalOrphans={totalOrphans}
         loading={loading}
         zoom={cam.z}
         pal={pal}
@@ -400,14 +402,14 @@ function WorkflowStage({
 
       <Box sx={{ flex: 1, display: 'flex', minHeight: 0 }}>
         <DomainNav
-          islands={world.islands}
+          zones={world.zones}
           active={activeDomain}
           pal={pal}
-          onPick={focusIsland}
+          onPick={focusZone}
           onAll={fitAll}
         />
 
-        {/* ── 뷰포트: 스크롤 없음, 카메라만 ── */}
+        {/* ── 뷰포트: 스크롤 없음, 카메라만. perspective가 여기 걸린다. ── */}
         <Box
           ref={vpRef}
           onPointerDown={onPointerDown}
@@ -415,40 +417,46 @@ function WorkflowStage({
           sx={{
             position: 'relative', flex: 1, overflow: 'hidden', touchAction: 'none',
             cursor: dragging ? 'grabbing' : 'grab',
+            perspective: `${PERSPECTIVE}px`,
+            perspectiveOrigin: '50% 50%',
           }}
         >
           <SpaceBackdrop camX={cam.x} camY={cam.y} camZ={cam.z} />
 
+          {/* 카메라 레이어 — 여기부터 아래로는 opacity/filter를 걸면 3D가 평면으로 눌린다. */}
           <Box
-            sx={{ position: 'absolute', inset: 0, transformOrigin: '0 0', willChange: 'transform' }}
+            sx={{ position: 'absolute', inset: 0, transformOrigin: '0 0', willChange: 'transform', transformStyle: 'preserve-3d' }}
             style={{ transform: `translate3d(${cam.x}px, ${cam.y}px, 0) scale(${cam.z})` }}
           >
-            {world.islands.map((island, idx) => {
-              const isOwnerZone = hlSet ? island.rows.some((r) => r.ip.id === hlOwnerIpId) : false;
-              const zoneOpacity = hlSet
+            <TimeAxis world={world} top={world.bounds.y} bottom={worldBottom} detail={detail} />
+
+            {world.zones.map((zone) => {
+              const isOwnerZone = hlSet ? zone.rows.some((r) => r.workflow.id === hlOwner) : false;
+              const dim = hlSet
                 ? (isOwnerZone ? 1 : 0.16)
-                : (Boolean(focusedDomain) && focusedDomain !== island.key ? 0.36 : 1);
+                : (Boolean(focusedDomain) && focusedDomain !== zone.key ? 0.36 : 1);
               return (
                 <DomainZone
-                  key={island.key}
-                  island={island}
+                  key={zone.key}
+                  zone={zone}
+                  world={world}
                   statusHex={statusHex}
+                  orphanHex={orphanHex}
                   detail={detail}
-                  opacity={zoneOpacity}
+                  dim={dim}
                   hlSet={hlSet}
-                  hlOwnerIpId={hlOwnerIpId}
-                  isLast={idx === world.islands.length - 1}
-                  onOpenIp={openIp}
+                  hlOwner={hlOwner}
+                  onOpenWorkflow={openWorkflow}
                   onSelectBlock={onSelectBlock}
                 />
               );
             })}
           </Box>
 
-          {!world.islands.length && (
+          {!world.zones.length && (
             <Box sx={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', pointerEvents: 'none' }}>
               <Box sx={{ textAlign: 'center', color: T.dm2, fontSize: 13 }}>
-                이 과제에서 볼 수 있는 IP가 없습니다.
+                이 과제에서 볼 수 있는 workflow가 없습니다.
               </Box>
             </Box>
           )}
@@ -460,139 +468,173 @@ function WorkflowStage({
   );
 }
 
-/* ══════════════════════════════════════════════════════════ DomainZone ═══ */
-
-const HAIR_DOMAIN = 0.34;
-const HAIR_PHASE = 0.16;
+/* ══════════════════════════════════════════════════════════════ TimeAxis ═══ */
 
 /**
- * 도메인 하나의 영역. 판도, 카드도, 테두리도 없다 — 시작점에 아주 옅은 가로 대시
- * 라인 + 라벨만 띄운다. 그 안의 Phase 구분도 옅은 세로 대시 라인뿐이다. 모든
- * 라벨은 박스 없이 점 + 텍스트로 떠 있고, 별이 흐린 뒤에서도 읽히도록 텍스트
- * 자체에 halo(text-shadow)를 건다. (배경에 도메인별 색 성운은 두지 않는다 —
- * 도메인 구분이 배경색으로 이뤄질 필요는 없다는 판단, 대시 선/라벨로 충분하다.)
- *
- * hlSet이 있으면(산출물을 클릭한 상태) 이 도메인이 그 산출물의 IP를 담고 있지
- * 않은 이상 전체가 흐려지고, 담고 있어도 flow로 연결 안 된 IP 행/산출물은
- * 각자 한 단계씩 더 흐려진다 — IP 캔버스에서 블록을 클릭했을 때와 같은 규칙.
+ * 시간축 배경 — 월드 전체를 세로로 가로지른다.
+ *   · 과제 마일스톤 = 아주 옅은 세로 밴드 + 위쪽 라벨. 도메인/workflow와 무관하게
+ *     화면 전체에 걸리는 배경이며, 무언가를 감싸는 프레임이 아니다.
+ *   · 월 눈금과 TODAY 선.
+ *   · 왼쪽 바깥의 "일정 없음" 구역 표시 — 유실된 산출물이 모이는 자리다.
+ * 전부 z=0 평면에 있다.
  */
-function DomainZone({
-  island, statusHex, detail, opacity, hlSet, hlOwnerIpId, isLast, onOpenIp, onSelectBlock,
+function TimeAxis({
+  world, top, bottom, detail,
 }: {
-  island: IslandLayout; statusHex: Record<'released' | 'inProgress' | 'notSubmitted', string>;
-  detail: boolean; opacity: number; hlSet: Set<string> | null; hlOwnerIpId: string | null;
-  isLast: boolean; onOpenIp: (ipId: string) => void; onSelectBlock: (id: string) => void;
+  world: WorldLayout; top: number; bottom: number; detail: boolean;
 }) {
-  const label = island.key === UNASSIGNED_DOMAIN ? 'Unassigned' : island.label;
-  const gridW = LABEL_W + GUTTER_W + island.cols.length * (island.cols[0]?.w ?? 0);
-  const lineW = gridW + ISLAND_PAD * 1.4;
-  const bodyH = island.contentY + Math.max(1, island.rows.length) * island.rowH;
-  const hlColor = hlOwnerIpId ? (island.rows.find((r) => r.ip.id === hlOwnerIpId)?.ip.color ?? T.tl) : null;
-
+  const h = bottom - top;
   return (
-    <Box
-      style={{ left: island.x, top: island.y, width: island.w, height: island.h }}
-      sx={{ position: 'absolute', opacity, transition: 'opacity .45s' }}
-    >
-      {/* 상단 threshold — 가로 대시 한 줄. 왼쪽·오른쪽·아래에는 선이 없다: 이건
-          프레임이 아니라 "여기서부터 이 도메인"이라는 문턱 하나일 뿐이다. */}
-      <Box
-        style={{ left: 0, top: ISLAND_PAD, width: lineW }}
-        sx={{ position: 'absolute', height: 0, borderTop: `1px dashed ${withAlpha(island.color, HAIR_DOMAIN)}`, pointerEvents: 'none' }}
-      />
-      <Box style={{ left: ISLAND_PAD, top: ISLAND_PAD - 22 }} sx={{ position: 'absolute', display: 'flex', alignItems: 'baseline', gap: '13px' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <Box sx={{ width: 10, height: 10, borderRadius: '50%', background: island.color, boxShadow: `0 0 12px ${withAlpha(island.color, 0.85)}` }} />
-          <Halo sx={{ fontFamily: FONT_MONO, fontSize: 24, fontWeight: 700, letterSpacing: '.12em', color: T.tx }}>
-            {label}
-          </Halo>
-        </Box>
-        <Halo sx={{ fontSize: 12.5, color: T.dm2, fontFamily: FONT_MONO }}>
-          {island.rows.length} IP · {island.released}/{island.total} released
-        </Halo>
-      </Box>
-
-      {/* ── Phase 문턱: 세로 대시 라인 + 떠 있는 라벨. 지금 Phase만 은은한
-          실선 + 발광으로 살짝 도드라지게 — 그것도 채워진 배경이 아니라 선이다. */}
-      {island.cols.map((c) => {
-        const cur = c.state === 'current';
+    <Box sx={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+      {world.bands.map((b) => {
+        const cur = b.state === 'current';
         return (
-          <Box key={c.phase.key}>
+          <Box key={b.id}>
             <Box
-              style={{ left: c.x, top: island.contentY - PHASE_HEAD_H, height: PHASE_HEAD_H + island.rows.length * island.rowH }}
+              style={{ left: b.x, top, width: b.w, height: h }}
               sx={{
-                position: 'absolute', width: 0, pointerEvents: 'none',
-                borderLeft: cur
-                  ? `1.5px solid ${withAlpha(island.color, 0.55)}`
-                  : `1px dashed ${withAlpha(island.color, HAIR_PHASE)}`,
-                boxShadow: cur ? `0 0 10px ${withAlpha(island.color, 0.4)}` : 'none',
+                position: 'absolute',
+                background: cur ? withAlpha('#2ee6c5', 0.05) : withAlpha('#8b99ab', 0.028),
+                borderLeft: `1px ${cur ? 'solid' : 'dashed'} ${withAlpha(cur ? '#2ee6c5' : '#8b99ab', cur ? 0.4 : 0.18)}`,
               }}
             />
             <Halo
-              style={{ left: c.x + 10, top: island.contentY - PHASE_HEAD_H + 6 }}
-              sx={{ position: 'absolute', width: c.w - 16 }}
+              style={{ left: b.x + 8, top: top + 10 }}
+              sx={{
+                position: 'absolute', display: 'flex', alignItems: 'center', gap: '6px',
+                fontFamily: FONT_MONO, fontSize: 15, fontWeight: 700, letterSpacing: '.08em',
+                color: cur ? T.tl : T.dm, whiteSpace: 'nowrap',
+              }}
             >
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Box sx={{ fontFamily: FONT_MONO, fontSize: 13, fontWeight: 700, color: cur ? T.tl : c.state === 'past' ? T.dm : T.tx }}>
-                  {c.phase.key}
+              {b.name}
+              {cur && (
+                <Box
+                  component="span"
+                  sx={{
+                    fontSize: 9, fontFamily: FONT_MONO, color: '#fff', background: T.tl,
+                    borderRadius: '999px', padding: '1px 6px', fontWeight: 700,
+                  }}
+                >
+                  NOW
                 </Box>
-                {cur && (
-                  <Box
-                    component="span"
-                    sx={{
-                      fontSize: 8, fontFamily: FONT_MONO, color: '#fff', background: T.tl,
-                      borderRadius: '999px', padding: '1px 6px', fontWeight: 700,
-                    }}
-                  >
-                    NOW
-                  </Box>
-                )}
-              </Box>
-              <Box sx={{ fontSize: 10, color: T.dm2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {c.phase.label}
-              </Box>
+              )}
             </Halo>
           </Box>
         );
       })}
 
-      {/* ── 와이어: 같은 IP 안의 산출물↔산출물 flow만 — 아주 얇은 곡선으로 이어져
-          있다는 느낌만 준다. IP 행(구체)보다 먼저 그려서 구체가 그 위를 덮게
-          한다 — 그래야 선이 산출물을 뚫고 지나가는 게 아니라 산출물 뒤로
-          숨었다 나오는 것처럼 보인다. 직선 대신 완만한 S자 곡선(적분 기호
-          느낌)을 쓰는 것도 같은 이유: 같은 칸에 세로로 쌓인 산출물 사이를
-          이어도 그 사이에 낀 다른 산출물을 그대로 관통하지 않고 옆으로 비켜
-          간다. 클릭해서 고른 것과 양끝이 다 걸리는 와이어만 밝게 + 흐르는
-          점선으로 살아난다(IP 캔버스의 flowdash와 같은 애니메이션). ── */}
-      {island.wires.length > 0 && (
+      {detail && world.ticks.map((t) => (
+        <Halo
+          key={t.label}
+          style={{ left: t.x + 4, top: bottom + 12 }}
+          sx={{ position: 'absolute', fontFamily: FONT_MONO, fontSize: 12, color: T.dm2, whiteSpace: 'nowrap' }}
+        >
+          {t.label}
+        </Halo>
+      ))}
+
+      {world.todayX !== null && (
+        <>
+          <Box
+            style={{ left: world.todayX, top, height: h }}
+            sx={{ position: 'absolute', width: '2px', background: withAlpha('#ff6b62', 0.5) }}
+          />
+          <Halo
+            style={{ left: world.todayX + 7, top: top + 34 }}
+            sx={{ position: 'absolute', fontFamily: FONT_MONO, fontSize: 12, fontWeight: 700, color: T.rd, whiteSpace: 'nowrap' }}
+          >
+            TODAY
+          </Halo>
+        </>
+      )}
+
+      {/* "일정 없음" 구역 — 날짜축 바깥이라는 사실 자체가 표시다. */}
+      <Box
+        style={{ left: LABEL_W, top, width: UNSCHEDULED_W, height: h }}
+        sx={{
+          position: 'absolute',
+          background: `repeating-linear-gradient(135deg, ${withAlpha('#c8352c', 0.05)} 0 10px, transparent 10px 20px)`,
+          borderRight: `1px dashed ${withAlpha('#c8352c', 0.35)}`,
+        }}
+      />
+      <Halo
+        style={{ left: LABEL_W + 10, top: top + 10 }}
+        sx={{
+          position: 'absolute', fontFamily: FONT_MONO, fontSize: 12, fontWeight: 700,
+          letterSpacing: '.08em', color: T.rd, whiteSpace: 'nowrap', lineHeight: 1.5,
+        }}
+      >
+        NO SCHEDULE
+      </Halo>
+    </Box>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════ DomainZone ═══ */
+
+/**
+ * 도메인 하나의 구역. 판도, 카드도, 테두리도 없다 — 시작점에 아주 옅은 가로 대시
+ * 라인 + 라벨만 띄운다. 그 선은 "그 너머에 다른 도메인이 있다"는 문턱일 뿐이다.
+ *
+ * ★ 이 컴포넌트와 그 자식에는 opacity를 걸지 않는다(3D 평면화 방지) — dim은 잎
+ *   요소마다 직접 곱해서 넘긴다.
+ */
+function DomainZone({
+  zone, world, statusHex, orphanHex, detail, dim, hlSet, hlOwner, onOpenWorkflow, onSelectBlock,
+}: {
+  zone: DomainZoneLayout;
+  world: WorldLayout;
+  statusHex: Record<'released' | 'inProgress' | 'notSubmitted', string>;
+  orphanHex: string;
+  detail: boolean;
+  dim: number;
+  hlSet: Set<string> | null;
+  hlOwner: string | null;
+  onOpenWorkflow: (id: string) => void;
+  onSelectBlock: (id: string) => void;
+}) {
+  const label = zone.key === UNASSIGNED_DOMAIN ? 'Unassigned' : zone.label;
+  const lineW = world.bounds.w;
+  const hlColor = hlOwner ? (zone.rows.find((r) => r.workflow.id === hlOwner)?.workflow.color ?? T.tl) : null;
+
+  return (
+    <Box sx={{ position: 'absolute', inset: 0, transformStyle: 'preserve-3d', pointerEvents: 'none' }}>
+      {/* 도메인 문턱 — 가로 대시 한 줄. 왼쪽·오른쪽·아래에는 선이 없다. */}
+      <Box
+        style={{ left: 0, top: zone.y + DOMAIN_HEAD_H - 26, width: lineW, opacity: dim }}
+        sx={{ position: 'absolute', height: 0, borderTop: `1px dashed ${withAlpha(zone.color, 0.34)}` }}
+      />
+      <Box
+        style={{ left: 18, top: zone.y + DOMAIN_HEAD_H - 62, opacity: dim }}
+        sx={{ position: 'absolute', display: 'flex', alignItems: 'baseline', gap: '13px' }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <Box sx={{ width: 10, height: 10, borderRadius: '50%', background: zone.color, boxShadow: `0 0 12px ${withAlpha(zone.color, 0.85)}` }} />
+          <Halo sx={{ fontFamily: FONT_MONO, fontSize: 24, fontWeight: 700, letterSpacing: '.12em', color: T.tx }}>
+            {label}
+          </Halo>
+        </Box>
+        <Halo sx={{ fontSize: 12.5, color: T.dm2, fontFamily: FONT_MONO }}>
+          {zone.rows.length} workflow · {zone.released}/{zone.total} released
+        </Halo>
+      </Box>
+
+      {/* 와이어 — 같은 workflow 안의 산출물↔산출물 flow만. 구체보다 먼저 그려서 뒤로 숨는다. */}
+      {zone.wires.length > 0 && (
         <Box
           component="svg"
-          style={{ left: 0, top: 0, width: island.w, height: bodyH }}
+          style={{ left: 0, top: 0, width: world.bounds.x + world.bounds.w, height: zone.y + zone.h }}
           sx={{ position: 'absolute', overflow: 'visible', pointerEvents: 'none' }}
         >
-          {island.wires.map((w) => {
+          {zone.wires.map((w) => {
             const on = !!hlSet && hlSet.has(w.fromId) && hlSet.has(w.toId);
-            const wireOpacity = hlSet ? (on ? 1 : 0.06) : 1;
             return (
-              <g key={w.id} opacity={wireOpacity} style={{ transition: 'opacity .3s' }}>
-                <path
-                  d={w.path}
-                  fill="none"
-                  stroke={on ? hlColor ?? T.tl : T.dm2}
-                  strokeWidth={on ? 1.6 : 1}
-                  opacity={on ? 0.9 : 0.32}
-                  strokeLinecap="round"
-                />
+              <g key={w.id} opacity={(hlSet ? (on ? 1 : 0.06) : 1) * dim} style={{ transition: 'opacity .3s' }}>
+                <path d={w.path} fill="none" stroke={on ? hlColor ?? T.tl : T.dm2} strokeWidth={on ? 1.6 : 1} opacity={on ? 0.9 : 0.32} strokeLinecap="round" />
                 {on && (
                   <path
-                    d={w.path}
-                    fill="none"
-                    stroke={hlColor ?? T.tl}
-                    strokeWidth={2.2}
-                    strokeLinecap="round"
-                    strokeDasharray="9 10"
-                    opacity={0.85}
-                    style={{ animation: 'flowdash .65s linear infinite' }}
+                    d={w.path} fill="none" stroke={hlColor ?? T.tl} strokeWidth={2.2} strokeLinecap="round"
+                    strokeDasharray="9 10" opacity={0.85} style={{ animation: 'flowdash .65s linear infinite' }}
                   />
                 )}
               </g>
@@ -601,81 +643,71 @@ function DomainZone({
         </Box>
       )}
 
-      {/* ── IP 행: 박스 없이 점 + 이름만 떠 있는 라벨. ── */}
-      {island.rows.map((row) => {
-        const rowOpacity = hlSet ? (row.ip.id === hlOwnerIpId ? 1 : 0.28) : 1;
+      {/* workflow 행 — 박스 없이 점 + 이름만 떠 있는 라벨 + 그 줄의 산출물 구체들. */}
+      {zone.rows.map((row) => {
+        const rowDim = dim * (hlSet ? (row.workflow.id === hlOwner ? 1 : 0.28) : 1);
         return (
-          <Box key={row.ip.id} sx={{ opacity: rowOpacity, transition: 'opacity .3s' }}>
+          <Box key={row.workflow.id} sx={{ transformStyle: 'preserve-3d' }}>
             <Box
               component="button"
-              onClick={() => onOpenIp(row.ip.id)}
-              title={`${row.ip.name} — open IP board`}
-              style={{ left: ISLAND_PAD, top: row.y + row.h / 2 - 20, width: LABEL_W - 14 }}
+              onClick={() => onOpenWorkflow(row.workflow.id)}
+              title={`${row.workflow.name} — open workflow board`}
+              style={{ left: 18, top: row.y - 20, width: LABEL_W - 34, opacity: rowDim }}
               sx={{
                 position: 'absolute', display: 'flex', flexDirection: 'column', gap: '2px',
                 alignItems: 'flex-start', textAlign: 'left', background: 'transparent', border: 'none',
                 padding: 0, cursor: CURSOR_POINTER, fontFamily: 'inherit', color: 'inherit',
-                '&:hover .dw-ip-name': { color: row.ip.color || T.tl },
+                pointerEvents: 'auto',
+                '&:hover .dw-wf-name': { color: row.workflow.color || T.tl },
               }}
             >
               <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', maxWidth: '100%' }}>
                 <Box
                   sx={{
                     width: 9, height: 9, borderRadius: '50%', flex: '0 0 auto',
-                    background: row.ip.color || T.tl, boxShadow: `0 0 8px ${withAlpha(row.ip.color || '#0c9a83', 0.75)}`,
+                    background: row.workflow.color || T.tl,
+                    boxShadow: `0 0 8px ${withAlpha(row.workflow.color || '#0c9a83', 0.75)}`,
                   }}
                 />
                 <Halo
-                  className="dw-ip-name"
+                  className="dw-wf-name"
                   sx={{
                     fontSize: 15, fontWeight: 700, color: T.tx, transition: 'color .15s',
-                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 190,
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: LABEL_W - 60,
                   }}
                 >
-                  {row.ip.name}
+                  {row.workflow.name}
                 </Halo>
               </Box>
               {detail && (
-                <Halo sx={{ fontSize: 10.5, color: T.dm2, ml: '17px' }}>
+                <Halo sx={{ fontSize: 10.5, color: row.orphans ? T.rd : T.dm2, ml: '17px' }}>
                   {row.released}/{row.total} released
+                  {row.orphans > 0 && ` · ${row.orphans} unscheduled`}
                 </Halo>
               )}
             </Box>
 
-            {/* 산출물 블록 — 진짜 3D 구체. */}
             {row.blocks.map((b) => (
               <DeliverableBlock
                 key={b.id}
                 b={b}
-                hex={statusHex[b.status]}
+                hex={b.orphan ? orphanHex : statusHex[b.status]}
                 detail={detail}
                 selected={!!hlSet && hlSet.has(b.id)}
-                faded={!!hlSet && !hlSet.has(b.id)}
+                opacity={rowDim * (hlSet && !hlSet.has(b.id) ? 0.3 : 1)}
                 onSelect={onSelectBlock}
               />
             ))}
           </Box>
         );
       })}
-
-      {/* 마지막 도메인 다음엔 우주를 닫는 대시 라인 하나(라벨 없음) — 스케치의
-          맨 마지막 "----" 줄과 같다. */}
-      {isLast && (
-        <Box
-          style={{ left: 0, top: island.h - ISLAND_PAD * 0.5, width: lineW }}
-          sx={{ position: 'absolute', height: 0, borderTop: `1px dashed ${withAlpha(island.color, HAIR_DOMAIN * 0.7)}`, pointerEvents: 'none' }}
-        />
-      )}
     </Box>
   );
 }
 
 /**
  * 별이 흐린 배경 위에서도 박스 없이 읽히도록 대비를 살짝만 깔아 주는 래퍼.
- * blur 14px짜리 그림자는 테두리가 번져 보였고("빛번짐"), 그걸 4방향 1px
- * 그림자로 둘러싸 봤더니 이번엔 잉크 번지듯 두꺼워 보였다 — 결국 둘 다
- * "글자 자체를 두껍게 만드는" 접근이라 문제였다. 그림자는 딱 하나, 아주
- * 작은 블러로 아래쪽에만 살짝 깔아 글자 두께에는 손대지 않는다.
+ * 그림자는 딱 하나, 아주 작은 블러로 아래쪽에만 살짝 — 글자 두께에는 손대지 않는다.
  */
 function Halo({ children, sx, style, className }: { children: React.ReactNode; sx?: object; style?: React.CSSProperties; className?: string }) {
   return (
@@ -693,22 +725,18 @@ function Halo({ children, sx, style, className }: { children: React.ReactNode; s
 }
 
 /**
- * 산출물 = 초안 우주 뷰의 "행성"을 그대로 다시 쓴 것 — 카드가 아니라 실제로 광원이
- * 있는 구체다. 배경은 두 겹의 radial-gradient로 만든다: 위쪽은 하이라이트(광원),
- * 아래쪽은 lighten→base→darken 그라디언트로 둥근 음영을 준다. 계속 움직이는
- * bob 애니메이션은 쓰지 않는다 — 화면 하나에 수십 개가 동시에 흔들리면 멀미가
- * 난다는 피드백이 있었다; 정지 상태에서도 그라디언트 음영만으로 입체감은 충분하다.
+ * 산출물 = 카드가 아니라 실제로 광원이 있는 구체다. translate3d의 z가 깊이를 만들고,
+ * 뷰포트의 perspective가 그 깊이를 원근으로 바꾼다 — 그래서 같은 x·y라도 z가 다르면
+ * 화면상 위치와 크기가 달라져 "떠 있는 행성"처럼 보인다.
  *
- * 클릭하면 같은 IP 안에서 flow(EdgeDto)로 연결된 산출물들이 함께 밝아지고
- * (selected) 나머지는 흐려진다(faded) — IP 캔버스와 같은 규칙.
+ * 일정을 잃은 산출물은 상태색 대신 붉은색 + 파선 링을 둘러 즉시 구분되게 한다.
  */
 function DeliverableBlock({
-  b, hex, detail, selected, faded, onSelect,
+  b, hex, detail, selected, opacity, onSelect,
 }: {
   b: BlockNode; hex: string; detail: boolean;
-  selected: boolean; faded: boolean; onSelect: (id: string) => void;
+  selected: boolean; opacity: number; onSelect: (id: string) => void;
 }) {
-  const d = Math.min(b.h, 46) * b.depth;
   const sphereBg = [
     `radial-gradient(circle at 30% 24%, ${withAlpha('#ffffff', 0.95)}, ${withAlpha('#ffffff', 0)} 42%)`,
     `radial-gradient(circle at 42% 38%, ${lighten(hex, 0.55)} 0%, ${hex} 55%, ${darken(hex, 0.55)} 100%)`,
@@ -718,51 +746,54 @@ function DeliverableBlock({
     <Box
       component="button"
       onClick={(e: React.MouseEvent) => { e.stopPropagation(); onSelect(b.id); }}
-      style={{ left: b.x, top: b.y, width: b.w, height: b.h }}
+      style={{
+        left: b.x - b.d / 2,
+        top: b.y - b.d / 2,
+        transform: `translate3d(0, 0, ${b.z}px)`,
+        opacity,
+      }}
       sx={{
         position: 'absolute', border: 'none', background: 'transparent', padding: 0, fontFamily: 'inherit',
-        cursor: CURSOR_POINTER, opacity: faded ? 0.3 : 1, transition: 'opacity .3s',
+        cursor: CURSOR_POINTER, transition: 'opacity .3s', pointerEvents: 'auto',
+        display: 'flex', alignItems: 'center', gap: '9px', whiteSpace: 'nowrap',
       }}
+      title={`${b.name}\n${b.orphan ? 'No release schedule' : b.phaseName ?? ''}`}
     >
       <Box
-        sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', gap: '10px' }}
-        title={`${b.name}\n${b.status === 'released' ? 'Released' : b.status === 'inProgress' ? 'In progress' : 'Not submitted'}`}
+        style={{ width: b.d, height: b.d }}
+        sx={{
+          position: 'relative', borderRadius: '50%', flex: '0 0 auto',
+          background: sphereBg,
+          border: b.orphan ? `2px dashed ${withAlpha('#ffffff', 0.75)}` : 'none',
+          boxShadow: selected
+            ? `0 0 0 2.5px #fff, 0 0 ${b.d * 0.85}px ${withAlpha(hex, 0.75)}, 0 3px 8px ${withAlpha('#000000', 0.35)}`
+            : `0 0 ${b.d * 0.5}px ${withAlpha(hex, 0.42)}, 0 3px 8px ${withAlpha('#000000', 0.35)}`,
+          transition: 'box-shadow .2s',
+        }}
       >
-        {/* 구체 — 위 하이라이트 + 아래 그라디언트 음영 + 은은한 발광. */}
-        <Box
-          sx={{
-            position: 'relative', width: d, height: d, borderRadius: '50%', flex: '0 0 auto',
-            background: sphereBg,
-            boxShadow: selected
-              ? `0 0 0 2.5px #fff, 0 0 ${d * 0.85}px ${withAlpha(hex, 0.75)}, 0 3px 8px ${withAlpha('#000000', 0.35)}`
-              : `0 0 ${d * 0.5}px ${withAlpha(hex, 0.42)}, 0 3px 8px ${withAlpha('#000000', 0.35)}`,
-            transition: 'box-shadow .2s',
-          }}
-        >
-          {detail && (
-            <Box
-              sx={{
-                position: 'absolute', inset: 0, display: 'grid', placeItems: 'center',
-                color: withAlpha('#ffffff', 0.92), filter: 'drop-shadow(0 1px 2px rgba(0,0,0,.5))',
-              }}
-            >
-              <DocIcon type={b.docType} size={Math.round(d * 0.42)} />
-            </Box>
-          )}
-        </Box>
-
         {detail && (
           <Box
             sx={{
-              fontSize: 13, fontWeight: 500, color: T.tx, flex: 1, minWidth: 0,
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'left',
-              textShadow: `0 1px 3px ${withAlpha('#000000', 0.25)}`,
+              position: 'absolute', inset: 0, display: 'grid', placeItems: 'center',
+              color: withAlpha('#ffffff', 0.92), filter: 'drop-shadow(0 1px 2px rgba(0,0,0,.5))',
             }}
           >
-            {b.name}
+            <DocIcon type={b.docType} size={Math.round(b.d * 0.42)} />
           </Box>
         )}
       </Box>
+
+      {detail && (
+        <Box
+          sx={{
+            fontSize: 13, fontWeight: 500, color: b.orphan ? T.rd : T.tx, textAlign: 'left',
+            textShadow: `0 1px 3px ${withAlpha('#000000', 0.25)}`,
+            maxWidth: BLOCK_LABEL_W, overflow: 'hidden', textOverflow: 'ellipsis',
+          }}
+        >
+          {b.name}
+        </Box>
+      )}
     </Box>
   );
 }
@@ -770,11 +801,11 @@ function DeliverableBlock({
 /* ═════════════════════════════════════════════════════════════ Chrome ═══ */
 
 function TopBar({
-  projectName, projectCode, model, domainCount, totalWires, loading, zoom, pal,
+  projectName, projectCode, model, domainCount, totalWires, totalOrphans, loading, zoom, pal,
   onZoomIn, onZoomOut, onFit, onClose,
 }: {
   projectName: string; projectCode: string; model: DomainWorkflowModel;
-  domainCount: number; totalWires: number; loading: boolean; zoom: number; pal: SpacePalette;
+  domainCount: number; totalWires: number; totalOrphans: number; loading: boolean; zoom: number; pal: SpacePalette;
   onZoomIn: () => void; onZoomOut: () => void; onFit: () => void; onClose: () => void;
 }) {
   return (
@@ -801,8 +832,9 @@ function TopBar({
 
       <Box sx={{ display: 'flex', gap: '18px', mr: '4px' }}>
         <Stat label="DOMAINS" value={domainCount} />
-        <Stat label="IPS" value={model.domains.reduce((n, d) => n + d.ips.length, 0)} />
+        <Stat label="WORKFLOWS" value={model.domains.reduce((n, d) => n + d.workflows.length, 0)} />
         <Stat label="WIRES" value={totalWires} />
+        {totalOrphans > 0 && <Stat label="UNSCHEDULED" value={totalOrphans} tone={T.rd} />}
         <Stat label="RELEASED" value={`${model.counts.released}/${model.counts.total}`} tone={T.tl} />
       </Box>
 
@@ -847,10 +879,10 @@ function GlassBtn({ children, onClick, title }: { children: React.ReactNode; onC
 }
 
 function DomainNav({
-  islands, active, pal, onPick, onAll,
+  zones, active, pal, onPick, onAll,
 }: {
-  islands: IslandLayout[]; active: string | null; pal: SpacePalette;
-  onPick: (island: IslandLayout) => void; onAll: () => void;
+  zones: DomainZoneLayout[]; active: string | null; pal: SpacePalette;
+  onPick: (zone: DomainZoneLayout) => void; onAll: () => void;
 }) {
   return (
     <Box
@@ -879,28 +911,29 @@ function DomainNav({
       </Box>
 
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-        {islands.map((d) => {
-          const pct = d.total ? Math.round((d.released / d.total) * 100) : 0;
-          const on = active === d.key;
-          const label = d.key === UNASSIGNED_DOMAIN ? 'Unassigned' : d.key;
+        {zones.map((z) => {
+          const pct = z.total ? Math.round((z.released / z.total) * 100) : 0;
+          const on = active === z.key;
+          const label = z.key === UNASSIGNED_DOMAIN ? 'Unassigned' : z.key;
+          const orphans = z.rows.reduce((n, r) => n + r.orphans, 0);
           return (
             <Box
-              key={d.key}
+              key={z.key}
               component="button"
-              onClick={() => onPick(d)}
+              onClick={() => onPick(z)}
               sx={{
                 textAlign: 'left', width: '100%', border: '1px solid', borderRadius: '9px',
                 padding: '8px 10px', cursor: CURSOR_POINTER, fontFamily: 'inherit', transition: '.14s',
-                borderColor: on ? withAlpha(d.color, 0.55) : 'transparent',
-                background: on ? withAlpha(d.color, 0.12) : 'transparent',
-                '&:hover': { background: on ? withAlpha(d.color, 0.16) : T.sf3 },
+                borderColor: on ? withAlpha(z.color, 0.55) : 'transparent',
+                background: on ? withAlpha(z.color, 0.12) : 'transparent',
+                '&:hover': { background: on ? withAlpha(z.color, 0.16) : T.sf3 },
               }}
             >
               <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Box
                   sx={{
-                    width: 8, height: 8, borderRadius: '50%', background: d.color, flex: '0 0 auto',
-                    boxShadow: on ? `0 0 9px ${withAlpha(d.color, 0.9)}` : 'none',
+                    width: 8, height: 8, borderRadius: '50%', background: z.color, flex: '0 0 auto',
+                    boxShadow: on ? `0 0 9px ${withAlpha(z.color, 0.9)}` : 'none',
                   }}
                 />
                 <Box
@@ -913,10 +946,11 @@ function DomainNav({
                 </Box>
               </Box>
               <Box sx={{ fontSize: 9.5, color: T.dm2, mt: '3px', ml: '16px' }}>
-                {d.rows.length} IP · {d.released}/{d.total} released
+                {z.rows.length} workflow · {z.released}/{z.total} released
+                {orphans > 0 && <Box component="span" sx={{ color: T.rd }}> · {orphans} unscheduled</Box>}
               </Box>
               <Box sx={{ height: 3, borderRadius: 999, background: T.sf3, mt: '5px', ml: '16px', overflow: 'hidden' }}>
-                <Box sx={{ width: `${pct}%`, height: '100%', background: d.color, transition: 'width .3s' }} />
+                <Box sx={{ width: `${pct}%`, height: '100%', background: z.color, transition: 'width .3s' }} />
               </Box>
             </Box>
           );
@@ -930,6 +964,10 @@ function DomainNav({
             {k === 'released' ? 'Released' : k === 'inProgress' ? 'In progress' : 'Not submitted'}
           </Box>
         ))}
+        <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: 10.5, color: T.rd }}>
+          <Box sx={{ width: 8, height: 8, borderRadius: '50%', border: `2px dashed ${T.rd}` }} />
+          No release schedule
+        </Box>
       </Box>
     </Box>
   );
@@ -947,6 +985,7 @@ function HintBar({ pal }: { pal: SpacePalette }) {
     >
       <span>DRAG · 시점 이동</span>
       <span>WHEEL · 확대/축소</span>
+      <span>X · 시간 &nbsp;/&nbsp; Y · workflow</span>
     </Box>
   );
 }

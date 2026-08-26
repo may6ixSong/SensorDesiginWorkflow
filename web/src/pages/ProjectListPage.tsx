@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Box } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { ProjectDto } from '@/types/domain';
-import { useProjects, useProjectIps } from '@/api/hooks/useProjects';
+import { useProjects, useProjectWorkflows } from '@/api/hooks/useProjects';
 import { AppShell } from '@/components/layout/AppShell';
 import { SirenButton } from '@/components/common/SirenButton';
 import { UserAvatar } from '@/components/common/Avatar';
@@ -165,13 +165,13 @@ export function ProjectListPage() {
 
 function ProjectCard({ project, view }: { project: ProjectDto; view: View }) {
   const navigate = useNavigate();
-  const { data: ips } = useProjectIps(project._id);
-  const { pct, current, done, total } = progressOf(project.phases);
+  const { data: workflows } = useProjectWorkflows(project._id);
+  const { pct, current, done, total } = progressOf(project.milestones);
   const owners = useMemo(() => {
     const seen = new Map<string, DirectoryUser>();
-    (ips ?? []).flatMap((i) => i.owners).forEach((knoxId) => seen.set(knoxId, findDirectoryUser(knoxId)));
+    (workflows ?? []).flatMap((i) => i.owners).forEach((knoxId) => seen.set(knoxId, findDirectoryUser(knoxId)));
     return [...seen.values()];
-  }, [ips]);
+  }, [workflows]);
 
   const row = view === 'list';
 
@@ -218,7 +218,7 @@ function ProjectCard({ project, view }: { project: ProjectDto; view: View }) {
           {project.name}
         </Box>
         <Box sx={{ fontSize: 11.5, color: T.dm, mt: '4px' }}>
-          {project.domain} · {ips?.length ?? 0} IPs
+          {project.domain} · {workflows?.length ?? 0} workflows
         </Box>
       </Box>
 
@@ -230,7 +230,7 @@ function ProjectCard({ project, view }: { project: ProjectDto; view: View }) {
           <Box sx={{ flex: 1 }} />
           <Box sx={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 600, color: T.tl }}>{pct}%</Box>
           <Box sx={{ fontSize: 10, color: T.dm2 }}>
-            {done}/{total} phases
+            {done}/{total} milestones
           </Box>
         </Box>
         <Box sx={{ height: 6, borderRadius: 999, background: T.sf3, overflow: 'hidden' }}>
@@ -245,7 +245,7 @@ function ProjectCard({ project, view }: { project: ProjectDto; view: View }) {
 
         {!row && (
           <Box sx={{ display: 'flex', gap: '5px', flexWrap: 'wrap', mt: '13px' }}>
-            {(ips ?? []).map((i) => (
+            {(workflows ?? []).map((i) => (
               <Box
                 key={i.id}
                 sx={{

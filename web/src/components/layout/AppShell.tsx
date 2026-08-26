@@ -2,7 +2,7 @@ import { ReactNode } from 'react';
 import { Box } from '@mui/material';
 import { Link, useLocation } from 'react-router-dom';
 import MenuBookRoundedIcon from '@mui/icons-material/MenuBookRounded';
-import { IpDto, ProjectDto } from '@/types/domain';
+import { WorkflowDto, ProjectDto } from '@/types/domain';
 import { useCanvasStore } from '@/store/canvasStore';
 import { useAuth } from '@/app/providers/AuthProvider';
 import { SirenMark, Icon } from '@/components/common/Icon';
@@ -16,12 +16,12 @@ import { SelectBox } from './SelectBox';
 import { FONT_DISPLAY, FONT_MONO, T } from '@/theme/tokens';
 
 interface AppShellProps {
-  /** Project/IP selects only appear on the board (/details). Omit to hide them. */
+  /** Project/workflow selects only appear on the board (/details). Omit to hide them. */
   projects?: ProjectDto[];
   projectId?: string;
   onChangeProject?: (id: string) => void;
-  ips?: IpDto[];
-  ipId?: string;
+  workflows?: WorkflowDto[];
+  workflowId?: string;
   onChangeIp?: (id: string) => void;
   canToggleRecv?: boolean;
   children: ReactNode;
@@ -29,11 +29,11 @@ interface AppShellProps {
 
 // Short technical labels used throughout the top bar are kept in English
 // regardless of the language toggle (matches the rest of the mock content —
-// IP/deliverable names, phase codes — which is English-only by design).
+// workflow/deliverable names, phase codes — which is English-only by design).
 const NAV_LABEL = 'Project List';
 
 /**
- * 목업 .tb 상단바 — 로고 + SIREN 워드마크 + 페이지 네비 + (보드에서만) 과제/IP select
+ * 목업 .tb 상단바 — 로고 + SIREN 워드마크 + 페이지 네비 + (보드에서만) 과제/workflow select
  * + 수신부서 시점 + 사용자 배지. (설계서 7.1 컴포넌트 트리의 AppShell)
  *
  * Right-side chrome (language/theme/notices/profile) mirrors SSM_WEB's
@@ -44,7 +44,7 @@ const NAV_LABEL = 'Project List';
  */
 export function AppShell({
   projects, projectId, onChangeProject,
-  ips, ipId, onChangeIp,
+  workflows, workflowId, onChangeIp,
   canToggleRecv = false, children,
 }: AppShellProps) {
   const { user } = useAuth();
@@ -129,14 +129,14 @@ export function AppShell({
               options={(projects ?? []).map((p) => ({ value: p._id, label: `${p.code} · ${p.name}` }))}
             />
             <SelectBox
-              label="IP"
-              value={ipId ?? ''}
+              label="workflow"
+              value={workflowId ?? ''}
               onChange={onChangeIp!}
               minWidth={110}
-              disabled={!ips?.length}
+              disabled={!workflows?.length}
               options={
-                ips?.length
-                  ? ips.map((i) => ({ value: i.id, label: i.name }))
+                workflows?.length
+                  ? workflows.map((i) => ({ value: i.id, label: i.name }))
                   : [{ value: '', label: 'No access' }]
               }
             />

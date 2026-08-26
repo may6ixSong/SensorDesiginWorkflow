@@ -1,98 +1,56 @@
-import { useState } from 'react';
 import { Box } from '@mui/material';
-import { PhaseRef } from '@/types/domain';
+import { Milestone } from '@/types/domain';
 import { ModalShell } from '@/components/common/ModalShell';
-import { SirenButton } from '@/components/common/SirenButton';
-import { DateInput, Ey, TextInput } from '@/components/common/Panel';
-import { Icon } from '@/components/common/Icon';
-import { FONT_MONO, T } from '@/theme/tokens';
+import { Ey } from '@/components/common/Panel';
+import { ScheduleDraft, ScheduleEditor } from './ScheduleEditor';
+import { T } from '@/theme/tokens';
 
 interface Props {
-  phases: PhaseRef[];
+  milestones: Milestone[];
   onClose: () => void;
-  onSave: (phases: { key: string; label: string; start: string; end: string }[]) => void;
+  onSave: (milestones: ScheduleDraft[]) => void;
   saving?: boolean;
   error?: string | null;
 }
 
-type Row = { key: string; order: number; label: string; start: string; end: string };
-
-/** Project Information의 "Edit schedule" — 마일스톤 label/start/end만 수정한다(key/order 고정). */
-export function EditMilestonesDialog({ phases, onClose, onSave, saving, error }: Props) {
-  const [rows, setRows] = useState<Row[]>(
-    () => [...phases].sort((a, b) => a.order - b.order).map((p) => ({ key: p.key, order: p.order, label: p.label, start: p.start, end: p.end })),
-  );
-  const [rowErr, setRowErr] = useState<Record<string, string>>({});
-
-  const setField = (key: string, field: 'label' | 'start' | 'end', value: string) => {
-    setRows((prev) => prev.map((r) => (r.key === key ? { ...r, [field]: value } : r)));
-    setRowErr((prev) => ({ ...prev, [key]: '' }));
-  };
-
-  const submit = () => {
-    const errs: Record<string, string> = {};
-    rows.forEach((r) => {
-      if (!r.label.trim()) errs[r.key] = 'Label is required.';
-      else if (!r.start || !r.end) errs[r.key] = 'Start and end dates are required.';
-      else if (new Date(r.start).getTime() >= new Date(r.end).getTime()) errs[r.key] = 'Start must be before end.';
-    });
-    setRowErr(errs);
-    if (Object.keys(errs).length) return;
-    onSave(rows.map((r) => ({ key: r.key, label: r.label.trim(), start: r.start, end: r.end })));
-  };
-
+/**
+ * Project Information의 "Edit milestones" — 과제 공통 일정을 고친다.
+ *
+ * 여기서 고치는 것은 **과제 일정**이지 어느 workflow의 일정이 아니다. 이미 만들어진
+ * workflow는 생성 시점에 이 목록을 복사해 자기 것으로 들고 있으므로 여기를 바꿔도
+ * 따라 바뀌지 않는다 — 새로 만드는 workflow의 기본값과, 타임라인/3D 뷰의 배경 구간이
+ * 달라질 뿐이다. 그 점을 화면에서 한 줄로 못박아 둔다.
+ */
+export function EditMilestonesDialog({ milestones, onClose, onSave, saving, error }: Props) {
   return (
     <ModalShell
       open
       onClose={onClose}
-      width={620}
+      width={660}
       header={
         <>
-          <Ey>Milestones</Ey>
-          <Box sx={{ fontSize: 16, fontWeight: 700, mt: '2px' }}>Edit Schedule</Box>
+          <Ey>Project schedule</Ey>
+          <Box sx={{ fontSize: 16, fontWeight: 700, mt: '2px' }}>Edit Milestones</Box>
         </>
       }
     >
-      <Box sx={{ fontSize: 11.5, color: T.dm2, mb: '14px' }}>
-        Milestone names and dates can be adjusted. Milestones can't be added or removed here.
+      <Box
+        sx={{
+          fontSize: 11.5, color: T.dm, background: T.sf2, border: `1px solid ${T.ln}`,
+          borderRadius: '9px', padding: '9px 11px', mb: '14px', lineHeight: 1.7,
+        }}
+      >
+        These are the project's shared milestones. Workflows that already exist keep the schedule they
+        own — changing this list only affects new workflows (which start as a copy of it) and the date
+        axis on the timeline and 3D view.
       </Box>
-      {rows.map((r) => (
-        <Box
-          key={r.key}
-          sx={{
-            display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '9px 0',
-            borderBottom: `1px solid ${T.ln}`,
-          }}
-        >
-          <Box
-            sx={{
-              flex: '0 0 44px', fontFamily: FONT_MONO, fontSize: 11.5, fontWeight: 700,
-              color: T.dm, padding: '9px 0',
-            }}
-          >
-            {r.key}
-          </Box>
-          <Box sx={{ flex: '1 1 180px', minWidth: 140 }}>
-            <TextInput value={r.label} onChange={(v) => setField(r.key, 'label', v)} error={!!rowErr[r.key]} />
-          </Box>
-          <Box sx={{ flex: '0 0 148px' }}>
-            <DateInput value={r.start} onChange={(v) => setField(r.key, 'start', v)} error={!!rowErr[r.key]} />
-          </Box>
-          <Box component="span" sx={{ padding: '9px 0', color: T.dm2 }}>→</Box>
-          <Box sx={{ flex: '0 0 148px' }}>
-            <DateInput value={r.end} onChange={(v) => setField(r.key, 'end', v)} error={!!rowErr[r.key]} />
-          </Box>
-        </Box>
-      ))}
-      {Object.values(rowErr).some(Boolean) && (
-        <Box sx={{ fontSize: 11.5, color: T.rd, mt: '10px' }}>
-          {Object.entries(rowErr).find(([, v]) => v)?.[1]}
-        </Box>
-      )}
-      {error && <Box sx={{ fontSize: 11.5, color: T.rd, mt: '10px' }}>{error}</Box>}
-      <SirenButton variant="primary" onClick={submit} disabled={saving} sx={{ mt: '16px' }}>
-        <Icon name="check" /> {saving ? 'Saving…' : 'Save'}
-      </SirenButton>
+      <ScheduleEditor
+        spans={milestones}
+        noun="milestone"
+        onSubmit={onSave}
+        saving={saving}
+        error={error}
+      />
     </ModalShell>
   );
 }

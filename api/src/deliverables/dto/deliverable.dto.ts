@@ -1,9 +1,10 @@
 import { DeliverableDocument, DeliverableVersion } from '../schemas/deliverable.schema';
-import { IpDocument } from '../../ips/schemas/ip.schema';
+import { WorkflowDocument } from '../../workflows/schemas/workflow.schema';
+import { WorkflowPhaseDto, toPhaseDto } from '../../workflows/dto/workflow.dto';
 import { Actor } from '../../common/actor';
 
-function isEditor(ip: IpDocument, me: Actor): boolean {
-  return ip.owners.includes(me.knoxId);
+function isEditor(workflow: WorkflowDocument, me: Actor): boolean {
+  return workflow.owners.includes(me.knoxId);
 }
 
 /** 목업의 MV(major,minor,kind,by,at,note,file) 형태로 내려준다. by는 KnoxID다. */
@@ -27,8 +28,8 @@ function toVersionDto(v: DeliverableVersion) {
  * 그 외에는 Released(major)만. FE는 이 배열로 목업의 latA()/latR()/hasW()를
  * 그대로 계산하므로, 권한 없는 사용자에게는 작업중 버전이 존재조차 하지 않는다.
  */
-export function toDeliverableDto(d: DeliverableDocument, ip: IpDocument, me: Actor) {
-  const isEdit = isEditor(ip, me);
+export function toDeliverableDto(d: DeliverableDocument, workflow: WorkflowDocument, me: Actor) {
+  const isEdit = isEditor(workflow, me);
   const all = d.versions ?? [];
   const visible = isEdit ? all : all.filter((v) => v.kind === 'major');
   const latest = visible[0] ?? null;
@@ -37,8 +38,8 @@ export function toDeliverableDto(d: DeliverableDocument, ip: IpDocument, me: Act
   return {
     id: d._id.toString(),
     projectId: d.projectId.toString(),
-    ipId: d.ipId.toString(),
-    phaseKey: d.phaseKey,
+    workflowId: d.workflowId.toString(),
+    phaseId: d.phaseId,
     name: d.name,
     docType: d.docType,
     network: d.network,
@@ -48,37 +49,49 @@ export function toDeliverableDto(d: DeliverableDocument, ip: IpDocument, me: Act
     layout: { x: d.layout.x, y: d.layout.y, w: d.layout.w, h: d.layout.h },
     recvDept: d.recvDept ?? null,
     recvContact: d.recvContact ?? null,
-    recvIpId: d.recvIpId ? d.recvIpId.toString() : null,
+    recvWorkflowId: d.recvWorkflowId ? d.recvWorkflowId.toString() : null,
     sourceDept: d.sourceDept ?? null,
     versions: visible.map(toVersionDto),
     releasedVersion: released ? toVersionDto(released) : null,
     workingVersion: isEdit && latest?.kind === 'minor' ? toVersionDto(latest) : null,
     canEdit: isEdit,
-    sourceIp: null,
+    sourceWorkflow: null,
+    sourcePhase: null,
   };
 }
 
+/** 이 산출물이 주는 쪽 workflow에서 어느 phase에 걸려 있었는지 (없으면 그쪽에서도 유실된 것). */
+function sourcePhaseOf(d: DeliverableDocument, sourceWorkflow: WorkflowDocument): WorkflowPhaseDto | null {
+  const p = (sourceWorkflow.phases ?? []).find((x) => x.id === d.phaseId);
+  return p ? toPhaseDto(p) : null;
+}
+
 /** GET /deliverables/:id/versions - 가시성 규칙 적용된 버전 이력 (설계서 5.1, 3.5). */
-export function toVisibleVersions(d: DeliverableDocument, ip: IpDocument, me: Actor) {
-  const isEdit = isEditor(ip, me);
+export function toVisibleVersions(d: DeliverableDocument, workflow: WorkflowDocument, me: Actor) {
+  const isEdit = isEditor(workflow, me);
   const versions = isEdit ? d.versions : d.versions.filter((v) => v.kind === 'major');
   return versions.map(toVersionDto);
 }
 
 /**
- * 다른 IP의 보드에 "Incoming from other IPs"로 노출되는 산출물 응답.
- * 주는 쪽(sourceIp)에서의 Edit 권한과 무관하게 항상 Release(major) 버전만 보이고,
+ * 다른 workflow의 보드에 "Incoming from other workflows"로 노출되는 산출물 응답.
+ * 주는 쪽(sourceWorkflow)에서의 Edit 권한과 무관하게 항상 Release(major) 버전만 보이고,
  * Working copy는 절대 노출하지 않는다 — 받는 쪽은 Release 버전만 볼 수 있다는
- * 규칙은 조회자가 우연히 sourceIp의 owner여도 예외 없이 적용된다.
+ * 규칙은 조회자가 우연히 sourceWorkflow의 owner여도 예외 없이 적용된다.
+ *
+ * ★ phaseId는 "주는 쪽 workflow의 phase" id다 — 이제 phase가 workflow마다 다르므로
+ *   받는 쪽 캔버스에서는 그 id로 아무것도 찾을 수 없다. 그래서 그 phase의 날짜
+ *   구간(sourcePhase)을 함께 내려보내, 받는 쪽이 자기 phase 중 날짜가 맞는 칸에
+ *   놓을 수 있게 한다 (web/src/lib/canvasModel.ts의 placeIncomingNodes).
  */
-export function toIncomingDeliverableDto(d: DeliverableDocument, sourceIp: IpDocument) {
+export function toIncomingDeliverableDto(d: DeliverableDocument, sourceWorkflow: WorkflowDocument) {
   const released = (d.versions ?? []).find((v) => v.kind === 'major') ?? null;
 
   return {
     id: d._id.toString(),
     projectId: d.projectId.toString(),
-    ipId: d.ipId.toString(),
-    phaseKey: d.phaseKey,
+    workflowId: d.workflowId.toString(),
+    phaseId: d.phaseId,
     name: d.name,
     docType: d.docType,
     network: d.network,
@@ -88,12 +101,17 @@ export function toIncomingDeliverableDto(d: DeliverableDocument, sourceIp: IpDoc
     layout: { x: d.layout.x, y: d.layout.y, w: d.layout.w, h: d.layout.h },
     recvDept: d.recvDept ?? null,
     recvContact: d.recvContact ?? null,
-    recvIpId: d.recvIpId ? d.recvIpId.toString() : null,
+    recvWorkflowId: d.recvWorkflowId ? d.recvWorkflowId.toString() : null,
     sourceDept: null,
     versions: released ? [toVersionDto(released)] : [],
     releasedVersion: released ? toVersionDto(released) : null,
     workingVersion: null,
     canEdit: false,
-    sourceIp: { id: sourceIp._id.toString(), name: sourceIp.name, color: sourceIp.color },
+    sourceWorkflow: {
+      id: sourceWorkflow._id.toString(),
+      name: sourceWorkflow.name,
+      color: sourceWorkflow.color,
+    },
+    sourcePhase: sourcePhaseOf(d, sourceWorkflow),
   };
 }

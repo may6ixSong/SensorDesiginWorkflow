@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { Box } from '@mui/material';
-import { HldReleaseDto, PhaseRef } from '@/types/domain';
+import { HldReleaseDto, WorkflowPhase } from '@/types/domain';
 import { CanvasNode } from '@/lib/canvasModel';
 import { departmentName } from '@/shared/constants/departments';
 import { findDirectoryUser } from '@/shared/constants/mock-users';
@@ -13,10 +13,10 @@ import { SelectBox } from '@/components/layout/SelectBox';
 import { CURSOR_POINTER, FONT_MONO, T } from '@/theme/tokens';
 
 interface Props {
-  ipName: string;
+  workflowName: string;
   releases: HldReleaseDto[];
   nodes: CanvasNode[];
-  phases: PhaseRef[];
+  phases: WorkflowPhase[];
   selectedId: string | null;
   onSelect: (id: string) => void;
   onClose: () => void;
@@ -29,7 +29,7 @@ interface Props {
  * 단일 하이라이트로 표시한다 (설계서 3.10). 이 조인/diff는 FE에서 계산한다.
  */
 export function HldReleaseDialog({
-  ipName, releases, nodes, phases, selectedId, onSelect, onClose, onOpenRow,
+  workflowName, releases, nodes, phases, selectedId, onSelect, onClose, onOpenRow,
 }: Props) {
   const sorted = useMemo(() => [...releases].sort((a, b) => (a.date < b.date ? 1 : -1)), [releases]);
 
@@ -41,7 +41,7 @@ export function HldReleaseDialog({
         width={520}
         header={
           <>
-            <Ey>{ipName}</Ey>
+            <Ey>{workflowName}</Ey>
             <Box sx={{ fontSize: 16, fontWeight: 700, mt: '2px' }}>HLD Release</Box>
           </>
         }
@@ -55,7 +55,7 @@ export function HldReleaseDialog({
   const prev = sorted[sorted.findIndex((h) => h._id === cur._id) + 1] ?? null;
 
   const order: Record<string, number> = {};
-  phases.forEach((p, i) => (order[p.key] = i));
+  phases.forEach((p, i) => (order[p.id] = i));
   const rows = [...nodes].sort((a, b) =>
     (order[a.phase] ?? 99) !== (order[b.phase] ?? 99)
       ? (order[a.phase] ?? 99) - (order[b.phase] ?? 99)
@@ -73,7 +73,7 @@ export function HldReleaseDialog({
         <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: '11px' }}>
           <Box component="span" sx={{ color: T.tl, mt: '3px' }}><Icon name="grid" /></Box>
           <Box sx={{ flex: 1 }}>
-            <Ey>{ipName} · HLD RELEASE</Ey>
+            <Ey>{workflowName} · HLD RELEASE</Ey>
             <Box sx={{ fontSize: 18, fontWeight: 700, mt: '2px' }}>
               HLD {cur.version}
               <Box component="span" sx={{ fontSize: 12, fontWeight: 400, color: T.dm, ml: '8px' }}>

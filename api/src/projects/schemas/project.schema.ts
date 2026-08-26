@@ -2,32 +2,38 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 
 /**
- * Phase(마일스톤) 일정. 설계서 3.2/4.4는 원래 읽기 전용 참조를 가정했지만, Project
- * Information 페이지에서 일정(label/start/end)을 직접 수정할 수 있도록 확장했다
- * (PATCH /projects/:id/phases, ProjectsService.updatePhases). key/order는 산출물의
- * phaseKey·레이아웃 계산이 참조하는 식별자라 이 API로는 바꾸지 않는다.
+ * 과제 공통 일정 = 마일스톤. 과제에 참여하는 모든 workflow가 공유하는 "큰 일정"이고,
+ * workflow가 새로 만들어질 때 이 목록이 그 workflow의 phase 초기값으로 복사된다
+ * (WorkflowsService.create). 복사된 뒤로는 완전히 독립이다 — 여기를 고쳐도 이미
+ * 만들어진 workflow의 phase는 따라 바뀌지 않는다(사용자가 명시적으로 "과제 일정으로
+ * 되돌리기"를 눌러야 한다).
+ *
+ * id는 생성 시 한 번 정해져 절대 바뀌지 않는 내부 식별자다 — name(화면에 뜨는 짧은
+ * 표기, 예: 'KO', 'ML1')은 언제든 바꿀 수 있어야 하므로 이름을 키로 쓰지 않는다.
+ * 별도의 order 필드는 두지 않는다: 순서는 항상 start 오름차순으로 파생된다
+ * (src/common/schedule.ts의 sortSchedule).
  */
 @Schema({ _id: false })
-export class PhaseRef {
+export class Milestone {
   @Prop({ required: true })
-  key: string;
+  id: string;
 
-  @Prop({ required: true })
-  label: string;
+  /** 화면에 그대로 뜨는 짧은 표기. 약어의 full name을 따로 저장하지 않는다. */
+  @Prop({ required: true, trim: true })
+  name: string;
 
+  /** 'YYYY-MM-DD' */
   @Prop({ required: true })
   start: string;
 
+  /** 'YYYY-MM-DD' */
   @Prop({ required: true })
   end: string;
-
-  @Prop({ required: true })
-  order: number;
 }
-export const PhaseRefSchema = SchemaFactory.createForClass(PhaseRef);
+export const MilestoneSchema = SchemaFactory.createForClass(Milestone);
 
 /**
- * 과제(Project) 단위 부서별 팀원 로스터 — IP의 owners/viewGrants(접근 권한)와는
+ * 과제(Project) 단위 부서별 팀원 로스터 — workflow의 owners/viewGrants(접근 권한)와는
  * 별개 개념이다. 이 프로젝트에 실제로 참여하는 인원을 부서별로 보여주기 위한
  * 정보성 명단이며, department는 부여 시점에 자유 입력(사용자의 실제 소속과
  * 다를 수 있음 — ViewGrant.department와 동일한 패턴).
@@ -61,16 +67,17 @@ export class Project {
   domain: string;
 
   /**
-   * 이 과제의 IP가 고를 수 있는 설계 도메인 후보 목록 (Ip.domain에 들어갈 값).
+   * 이 과제의 workflow가 고를 수 있는 설계 도메인 후보 목록 (Workflow.domain에 들어갈 값).
    * 위 domain(과제 자신의 분류)과는 다른 축이다 - 이쪽은 과제마다 자유롭게 편집하는
    * 목록이라 DEPARTMENTS 같은 전사 고정 상수로 두지 않는다
-   * (PATCH /projects/:id/ip-domains, ProjectsService.updateIpDomains).
+   * (PATCH /projects/:id/workflow-domains, ProjectsService.updateWorkflowDomains).
    */
   @Prop({ type: [String], default: [] })
-  ipDomains: string[];
+  workflowDomains: string[];
 
-  @Prop({ type: [PhaseRefSchema], default: [] })
-  phases: PhaseRef[];
+  /** 과제 공통 일정. workflow phase의 기본값이자, 타임라인/3D 뷰의 배경 구간이 된다. */
+  @Prop({ type: [MilestoneSchema], default: [] })
+  milestones: Milestone[];
 
   @Prop({ default: 'ACTIVE' })
   status: string;

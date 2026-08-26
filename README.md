@@ -1,7 +1,24 @@
 # SIREN — Sensor(CIS) Design Work flow
 
-CIS(CMOS Image Sensor) 개발의 Analog 영역 산출물을 IP 단위 캔버스 위에서 흐름(flow)으로
-관리하고 버전·권한을 통제하는 시스템. 설계서는 [`docs/siren-design-v2.md`](docs/siren-design-v2.md)를 참고한다.
+CIS(CMOS Image Sensor) 개발의 설계 산출물을 workflow 단위 캔버스 위에서 흐름(flow)으로
+관리하고 버전·권한을 통제하는 시스템. 설계서는 [`docs/siren-design-v2.md`](docs/siren-design-v2.md)를
+참고한다 — **일정 모델은 그 문서의 「부록 A. v3 개정」이 본문보다 우선한다.**
+
+## 일정 모델 (2026-08 개정)
+
+일정 축이 둘로 갈려 있다. 헷갈리면 이 표만 보면 된다.
+
+| | 소유자 | 어디서 고치나 | 성격 |
+|---|---|---|---|
+| **마일스톤(milestone)** | 과제(Project) | Project Information → Edit milestones | 과제 공통 일정. 새 workflow의 초기값이자 타임라인/3D 뷰의 날짜축 배경 |
+| **Phase** | Workflow | 그 workflow 보드 → Edit phases | workflow마다 완전히 다른 자기 일정. 서로 겹쳐도 된다 |
+
+- workflow를 만들면 마일스톤이 **복사**되어 phase가 된다. 그 뒤로는 독립이라 마일스톤을 고쳐도
+  기존 workflow는 안 따라간다.
+- 순서는 저장하지 않는다 — 항상 시작일 오름차순이고, 그게 캔버스의 좌 → 우 순서다.
+- phase를 지우면 그걸 가리키던 산출물은 **지워지지도 옮겨지지도 않는다.** 캔버스의 원래 자리에
+  남아 "릴리즈 일정 없음"으로 표시되고, 산출물 상세의 Release schedule에서 새 phase를 골라야
+  다시 일정에 올라온다.
 
 > 이번 세션에는 UI 정본인 `analog-dashboard-v15.html` 목업 파일이 첨부되지 않았다. 캔버스 레이아웃
 > 상수(`web/src/lib/layoutConstants.ts`)와 색상 토큰(`web/src/theme/theme.ts`)은 설계서 3장/7.1절의
@@ -19,6 +36,8 @@ docs/   설계서, 킥오프 프롬프트
 
 `DEPARTMENTS` 같은 FE/BE 공유 상수는 `api/src/common/constants/departments.ts`와
 `web/src/shared/constants/departments.ts`에 중복 정의되어 있다. 값을 바꿀 때는 반드시 두 파일을 함께 수정한다.
+일정 정렬/검증 규칙도 마찬가지로 `api/src/common/schedule.ts`와 `web/src/lib/schedule.ts`에 각각 있다 —
+정렬 기준(시작일 오름차순 → 종료일 → 이름 → id)이 두 쪽에서 어긋나면 캔버스 순서와 저장 순서가 갈린다.
 
 ## 실행 방법
 
@@ -44,9 +63,9 @@ npm install
 npm run start:dev       # http://localhost:3000/api/v1 - 인메모리 모드면 목업 데이터 자동 시드
 ```
 
-실제 DB(`MONGODB_URI`를 채운 경우)를 쓸 때는 최초 1회 `npm run seed`로 목업 데이터를 넣는다
-(과제 2개, IP 3개, 산출물 ~31개, HLD 2건). 인메모리 모드에서는 매 부팅마다 자동으로 시드되므로
-`npm run seed`를 따로 실행할 필요가 없다(오히려 실행하면 실패한다 — MONGODB_URI가 없다는 에러가 뜬다).
+인메모리 모드에서는 매 부팅마다 목업이 자동 시드된다
+(과제 2개, workflow 6개 — 저마다 다른 phase 목록, 산출물 51개, 그중 2개는 일부러 "일정을 잃은"
+상태로 둬서 유실 표시를 바로 확인할 수 있다).
 
 Object Storage(S3) 관련 값은 `.env.example`에 비어 있다 — 개발자가 로컬 환경에서 채워 넣을 값이며,
 비어 있는 동안 `storage` 모듈은 `mock://` presigned URL을 반환해 업로드 플로우 개발이 막히지 않게 한다.
@@ -72,7 +91,7 @@ npm run dev              # http://localhost:5173
 FE의 `canEdit`류 판정은 UX 게이트일 뿐이며, 모든 쓰기 API와 민감 필드 응답은 BE가 다시 검증한다
 (설계서 1.3, 6장). 특히:
 
-- `ips.owners` 추가 시 대상 사용자의 부서가 `analog`인지 BE가 검증한다 (`api/src/ips/ips.service.ts`).
+- `workflows.owners` 추가 시 대상 사용자의 부서가 `analog`인지 BE가 검증한다 (`api/src/workflows/workflows.service.ts`).
 - 산출물 `recvContact` 지정 시 `recvContact.department === recvDept`를 BE가 검증한다
   (`api/src/deliverables/deliverables.service.ts`).
 - 산출물 응답은 `toDeliverableDto()` 단일 통로를 거쳐 `workingVersion`(작업중 minor)을

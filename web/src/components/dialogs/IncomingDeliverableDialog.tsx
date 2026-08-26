@@ -1,5 +1,6 @@
 import { Box } from '@mui/material';
-import { DeliverableDto, PhaseRef } from '@/types/domain';
+import { DeliverableDto } from '@/types/domain';
+import { shortDate } from '@/lib/schedule';
 import { fmtAt } from '@/lib/canvasModel';
 import { findDirectoryUser } from '@/shared/constants/mock-users';
 import { ModalShell } from '@/components/common/ModalShell';
@@ -12,19 +13,19 @@ import { FONT_MONO, T } from '@/theme/tokens';
 
 interface Props {
   d: DeliverableDto | null;
-  phases: PhaseRef[];
   onClose: () => void;
 }
 
 /**
- * 다른 IP로부터 받는 산출물의 읽기 전용 상세 — DeliverableDialog와 달리 탭도,
+ * 다른 workflow로부터 받는 산출물의 읽기 전용 상세 — DeliverableDialog와 달리 탭도,
  * 편집/업로드/Release 버튼도 없다. 항상 released 버전만 보여준다(전달받은 DeliverableDto
- * 자체가 BE에서 그렇게 필터링돼 온다) — 이 규칙은 조회자가 우연히 sourceIp의
+ * 자체가 BE에서 그렇게 필터링돼 온다) — 이 규칙은 조회자가 우연히 sourceWorkflow의
  * owner여도 예외 없이 적용된다(BE toIncomingDeliverableDto 참고).
  */
-export function IncomingDeliverableDialog({ d, phases, onClose }: Props) {
+export function IncomingDeliverableDialog({ d, onClose }: Props) {
   if (!d) return null;
-  const ph = phases.find((p) => p.key === d.phaseKey);
+  // 여기 뜨는 일정은 "주는 쪽 workflow"의 phase다 — 내 캔버스의 칸 이름이 아니다.
+  const ph = d.sourcePhase;
   const rel = d.releasedVersion;
   const by = rel ? findDirectoryUser(rel.by) : undefined;
 
@@ -39,7 +40,7 @@ export function IncomingDeliverableDialog({ d, phases, onClose }: Props) {
             <DocIcon type={d.docType} />
           </Box>
           <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Ey>{ph ? `${ph.key} · ${ph.label}` : ''}</Ey>
+            <Ey>{ph ? `${ph.name} · ${shortDate(ph.start)} → ${shortDate(ph.end)}` : 'No schedule on the source workflow'}</Ey>
             <Box sx={{ fontSize: 18, fontWeight: 700, mt: '3px' }}>{d.name}</Box>
           </Box>
           <Badge color={T.vi} bg={T.vi2} borderColor={T.vi3} sx={{ mt: '6px' }}>Incoming</Badge>
@@ -47,10 +48,10 @@ export function IncomingDeliverableDialog({ d, phases, onClose }: Props) {
       }
     >
       <Card sx={{ mb: '12px', display: 'flex', alignItems: 'center', gap: '9px' }}>
-        <Box sx={{ width: 9, height: 9, borderRadius: '50%', background: d.sourceIp?.color ?? T.dm2, flex: '0 0 auto' }} />
+        <Box sx={{ width: 9, height: 9, borderRadius: '50%', background: d.sourceWorkflow?.color ?? T.dm2, flex: '0 0 auto' }} />
         <Box sx={{ flex: 1 }}>
           <Ey>Received from</Ey>
-          <Box sx={{ fontSize: 14, fontWeight: 700, mt: '2px' }}>{d.sourceIp?.name ?? 'Unknown department'}</Box>
+          <Box sx={{ fontSize: 14, fontWeight: 700, mt: '2px' }}>{d.sourceWorkflow?.name ?? 'Unknown department'}</Box>
         </Box>
         <Badge
           color={d.network === 'HPC' ? T.hp : T.dm}
@@ -73,7 +74,7 @@ export function IncomingDeliverableDialog({ d, phases, onClose }: Props) {
           </Box>
         ) : (
           <Box sx={{ fontSize: 12, color: T.dm2, mt: '7px' }}>
-            {d.sourceIp?.name ?? 'The owning IP'} hasn't released a version yet — this card will update the moment they do.
+            {d.sourceWorkflow?.name ?? 'The owning workflow'} hasn't released a version yet — this card will update the moment they do.
           </Box>
         )}
         {rel?.note && <Box sx={{ fontSize: 12, color: T.dm, mt: '7px' }}>{rel.note}</Box>}

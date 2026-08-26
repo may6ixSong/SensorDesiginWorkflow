@@ -1,8 +1,8 @@
 import { ReactNode, useMemo, useState } from 'react';
 import { Box, CircularProgress, Stack, Typography } from '@mui/material';
 import { Link, useLocation, useParams } from 'react-router-dom';
-import { IpDto, ProjectDetailDto } from '@/types/domain';
-import { useProject, useProjectIps, useUpdateProject } from '@/api/hooks/useProjects';
+import { WorkflowDto, ProjectDetailDto } from '@/types/domain';
+import { useProject, useProjectWorkflows, useUpdateProject } from '@/api/hooks/useProjects';
 import { AppShell } from '@/components/layout/AppShell';
 import { SirenButton } from '@/components/common/SirenButton';
 import { Card, Ey } from '@/components/common/Panel';
@@ -19,7 +19,7 @@ const TABS = [
 ];
 
 interface Props {
-  children: (ctx: { project: ProjectDetailDto; ips: IpDto[]; own: boolean }) => ReactNode;
+  children: (ctx: { project: ProjectDetailDto; workflows: WorkflowDto[]; own: boolean }) => ReactNode;
 }
 
 /**
@@ -31,15 +31,15 @@ export function ProjectPageShell({ children }: Props) {
   const { projectId } = useParams<{ projectId: string }>();
   const { pathname } = useLocation();
   const { data: project, isLoading: projectLoading, isError } = useProject(projectId);
-  const { data: ips, isLoading: ipsLoading } = useProjectIps(projectId);
+  const { data: workflows, isLoading: ipsLoading } = useProjectWorkflows(projectId);
   const updateProject = useUpdateProject(projectId ?? '');
   const [editOpen, setEditOpen] = useState(false);
   const [editErr, setEditErr] = useState<string | null>(null);
 
-  const own = useMemo(() => canManageProject(ips), [ips]);
+  const own = useMemo(() => canManageProject(workflows), [workflows]);
   const { pct, current, done, total } = useMemo(
-    () => progressOf(project?.phases ?? []),
-    [project?.phases],
+    () => progressOf(project?.milestones ?? []),
+    [project?.milestones],
   );
 
   if (projectLoading || ipsLoading) {
@@ -57,7 +57,7 @@ export function ProjectPageShell({ children }: Props) {
           <Box sx={{ textAlign: 'center', maxWidth: 420 }}>
             <Typography sx={{ fontSize: 20, fontWeight: 700, mb: '10px' }}>No viewable project</Typography>
             <Typography sx={{ fontSize: 13, color: T.dm, lineHeight: 1.8 }}>
-              You don't have access to any IP under this project.
+              You don't have access to any workflow under this project.
             </Typography>
           </Box>
         </Box>
@@ -122,7 +122,7 @@ export function ProjectPageShell({ children }: Props) {
                   }}
                 />
               </Box>
-              <Box sx={{ fontSize: 10.5, color: T.dm2, mt: '6px' }}>{done}/{total} phases complete</Box>
+              <Box sx={{ fontSize: 10.5, color: T.dm2, mt: '6px' }}>{done}/{total} milestones complete</Box>
             </Card>
           </Box>
 
@@ -150,7 +150,7 @@ export function ProjectPageShell({ children }: Props) {
             })}
           </Box>
 
-          {children({ project, ips: ips ?? [], own })}
+          {children({ project, workflows: workflows ?? [], own })}
         </Box>
       </Box>
 

@@ -12,8 +12,8 @@ export type EdgeDocument = Edge & Document;
  */
 @Schema({ timestamps: true })
 export class Edge {
-  @Prop({ type: SchemaTypes.ObjectId, ref: 'Ip', required: true, index: true })
-  ipId: Types.ObjectId;
+  @Prop({ type: SchemaTypes.ObjectId, ref: 'Workflow', required: true, index: true })
+  workflowId: Types.ObjectId;
 
   @Prop({ type: SchemaTypes.ObjectId, ref: 'Deliverable', required: true })
   fromId: Types.ObjectId;

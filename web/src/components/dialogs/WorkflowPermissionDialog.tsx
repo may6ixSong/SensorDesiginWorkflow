@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Box } from '@mui/material';
-import { IpDto } from '@/types/domain';
+import { WorkflowDto } from '@/types/domain';
 import { DEPARTMENTS, departmentName } from '@/shared/constants/departments';
 import { DirectoryUser, findDirectoryUser } from '@/shared/constants/mock-users';
 import { ModalShell } from '@/components/common/ModalShell';
@@ -11,7 +11,7 @@ import { UserAvatar } from '@/components/common/Avatar';
 import { T } from '@/theme/tokens';
 
 interface Props {
-  ip: IpDto;
+  workflow: WorkflowDto;
   users: DirectoryUser[];
   own: boolean;
   onClose: () => void;
@@ -26,16 +26,16 @@ interface Props {
  * 목업 ownerDlgH() — 담당자·권한.
  * Edit 후보를 Analog로 필터링하는 건 UX 편의일 뿐이고, 실제 방어는 BE에 있다 (설계서 3.3, 6.2).
  */
-export function IpPermissionDialog({
-  ip, users, own, onClose, onAddOwner, onRemoveOwner, onAddViewGrant, onRemoveViewGrant,
+export function WorkflowPermissionDialog({
+  workflow, users, own, onClose, onAddOwner, onRemoveOwner, onAddViewGrant, onRemoveViewGrant,
 }: Props) {
-  const owners = ip.owners.map(findDirectoryUser);
+  const owners = workflow.owners.map(findDirectoryUser);
   const primary = owners[0];
   const analogCandidates = users.filter(
-    (u) => u.department === 'analog' && !ip.owners.includes(u.knoxId),
+    (u) => u.department === 'analog' && !workflow.owners.includes(u.knoxId),
   );
   const viewCandidates = users.filter(
-    (u) => !ip.owners.includes(u.knoxId) && !ip.viewGrants.some((g) => g.knoxId === u.knoxId),
+    (u) => !workflow.owners.includes(u.knoxId) && !workflow.viewGrants.some((g) => g.knoxId === u.knoxId),
   );
 
   const [ownerSel, setOwnerSel] = useState('');
@@ -49,7 +49,7 @@ export function IpPermissionDialog({
       width={560}
       header={
         <>
-          <Ey>{ip.name}</Ey>
+          <Ey>{workflow.name}</Ey>
           <Box sx={{ fontSize: 17, fontWeight: 700, mt: '2px' }}>Owners & Permissions</Box>
         </>
       }
@@ -61,7 +61,7 @@ export function IpPermissionDialog({
           <Box>
             <Box sx={{ fontSize: 14, fontWeight: 600 }}>{primary?.name ?? '—'}</Box>
             <Box sx={{ fontSize: 11, color: T.dm2 }}>
-              {primary ? departmentName(primary.department) : ''} · set up this IP workflow initially
+              {primary ? departmentName(primary.department) : ''} · set up this workflow workflow initially
             </Box>
           </Box>
         </Box>
@@ -117,8 +117,8 @@ export function IpPermissionDialog({
 
       <Card>
         <Ey sx={{ mb: '9px' }}>View access — any department</Ey>
-        {ip.viewGrants.length ? (
-          ip.viewGrants.map((g) => {
+        {workflow.viewGrants.length ? (
+          workflow.viewGrants.map((g) => {
             const gu = findDirectoryUser(g.knoxId);
             return (
               <Box key={g.knoxId} sx={{ display: 'flex', alignItems: 'center', gap: '9px', padding: '7px 0', borderBottom: `1px solid ${T.ln}` }}>

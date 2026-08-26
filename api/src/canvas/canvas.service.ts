@@ -2,9 +2,8 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Deliverable, DeliverableDocument } from '../deliverables/schemas/deliverable.schema';
-import { IpDocument } from '../ips/schemas/ip.schema';
+import { WorkflowDocument } from '../workflows/schemas/workflow.schema';
 import { Actor } from '../common/actor';
-import { ProjectsService } from '../projects/projects.service';
 import { MemosService } from '../memos/memos.service';
 import { EdgesService } from '../edges/edges.service';
 import { AuditService } from '../audit/audit.service';
@@ -19,25 +18,36 @@ import { PutCanvasDto } from './dto/put-canvas.dto';
 export class CanvasService {
   constructor(
     @InjectModel(Deliverable.name) private readonly deliverableModel: Model<DeliverableDocument>,
-    private readonly projects: ProjectsService,
     private readonly memos: MemosService,
     private readonly edges: EdgesService,
     private readonly audit: AuditService,
   ) {}
 
-  async apply(ip: IpDocument, dto: PutCanvasDto, actor: Actor) {
-    const project = await this.projects.findByIdOrThrow(ip.projectId.toString());
-    const validPhaseKeys = new Set(project.phases.map((p) => p.key));
+  async apply(workflow: WorkflowDocument, dto: PutCanvasDto, actor: Actor) {
+    // ★ phaseId 검증은 이 workflow의 phase 목록 기준이다(더 이상 과제 마일스톤이 아니다).
+    //   단, "지금 목록에 없는 phaseId"를 무조건 거절하면 안 된다 — phase를 지우면 그걸
+    //   가리키던 산출물은 일부러 그대로 남겨 두는 설계라(사용자 요청: 유실 표시), 그 산출물이
+    //   포함된 캔버스는 영영 저장할 수 없게 된다. 그래서 "이미 저장돼 있던 값 그대로면"
+    //   통과시키고, 새로 지정하는 phaseId만 실재 여부를 따진다.
+    const validPhaseIds = new Set((workflow.phases ?? []).map((p) => p.id));
 
     this.assertValidLayouts(dto);
+
+    const stored = await this.deliverableModel
+      .find({ workflowId: workflow._id }, { phaseId: 1 })
+      .exec();
+    const storedPhaseId = new Map(stored.map((d) => [d._id.toString(), d.phaseId]));
+
     for (const d of dto.deliverables) {
-      if (!validPhaseKeys.has(d.phaseKey)) {
-        throw new BadRequestException(`Unknown phase: ${d.phaseKey}`);
-      }
+      if (validPhaseIds.has(d.phaseId)) continue;
+      if (storedPhaseId.get(d.id) === d.phaseId) continue; // 유실된 채로 그대로 둔 산출물
+      throw new BadRequestException(`Unknown phase: ${d.phaseId}`);
     }
+    // 메모는 산출물과 달리 유실을 표시할 이유가 없다 — 사라진 phase에 붙어 있던 메모는
+    // FE가 저장 직전에 남아 있는 첫 phase로 옮겨 보낸다.
     for (const m of dto.memos) {
-      if (!validPhaseKeys.has(m.phaseKey)) {
-        throw new BadRequestException(`Unknown phase: ${m.phaseKey}`);
+      if (!validPhaseIds.has(m.phaseId)) {
+        throw new BadRequestException(`Unknown phase: ${m.phaseId}`);
       }
     }
 
@@ -45,43 +55,43 @@ export class CanvasService {
       dto.deliverables.map((d) =>
         this.deliverableModel
           .updateOne(
-            { _id: d.id, ipId: ip._id },
-            { $set: { layout: d.layout, phaseKey: d.phaseKey } },
+            { _id: d.id, workflowId: workflow._id },
+            { $set: { layout: d.layout, phaseId: d.phaseId } },
           )
           .exec(),
       ),
     );
 
-    await this.memos.replaceAllForIp(
-      ip._id.toString(),
+    await this.memos.replaceAllForWorkflow(
+      workflow._id.toString(),
       dto.memos.map((m) => ({
         id: m.id,
-        phaseKey: m.phaseKey,
+        phaseId: m.phaseId,
         text: m.text,
         layout: m.layout,
         createdBy: actor.knoxId,
       })),
-      ip.isMock,
+      workflow.isMock,
     );
 
-    await this.edges.replaceAllForIp(ip._id.toString(), dto.edges, ip.isMock);
+    await this.edges.replaceAllForWorkflow(workflow._id.toString(), dto.edges, workflow.isMock);
 
-    await this.audit.log(actor.knoxId, 'LAYOUT_UPDATE', 'ip', ip._id, {
+    await this.audit.log(actor.knoxId, 'LAYOUT_UPDATE', 'workflow', workflow._id, {
       deliverableCount: dto.deliverables.length,
       memoCount: dto.memos.length,
       edgeCount: dto.edges.length,
     });
 
     return {
-      deliverables: await this.deliverableModel.find({ ipId: ip._id }).exec(),
-      memos: await this.memos.listForIp(ip._id.toString()),
-      edges: await this.edges.listForIp(ip._id.toString()),
+      deliverables: await this.deliverableModel.find({ workflowId: workflow._id }).exec(),
+      memos: await this.memos.listForWorkflow(workflow._id.toString()),
+      edges: await this.edges.listForWorkflow(workflow._id.toString()),
     };
   }
 
   private assertValidLayouts(dto: PutCanvasDto) {
     // y는 위 방향 벽(top wall)을 없애 자유롭게 음수로 드래그할 수 있으므로 하한을
-    // 두지 않는다 - x(Phase 레인 좌측 경계)는 여전히 0 이상이어야 한다.
+    // 두지 않는다 - x(phase 레인 좌측 경계)는 여전히 0 이상이어야 한다.
     const isValid = (l: { x: number; y: number; w: number; h: number }) =>
       l && l.x >= 0 && Number.isFinite(l.y) && l.w > 0 && l.h > 0;
     for (const d of dto.deliverables) {

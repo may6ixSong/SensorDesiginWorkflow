@@ -1,23 +1,23 @@
 /**
  * Design Workflow view의 순수 데이터 모델 — 과제의 모든 IP를 도메인(Analog/Digital/
- * APS…) 단위 영역으로 나눈다. IP↔IP(도메인을 넘나드는) 산출물 handoff는 이 화면의
- * 관심사가 아니다 — 주고/받는 두 IP 입장에서는 "같은 산출물" 하나일 뿐이라 별도
- * 연결선이 필요 없다는 게 이 화면의 전제다(요청). 대신 같은 IP 안의 산출물↔산출물
+ * APS…) 단위 영역으로 나눈다. workflow↔workflow(도메인을 넘나드는) 산출물 handoff는 이 화면의
+ * 관심사가 아니다 — 주고/받는 두 workflow 입장에서는 "같은 산출물" 하나일 뿐이라 별도
+ * 연결선이 필요 없다는 게 이 화면의 전제다(요청). 대신 같은 workflow 안의 산출물↔산출물
  * flow(EdgeDto)는 web/src/lib/designWorkflowLayout.ts가 와이어로 그린다.
  *
- * 도메인 섹션 목록은 IP가 가진 도메인 + `knownDomains`(= 과제에 등록된 Project.ipDomains)의
+ * 도메인 섹션 목록은 IP가 가진 도메인 + `knownDomains`(= 과제에 등록된 Project.workflowDomains)의
  * 합집합이다. 그래서 아직 IP가 배정되지 않은 도메인도 빈 섹션으로 자리를 잡는다 —
  * "이 과제에 어떤 도메인이 있는지"가 화면에 그대로 보이는 게 목적이다.
  *
  * React/DOM을 전혀 모르는 순수 함수만 모아 뒀다.
  */
-import { DeliverableDto, IpDto } from '@/types/domain';
+import { DeliverableDto, WorkflowDto } from '@/types/domain';
 
 export const UNASSIGNED_DOMAIN = 'UNASSIGNED';
 
 /** IP가 속한 도메인 — BE에 domain 필드가 아직 없는 데이터도 깨지지 않게 폴백을 둔다. */
-export function domainOf(ip: IpDto): string {
-  const raw = (ip.domain ?? '').trim();
+export function domainOf(workflow: WorkflowDto): string {
+  const raw = (workflow.domain ?? '').trim();
   return raw ? raw.toUpperCase() : UNASSIGNED_DOMAIN;
 }
 
@@ -59,7 +59,7 @@ export interface DomainGroup {
   key: string;
   label: string;
   color: string;
-  ips: IpDto[];
+  workflows: WorkflowDto[];
   counts: StatusCounts;
 }
 
@@ -97,28 +97,28 @@ function assignColors(keys: string[]): Map<string, string> {
 }
 
 /**
- * IP 목록 + IP별 산출물(own)로 도메인 모델을 만든다.
- * @param deliverablesByIp ipId → 그 IP가 주는 산출물(own). incoming은 반대편에서
+ * workflow 목록 + IP별 산출물(own)로 도메인 모델을 만든다.
+ * @param deliverablesByIp workflowId → 그 IP가 주는 산출물(own). incoming은 반대편에서
  *   이미 한 번 세므로 넣지 않는다(항로 중복 방지).
- * @param knownDomains 과제에 등록된 도메인 목록(Project.ipDomains). IP가 하나도 배정되지
+ * @param knownDomains 과제에 등록된 도메인 목록(Project.workflowDomains). IP가 하나도 배정되지
  *   않은 도메인도 빈 섹션으로 보여 주기 위한 것 — 이걸 넘기지 않으면 IP가 실제로 가진
  *   도메인만 나온다. 대소문자는 domainOf()와 같은 기준으로 올려 맞춘다.
  */
 export function buildDomainModel(
-  ips: IpDto[],
+  workflows: WorkflowDto[],
   deliverablesByIp: Map<string, DeliverableDto[]>,
   knownDomains: string[] = [],
 ): DomainWorkflowModel {
-  const grouped = new Map<string, IpDto[]>();
+  const grouped = new Map<string, WorkflowDto[]>();
   // 등록된 도메인을 먼저 빈 그룹으로 깔아 둔다 — IP가 없어도 섹션 자리는 만든다.
   knownDomains.forEach((d) => {
     const key = d.trim().toUpperCase();
     if (key && !grouped.has(key)) grouped.set(key, []);
   });
-  ips.forEach((ip) => {
-    const key = domainOf(ip);
+  workflows.forEach((workflow) => {
+    const key = domainOf(workflow);
     const arr = grouped.get(key) ?? [];
-    arr.push(ip);
+    arr.push(workflow);
     grouped.set(key, arr);
   });
 
@@ -133,10 +133,10 @@ export function buildDomainModel(
   const domains: DomainGroup[] = domainKeys.map((key) => {
     const members = [...(grouped.get(key) ?? [])].sort((a, b) => a.name.localeCompare(b.name));
     const counts = members.reduce(
-      (acc, ip) => addCounts(acc, countStatuses(deliverablesByIp.get(ip.id) ?? [])),
+      (acc, workflow) => addCounts(acc, countStatuses(deliverablesByIp.get(workflow.id) ?? [])),
       emptyCounts(),
     );
-    return { key, label: key, color: colorOf.get(key) ?? DOMAIN_PALETTE[0], ips: members, counts };
+    return { key, label: key, color: colorOf.get(key) ?? DOMAIN_PALETTE[0], workflows: members, counts };
   });
 
   return {

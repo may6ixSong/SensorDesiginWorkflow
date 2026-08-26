@@ -40,6 +40,9 @@ export const T = {
 
   bl: 'var(--siren-bl)',
   rd: 'var(--siren-rd)',
+  /** 유실(일정 없음) 표시용 옅은 배경/테두리 — 캔버스 블록, 타임라인, 3D 뷰가 함께 쓴다. */
+  rd2: 'var(--siren-rd2)',
+  rd3: 'var(--siren-rd3)',
 
   ss: 'var(--siren-shadow-ss)',
   sm: 'var(--siren-shadow-sm)',

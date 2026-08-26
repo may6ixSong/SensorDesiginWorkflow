@@ -1,27 +1,27 @@
 import { Body, Controller, Param, Put, UseGuards } from '@nestjs/common';
-import { IpAccessGuard } from '../common/guards/ip-access.guard';
-import { IpAccess } from '../common/decorators/ip-access.decorator';
+import { WorkflowAccessGuard } from '../common/guards/workflow-access.guard';
+import { WorkflowAccess } from '../common/decorators/workflow-access.decorator';
 import { CurrentActor } from '../common/decorators/current-actor.decorator';
-import { CurrentIp } from '../common/decorators/current-ip.decorator';
+import { CurrentWorkflow } from '../common/decorators/current-workflow.decorator';
 import { Actor } from '../common/actor';
-import { IpDocument } from '../ips/schemas/ip.schema';
+import { WorkflowDocument } from '../workflows/schemas/workflow.schema';
 import { CanvasService } from './canvas.service';
 import { PutCanvasDto } from './dto/put-canvas.dto';
 
-@UseGuards(IpAccessGuard)
-@Controller('ips/:ipId/canvas')
+@UseGuards(WorkflowAccessGuard)
+@Controller('workflows/:workflowId/canvas')
 export class CanvasController {
   constructor(private readonly canvas: CanvasService) {}
 
-  @IpAccess('edit')
+  @WorkflowAccess('edit')
   @Put()
   async put(
-    @Param('ipId') _ipId: string,
+    @Param('workflowId') _workflowId: string,
     @Body() dto: PutCanvasDto,
-    @CurrentIp() ip: IpDocument,
+    @CurrentWorkflow() workflow: WorkflowDocument,
     @CurrentActor() me: Actor,
   ) {
-    const result = await this.canvas.apply(ip, dto, me);
+    const result = await this.canvas.apply(workflow, dto, me);
     return { data: result };
   }
 }

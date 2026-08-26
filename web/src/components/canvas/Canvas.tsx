@@ -1,17 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Box } from '@mui/material';
-import { IpBriefDto, IpDto, PhaseRef } from '@/types/domain';
+import { WorkflowBriefDto, WorkflowDto, WorkflowPhase } from '@/types/domain';
 import { useCanvasStore } from '@/store/canvasStore';
 import { toast } from '@/store/toastStore';
 import {
-  CanvasEdge, CanvasMemo, CanvasNode, connectedSet, laneG, getPW, phaseAtX,
-  resizePhase, wallAdj, todayX, autoFit as computeAutoFit,
+  CanvasMemo, CanvasNode, connectedSet, countOrphans, isOrphanPhase, laneG, getPW,
+  phaseAtX, resizePhase, wallAdj, todayX, autoFit as computeAutoFit,
   resolveNodePhases,
 } from '@/lib/canvasModel';
 import {
   CANVAS_TAIL, CH, MAXH, MAXW, MINH, MINW, PAD, ZOOM_DEFAULT_FLOOR, ZOOM_MAX, ZOOM_MIN, ZOOM_STEP, snp,
 } from '@/lib/constants';
 import { FONT_MONO, T } from '@/theme/tokens';
+import { Icon } from '@/components/common/Icon';
 import { PhaseStepper } from './PhaseStepper';
 import { EdgeLayer } from './EdgeLayer';
 import { DeliverableNode } from './DeliverableNode';
@@ -20,13 +21,13 @@ import { Toolbox } from './Toolbox';
 import { Legend } from './Legend';
 
 interface Props {
-  ip: IpDto;
-  phases: PhaseRef[];
+  workflow: WorkflowDto;
+  phases: WorkflowPhase[];
   canEdit: boolean;
   /** origin==='incoming'인 노드를 열 때(읽기 전용 상세) 호출된다. */
   onOpenIncoming: (id: string) => void;
-  /** "다른 IP에 준다" 배지(→ IP명) 해석용 — 과제 소속 IP 전체(id/name/color). */
-  ipDirectory: IpBriefDto[];
+  /** "다른 IP에 준다" 배지(→ IP명) 해석용 — 과제 소속 workflow 전체(id/name/color). */
+  workflowDirectory: WorkflowBriefDto[];
   /** 저장 완료(성공/실패 무관) 후 호출할 콜백을 받는다 — 편집 종료를 저장 이후로 미뤄 쿼리 재활성화 레이스를 막는다. */
   onSaveLayout: (onSettled: () => void) => void;
 }
@@ -38,8 +39,8 @@ type Blk = CanvasNode | CanvasMemo;
  * 줌/팬, 자유 드래그 + Phase 벽 저항, grip 리사이즈, pin 연결, Phase 레인 폭 조절,
  * flow 하이라이트, Auto Fit 이 모두 여기서 완결된다 (설계서 3.7~3.9, 7.1).
  */
-export function Canvas({ ip, phases, canEdit, onOpenIncoming, ipDirectory, onSaveLayout }: Props) {
-  const ipById = useMemo(() => new Map(ipDirectory.map((d) => [d.id, d])), [ipDirectory]);
+export function Canvas({ workflow, phases, canEdit, onOpenIncoming, workflowDirectory, onSaveLayout }: Props) {
+  const workflowById = useMemo(() => new Map(workflowDirectory.map((d) => [d.id, d])), [workflowDirectory]);
   const vpRef = useRef<HTMLDivElement>(null);
   const cvRef = useRef<HTMLDivElement>(null);
   const elRefs = useRef(new Map<string, HTMLDivElement>());
@@ -99,13 +100,13 @@ export function Canvas({ ip, phases, canEdit, onOpenIncoming, ipDirectory, onSav
   );
 
   // IP가 바뀔 때: hydrate()가 x/y를 0으로 초기화한 뒤 nodes가 도착하면 today 중앙으로 이동.
-  // hydrate는 데이터 쿼리가 해결된 후에 호출되므로, ip.id 변화 시점보다 늦게 실행된다.
+  // hydrate는 데이터 쿼리가 해결된 후에 호출되므로, workflow.id 변화 시점보다 늦게 실행된다.
   // → nodes.length > 0 을 함께 감지해, 데이터 도착 이후에 한 번만 센터링한다.
   const hasNodes = nodes.length > 0;
   useEffect(() => {
     if (!hasNodes) return;
-    if (centeredForRef.current === ip.id) return; // 이미 이 IP에 대해 센터링 완료
-    centeredForRef.current = ip.id;
+    if (centeredForRef.current === workflow.id) return; // 이미 이 IP에 대해 센터링 완료
+    centeredForRef.current = workflow.id;
     const vp = vpRef.current;
     if (!vp) return;
     const todayCanvas = tx ?? W / 2;
@@ -114,7 +115,7 @@ export function Canvas({ ip, phases, canEdit, onOpenIncoming, ipDirectory, onSav
     const c = clampVP(fitZ, vp.clientWidth / 2 - todayCanvas * fitZ, 0);
     st.getState().setVP(c.z, c.x, c.y);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ip.id, hasNodes]);
+  }, [workflow.id, hasNodes]);
 
   // 윈도우 리사이즈 or 캔버스 크기 변화 시 현재 줌/팬을 재클램프
   useEffect(() => {
@@ -286,10 +287,17 @@ export function Canvas({ ip, phases, canEdit, onOpenIncoming, ipDirectory, onSav
     // 캔버스 맨 위(y<0)까지 자유롭게 끌어올릴 수 있게 한다.
     const rawY = Math.min(H - b.h - PAD, p.y - D.dy);
     D.moved = true;
-    // origin==='incoming' 노드는 다른 IP 소유라 Phase 벽 물리(wallAdj)를 적용하지 않고
+    // origin==='incoming' 노드는 다른 workflow 소유라 Phase 벽 물리(wallAdj)를 적용하지 않고
     // 자유롭게 옮기기만 한다 — Phase를 실제로 벗어났는지는 놓는 순간(pointerUp)에만
     // 검사해서 벗어났으면 alert 후 원위치로 되돌린다.
-    if ('origin' in b && b.origin === 'incoming') {
+    // 일정을 잃은 산출물도 마찬가지로 벽 물리를 적용하지 않는다 — 속한 레인이 없는데
+    // 레인 경계에서 튕기면 "어디에도 안 붙는다"는 상태와 조작감이 서로 어긋난다.
+    // 자유롭게 옮길 수 있고, 어느 레인에 걸쳐 놔도 유실 상태는 그대로 유지된다
+    // (resolveNodePhases가 유실 노드는 건너뛴다).
+    const freeMove =
+      ('origin' in b && b.origin === 'incoming') ||
+      ('phase' in b && 'origin' in b && isOrphanPhase(phases, b.phase));
+    if (freeMove) {
       b.x = snp(rawX);
       b.y = snp(rawY);
       s.bumpBlocks();
@@ -348,7 +356,7 @@ export function Canvas({ ip, phases, canEdit, onOpenIncoming, ipDirectory, onSav
         const np = phaseAtX(phases, s.phasePW, cx);
         if (np && np !== b.phase) {
           b.phase = np;
-          toast(`Moved to ${(phases.find((p) => p.key === np) || { key: '' }).key}`);
+          toast(`Moved to ${(phases.find((p) => p.id === np) || { name: '' }).name}`);
         }
       }
       s.bumpBlocks();
@@ -426,11 +434,11 @@ export function Canvas({ ip, phases, canEdit, onOpenIncoming, ipDirectory, onSav
 
   /* ── PHASE RESIZE (스텝퍼 / 레인 양쪽 핸들) ── */
   const phResizeRef = useRef<{ pid: string; startX: number; startW: number } | null>(null);
-  const onPhResizeStart = (phaseKey: string, e: React.PointerEvent) => {
+  const onPhResizeStart = (phaseId: string, e: React.PointerEvent) => {
     e.preventDefault();
     e.stopPropagation();
     const s = st.getState();
-    phResizeRef.current = { pid: phaseKey, startX: e.clientX, startW: getPW(s.phasePW, phaseKey) };
+    phResizeRef.current = { pid: phaseId, startX: e.clientX, startW: getPW(s.phasePW, phaseId) };
     const move = (ev: PointerEvent) => {
       const r = phResizeRef.current;
       if (!r) return;
@@ -491,14 +499,14 @@ export function Canvas({ ip, phases, canEdit, onOpenIncoming, ipDirectory, onSav
   };
   const handleAddNote = () => {
     const s = st.getState();
-    const g = lanes[phases[0].key] ?? { x: 0 };
+    const g = lanes[phases[0].id] ?? { x: 0 };
     const id = `tmp-note-${Date.now()}`;
     s.setMemos([
       ...s.memos,
       {
         id,
-        ip: ip.id,
-        phase: phases[0].key,
+        workflow: workflow.id,
+        phase: phases[0].id,
         text: 'New memo',
         x: snp(g.x + 46),
         y: 40 + 3 * 150,
@@ -516,6 +524,11 @@ export function Canvas({ ip, phases, canEdit, onOpenIncoming, ipDirectory, onSav
   }, []);
 
   const flashBnd = useCanvasStore((s) => s.flashBnd);
+  /** 일정을 잃은 산출물 수 — 0보다 크면 캔버스 위에 눈에 띄는 배너를 띄운다. */
+  // rev를 의존성에 넣는 이유: 드래그로 phase가 바뀌어도 nodes 배열 자체는 그대로라
+  // (in-place 수정) 이 값이 갱신되지 않는다. bumpBlocks()가 올리는 rev가 유일한 신호다.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const orphanCount = useMemo(() => countOrphans(nodes, phases), [nodes, phases, rev]);
 
   return (
     <>
@@ -563,22 +576,22 @@ export function Canvas({ ip, phases, canEdit, onOpenIncoming, ipDirectory, onSav
         >
           {/* Phase 레인 — 경계선은 canvas 밖 screen-space에서 그린다 */}
           {phases.map((p) => {
-            const g = lanes[p.key];
+            const g = lanes[p.id];
             return (
               <Box
-                key={p.key}
-                data-lane={p.key}
+                key={p.id}
+                data-lane={p.id}
                 sx={{
                   position: 'absolute', top: 0, bottom: 0, left: g.x, width: g.w,
                   pointerEvents: 'none',
                 }}
               >
                 <Box component="span" sx={{ position: 'absolute', bottom: 10, left: 10, fontSize: 10, color: T.ln3 }}>
-                  {p.label}
+                  {p.name}
                 </Box>
                 {edit && (
                   <Box
-                    onPointerDown={(e) => onPhResizeStart(p.key, e)}
+                    onPointerDown={(e) => onPhResizeStart(p.id, e)}
                     sx={{
                       position: 'absolute', right: -5, top: 0, bottom: 0, width: 10,
                       cursor: 'col-resize', zIndex: 6, pointerEvents: 'all',
@@ -631,8 +644,9 @@ export function Canvas({ ip, phases, canEdit, onOpenIncoming, ipDirectory, onSav
             <DeliverableNode
               key={d.id}
               d={d}
-              phase={phases.find((p) => p.key === d.phase)}
-              recvIp={d.recvIpId ? ipById.get(d.recvIpId) : undefined}
+              phase={phases.find((p) => p.id === d.phase)}
+              orphan={d.origin !== 'incoming' && isOrphanPhase(phases, d.phase)}
+              recvWorkflow={d.recvWorkflowId ? workflowById.get(d.recvWorkflowId) : undefined}
               edit={edit}
               canEdit={canEdit}
               isSel={sel === d.id}
@@ -665,13 +679,13 @@ export function Canvas({ ip, phases, canEdit, onOpenIncoming, ipDirectory, onSav
         {/* Phase 경계 점선 — canvas scale() 밖에 렌더하므로 zoom에 관계없이
             dash 패턴이 항상 동일한 픽셀 크기를 유지한다. */}
         {phases.map((p) => {
-          const g = lanes[p.key];
+          const g = lanes[p.id];
           const lineX = Math.round((g.x + g.w) * z + panX);
           const isFlash = flashBnd !== null && Math.abs(g.x + g.w - flashBnd) < 4;
           const col = isFlash ? T.tl : T.ln2;
           return (
             <Box
-              key={`ph-line-${p.key}`}
+              key={`ph-line-${p.id}`}
               sx={{
                 position: 'absolute', top: 0, bottom: 0,
                 left: lineX, width: 2,
@@ -687,11 +701,11 @@ export function Canvas({ ip, phases, canEdit, onOpenIncoming, ipDirectory, onSav
             같은 픽셀 크기·대비를 유지한다 (Today 선 / Phase 경계 점선과 같은 방식). 세로 위치는
             의도적으로 뷰포트 상단에 고정 — 레인을 오래 내려다봐도 이름표가 항상 보인다. */}
         {phases.map((p) => {
-          const g = lanes[p.key];
+          const g = lanes[p.id];
           const left = Math.round(g.x * z + panX);
           return (
             <Box
-              key={`ph-label-${p.key}`}
+              key={`ph-label-${p.id}`}
               sx={{
                 position: 'absolute', top: 10, left: left + 10,
                 display: 'inline-flex', alignItems: 'center',
@@ -701,10 +715,33 @@ export function Canvas({ ip, phases, canEdit, onOpenIncoming, ipDirectory, onSav
                 pointerEvents: 'none', zIndex: 2, whiteSpace: 'nowrap',
               }}
             >
-              {p.key}
+              {p.name}
             </Box>
           );
         })}
+
+        {orphanCount > 0 && (
+          <Box
+            sx={{
+              // 아래 가운데 — 위쪽은 phase 이름표가, 좌우 아래는 툴박스/범례가 쓰고 있어
+              // 여기가 캔버스 내용을 안 가리는 유일한 자리다.
+              position: 'absolute', bottom: 14, left: '50%', transform: 'translateX(-50%)',
+              zIndex: 8, maxWidth: 460,
+              display: 'flex', alignItems: 'flex-start', gap: '9px',
+              background: T.rd2, border: `1px solid ${T.rd3}`, borderRadius: '10px',
+              padding: '10px 12px', boxShadow: T.sm, color: T.rd, fontSize: 11.5, lineHeight: 1.6,
+            }}
+          >
+            <Box component="span" sx={{ mt: '1px', flex: '0 0 auto' }}><Icon name="warn" size={14} /></Box>
+            <Box>
+              <Box sx={{ fontWeight: 700, fontFamily: FONT_MONO, letterSpacing: '.05em', mb: '2px' }}>
+                {orphanCount} ARTIFACT{orphanCount > 1 ? 'S' : ''} WITH NO RELEASE SCHEDULE
+              </Box>
+              Their phase was removed from this workflow's schedule. They kept their position — open one
+              and pick a phase under “Release schedule” to put it back on the plan.
+            </Box>
+          </Box>
+        )}
 
         <Legend />
         <Toolbox

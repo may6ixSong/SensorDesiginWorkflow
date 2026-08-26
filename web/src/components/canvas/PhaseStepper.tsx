@@ -1,34 +1,41 @@
 import { Box } from '@mui/material';
-import { PhaseRef } from '@/types/domain';
+import { WorkflowPhase } from '@/types/domain';
 import { CanvasNode, getPW, todayX } from '@/lib/canvasModel';
+import { DAY_MS, dayMs, shortDate } from '@/lib/schedule';
 import { CURSOR_POINTER, FONT_MONO, T } from '@/theme/tokens';
 
 interface Props {
-  phases: PhaseRef[];
+  phases: WorkflowPhase[];
   phasePW: Record<string, number>;
   nodes: CanvasNode[];
   z: number;
   panX: number;
   edit: boolean;
-  onPhaseClick: (phaseKey: string) => void;
-  onResizeStart: (phaseKey: string, e: React.PointerEvent) => void;
+  onPhaseClick: (phaseId: string) => void;
+  onResizeStart: (phaseId: string, e: React.PointerEvent) => void;
 }
 
 /**
- * 목업 .st-shell / .st-track / .ph — 화살표(clip-path) 스텝퍼.
+ * 이 workflow의 일정 스텝퍼 — 화살표(clip-path) 셀 하나가 phase 한 칸이다.
+ *
+ * 여기 뜨는 이름(KO / ML1 / AR …)은 이 workflow가 스스로 정한 짧은 표기일 뿐,
+ * 과제 마일스톤이 아니다 — 그래서 "Milestone"이라는 단어를 쓰지 않는다.
+ * 칸끼리 일정이 겹칠 수 있고, 그래도 좌→우 순서는 시작일 오름차순 그대로다.
  *
  * 캔버스와 정확히 같은 좌표계를 유지하는 방식이 핵심이다:
  *  - 트랙은 translateX(panX)만 적용하고,
  *  - 각 셀의 폭은 getPW(p) * z 로 미리 곱해둔다.
- * 캔버스는 반대로 translateX(panX) scaleX(z)로 통째로 스케일하고 레인 폭은 원본값을 쓴다.
- * 두 방식의 결과 픽셀 폭이 같아지므로 Phase와 블록이 어긋나지 않는다.
+ * 캔버스는 반대로 translateX(panX) scale(z)로 통째로 스케일하고 레인 폭은 원본값을 쓴다.
+ * 두 방식의 결과 픽셀 폭이 같아지므로 phase와 블록이 어긋나지 않는다.
  */
 export function PhaseStepper({
   phases, phasePW, nodes, z, panX, edit, onPhaseClick, onResizeStart,
 }: Props) {
-  const today = new Date();
-  const tx = todayX(phases, phasePW, today);
+  const now = Date.now();
+  const tx = todayX(phases, phasePW, new Date(now));
   const todayLeft = tx !== null ? tx * z + panX : null;
+  /** 앞 칸보다 일찍 시작하는 칸 = 앞 칸과 일정이 겹친다는 뜻 — 셀에 표시해 준다. */
+  const overlaps = phases.map((p, i) => i > 0 && dayMs(p.start) < dayMs(phases[i - 1].end));
 
   return (
     <Box
@@ -58,21 +65,21 @@ export function PhaseStepper({
 
       <Box sx={{ display: 'flex', whiteSpace: 'nowrap', willChange: 'transform', transform: `translateX(${panX}px)` }}>
         {phases.map((p, i) => {
-          const cnt = nodes.filter((d) => d.phase === p.key).length;
-          const st = new Date(p.start);
-          const en = new Date(p.end);
-          const past = en < today;
-          const cur = st <= today && today <= en;
-          const prog = cur ? Math.min(1, (+today - +st) / (+en - +st)) : past ? 1 : 0;
-          const pw = getPW(phasePW, p.key) * z;
+          const cnt = nodes.filter((d) => d.phase === p.id).length;
+          const st = dayMs(p.start);
+          const en = dayMs(p.end) + DAY_MS;
+          const past = en < now;
+          const cur = st <= now && now <= en;
+          const prog = cur ? Math.min(1, (now - st) / (en - st)) : past ? 1 : 0;
+          const pw = getPW(phasePW, p.id) * z;
 
           return (
             <Box
-              key={p.key}
+              key={p.id}
               onClick={(e) => {
                 if ((e.target as HTMLElement).dataset.phresize !== undefined) return;
                 e.stopPropagation();
-                onPhaseClick(p.key);
+                onPhaseClick(p.id);
               }}
               sx={{
                 position: 'relative',
@@ -103,14 +110,26 @@ export function PhaseStepper({
                 '&:hover': cur ? {} : { background: T.sf3 },
               }}
             >
-              <Box sx={{ fontFamily: FONT_MONO, fontSize: 12, fontWeight: 600, letterSpacing: '.05em', color: cur ? T.tl : past ? T.dm : T.tx }}>
-                {p.key}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Box sx={{ fontFamily: FONT_MONO, fontSize: 12, fontWeight: 600, letterSpacing: '.05em', color: cur ? T.tl : past ? T.dm : T.tx }}>
+                  {p.name}
+                </Box>
+                {overlaps[i] && (
+                  <Box
+                    component="span"
+                    title="This phase overlaps the previous one — that's allowed; lanes stay ordered by start date."
+                    sx={{
+                      fontFamily: FONT_MONO, fontSize: 8, fontWeight: 700, letterSpacing: '.06em',
+                      color: T.vi, background: T.vi2, border: `1px solid ${T.vi3}`,
+                      borderRadius: '999px', padding: '0 5px',
+                    }}
+                  >
+                    OVERLAP
+                  </Box>
+                )}
               </Box>
-              <Box sx={{ fontSize: 11, color: T.dm, margin: '1px 0 2px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {p.label}
-              </Box>
-              <Box sx={{ fontFamily: FONT_MONO, fontSize: 9, color: T.dm2 }}>
-                {p.start.slice(2)} → {p.end.slice(2)}
+              <Box sx={{ fontFamily: FONT_MONO, fontSize: 9.5, color: T.dm2, margin: '2px 0 0' }}>
+                {shortDate(p.start)} → {shortDate(p.end)}
               </Box>
               <Box sx={{ position: 'absolute', bottom: 7, right: 20, fontFamily: FONT_MONO, fontSize: 9, color: T.dm2 }}>
                 {cnt}
@@ -122,7 +141,7 @@ export function PhaseStepper({
                 <>
                   <Box
                     data-phresize=""
-                    onPointerDown={(e) => onResizeStart(p.key, e)}
+                    onPointerDown={(e) => onResizeStart(p.id, e)}
                     sx={{
                       position: 'absolute', right: 0, top: 0, bottom: 0, width: 10,
                       cursor: 'col-resize', zIndex: 5, background: 'transparent',
@@ -136,6 +155,12 @@ export function PhaseStepper({
             </Box>
           );
         })}
+
+        {!phases.length && (
+          <Box sx={{ padding: '14px 18px', fontSize: 12, color: T.dm2 }}>
+            This workflow has no schedule yet — add phases from “Edit phases”.
+          </Box>
+        )}
       </Box>
     </Box>
   );

@@ -24,8 +24,8 @@ interface CanvasState {
   memos: CanvasMemo[];
   edges: CanvasEdge[];
   phasePW: Record<string, number>;
-  /* 현재 로드된 IP — 서버 데이터 동기화 판단용 */
-  loadedIpId: string | null;
+  /* 현재 로드된 workflow — 서버 데이터 동기화 판단용 */
+  loadedWorkflowId: string | null;
   /* 상호작용 */
   edit: boolean;
   recv: boolean;
@@ -60,7 +60,7 @@ interface CanvasState {
 
   setVP: (z: number, x: number, y: number) => void;
   setPan: (x: number) => void;
-  hydrate: (ipId: string, d: { nodes: CanvasNode[]; memos: CanvasMemo[]; edges: CanvasEdge[] }) => void;
+  hydrate: (workflowId: string, d: { nodes: CanvasNode[]; memos: CanvasMemo[]; edges: CanvasEdge[] }) => void;
   setNodes: (nodes: CanvasNode[]) => void;
   setMemos: (memos: CanvasMemo[]) => void;
   setEdges: (edges: CanvasEdge[]) => void;
@@ -103,7 +103,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   memos: [],
   edges: [],
   phasePW: {},
-  loadedIpId: null,
+  loadedWorkflowId: null,
   edit: false,
   recv: false,
   sel: null,
@@ -129,18 +129,18 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   setVP: (z, x, y) => set({ z: Math.max(ZOOM_MIN, z), x, y }),
   setPan: (x) => set({ x }),
 
-  hydrate: (ipId, d) =>
+  hydrate: (workflowId, d) =>
     set((s) => ({
-      loadedIpId: ipId,
+      loadedWorkflowId: workflowId,
       nodes: d.nodes,
       memos: d.memos,
       edges: d.edges,
       // IP가 바뀌면 레인 폭/선택/뷰포트 초기화
-      phasePW: s.loadedIpId === ipId ? s.phasePW : {},
-      sel: s.loadedIpId === ipId ? s.sel : null,
-      hlSet: s.loadedIpId === ipId ? s.hlSet : null,
-      x: s.loadedIpId === ipId ? s.x : 0,
-      y: s.loadedIpId === ipId ? s.y : 0,
+      phasePW: s.loadedWorkflowId === workflowId ? s.phasePW : {},
+      sel: s.loadedWorkflowId === workflowId ? s.sel : null,
+      hlSet: s.loadedWorkflowId === workflowId ? s.hlSet : null,
+      x: s.loadedWorkflowId === workflowId ? s.x : 0,
+      y: s.loadedWorkflowId === workflowId ? s.y : 0,
       rev: s.rev + 1,
     })),
 

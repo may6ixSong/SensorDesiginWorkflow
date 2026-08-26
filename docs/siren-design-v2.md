@@ -527,3 +527,70 @@ async addOwner(ipId: string, userId: string) {
 | `analog-dashboard-v15.html` | **UI 기준 목업(최신).** 색상 토큰, 레이아웃 상수, 상호작용의 정본 |
 
 목업에서 직접 확인 가능한 것: 사용자 전환에 따른 IP 노출 차이, Edit/View 권한별 화면, Auto Fit 지그재그 결과, Phase 벽 저항, flow 방향별 하이라이트, HLD 다이얼로그의 diff 하이라이트, Today 인디케이터.
+
+---
+
+## 부록 A. v3 개정 (2026-08-26) — Workflow 단위 일정
+
+> 이 절은 v2 본문보다 **우선한다**. 아래에서 바뀐 항목은 본문의 서술이 오래된 것이며,
+> 코드는 이 절을 따른다. (본문은 나머지 규칙 — 버전/권한/HLD/캔버스 조작 — 의 근거로 계속 유효하다.)
+
+### A.1 IP → Workflow
+
+`IP`라는 명칭을 **Workflow**로 통일했다. 스키마(`Workflow`), 컬렉션(`workflows`), API 경로
+(`/workflows/:workflowId/...`), DTO 필드(`workflowId`, `recvWorkflowId`)까지 전부 바뀌었다.
+도메인(Analog/Digital/…) 단위 묶음은 그대로다.
+
+### A.2 일정이 두 축으로 갈렸다
+
+| | 소유자 | 필드 | 의미 |
+|---|---|---|---|
+| **마일스톤** | Project | `Project.milestones` | 과제 공통 일정. 모든 workflow가 공유하는 큰 축 |
+| **Phase** | Workflow | `Workflow.phases` | 그 workflow만의 일정. 칸 수·이름·날짜가 workflow마다 다르다 |
+
+- workflow를 만들면 그 시점의 마일스톤이 **복사**되어 초기 phase가 된다(id는 새로 발급).
+  복사 이후엔 완전히 독립이다 — 마일스톤을 고쳐도 기존 workflow는 따라 바뀌지 않는다
+  ("Reset to project milestones"로 사용자가 명시적으로 다시 복사할 수는 있다).
+- **일정끼리 겹쳐도 된다.** 순서는 저장하지 않고 항상 `start` 오름차순으로 파생하며,
+  그 순서가 곧 캔버스의 좌 → 우다 (`api/src/common/schedule.ts`, `web/src/lib/schedule.ts`).
+- `PhaseRef{key,label,order}`는 사라졌다. 둘 다 `{ id, name, start, end }`를 쓴다.
+  `name`은 화면에 그대로 뜨는 짧은 표기(`KO`, `ML1`, `AR` …)이며 **full name은 저장하지 않는다** —
+  workflow마다 일정을 다르게 잡게 되면서 그 약어가 무엇의 약자인지는 과제/조직마다 달라졌고,
+  시스템이 추측해서 채우지 않는다. 캔버스에서 "Milestone"이라는 단어도 쓰지 않는다.
+- 산출물은 `Deliverable.phaseId`로 **소유 workflow의 phase**를 가리킨다(`phaseKey` 폐기).
+
+### A.3 일정을 잃은 산출물 (orphan)
+
+phase를 지워도 서버는 그 phase를 가리키던 산출물을 **옮기지도 지우지도 않는다.**
+산출물은 캔버스의 원래 좌표에 그대로 남고, FE가 "그 phaseId가 지금 목록에 없다"는 사실만으로
+유실 상태를 그린다(붉은 파선 + `NO SCHEDULE` 리본 + 캔버스 배너 + 헤더 chip).
+
+- `resolveNodePhases()`는 유실 노드를 **건너뛴다** — 좌표가 우연히 옆 레인과 겹쳤다고 흡수되면
+  사용자가 유실을 알아채기 전에 표시가 사라진다.
+- 유실을 푸는 유일한 경로는 산출물 상세의 **Release schedule**에서 살아 있는 phase를 고르는 것이다.
+  이때 `PATCH /deliverables/:id/schedule`이 원본의 `phaseId`를 첫 번째 선택 phase로 **옮긴다**
+  (좌표는 건드리지 않는다).
+- 캔버스 저장(`PUT /workflows/:id/canvas`)은 "이미 저장돼 있던 값 그대로인" 유실 phaseId를 통과시킨다 —
+  안 그러면 유실 산출물이 있는 캔버스를 영영 저장할 수 없다.
+
+### A.4 다른 workflow에서 받은 산출물(incoming)의 배치
+
+phase가 workflow마다 다르므로, 주는 쪽의 `phaseId`는 받는 쪽 캔버스에서 아무 의미가 없다.
+그래서 incoming DTO가 `sourcePhase{ id,name,start,end }`를 함께 내려주고, 받는 쪽은 그 **종료일이
+자기 어느 phase 구간에 들어오는지**로 레인을 고른다(`matchPhaseByDate`).
+
+### A.5 flow 연결
+
+산출물 상세에서 연결을 만들거나 지우지 않는다. 연결은 **캔버스에서만** 한다(핀 드래그 / 링크 ✕).
+상세의 Flow links 카드는 읽기 전용 목록이다.
+
+### A.6 화면
+
+- **Project Information → Schedule**: x축이 실제 날짜인 타임라인. 위에 과제 마일스톤 띠,
+  아래에 도메인 → workflow 행마다 자기 phase 막대. 축 범위는 마일스톤 ∪ 모든 workflow phase다.
+- **Design Workflow(3D)**: x = 시간(산출물은 자기 phase의 **종료일** 위치), y = workflow
+  (도메인끼리 큰 간격으로 분리), z = 자유(결정적 해시, 아무 데이터도 뜻하지 않음).
+  CSS `perspective` + `translate3d`로 실제 원근을 준다 — 그래서 카메라 레이어 아래 중간 래퍼에
+  `opacity`/`filter`를 걸면 안 된다(3D가 평면으로 눌린다). 흐림은 잎 요소에 직접 준다.
+  과제 마일스톤은 x축 전체를 세로로 가로지르는 옅은 밴드로만 그린다.
+  일정을 잃은 산출물은 날짜축 바깥의 `NO SCHEDULE` 구역에 붉게 모인다.

@@ -39,7 +39,7 @@ export default function App() {
         <Route path="/projects/:projectId/members" element={<ProjectMembersPage />} />
         <Route path="/details" element={<DetailsRedirect />} />
         <Route path="/details/:projectId" element={<DetailsRedirect />} />
-        <Route path="/details/:projectId/:ipId" element={<BoardPage />} />
+        <Route path="/details/:projectId/:workflowId" element={<BoardPage />} />
         <Route path="/guide" element={<GuidePage />} />
         <Route path="/no-access" element={<NoAccessPage />} />
       </Routes>

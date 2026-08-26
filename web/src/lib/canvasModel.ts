@@ -5,7 +5,8 @@
  *
  * 설계서 1.3·5.5에 따라 이 계산은 전부 FE에서 완결되고, BE는 결과 좌표만 저장한다.
  */
-import { DeliverableDto, EdgeDto, MemoDto, PhaseRef } from '@/types/domain';
+import { DeliverableDto, EdgeDto, MemoDto, WorkflowPhase } from '@/types/domain';
+import { DAY_MS, dayMs, matchPhaseByDate } from './schedule';
 import {
   DEFAULT_PW, GAP, LANE_PAD, MH, MW, NH, NW, PAD, ROW_H, TOP_PAD, WALL_FORCE, snp,
 } from './constants';
@@ -24,7 +25,13 @@ export interface VersionView {
 
 export interface CanvasNode {
   id: string;
-  ip: string;
+  workflow: string;
+  /**
+   * 이 산출물이 걸려 있는 phase의 id. 소유 workflow의 phase 목록에 없으면 "일정 유실"
+   * 상태다 — 캔버스는 좌표를 그대로 두고 유실 표시만 붙인다(isOrphanPhase 참고).
+   * origin==='incoming'이면 주는 쪽 phase가 아니라, sourcePhase의 날짜로 골라낸
+   * "내 phase" id가 들어간다(placeIncomingNodes).
+   */
   phase: string;
   name: string;
   type: string;
@@ -34,14 +41,16 @@ export interface CanvasNode {
   seriesTotal: number;
   recvDept: string | null;
   recvContact: string | null;
-  /** 이 산출물을 받아야 하는 다른 Analog IP. */
-  recvIpId: string | null;
+  /** 이 산출물을 받아야 하는 다른 Analog workflow. */
+  recvWorkflowId: string | null;
   /** 이 시스템에 없는 외부 부서로부터 받았음을 나타내는 자유 텍스트 — own 그대로라 자유 편집 가능. */
   sourceDept: string | null;
   /** 'incoming'이면 다른 IP가 이 IP로 보낸 산출물 — 드래그/리사이즈 불가, 저장 대상 아님. */
   origin: 'own' | 'incoming';
-  /** origin==='incoming'일 때만 채워진다 — 이 산출물을 준 IP. */
-  sourceIp: { id: string; name: string; color: string } | null;
+  /** origin==='incoming'일 때만 채워진다 — 이 산출물을 준 workflow. */
+  sourceWorkflow: { id: string; name: string; color: string } | null;
+  /** origin==='incoming'일 때만 채워진다 — 주는 쪽 workflow에서의 일정 구간. */
+  sourcePhase: WorkflowPhase | null;
   versions: VersionView[];
   canEdit: boolean;
   x: number;
@@ -52,7 +61,7 @@ export interface CanvasNode {
 
 export interface CanvasMemo {
   id: string;
-  ip: string;
+  workflow: string;
   phase: string;
   text: string;
   x: number;
@@ -84,8 +93,8 @@ export interface CanvasData {
 export function toCanvasNode(d: DeliverableDto, origin: 'own' | 'incoming' = 'own'): CanvasNode {
   return {
     id: d.id,
-    ip: d.ipId,
-    phase: d.phaseKey,
+    workflow: d.workflowId,
+    phase: d.phaseId,
     name: d.name,
     type: d.docType,
     net: d.network,
@@ -94,10 +103,11 @@ export function toCanvasNode(d: DeliverableDto, origin: 'own' | 'incoming' = 'ow
     seriesTotal: d.seriesTotal,
     recvDept: d.recvDept,
     recvContact: d.recvContact,
-    recvIpId: d.recvIpId,
+    recvWorkflowId: d.recvWorkflowId,
     sourceDept: d.sourceDept ?? null,
     origin,
-    sourceIp: d.sourceIp ?? null,
+    sourceWorkflow: d.sourceWorkflow ?? null,
+    sourcePhase: d.sourcePhase ?? null,
     versions: d.versions ?? [],
     canEdit: d.canEdit,
     x: origin === 'incoming' ? 0 : d.layout?.x ?? 0,
@@ -109,8 +119,8 @@ export function toCanvasNode(d: DeliverableDto, origin: 'own' | 'incoming' = 'ow
 export function toCanvasMemo(m: MemoDto): CanvasMemo {
   return {
     id: m._id,
-    ip: m.ipId,
-    phase: m.phaseKey,
+    workflow: m.workflowId,
+    phase: m.phaseId,
     text: m.text,
     x: m.layout?.x ?? 0,
     y: m.layout?.y ?? 0,
@@ -126,31 +136,46 @@ export function toCanvasEdge(e: EdgeDto): CanvasEdge {
 export const getPW = (phasePW: Record<string, number>, id: string) => phasePW[id] || DEFAULT_PW;
 
 /** 목업 laneG(): Phase 순서대로 x를 누적. __tot은 전체 폭. */
-export function laneG(phases: PhaseRef[], phasePW: Record<string, number>) {
+export function laneG(phases: WorkflowPhase[], phasePW: Record<string, number>) {
   let x = 0;
   const o: Record<string, { x: number; w: number }> = {};
   phases.forEach((p) => {
-    const w = getPW(phasePW, p.key);
-    o[p.key] = { x, w };
+    const w = getPW(phasePW, p.id);
+    o[p.id] = { x, w };
     x += w;
   });
   return { lanes: o, total: x };
 }
 
+/**
+ * 이 phaseId를 가진 산출물이 "일정을 잃었는지" — 지금 workflow의 phase 목록에 그 id가
+ * 없으면 유실이다. phase를 지워도 서버가 산출물을 옮기거나 지우지 않기 때문에 생기는
+ * 상태이고(사용자 요청), 캔버스는 좌표를 그대로 둔 채 표시만 다르게 한다. 같은 id의
+ * phase가 다시 생기면 아무 조작 없이 원래대로 붙는다.
+ */
+export function isOrphanPhase(phases: WorkflowPhase[], phaseId: string): boolean {
+  return !phases.some((p) => p.id === phaseId);
+}
+
+/** 유실된 산출물이 몇 개인지 — 툴바/토스트 문구용. */
+export function countOrphans(nodes: CanvasNode[], phases: WorkflowPhase[]): number {
+  return nodes.filter((n) => n.origin !== 'incoming' && isOrphanPhase(phases, n.phase)).length;
+}
+
 /** x 좌표가 속한 Phase id (목업 phaseAtX) */
-export function phaseAtX(phases: PhaseRef[], phasePW: Record<string, number>, cx: number): string {
+export function phaseAtX(phases: WorkflowPhase[], phasePW: Record<string, number>, cx: number): string {
   const { lanes } = laneG(phases, phasePW);
   for (const p of phases) {
-    const g = lanes[p.key];
-    if (cx >= g.x && cx < g.x + g.w) return p.key;
+    const g = lanes[p.id];
+    if (cx >= g.x && cx < g.x + g.w) return p.id;
   }
-  return cx < 0 ? phases[0].key : phases[phases.length - 1].key;
+  return cx < 0 ? phases[0].id : phases[phases.length - 1].id;
 }
 
 type Blk = { id: string; phase: string; x: number; y: number; w: number; h: number };
 
 /** 레인 밖으로 삐져나간 블록이 있는지 (목업 laneOverflow) */
-export function laneOverflow(blocks: Blk[], phases: PhaseRef[], phasePW: Record<string, number>, pid: string) {
+export function laneOverflow(blocks: Blk[], phases: WorkflowPhase[], phasePW: Record<string, number>, pid: string) {
   const g = laneG(phases, phasePW).lanes[pid];
   if (!g) return false;
   return blocks
@@ -159,7 +184,7 @@ export function laneOverflow(blocks: Blk[], phases: PhaseRef[], phasePW: Record<
 }
 
 /** 레인 안에서 좌→우 배치, 폭이 모자라면 아래 줄로 개행 (목업 reflowLane) */
-export function reflowLane(blocks: Blk[], phases: PhaseRef[], phasePW: Record<string, number>, pid: string) {
+export function reflowLane(blocks: Blk[], phases: WorkflowPhase[], phasePW: Record<string, number>, pid: string) {
   const g = laneG(phases, phasePW).lanes[pid];
   if (!g) return;
   const lx = g.x + LANE_PAD;
@@ -190,7 +215,7 @@ export function reflowLane(blocks: Blk[], phases: PhaseRef[], phasePW: Record<st
  */
 export function placeInLane(
   block: { x: number; y: number; phase: string },
-  phases: PhaseRef[],
+  phases: WorkflowPhase[],
   phasePW: Record<string, number>,
 ): void {
   const g = laneG(phases, phasePW).lanes[block.phase];
@@ -200,15 +225,20 @@ export function placeInLane(
 }
 
 /**
- * origin==='incoming' 노드(다른 IP가 이 IP에 보낸 산출물)는 이 캔버스의 저장 대상이
- * 아니므로 서버에 위치가 없다 — 매 hydrate마다 이 함수로 다시 계산한다. own 노드의
- * 위치(사용자가 드래그해 저장한 값)는 절대 건드리지 않고, incoming 노드만 그 Phase
- * 레인 안에서 own/다른 incoming 노드와 겹치지 않는 첫 빈 자리(위→아래 탐색)에 놓는다.
- * 그래서 own 노드들 사이에 실제로 "섞여" 보이고, edge로 자유롭게 연결할 수 있다.
+ * origin==='incoming' 노드(다른 workflow가 이 workflow에 보낸 산출물)는 이 캔버스의 저장
+ * 대상이 아니므로 서버에 위치가 없다 — 매 hydrate마다 이 함수로 다시 계산한다. own 노드의
+ * 위치(사용자가 드래그해 저장한 값)는 절대 건드리지 않고, incoming 노드만 레인 안에서
+ * own/다른 incoming 노드와 겹치지 않는 첫 빈 자리(위→아래 탐색)에 놓는다. 그래서 own
+ * 노드들 사이에 실제로 "섞여" 보이고, edge로 자유롭게 연결할 수 있다.
+ *
+ * ★ 어느 레인에 놓을지는 날짜로 정한다. incoming 산출물이 들고 오는 phaseId는 "주는 쪽
+ *   workflow"의 것이라 내 phase 목록에는 아예 없다(phase가 workflow마다 다르므로).
+ *   그래서 함께 받은 sourcePhase의 종료일이 내 어느 phase 구간에 들어오는지로 고르고,
+ *   어디에도 안 들어오면 가장 가까운 phase로 붙인다(lib/schedule.ts의 matchPhaseByDate).
  */
 export function placeIncomingNodes(
   nodes: CanvasNode[],
-  phases: PhaseRef[],
+  phases: WorkflowPhase[],
   phasePW: Record<string, number>,
 ): void {
   const { lanes } = laneG(phases, phasePW);
@@ -225,6 +255,9 @@ export function placeIncomingNodes(
     .filter((n) => n.origin === 'incoming')
     .sort((a, b) => a.id.localeCompare(b.id))
     .forEach((n) => {
+      const localPhase = matchPhaseByDate(phases, n.sourcePhase);
+      if (!localPhase) return;
+      n.phase = localPhase;
       const g = lanes[n.phase];
       if (!g) return;
       const placed = placedByPhase.get(n.phase) ?? [];
@@ -245,16 +278,19 @@ export function placeIncomingNodes(
 }
 
 /**
- * 편집 완료 시 1회만 호출 — 각 노드가 가장 많이 겹치는 Phase 레인을 찾아 `phase`
- * 필드(소속 표시·필터링용 메타데이터)만 확정한다. 겹침이 이제 허용되므로(설계
- * 변경 — 사용자 요청) 좌표는 절대 건드리지 않는다: 내가 직접 드래그하지 않은
- * 다른 노드가 "제멋대로" 움직이는 일이 없어야 한다 — 이 함수는 항상 내가
- * 옮긴 노드만 만지고, 나머지는 순수 조회만 한다.
- * 드래그 중(포인터 이동/업)마다 계산하면 비용이 크므로 세션 종료 시점에만 실행한다.
+ * 편집 완료 시 1회만 호출 — 각 노드가 가장 많이 겹치는 phase 레인을 찾아 `phase`
+ * 필드(소속 표시·필터링용 메타데이터)만 확정한다. 겹침이 허용되므로 좌표는 절대
+ * 건드리지 않는다: 내가 직접 드래그하지 않은 다른 노드가 "제멋대로" 움직이는 일이
+ * 없어야 한다 — 이 함수는 항상 내가 옮긴 노드만 만지고, 나머지는 순수 조회만 한다.
+ *
+ * ★ 일정을 잃은 산출물(isOrphanPhase)은 건너뛴다. 사라진 phase 자리에 그대로 남아 있는
+ *   좌표가 우연히 옆 레인과 겹친다는 이유로 그 phase에 흡수돼 버리면, 사용자가 유실
+ *   사실을 알아채기도 전에 표시가 사라진다. 다시 일정을 잡는 것은 산출물 상세의
+ *   "Release schedule"에서 명시적으로만 한다.
  */
 export function resolveNodePhases(
   nodes: CanvasNode[],
-  phases: PhaseRef[],
+  phases: WorkflowPhase[],
   phasePW: Record<string, number>,
 ): { reassigned: number } {
   if (!phases.length) return { reassigned: 0 };
@@ -262,19 +298,20 @@ export function resolveNodePhases(
   let reassigned = 0;
 
   nodes.forEach((n) => {
-    let bestKey = phases[0].key;
+    if (isOrphanPhase(phases, n.phase)) return;
+    let bestId = phases[0].id;
     let bestOverlap = -Infinity;
     phases.forEach((p) => {
-      const g = lanes[p.key];
+      const g = lanes[p.id];
       const overlap = Math.min(n.x + n.w, g.x + g.w) - Math.max(n.x, g.x);
       if (overlap > bestOverlap) {
         bestOverlap = overlap;
-        bestKey = p.key;
+        bestId = p.id;
       }
     });
 
-    if (n.phase !== bestKey) {
-      n.phase = bestKey;
+    if (n.phase !== bestId) {
+      n.phase = bestId;
       reassigned++;
     }
   });
@@ -294,12 +331,12 @@ export function minPW(blocks: Blk[], pid: string) {
  */
 export function resizePhase(
   blocks: Blk[],
-  phases: PhaseRef[],
+  phases: WorkflowPhase[],
   phasePW: Record<string, number>,
   pid: string,
   rawNewW: number,
 ): Record<string, number> {
-  const idx = phases.findIndex((p) => p.key === pid);
+  const idx = phases.findIndex((p) => p.id === pid);
   if (idx < 0) return phasePW;
 
   const nw = Math.max(minPW(blocks, pid), Math.round(rawNewW));
@@ -313,9 +350,9 @@ export function resizePhase(
 
   phases.forEach((p, i) => {
     if (i < idx) return;
-    const dx = (Gnew[p.key]?.x ?? 0) - (Gold[p.key]?.x ?? 0);
+    const dx = (Gnew[p.id]?.x ?? 0) - (Gold[p.id]?.x ?? 0);
     if (dx === 0) return;
-    blocks.filter((b) => b.phase === p.key).forEach((b) => {
+    blocks.filter((b) => b.phase === p.id).forEach((b) => {
       b.x = snp(Math.max(PAD, b.x + dx));
     });
   });
@@ -347,7 +384,7 @@ export function resizePhase(
  * 넘어간 경우 넘은 경계 x를 crossed로 알려 하이라이트에 쓴다.
  */
 export function wallAdj(
-  phases: PhaseRef[],
+  phases: WorkflowPhase[],
   phasePW: Record<string, number>,
   bx: number,
   bw: number,
@@ -355,7 +392,7 @@ export function wallAdj(
   accum: number,
 ): { x: number; crossed: number | null } {
   const { lanes } = laneG(phases, phasePW);
-  const bnds = phases.slice(1).map((p) => lanes[p.key].x);
+  const bnds = phases.slice(1).map((p) => lanes[p.id].x);
   for (const bnd of bnds) {
     if (cx < bnd && cx + bw > bnd) {
       if (Math.abs(accum) < WALL_FORCE) {
@@ -450,24 +487,51 @@ export function stamp(): string {
   return fmtAt(new Date().toISOString());
 }
 
-/** 오늘 날짜의 캔버스 x 좌표 (목업 todayX) */
-export function todayX(phases: PhaseRef[], phasePW: Record<string, number>, now = new Date()): number | null {
+/**
+ * 오늘 날짜의 캔버스 x 좌표.
+ *
+ * phase가 서로 겹치거나 사이가 비어 있을 수 있으므로(설계 변경) "오늘이 들어 있는
+ * 단 하나의 phase"를 가정할 수 없다. 규칙:
+ *   1) 오늘을 품는 phase가 있으면 그중 가장 왼쪽 레인 안에서 경과 비율만큼.
+ *   2) 없으면(레인 사이 빈 구간) 앞뒤 레인 경계 사이를 날짜 비율로 보간한다.
+ *   3) 전체 일정보다 이르면 0, 늦으면 전체 폭.
+ */
+export function todayX(phases: WorkflowPhase[], phasePW: Record<string, number>, now = new Date()): number | null {
   if (!phases.length) return null;
   const { lanes, total } = laneG(phases, phasePW);
-  const first = new Date(phases[0].start);
-  const last = new Date(phases[phases.length - 1].end);
-  if (now < first) return 0;
-  if (now > last) return total;
+  const t = now.getTime();
+  const firstStart = Math.min(...phases.map((p) => dayMs(p.start)));
+  const lastEnd = Math.max(...phases.map((p) => dayMs(p.end)));
+  if (t <= firstStart) return 0;
+  if (t >= lastEnd + DAY_MS) return total;
+
   for (const p of phases) {
-    const st = new Date(p.start);
-    const en = new Date(p.end);
-    if (now >= st && now <= en) {
-      const g = lanes[p.key];
-      const r = (now.getTime() - st.getTime()) / Math.max(1, en.getTime() - st.getTime());
+    const st = dayMs(p.start);
+    const en = dayMs(p.end) + DAY_MS;
+    if (t >= st && t <= en) {
+      const g = lanes[p.id];
+      const r = (t - st) / Math.max(1, en - st);
       return Math.round(g.x + g.w * r);
     }
   }
-  return null;
+
+  // 빈 구간: 바로 앞에서 끝난 레인의 오른쪽 끝 ~ 바로 뒤에 시작할 레인의 왼쪽 끝.
+  let prev: { edge: number; ms: number } | null = null;
+  let next: { edge: number; ms: number } | null = null;
+  phases.forEach((p) => {
+    const g = lanes[p.id];
+    const en = dayMs(p.end) + DAY_MS;
+    const st = dayMs(p.start);
+    if (en <= t && (!prev || en > prev.ms)) prev = { edge: g.x + g.w, ms: en };
+    if (st >= t && (!next || st < next.ms)) next = { edge: g.x, ms: st };
+  });
+  if (prev && next) {
+    const a = prev as { edge: number; ms: number };
+    const b = next as { edge: number; ms: number };
+    const r = (t - a.ms) / Math.max(1, b.ms - a.ms);
+    return Math.round(a.edge + (b.edge - a.edge) * r);
+  }
+  return prev ? (prev as { edge: number }).edge : 0;
 }
 
 /**
@@ -477,7 +541,7 @@ export function todayX(phases: PhaseRef[], phasePW: Record<string, number>, now 
 export function autoFit(
   nodes: CanvasNode[],
   edges: CanvasEdge[],
-  phases: PhaseRef[],
+  phases: WorkflowPhase[],
 ): { positions: Record<string, { x: number; y: number }>; phasePW: Record<string, number> } {
   const allIds = nodes.map((d) => d.id);
   const visSet = new Set(allIds);
@@ -524,9 +588,9 @@ export function autoFit(
 
   const nextPW: Record<string, number> = {};
   phases.forEach((p) => {
-    const days = Math.max(1, Math.round((+new Date(p.end) - +new Date(p.start)) / 864e5));
+    const days = Math.max(1, Math.round((dayMs(p.end) - dayMs(p.start)) / DAY_MS));
     const cols = days >= 56 ? 3 : days >= 28 ? 2 : 1;
-    nextPW[p.key] = Math.max(DEFAULT_PW, LANE_PAD * 2 + cols * NW + (cols - 1) * GAP + ZDXR);
+    nextPW[p.id] = Math.max(DEFAULT_PW, LANE_PAD * 2 + cols * NW + (cols - 1) * GAP + ZDXR);
   });
   const { lanes } = laneG(phases, nextPW);
 
@@ -534,9 +598,9 @@ export function autoFit(
   const placed: Record<string, { x: number; y: number }> = {};
 
   phases.forEach((p) => {
-    const g = lanes[p.key];
+    const g = lanes[p.id];
     if (!g) return;
-    const pbs = order.filter((id) => byId.get(id)?.phase === p.key);
+    const pbs = order.filter((id) => byId.get(id)?.phase === p.id);
     if (!pbs.length) return;
     const minD = Math.min(...pbs.map((id) => depth[id] ?? 0));
     const byD: Record<number, string[]> = {};
