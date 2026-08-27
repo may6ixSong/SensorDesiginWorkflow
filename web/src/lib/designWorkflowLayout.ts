@@ -26,8 +26,11 @@ import { DomainGroup, statusOf } from './domainWorkflow';
  * 한 workflow에 보통 20~30개의 산출물이 몰린다 — 그래서 "기본 간격"이 아니라
  * "그 정도 밀도에서도 안 겹치는 간격"을 기준으로 잡는다. 실제 행 높이는
  * buildWorldLayout이 각 행의 실제 lane 개수를 보고 그때그때 더 넓혀 준다. */
-/** 하루당 가로 픽셀 — 마일스톤 구간 자체가 오밀조밀해 보이지 않도록 예전보다 두 배로. */
-export const PX_PER_DAY = 6;
+/**
+ * 하루당 가로 픽셀 — 전체를 fit(줌아웃)했을 때도 마일스톤 구간 하나하나가
+ * 화면을 꽉 채울 만큼 넉넉하게 잡는다.
+ */
+export const PX_PER_DAY = 12;
 export const MIN_AXIS_W = 1200;
 /** workflow 이름 라벨이 차지하는 왼쪽 칸. */
 export const LABEL_W = 250;
