@@ -268,13 +268,33 @@ function WorkflowStage({
     [size.w, size.h],
   );
 
-  /* 처음 열렸을 때(그리고 데이터가 들어와 크기가 확정될 때) 전체를 한 화면에. */
+  /**
+   * 세로로만 꽉 채우는 카메라 계산 — 도메인 전체를 fit하면 가로(전체 날짜축)에 밀려
+   * 세로가 화면을 못 채운다. 그래서 세로만 그 도메인 높이에 맞추고, 가로는 라벨과
+   * 축 시작 지점이 보이는 왼쪽에 둔다.
+   */
+  const frameZoneHeight = useCallback(
+    (zone: DomainZoneLayout, pad = 1.1): Camera => {
+      const z = clamp(size.h / (zone.h * pad), Z_MIN, Z_MAX);
+      const y = size.h / 2 - (zone.y + zone.h / 2) * z;
+      const x = 32 - world.bounds.x * z;
+      return { z, x, y };
+    },
+    [size.h, world.bounds.x],
+  );
+
+  /*
+   * 처음 열렸을 때(그리고 데이터가 들어와 크기가 확정될 때) — 전체 도메인을 다 보여주면
+   * 도메인이 많고 날짜축이 넓을수록 하나하나가 너무 작아진다. 그래서 첫 도메인(가장
+   * workflow가 많은 도메인) 하나가 화면을 세로로 꽉 채우도록 시작한다. 전체를 보려면
+   * "Show all domains" 버튼으로 언제든 fitAll할 수 있다.
+   */
   useEffect(() => {
     if (fittedRef.current || !world.zones.length) return;
     if (size.w <= 240) return;
     fittedRef.current = true;
-    setCam(frameRect(world.bounds, 1.16));
-  }, [world, size.w, frameRect]);
+    setCam(frameZoneHeight(world.zones[0]));
+  }, [world, size.w, frameZoneHeight]);
 
   const fitAll = useCallback(() => {
     setFocusedDomain(null);
