@@ -378,8 +378,11 @@ function WorkflowStage({
     setActiveDomain(best);
   }, [cam, world.zones, size.h]);
 
-  /** 줌이 낮으면 블록 글자가 어차피 안 읽히므로 접는다(LOD). */
-  const detail = cam.z > 0.34;
+  /**
+   * 줌이 낮으면 블록 글자가 어차피 안 읽히므로 접는다(LOD). fit-all 상태에서도
+   * "이게 뭔지"는 보여야 하므로 예전보다 낮은 줌에서도 계속 켜져 있게 문턱을 낮췄다.
+   */
+  const detail = cam.z > 0.16;
   const worldBottom = world.bounds.y + world.bounds.h;
 
   return (
@@ -780,7 +783,7 @@ function DeliverableBlock({
       sx={{
         position: 'absolute', border: 'none', background: 'transparent', padding: 0, fontFamily: 'inherit',
         cursor: CURSOR_POINTER, transition: 'opacity .3s', pointerEvents: 'auto',
-        display: 'flex', alignItems: 'center', gap: '9px', whiteSpace: 'nowrap',
+        display: 'flex', alignItems: 'center', gap: '12px', whiteSpace: 'nowrap',
       }}
       title={`${b.name}\n${b.orphan ? 'No release schedule' : b.phaseName ?? ''}`}
     >
@@ -814,7 +817,7 @@ function DeliverableBlock({
       {detail && (
         <Box
           sx={{
-            fontSize: 13, fontWeight: 500, color: b.orphan ? T.rd : T.tx, textAlign: 'left',
+            fontSize: 16, fontWeight: 600, color: b.orphan ? T.rd : T.tx, textAlign: 'left',
             textShadow: `0 1px 3px ${withAlpha('#000000', 0.25)}`,
             maxWidth: BLOCK_LABEL_W, overflow: 'hidden', textOverflow: 'ellipsis',
           }}
