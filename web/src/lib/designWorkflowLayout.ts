@@ -26,8 +26,8 @@ import { DomainGroup, statusOf } from './domainWorkflow';
  * 한 workflow에 보통 20~30개의 산출물이 몰린다 — 그래서 "기본 간격"이 아니라
  * "그 정도 밀도에서도 안 겹치는 간격"을 기준으로 잡는다. 실제 행 높이는
  * buildWorldLayout이 각 행의 실제 lane 개수를 보고 그때그때 더 넓혀 준다. */
-/** 하루당 가로 픽셀 — 1년이면 대략 1100px. */
-export const PX_PER_DAY = 3;
+/** 하루당 가로 픽셀 — 마일스톤 구간 자체가 오밀조밀해 보이지 않도록 예전보다 두 배로. */
+export const PX_PER_DAY = 6;
 export const MIN_AXIS_W = 1200;
 /** workflow 이름 라벨이 차지하는 왼쪽 칸. */
 export const LABEL_W = 250;
@@ -45,8 +45,12 @@ export const DOMAIN_GAP = 480;
 export const DOMAIN_HEAD_H = 130;
 /** 산출물 구체의 기본 지름 — 카드보다 확실히 "구체"로 읽히도록 예전보다 키웠다. */
 export const BLOCK_D = 52;
-/** z(깊이) 진폭 — ±이 값 안에서 흩어진다. 순수하게 보기 위한 축이다. */
-export const Z_SPREAD = 340;
+/**
+ * z(깊이) 진폭 — ±이 값 안에서 흩어진다. 순수하게 보기 위한 축이지만, 너무 크면
+ * perspective 때문에 항목마다 화면상 위치·크기가 크게 튀어 "자유분방"하게 보인다.
+ * 살짝 떠 있는 느낌만 남도록 작게 눌러 둔다.
+ */
+export const Z_SPREAD = 110;
 /** 같은 행에서 x가 가까운 것들을 세로로 벌리는 간격 — 구체 지름보다 확실히 커야 겹치지 않는다. */
 const STACK_Y = 100;
 /** 같은 스택의 위아래 끝과 옆 행 사이에 남겨 둘 여유. */
@@ -61,8 +65,6 @@ export const BLOCK_LABEL_W = 175;
  * 20~30개가 몰려도 확실히 여유 있게 보이도록 여유분을 예전보다 크게 잡았다.
  */
 const MIN_GAP_X = BLOCK_D * 2 + 60 + BLOCK_LABEL_W;
-/** x 지터 — 같은 날짜에 끝나는 산출물이 완전히 겹쳐 한 점으로 보이지 않게. */
-const JITTER_X = 26;
 
 /** FNV-1a 32bit 해시 — 항상 같은 입력에 같은 값(새로고침해도 배치가 그대로). */
 function hash32(s: string): number {
@@ -218,13 +220,14 @@ export function buildWorldLayout(
       const items = deliverablesByWorkflow.get(workflow.id) ?? [];
 
       // x를 먼저 계산한다 — 실제 필요한 만큼만 세로로 갈라 주려면(아래 lane 배정) x가
-      // 먼저 있어야 한다.
+      // 먼저 있어야 한다. 지터 없이 phase 종료일 그대로 쓴다 — 같은 날짜에 끝나는
+      // 산출물은 x가 같아도 아래 lane 배정이 세로로 갈라 주므로 겹치지 않고, x를
+      // 무작위로 흔들지 않아야 "적당한 간격을 둔 정돈된 배치"로 읽힌다.
       const withX = items.map((d) => {
         const phase = phaseById.get(d.phaseId) ?? null;
         const orphan = !phase;
-        const baseX = phase ? xOfDate(phase.end) : unscheduledX;
-        const jitter = (rand01(`${d.id}:x`) - 0.5) * 2 * JITTER_X;
-        return { d, phase, orphan, x: baseX + jitter };
+        const x = phase ? xOfDate(phase.end) : unscheduledX;
+        return { d, phase, orphan, x };
       });
 
       /*
@@ -268,8 +271,9 @@ export function buildWorldLayout(
         // z는 순수하게 "떠 있는 느낌"을 위한 축 — 데이터와 무관한 결정적 난수다.
         const z = (rand01(`${d.id}:z`) - 0.5) * 2 * Z_SPREAD;
         // 가까운 것(z>0)이 조금 더 크게 — perspective가 처리하지만, 지름 자체도
-        // 살짝 섞어 두면 같은 깊이에 몰려 보이지 않는다.
-        const dia = BLOCK_D * (0.82 + rand01(`${d.id}:d`) * 0.42);
+        // 아주 살짝만 섞어 정돈된 느낌을 유지한다(너무 벌리면 크기가 들쭉날쭉해
+        // 자유분방하게 보인다).
+        const dia = BLOCK_D * (0.94 + rand01(`${d.id}:d`) * 0.12);
         const block: BlockNode = {
           id: d.id, name: d.name, docType: d.docType, status,
           x, y, z, d: dia, phaseName: phase?.name ?? null, orphan,
