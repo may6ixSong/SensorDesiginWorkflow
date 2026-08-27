@@ -36,32 +36,33 @@ export const UNSCHEDULED_W = 190;
 /** 축 오른쪽 여백. */
 export const TAIL_W = 140;
 /** workflow 한 줄의 최소 높이 — 산출물이 몇 개 안 되는 행의 바닥값이다. */
-export const ROW_H = 260;
+export const ROW_H = 340;
 /** 같은 도메인 안, 서로 다른 workflow 행 사이의 추가 여백(행 자체 높이 위에 더해진다). */
-const ROW_GAP = 70;
+const ROW_GAP = 150;
 /** 도메인 그룹 사이 여백 — 넉넉해야 "구역이 갈린다"는 느낌이 난다. */
-export const DOMAIN_GAP = 320;
-/** 도메인 헤더(이름 + 문턱선)가 차지하는 높이. */
-export const DOMAIN_HEAD_H = 84;
+export const DOMAIN_GAP = 480;
+/** 도메인 헤더(이름 + 문턱선)가 차지하는 높이 — 마일스톤 밴드 라벨과 절대 겹치지 않을 만큼. */
+export const DOMAIN_HEAD_H = 130;
 /** 산출물 구체의 기본 지름 — 카드보다 확실히 "구체"로 읽히도록 예전보다 키웠다. */
-export const BLOCK_D = 42;
+export const BLOCK_D = 52;
 /** z(깊이) 진폭 — ±이 값 안에서 흩어진다. 순수하게 보기 위한 축이다. */
-export const Z_SPREAD = 300;
+export const Z_SPREAD = 340;
 /** 같은 행에서 x가 가까운 것들을 세로로 벌리는 간격 — 구체 지름보다 확실히 커야 겹치지 않는다. */
-const STACK_Y = 64;
+const STACK_Y = 100;
 /** 같은 스택의 위아래 끝과 옆 행 사이에 남겨 둘 여유. */
-const STACK_PAD = 34;
+const STACK_PAD = 60;
 /** 산출물 이름표의 최대 폭 — 레이아웃과 렌더가 같은 값을 봐야 한다. */
 export const BLOCK_LABEL_W = 175;
 /**
  * 같은 행에서 두 산출물이 "같은 줄에 있어도 겹치지 않는" 최소 x 간격.
  * 산출물은 구체(중심에서 반지름만큼) + 오른쪽으로 뻗는 이름표(BLOCK_LABEL_W)를
  * 차지한다 — 그래서 필요한 간격은 "가장 큰 구체 지름 + 이름표 폭 + 여유"다.
- * 이 값보다 x가 가까운 것들만 세로로 갈라 준다(아래 lane 배정 참고).
+ * 이 값보다 x가 가까운 것들만 세로로 갈라 준다(아래 lane 배정 참고). 한 workflow당
+ * 20~30개가 몰려도 확실히 여유 있게 보이도록 여유분을 예전보다 크게 잡았다.
  */
-const MIN_GAP_X = BLOCK_D * 1.3 + 14 + BLOCK_LABEL_W;
+const MIN_GAP_X = BLOCK_D * 2 + 60 + BLOCK_LABEL_W;
 /** x 지터 — 같은 날짜에 끝나는 산출물이 완전히 겹쳐 한 점으로 보이지 않게. */
-const JITTER_X = 20;
+const JITTER_X = 26;
 
 /** FNV-1a 32bit 해시 — 항상 같은 입력에 같은 값(새로고침해도 배치가 그대로). */
 function hash32(s: string): number {

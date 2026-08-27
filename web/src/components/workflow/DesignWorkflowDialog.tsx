@@ -752,17 +752,20 @@ function DeliverableBlock({
 }) {
   /*
    * 원이 아니라 진짜 광원 받은 구체로 읽히려면 하이라이트 하나로는 부족하다 —
-   * (1) 작고 강한 정반사 하이라이트, (2) 그 반대편(빛이 안 닿는 쪽)의 core shadow,
-   * (3) 바닥에서 살짝 튕겨 오르는 약한 반사광까지 세 겹을 얹어야 "구"의 명암비가 산다.
-   * blend mode로 겹쳐야 밑에 깔린 색상(hex)이 흐려지지 않는다.
+   * (1) 작고 날카로운 정반사 글린트, (2) 그보다 넓고 흐린 광택 스프레드,
+   * (3) 중심에서 가장자리로 갈수록 어두워지는 vignette(구면이 시선에서 꺾여 나가는
+   * 램버시안 감쇠를 흉내), (4) 빛의 반대편(터미네이터) core shadow까지 네 겹을 얹어야
+   * "원"이 아니라 "구"의 명암비가 산다. blend mode로 겹쳐야 밑에 깔린 색상(hex)이
+   * 흐려지지 않는다.
    */
   const sphereBg = [
-    `radial-gradient(circle at 27% 22%, #ffffff 0%, ${withAlpha('#ffffff', 0)} 34%)`,
-    `radial-gradient(circle at 70% 80%, ${withAlpha('#ffffff', 0.4)} 0%, ${withAlpha('#ffffff', 0)} 24%)`,
-    `radial-gradient(circle at 68% 74%, ${withAlpha('#000000', 0.55)} 0%, ${withAlpha('#000000', 0)} 48%)`,
-    `radial-gradient(circle at 40% 36%, ${lighten(hex, 0.5)} 0%, ${hex} 46%, ${darken(hex, 0.65)} 100%)`,
+    `radial-gradient(circle at 26% 21%, #ffffff 0%, ${withAlpha('#ffffff', 0.9)} 4%, ${withAlpha('#ffffff', 0)} 13%)`,
+    `radial-gradient(circle at 30% 26%, ${withAlpha('#ffffff', 0.55)} 0%, ${withAlpha('#ffffff', 0)} 30%)`,
+    `radial-gradient(circle at 50% 50%, ${withAlpha('#000000', 0)} 52%, ${withAlpha('#000000', 0.4)} 96%, ${withAlpha('#000000', 0.62)} 100%)`,
+    `radial-gradient(circle at 70% 76%, ${withAlpha('#000000', 0.6)} 0%, ${withAlpha('#000000', 0)} 46%)`,
+    `radial-gradient(circle at 38% 34%, ${lighten(hex, 0.55)} 0%, ${hex} 44%, ${darken(hex, 0.72)} 100%)`,
   ].join(',');
-  const sphereBlend = 'screen, screen, multiply, normal';
+  const sphereBlend = 'screen, screen, multiply, multiply, normal';
 
   return (
     <Box
