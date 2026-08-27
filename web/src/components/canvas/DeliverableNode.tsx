@@ -72,6 +72,11 @@ export function DeliverableNode({
       style={{ left: d.x, top: d.y, width: d.w, height: d.h }}
       sx={{
         position: 'absolute',
+        // 선택된 블록 전체(Details 버튼 포함)를 자체 stacking context로 끌어올린다 — 그래야
+        // 옆 블록의 hover(transform)나 incoming opacity가 만드는 stacking context에
+        // Details 버튼이 가려지지 않는다(내부 zIndex:40은 부모가 stacking context를
+        // 만들 때만 의미가 있다). 드래그 중 zIndex(30)보다는 낮게 둔다.
+        zIndex: isSel ? 20 : 'auto',
         borderRadius: '15px',
         background: orphan
           // 옅은 대각 줄무늬 — "여기 있으면 안 되는 것이 남아 있다"는 느낌을 배경 자체로 준다.

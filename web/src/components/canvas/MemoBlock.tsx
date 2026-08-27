@@ -30,6 +30,9 @@ export function MemoBlock({
       style={{ left: n.x, top: n.y, width: n.w, height: n.h }}
       sx={{
         position: 'absolute',
+        // DeliverableNode와 동일하게 — 선택된 블록을 자체 stacking context로 끌어올려서
+        // 옆 블록의 hover/opacity가 만드는 stacking context에 가려지지 않게 한다.
+        zIndex: isSel ? 20 : 'auto',
         borderRadius: '15px',
         padding: '15px 16px',
         background: `repeating-linear-gradient(135deg,${T.memoA} 0 13px,${T.memoB} 13px 26px)`,
