@@ -37,7 +37,7 @@ import { canEditWorkflow } from '@/lib/access';
 export function BoardPage() {
   const { projectId, workflowId } = useParams<{ projectId: string; workflowId: string }>();
   const navigate = useNavigate();
-  const { user: me } = useAuth();
+  const { user: me, isAdmin } = useAuth();
 
   const { data: projects } = useProjects();
   /** 과제 공통 일정 — 캔버스는 쓰지 않고, "과제 일정으로 되돌리기"에만 필요하다. */
@@ -118,7 +118,7 @@ export function BoardPage() {
     s.bumpBlocks();
   }, [workflowId, deliverables, incoming, memos, edges, workflow?.phases, st]);
 
-  const isOwner = canEditWorkflow(workflow); // Admin(Group==='Admin')은 owner가 아니어도 편집 가능
+  const isOwner = canEditWorkflow(workflow, isAdmin); // Admin(Group==='Admin')은 owner가 아니어도 편집 가능
   const canEdit = !!isOwner && !recv; // 목업 canEd()
   const own = !!isOwner && !recv; // 목업 own = isOwn(workflow) && !S.recv
 

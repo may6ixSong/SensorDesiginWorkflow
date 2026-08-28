@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import Cookies from 'js-cookie';
 import axios from 'axios';
 import { addEventLog } from '../../service/event-log-service';
@@ -13,9 +13,6 @@ import { setApiKnoxId } from '../../api/client';
 // 항상 USER_GROUP_API에서 오고, 실패하면 User 클래스의 기본값('en'/'light')을 쓴다.
 //
 // TODO: SSO 연동 지점 - 실제 IdP 연동 시 이 파일만 교체하면 된다.
-
-let isAdminUser: boolean = false;
-export const isAdmin = () => isAdminUser;
 
 export type Language = 'ko' | 'en';
 export type Theme = 'dark' | 'light';
@@ -63,6 +60,8 @@ type AuthContextType = {
   user: User | null;
   updateUserPrefs: <K extends keyof User>(field: K, value: User[K]) => void,
   loginSuccess: boolean;
+  /** user.Group === 'Admin' — user가 바뀔 때마다 리렌더에 반영되는 파생 값. */
+  isAdmin: boolean;
 };
 
 const DEV_USER: ADSSOResponse = {
@@ -77,17 +76,15 @@ const isDev = import.meta.env.ENVIRONMENT === 'dev';
 const AuthContext = createContext<AuthContextType>({
   user: null,
   updateUserPrefs: (_field, _value) => {},
-  loginSuccess: false
+  loginSuccess: false,
+  isAdmin: false,
 });
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const { i18n } = useTranslation();
   const [user, setUser] = useState<User>({} as User);
   const [loginSuccess, openGate] = useState<boolean>(false);
-
-  useEffect(() => {
-    isAdminUser = user.Group === "Admin";
-  }, [user]);
+  const isAdmin = useMemo(() => user.Group === "Admin", [user]);
 
   useEffect(() => {
     if (isDev) {
@@ -176,7 +173,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, updateUserPrefs, loginSuccess }}>
+    <AuthContext.Provider value={{ user, updateUserPrefs, loginSuccess, isAdmin }}>
       {children}
     </AuthContext.Provider>
   );

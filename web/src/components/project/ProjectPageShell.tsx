@@ -12,6 +12,7 @@ import { progressOf } from '@/lib/projectProgress';
 import { toast } from '@/store/toastStore';
 import { FONT_DISPLAY, FONT_MONO, T } from '@/theme/tokens';
 import { canManageProject } from '@/lib/access';
+import { useAuth } from '@/app/providers/AuthProvider';
 
 const TABS = [
   { to: '', label: 'Information', icon: 'info' as const },
@@ -35,8 +36,9 @@ export function ProjectPageShell({ children }: Props) {
   const updateProject = useUpdateProject(projectId ?? '');
   const [editOpen, setEditOpen] = useState(false);
   const [editErr, setEditErr] = useState<string | null>(null);
+  const { isAdmin } = useAuth();
 
-  const own = useMemo(() => canManageProject(workflows), [workflows]);
+  const own = useMemo(() => canManageProject(workflows, isAdmin), [workflows, isAdmin]);
   const { pct, current, done, total } = useMemo(
     () => progressOf(project?.milestones ?? []),
     [project?.milestones],

@@ -1,5 +1,3 @@
-import { isAdmin } from '@/app/providers/AuthProvider';
-
 /**
  * workflow 편집 권한 판정 (2026-08-25 결정).
  *
@@ -10,10 +8,19 @@ import { isAdmin } from '@/app/providers/AuthProvider';
  * ⚠ 서버 응답 마스킹은 그대로 유지된다 - Admin이라도 owner가 아닌 IP의 작업중(minor)
  * 버전과 메모는 애초에 응답에 담겨오지 않는다(설계서 6.1). 즉 Admin은 "편집 UI가
  * 열린다"는 의미이고, 남이 아직 릴리즈하지 않은 파일까지 보게 되는 것은 아니다.
+ *
+ * isAdmin은 호출부에서 useAuth().isAdmin으로 받아 넘긴다 - 예전처럼 모듈 전역 변수를
+ * 직접 읽으면 그 값이 비동기로(로그인 응답 도착 후) 바뀌어도 이미 렌더된/메모이즈된
+ * 컴포넌트가 리렌더되리라는 보장이 없어, 실제 Admin이 admin으로 반영되지 않는 버그가
+ * 있었다. 인자로 받으면 React가 useMemo/렌더 의존성으로 추적할 수 있다.
  */
-export const canEditWorkflow = (workflow?: { myAccess: 'edit' | 'view' } | null): boolean =>
-  isAdmin() || workflow?.myAccess === 'edit';
+export const canEditWorkflow = (
+  workflow?: { myAccess: 'edit' | 'view' } | null,
+  isAdmin?: boolean,
+): boolean => !!isAdmin || workflow?.myAccess === 'edit';
 
 /** 과제 안에서 편집 가능한 IP가 하나라도 있는가 (과제 정보 수정 게이트). */
-export const canManageProject = (workflows?: { myAccess: 'edit' | 'view' }[] | null): boolean =>
-  isAdmin() || (workflows ?? []).some((workflow) => workflow.myAccess === 'edit');
+export const canManageProject = (
+  workflows?: { myAccess: 'edit' | 'view' }[] | null,
+  isAdmin?: boolean,
+): boolean => !!isAdmin || (workflows ?? []).some((workflow) => workflow.myAccess === 'edit');

@@ -6,6 +6,7 @@ import { CURSOR_POINTER, T } from '@/theme/tokens';
 import { initials } from '@/components/common/Avatar';
 import { findDirectoryUser } from '@/shared/constants/mock-users';
 import { canEditWorkflow } from '@/lib/access';
+import { useAuth } from '@/app/providers/AuthProvider';
 
 interface WorkflowHeaderProps {
   workflow: WorkflowDto;
@@ -28,6 +29,7 @@ interface WorkflowHeaderProps {
 export function WorkflowHeader({
   workflow, recv, orphanCount, onOpenPermissions, onOpenHld, onEditPhases,
 }: WorkflowHeaderProps) {
+  const { isAdmin } = useAuth();
   const repOwner = workflow.owners.length ? findDirectoryUser(workflow.owners[0]) : null;
   const extra = Math.max(0, workflow.owners.length - 1 + workflow.viewGrants.length);
 
@@ -49,9 +51,9 @@ export function WorkflowHeader({
       </Box>
 
       <Chip
-        label={canEditWorkflow(workflow) ? 'Edit access' : 'View access'}
+        label={canEditWorkflow(workflow, isAdmin) ? 'Edit access' : 'View access'}
         size="small"
-        color={canEditWorkflow(workflow) ? 'primary' : 'default'}
+        color={canEditWorkflow(workflow, isAdmin) ? 'primary' : 'default'}
         variant="outlined"
       />
       {recv && (
