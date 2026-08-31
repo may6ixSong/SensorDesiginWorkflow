@@ -6,7 +6,7 @@ import { useProjects, useProjectWorkflows } from '@/api/hooks/useProjects';
 import { AppShell } from '@/components/layout/AppShell';
 import { SirenButton } from '@/components/common/SirenButton';
 import { UserAvatar } from '@/components/common/Avatar';
-import { DirectoryUser, findDirectoryUser } from '@/shared/constants/mock-users';
+import { DirectoryUser, useDirectory } from '@/app/providers/DirectoryProvider';
 import { Icon } from '@/components/common/Icon';
 import { progressOf } from '@/lib/projectProgress';
 import { CURSOR_POINTER, FONT_DISPLAY, FONT_MONO, T } from '@/theme/tokens';
@@ -166,12 +166,13 @@ export function ProjectListPage() {
 function ProjectCard({ project, view }: { project: ProjectDto; view: View }) {
   const navigate = useNavigate();
   const { data: workflows } = useProjectWorkflows(project._id);
+  const { resolveUser } = useDirectory();
   const { pct, current, done, total } = progressOf(project.milestones);
   const owners = useMemo(() => {
     const seen = new Map<string, DirectoryUser>();
-    (workflows ?? []).flatMap((i) => i.owners).forEach((knoxId) => seen.set(knoxId, findDirectoryUser(knoxId)));
+    (workflows ?? []).flatMap((i) => i.owners).forEach((knoxId) => seen.set(knoxId, resolveUser(knoxId)));
     return [...seen.values()];
-  }, [workflows]);
+  }, [workflows, resolveUser]);
 
   const row = view === 'list';
 
@@ -218,7 +219,7 @@ function ProjectCard({ project, view }: { project: ProjectDto; view: View }) {
           {project.name}
         </Box>
         <Box sx={{ fontSize: 11.5, color: T.dm, mt: '4px' }}>
-          {project.domain} · {workflows?.length ?? 0} workflows
+          {workflows?.length ?? 0} workflows
         </Box>
       </Box>
 

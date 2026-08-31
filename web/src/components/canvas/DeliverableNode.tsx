@@ -2,7 +2,7 @@ import { Box } from '@mui/material';
 import { CanvasNode, latA, latR, hasW, stOf, vstr, fmtAt } from '@/lib/canvasModel';
 import { WorkflowBriefDto, WorkflowPhase } from '@/types/domain';
 import { departmentName } from '@/shared/constants/departments';
-import { findDirectoryUser } from '@/shared/constants/mock-users';
+import { useDirectory } from '@/app/providers/DirectoryProvider';
 import { DocIcon, Icon } from '@/components/common/Icon';
 import { CURSOR_POINTER, FONT_MONO, T } from '@/theme/tokens';
 
@@ -40,6 +40,7 @@ export function DeliverableNode({
   onOpen, onPinClick, onGripDown, linkActive, registerRef,
   onPointerDown, onPointerMove, onPointerUp, onClick,
 }: Props) {
+  const { resolveUser } = useDirectory();
   const st = stOf(d);
   const rel = latR(d);
   const work = hasW(d) ? latA(d) : null;
@@ -251,7 +252,7 @@ export function DeliverableNode({
         }}
       >
         {orphan ? 'Release schedule lost' : phase ? phase.name : '-'} ·{' '}
-        {last ? findDirectoryUser(last.by).name : '—'} ·{' '}
+        {last ? resolveUser(last.by).name : '—'} ·{' '}
         {last ? fmtAt(last.at).slice(5, 16) : 'No updates'}
       </Box>
 

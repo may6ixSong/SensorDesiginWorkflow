@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { KeyboardEvent, ReactNode } from 'react';
 import { Box } from '@mui/material';
 import { CURSOR_POINTER, FONT_MONO, T } from '@/theme/tokens';
 
@@ -59,9 +59,15 @@ const controlSx = {
 };
 
 export function TextInput({
-  value, onChange, placeholder, error, id,
+  value, onChange, placeholder, error, id, onKeyDown, autoFocus,
 }: {
-  value: string; onChange: (v: string) => void; placeholder?: string; error?: boolean; id?: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  error?: boolean;
+  id?: string;
+  onKeyDown?: (e: KeyboardEvent<HTMLInputElement>) => void;
+  autoFocus?: boolean;
 }) {
   return (
     <Box
@@ -69,7 +75,9 @@ export function TextInput({
       id={id}
       value={value}
       placeholder={placeholder}
+      autoFocus={autoFocus}
       onChange={(e) => onChange((e.target as HTMLInputElement).value)}
+      onKeyDown={onKeyDown}
       sx={{ ...controlSx, ...(error ? { borderColor: T.rd } : {}) }}
     />
   );

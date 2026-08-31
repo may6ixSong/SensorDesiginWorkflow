@@ -1,12 +1,9 @@
-import { Avatar, AvatarGroup, Box, Chip, Stack, Tooltip, Typography } from '@mui/material';
+import { Box, Chip, Stack, Tooltip, Typography } from '@mui/material';
+import { useTranslation } from 'react-i18next';
 import { WorkflowDto } from '@/types/domain';
 import { SirenButton } from '@/components/common/SirenButton';
 import { Icon } from '@/components/common/Icon';
-import { CURSOR_POINTER, T } from '@/theme/tokens';
-import { initials } from '@/components/common/Avatar';
-import { findDirectoryUser } from '@/shared/constants/mock-users';
-import { canEditWorkflow } from '@/lib/access';
-import { useAuth } from '@/app/providers/AuthProvider';
+import { T } from '@/theme/tokens';
 
 interface WorkflowHeaderProps {
   workflow: WorkflowDto;
@@ -20,8 +17,11 @@ interface WorkflowHeaderProps {
   onEditPhases?: () => void;
 }
 
+/** Edit phases / Owners & permissions 아이콘 버튼 크기 — 기존 권한 dialog 버튼(shield, 13px)의 2배. */
+const ICON_BUTTON_SIZE = 26;
+
 /**
- * workflow명, 담당자 chip(클릭→권한 dialog), 일정 편집 · HLD 버튼.
+ * workflow명, 일정 편집 · 권한 관리 아이콘 버튼(모두 왼쪽 정렬, workflow명 옆), HLD 버튼.
  *
  * 일정 편집이 여기 붙는 이유: phase는 이제 workflow가 소유한 데이터라 과제 화면이 아니라
  * 이 workflow의 보드가 제자리다(과제 화면에서 고치는 것은 공통 마일스톤뿐이다).
@@ -29,9 +29,7 @@ interface WorkflowHeaderProps {
 export function WorkflowHeader({
   workflow, recv, orphanCount, onOpenPermissions, onOpenHld, onEditPhases,
 }: WorkflowHeaderProps) {
-  const { isAdmin } = useAuth();
-  const repOwner = workflow.owners.length ? findDirectoryUser(workflow.owners[0]) : null;
-  const extra = Math.max(0, workflow.owners.length - 1 + workflow.viewGrants.length);
+  const { t } = useTranslation();
 
   return (
     <Stack
@@ -41,49 +39,36 @@ export function WorkflowHeader({
       sx={{ px: 2, py: 1.5, borderBottom: `1px solid ${T.ln}`, background: T.sf, flex: '0 0 auto' }}
     >
       <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: workflow.color, flexShrink: 0 }} />
-      <Box sx={{ flex: 1, minWidth: 0 }}>
-        <Typography variant="subtitle1" fontWeight={700} noWrap>
-          {workflow.name}
-        </Typography>
-        <Typography variant="caption" color="text.secondary" noWrap>
-          {workflow.description}
-        </Typography>
-      </Box>
 
-      <Chip
-        label={canEditWorkflow(workflow, isAdmin) ? 'Edit access' : 'View access'}
-        size="small"
-        color={canEditWorkflow(workflow, isAdmin) ? 'primary' : 'default'}
-        variant="outlined"
-      />
+      <Stack direction="row" alignItems="center" spacing={0.5} sx={{ flex: 1, minWidth: 0 }}>
+        <Box sx={{ minWidth: 0, mr: 1 }}>
+          <Typography variant="subtitle1" fontWeight={700} noWrap>
+            {workflow.name}
+          </Typography>
+          <Typography variant="caption" color="text.secondary" noWrap>
+            {workflow.description}
+          </Typography>
+        </Box>
+
+        {onEditPhases && (
+          <Tooltip title={t('workflow.editPhases')}>
+            <SirenButton variant="ghost" onClick={onEditPhases} sx={{ padding: '6px 8px' }} aria-label={t('workflow.editPhases')}>
+              <Icon name="calendar" size={ICON_BUTTON_SIZE} />
+            </SirenButton>
+          </Tooltip>
+        )}
+
+        <Tooltip title={t('workflow.permissions')}>
+          <SirenButton variant="ghost" onClick={onOpenPermissions} sx={{ padding: '6px 8px' }} aria-label={t('workflow.permissions')}>
+            <Icon name="shield" size={ICON_BUTTON_SIZE} />
+          </SirenButton>
+        </Tooltip>
+      </Stack>
+
       {recv && (
         <Chip label="Recipient-dept view" size="small" variant="outlined"
           sx={{ color: T.vi, borderColor: T.vi3, background: T.vi2 }} />
       )}
-
-      <Tooltip title="Manage owners / permissions">
-        <Stack
-          direction="row"
-          spacing={1}
-          alignItems="center"
-          onClick={onOpenPermissions}
-          sx={{ cursor: CURSOR_POINTER, px: 1, py: 0.5, borderRadius: 2, '&:hover': { bgcolor: T.sf2 } }}
-        >
-          <AvatarGroup max={4} sx={{ '& .MuiAvatar-root': { width: 24, height: 24, fontSize: 11 } }}>
-            {workflow.owners.map((knoxId) => {
-              const o = findDirectoryUser(knoxId);
-              return (
-                <Avatar key={knoxId} sx={{ bgcolor: o.color }}>
-                  {initials(o.name)}
-                </Avatar>
-              );
-            })}
-          </AvatarGroup>
-          <Typography variant="caption">
-            {repOwner?.name ?? 'No owner'} +{extra} more
-          </Typography>
-        </Stack>
-      </Tooltip>
 
       {orphanCount > 0 && (
         <Chip
@@ -95,18 +80,6 @@ export function WorkflowHeader({
           sx={{ color: T.rd, borderColor: T.rd3, background: T.rd2 }}
         />
       )}
-
-      {onEditPhases && (
-        <SirenButton onClick={onEditPhases}>
-          <Icon name="calendar" /> Edit phases
-        </SirenButton>
-      )}
-
-      <Tooltip title="Edit access — who can edit this workflow's canvas and schedule">
-        <SirenButton variant="ghost" onClick={onOpenPermissions} sx={{ padding: '6px 8px' }}>
-          <Icon name="shield" />
-        </SirenButton>
-      </Tooltip>
 
       <SirenButton onClick={onOpenHld}>
         <Icon name="grid" /> HLD Release

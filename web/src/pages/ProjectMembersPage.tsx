@@ -1,24 +1,25 @@
 import { useState } from 'react';
 import { Box } from '@mui/material';
+import { useTranslation } from 'react-i18next';
 import { ProjectMemberDto } from '@/types/domain';
 import {
   useAddProjectMember, useAddProjectManager, useRemoveProjectMember, useRemoveProjectManager,
 } from '@/api/hooks/useProjects';
-import { useUsers } from '@/api/hooks/useUsers';
 import { useAuth } from '@/app/providers/AuthProvider';
+import { useDirectory } from '@/app/providers/DirectoryProvider';
 import { canEditMilestones } from '@/lib/access';
 import { ProjectPageShell } from '@/components/project/ProjectPageShell';
+import { UserSearchDialog } from '@/components/dialogs/UserSearchDialog';
+import { ConfirmDialog } from '@/components/dialogs/ConfirmDialog';
 import { SirenButton } from '@/components/common/SirenButton';
-import { Card, Ey, Field, Row, SelectInput } from '@/components/common/Panel';
+import { Card, Ey } from '@/components/common/Panel';
 import { UserAvatar } from '@/components/common/Avatar';
 import { Icon } from '@/components/common/Icon';
-import { DEPARTMENTS, departmentName } from '@/shared/constants/departments';
-import { DirectoryUser, findDirectoryUser } from '@/shared/constants/mock-users';
+import { DEPARTMENTS } from '@/shared/constants/departments';
 import { toast } from '@/store/toastStore';
 import { T } from '@/theme/tokens';
 
 export function ProjectMembersPage() {
-  const { data: users } = useUsers();
   const { user: me, isAdmin } = useAuth();
 
   return (
@@ -30,7 +31,6 @@ export function ProjectMembersPage() {
             <ProjectManagersCard
               projectId={project._id}
               managers={project.managers}
-              allUsers={users ?? []}
               canManage={canManageManagers}
             />
 
@@ -48,7 +48,6 @@ export function ProjectMembersPage() {
                   deptId={dept.id}
                   deptName={dept.name}
                   members={project.members.filter((m) => m.department === dept.id)}
-                  allUsers={users ?? []}
                   takenKnoxIds={new Set(project.members.map((m) => m.knoxId))}
                   canManage={own}
                 />
@@ -68,21 +67,23 @@ export function ProjectMembersPage() {
  * Workflow의 "기존 owner가 다른 owner를 추가"하는 패턴과 동일하다.
  */
 function ProjectManagersCard({
-  projectId, managers, allUsers, canManage,
+  projectId, managers, canManage,
 }: {
-  projectId: string; managers: string[]; allUsers: DirectoryUser[]; canManage: boolean;
+  projectId: string; managers: string[]; canManage: boolean;
 }) {
+  const { t } = useTranslation();
+  const { resolveUser } = useDirectory();
   const addManager = useAddProjectManager(projectId);
   const removeManager = useRemoveProjectManager(projectId);
-  const candidates = allUsers.filter((u) => !managers.includes(u.knoxId));
-  const [sel, setSel] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [target, setTarget] = useState<string | null>(null);
 
   return (
     <Card sx={{ mb: '18px' }}>
       <Ey sx={{ mb: '9px' }}>Project Managers — can edit milestones</Ey>
       {managers.length ? (
         managers.map((knoxId) => {
-          const mu = findDirectoryUser(knoxId);
+          const mu = resolveUser(knoxId);
           return (
             <Box
               key={knoxId}
@@ -93,13 +94,10 @@ function ProjectManagersCard({
                 <Box sx={{ fontSize: 12.5, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {mu.name}
                 </Box>
-                <Box sx={{ fontSize: 10.5, color: T.dm2 }}>{departmentName(mu.department)}</Box>
+                <Box sx={{ fontSize: 10.5, color: T.dm2 }}>{mu.department}</Box>
               </Box>
               {canManage && (
-                <SirenButton
-                  variant="ghost"
-                  onClick={() => removeManager.mutate(knoxId, { onSuccess: () => toast('Manager removed') })}
-                >
+                <SirenButton variant="ghost" onClick={() => setTarget(knoxId)}>
                   <Icon name="trash" />
                 </SirenButton>
               )}
@@ -111,60 +109,74 @@ function ProjectManagersCard({
       )}
 
       {canManage && (
-        <Row sx={{ mt: '10px' }}>
-          <Field label="Add manager" sx={{ flex: 1, mb: 0 }}>
-            <SelectInput
-              value={sel || candidates[0]?.knoxId || ''}
-              onChange={setSel}
-              disabled={!candidates.length}
-              options={
-                candidates.length
-                  ? candidates.map((u) => ({ value: u.knoxId, label: u.name }))
-                  : [{ value: '', label: 'Everyone is already a manager' }]
-              }
-            />
-          </Field>
-          <Box sx={{ display: 'flex', alignItems: 'flex-end' }}>
-            <SirenButton
-              disabled={!candidates.length}
-              onClick={() => {
-                const u = sel || candidates[0]?.knoxId;
-                if (u) {
-                  addManager.mutate(u, { onSuccess: () => { setSel(''); toast('Manager added'); } });
-                }
-              }}
-            >
-              <Icon name="plus" /> Add
-            </SirenButton>
-          </Box>
-        </Row>
+        <Box sx={{ mt: '10px' }}>
+          <SirenButton onClick={() => setSearchOpen(true)}>
+            <Icon name="plus" /> {t('members.addManager')}
+          </SirenButton>
+        </Box>
+      )}
+
+      {searchOpen && (
+        <UserSearchDialog
+          title={t('members.addManager')}
+          excludeKnoxIds={new Set(managers)}
+          onClose={() => setSearchOpen(false)}
+          onConfirm={(knoxId) => {
+            addManager.mutate(knoxId, {
+              onSuccess: () => { setSearchOpen(false); toast('Manager added'); },
+              onError: (e: any) => toast(e?.response?.data?.message ?? 'Failed to add'),
+            });
+          }}
+        />
+      )}
+
+      {target && (
+        <ConfirmDialog
+          title={t('members.confirmRemoveManagerTitle')}
+          message={t('members.confirmRemoveManagerMessage', { name: resolveUser(target).name, knoxId: target })}
+          confirmLabel={t('members.remove')}
+          cancelLabel={t('members.cancel')}
+          busy={removeManager.isPending}
+          onCancel={() => setTarget(null)}
+          onConfirm={() => removeManager.mutate(target, {
+            onSuccess: () => { setTarget(null); toast('Manager removed'); },
+          })}
+        />
       )}
     </Card>
   );
 }
 
 function DepartmentMemberCard({
-  projectId, deptId, deptName, members, allUsers, takenKnoxIds, canManage,
+  projectId, deptId, deptName, members, takenKnoxIds, canManage,
 }: {
   projectId: string;
   deptId: string;
   deptName: string;
   members: ProjectMemberDto[];
-  allUsers: DirectoryUser[];
   takenKnoxIds: Set<string>;
   canManage: boolean;
 }) {
+  const { t } = useTranslation();
+  const { resolveUser } = useDirectory();
   const addMember = useAddProjectMember(projectId);
   const removeMember = useRemoveProjectMember(projectId);
-  const candidates = allUsers.filter((u) => !takenKnoxIds.has(u.knoxId));
-  const [sel, setSel] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [target, setTarget] = useState<string | null>(null);
 
   return (
     <Card>
-      <Ey sx={{ mb: '9px' }}>{deptName}</Ey>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', mb: '9px' }}>
+        <Ey sx={{ flex: 1 }}>{deptName}</Ey>
+        {canManage && (
+          <SirenButton variant="ghost" onClick={() => setSearchOpen(true)} aria-label={t('members.addMember')}>
+            <Icon name="plus" />
+          </SirenButton>
+        )}
+      </Box>
       {members.length ? (
         members.map((m) => {
-          const mu = findDirectoryUser(m.knoxId);
+          const mu = resolveUser(m.knoxId);
           return (
             <Box
               key={m.knoxId}
@@ -175,13 +187,10 @@ function DepartmentMemberCard({
                 <Box sx={{ fontSize: 12.5, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {mu.name}
                 </Box>
-                <Box sx={{ fontSize: 10.5, color: T.dm2 }}>{departmentName(mu.department)}</Box>
+                <Box sx={{ fontSize: 10.5, color: T.dm2 }}>{mu.department}</Box>
               </Box>
               {canManage && (
-                <SirenButton
-                  variant="ghost"
-                  onClick={() => removeMember.mutate(m.knoxId, { onSuccess: () => toast('Member removed') })}
-                >
+                <SirenButton variant="ghost" onClick={() => setTarget(m.knoxId)}>
                   <Icon name="trash" />
                 </SirenButton>
               )}
@@ -192,37 +201,37 @@ function DepartmentMemberCard({
         <Box sx={{ fontSize: 12, color: T.dm2, pb: '6px' }}>No members yet.</Box>
       )}
 
-      {canManage && (
-        <Row sx={{ mt: '10px' }}>
-          <Field label="Add member" sx={{ flex: 1, mb: 0 }}>
-            <SelectInput
-              value={sel || candidates[0]?.knoxId || ''}
-              onChange={setSel}
-              disabled={!candidates.length}
-              options={
-                candidates.length
-                  ? candidates.map((u) => ({ value: u.knoxId, label: u.name }))
-                  : [{ value: '', label: 'Everyone is already on the roster' }]
-              }
-            />
-          </Field>
-          <Box sx={{ display: 'flex', alignItems: 'flex-end' }}>
-            <SirenButton
-              disabled={!candidates.length}
-              onClick={() => {
-                const u = sel || candidates[0]?.knoxId;
-                if (u) {
-                  addMember.mutate(
-                    { knoxId: u, department: deptId },
-                    { onSuccess: () => { setSel(''); toast('Member added'); } },
-                  );
-                }
-              }}
-            >
-              <Icon name="plus" /> Add
-            </SirenButton>
-          </Box>
-        </Row>
+      {searchOpen && (
+        <UserSearchDialog
+          title={`${t('members.addMember')} — ${deptName}`}
+          excludeKnoxIds={takenKnoxIds}
+          fixedDepartment={deptId}
+          onClose={() => setSearchOpen(false)}
+          onConfirm={(knoxId, department) => {
+            addMember.mutate(
+              { knoxId, department: department ?? deptId },
+              {
+                onSuccess: () => { setSearchOpen(false); toast('Member added'); },
+                onError: (e: any) => toast(e?.response?.data?.message ?? 'Failed to add'),
+              },
+            );
+          }}
+        />
+      )}
+
+      {target && (
+        <ConfirmDialog
+          title={t('members.confirmDeleteMemberTitle')}
+          message={t('members.confirmDeleteMemberMessage', { name: resolveUser(target).name, knoxId: target, dept: deptName })}
+          warning={t('members.confirmDeleteMemberWarning')}
+          confirmLabel={t('members.remove')}
+          cancelLabel={t('members.cancel')}
+          busy={removeMember.isPending}
+          onCancel={() => setTarget(null)}
+          onConfirm={() => removeMember.mutate(target, {
+            onSuccess: () => { setTarget(null); toast('Member removed'); },
+          })}
+        />
       )}
     </Card>
   );

@@ -2,7 +2,7 @@ import { Box } from '@mui/material';
 import { DeliverableDto } from '@/types/domain';
 import { shortDate } from '@/lib/schedule';
 import { fmtAt } from '@/lib/canvasModel';
-import { findDirectoryUser } from '@/shared/constants/mock-users';
+import { useDirectory } from '@/app/providers/DirectoryProvider';
 import { ModalShell } from '@/components/common/ModalShell';
 import { Badge, SirenButton } from '@/components/common/SirenButton';
 import { Card, Ey } from '@/components/common/Panel';
@@ -23,11 +23,12 @@ interface Props {
  * owner여도 예외 없이 적용된다(BE toIncomingDeliverableDto 참고).
  */
 export function IncomingDeliverableDialog({ d, onClose }: Props) {
+  const { resolveUser } = useDirectory();
   if (!d) return null;
   // 여기 뜨는 일정은 "주는 쪽 workflow"의 phase다 — 내 캔버스의 칸 이름이 아니다.
   const ph = d.sourcePhase;
   const rel = d.releasedVersion;
-  const by = rel ? findDirectoryUser(rel.by) : undefined;
+  const by = rel ? resolveUser(rel.by) : undefined;
 
   return (
     <ModalShell

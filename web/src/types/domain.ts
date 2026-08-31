@@ -1,7 +1,7 @@
 /**
  * api/는 사용자를 KnoxID 문자열로만 표현한다 — 이름/부서/색 등 사용자 정보는
- * 전사 공통 플랫폼(USER_GROUP_API)의 소유이고, web이 knoxId로 해석한다.
- * shared/constants/mock-users.ts의 findDirectoryUser()를 참고.
+ * 전사 공통 SDP_COMMON_API의 소유이고, web이 knoxId로 해석한다.
+ * app/providers/DirectoryProvider.tsx의 useDirectory()/resolveUser()를 참고.
  */
 
 /**
@@ -38,7 +38,6 @@ export interface ProjectDto {
   _id: string;
   code: string;
   name: string;
-  domain: string;
   milestones: Milestone[];
   status: string;
 }
@@ -55,8 +54,8 @@ export interface ProjectDetailDto extends ProjectDto {
   members: ProjectMemberDto[];
   /**
    * 이 과제의 workflow가 고를 수 있는 설계 도메인 목록 (WorkflowDto.domain에 들어갈 값).
-   * 과제 자신의 분류인 ProjectDto.domain과는 다른 축이다. 과제마다 편집하는 데이터라
-   * DEPARTMENTS 같은 고정 상수가 아니다 (PATCH /projects/:id/workflow-domains).
+   * 과제마다 편집하는 데이터라 DEPARTMENTS 같은 고정 상수가 아니다
+   * (PATCH /projects/:id/workflow-domains).
    */
   workflowDomains: string[];
   /** 마일스톤(공통 일정)을 수정할 수 있는 Project Manager의 knoxId 목록 — Workflow의 owners(Edit 권한)와는 별개 role. */

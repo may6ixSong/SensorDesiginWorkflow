@@ -7,6 +7,7 @@ import CssBaseline from '@mui/material/CssBaseline';
 import { buildTheme } from './theme/theme';
 import { ThemeModeProvider, useThemeMode } from './theme/ThemeModeContext';
 import { AuthProvider } from './app/providers/AuthProvider';
+import { DirectoryProvider } from './app/providers/DirectoryProvider';
 import { PlatformPreferencesSync } from './components/layout/PlatformPreferencesSync';
 import App from './App';
 import './i18n';
@@ -36,14 +37,16 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ThemeModeProvider>
       <AuthProvider>
-        <MuiThemeBridge>
-          <PlatformPreferencesSync />
-          <QueryClientProvider client={queryClient}>
-            <BrowserRouter>
-              <App />
-            </BrowserRouter>
-          </QueryClientProvider>
-        </MuiThemeBridge>
+        <DirectoryProvider>
+          <MuiThemeBridge>
+            <PlatformPreferencesSync />
+            <QueryClientProvider client={queryClient}>
+              <BrowserRouter>
+                <App />
+              </BrowserRouter>
+            </QueryClientProvider>
+          </MuiThemeBridge>
+        </DirectoryProvider>
       </AuthProvider>
     </ThemeModeProvider>
   </React.StrictMode>,

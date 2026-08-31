@@ -25,21 +25,6 @@ export function useProject(projectId: string | undefined) {
   });
 }
 
-/** 과제 메타데이터(이름/코드/도메인/상태) 수정 — 마일스톤은 useUpdateMilestones가 따로 다룬다. */
-export function useUpdateProject(projectId: string) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (payload: { name?: string; code?: string; domain?: string; status?: string }) => {
-      const res = await apiClient.patch<ApiEnvelope<ProjectDetailDto>>(`/projects/${projectId}`, payload);
-      return res.data.data;
-    },
-    onSuccess: (project) => {
-      qc.setQueryData(queryKeys.project(projectId), project);
-      qc.invalidateQueries({ queryKey: queryKeys.projects });
-    },
-  });
-}
-
 /**
  * 과제 공통 일정(마일스톤) 목록 교체 — 추가/삭제/개명/재일정 전부 가능하다. id를 비워
  * 보내면 새 마일스톤이다.

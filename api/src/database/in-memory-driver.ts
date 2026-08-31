@@ -24,8 +24,21 @@ function applyTopLevelDefaults(schema: Schema, input: AnyDoc): AnyDoc {
   const result: AnyDoc = { ...input };
   schema.eachPath((pathName, schemaType) => {
     if (pathName === '_id' || pathName.includes('.') || result[pathName] !== undefined) return;
-    // getDefault()는 런타임에 존재하지만 공개 타입 선언에는 없다(mongoose 내부 API).
-    const def = (schemaType as unknown as { getDefault: (scope?: unknown) => unknown }).getDefault(result);
+    const st = schemaType as unknown as {
+      getDefault: (scope?: unknown) => unknown;
+      defaultValue: unknown;
+    };
+    let def: unknown;
+    try {
+      // getDefault()는 런타임에 존재하지만 공개 타입 선언에는 없다(mongoose 내부 API).
+      def = st.getDefault(result);
+    } catch {
+      // 배열 타입 필드(예: [String] default: [])는 실제 문서(document) 컨텍스트 밖에서
+      // getDefault()가 내부적으로 값을 캐스팅하려 하며 subdocument 스키마를 찾다가
+      // 터진다(mongoose SchemaArray.cast). 여기서는 캐스팅이 필요 없는 리터럴
+      // 기본값이면 충분하므로 원본 defaultValue를 그대로(함수면 호출해서) 쓴다.
+      def = typeof st.defaultValue === 'function' ? (st.defaultValue as () => unknown)() : st.defaultValue;
+    }
     if (def !== undefined) result[pathName] = def;
   });
   return result;

@@ -3,5 +3,42 @@
     "notices": {
       "empty": "No notices yet."
     }
+  },
+  "members": {
+    "addMember": "Add member",
+    "addManager": "Add manager",
+    "searchBy": "Search by",
+    "knoxId": "Knox ID",
+    "name": "Name",
+    "searchPlaceholderId": "Enter a Knox ID",
+    "searchPlaceholderName": "Enter a name",
+    "search": "Search",
+    "searching": "Searching…",
+    "searchHint": "Search by Knox ID or name to find someone to add.",
+    "noResults": "No matching users found.",
+    "alreadyAdded": "Already added",
+    "select": "Select",
+    "selectedUser": "Selected user",
+    "department": "Department",
+    "back": "Back",
+    "confirmAdd": "Add",
+    "searchFailed": "Failed to search users.",
+    "cancel": "Cancel",
+    "remove": "Remove",
+    "confirmDeleteMemberTitle": "Remove member",
+    "confirmDeleteMemberMessage": "Remove {{name}} ({{knoxId}}) from the {{dept}} roster?",
+    "confirmDeleteMemberWarning": "This cannot be undone.",
+    "confirmRemoveManagerTitle": "Remove manager",
+    "confirmRemoveManagerMessage": "Remove {{name}} ({{knoxId}}) as a project manager?"
+  },
+  "workflow": {
+    "editPhases": "Edit phases",
+    "permissions": "Owners & permissions",
+    "addOwner": "Add edit access",
+    "addViewGrant": "Add view access",
+    "confirmRemoveOwnerTitle": "Remove edit access",
+    "confirmRemoveOwnerMessage": "Remove {{name}} ({{knoxId}})'s edit access to this workflow?",
+    "confirmRemoveViewGrantTitle": "Remove view access",
+    "confirmRemoveViewGrantMessage": "Remove {{name}} ({{knoxId}})'s view access to this workflow?"
   }
 }

@@ -15,11 +15,5 @@ export class UpdateProjectDto {
 
   @IsOptional()
   @IsString()
-  @MinLength(1)
-  @MaxLength(40)
-  domain?: string;
-
-  @IsOptional()
-  @IsString()
   status?: string;
 }
