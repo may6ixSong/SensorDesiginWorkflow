@@ -5,7 +5,7 @@ import { AppShell } from '@/components/layout/AppShell';
 import { useThemeMode } from '@/theme/ThemeModeContext';
 import { FONT_DISPLAY, FONT_MONO } from '@/theme/tokens';
 import { HERO_SERVICES } from '@/config/heroServices';
-import { AnalogSchematic, SchematicPalette } from '@/components/home/AnalogSchematic';
+import { CircuitBackdrop, CircuitPalette } from '@/components/home/CircuitBackdrop';
 
 const LANES = ['CONCEPT', 'DESIGN', 'VERIFY', 'TAPE-OUT'];
 
@@ -24,20 +24,7 @@ function connectorPath(svcX: number, svcY: number) {
   return `M ${x} ${y} Q ${midX} ${midY}, ${HUB.x} ${HUB.y}`;
 }
 
-function circuitTrace(svcX: number, svcY: number, seed: number) {
-  const { x: px, y: py } = toPct(svcX, svcY);
-  const rand = makeRng(seed);
-  const dir = rand() < 0.5 ? -1 : 1;
-  const vdir = rand() < 0.5 ? -1 : 1;
-  const x1 = px + dir * (2.2 + rand() * 2.2);
-  const y1 = py + vdir * (1.6 + rand() * 2);
-  const x2 = x1 + dir * (1.2 + rand() * 1.6);
-  return {
-    d: `M ${px} ${py} H ${x1} V ${y1} H ${x2}`,
-    vias: [{ x: px, y: py }, { x: x1, y: py }, { x: x1, y: y1 }, { x: x2, y: y1 }],
-  };
-}
-
+/** Lanes converging up into the wordmark. Static — see the note on the stage. */
 const FLOW_PATHS = [
   'M 10 92 C 25 70, 34 55, 49 40',
   'M 30 96 C 38 74, 42 58, 49.5 41',
@@ -60,28 +47,18 @@ interface Palette {
   cardSub: string;
   wordmarkGradient: string;
   wordmarkGlow: string;
-  wordmarkGlowStrong: string;
   subCopy: string;
   flowStroke: string;
-  pulse: string;
   ctaBg: string;
   ctaText: string;
   ctaShadow: string;
   ctaShadowHover: string;
-  schematic: SchematicPalette;
+  circuit: CircuitPalette;
   connLive: string;
   connPending: string;
   badgeLiveBg: string;
   badgeLiveText: string;
   badgePendingText: string;
-}
-
-function makeRng(seed: number) {
-  let s = seed;
-  return () => {
-    s = (s * 16807) % 2147483647;
-    return (s - 1) / 2147483646;
-  };
 }
 
 
@@ -105,22 +82,21 @@ const PALETTE: Record<'light' | 'dark', Palette> = {
     cardSub: 'rgba(150,172,200,.58)',
     wordmarkGradient:
       'linear-gradient(120deg,#2ee6c5 0%,#f2f6fb 25%,#9a8bff 50%,#f2f6fb 75%,#2ee6c5 100%)',
-    wordmarkGlow: 'drop-shadow(0 4px 28px rgba(46,230,197,.25))',
-    wordmarkGlowStrong: 'drop-shadow(0 4px 44px rgba(46,230,197,.55))',
+    wordmarkGlow: 'drop-shadow(0 4px 30px rgba(46,230,197,.3))',
     subCopy: 'rgba(150,172,200,.62)',
-    flowStroke: 'rgba(120,158,190,.26)',
-    pulse: 'rgba(94,185,164,.7)',
+    flowStroke: 'rgba(120,158,190,.2)',
     ctaBg: '#1c9d85',
     ctaText: '#ffffff',
     ctaShadow: '0 6px 18px rgba(0,0,0,.4)',
     ctaShadowHover: '0 10px 24px rgba(0,0,0,.5)',
-    schematic: {
+    circuit: {
       bg: '#0a0d14',
-      line: 'rgba(126,158,196,.08)',
-      rail: 'rgba(126,158,196,.13)',
-      comp: 'rgba(126,158,196,.13)',
-      node: 'rgba(150,178,210,.22)',
-      active: 'rgba(94,185,164,.28)',
+      trace: 'rgba(126,158,196,.17)',
+      traceStrong: 'rgba(126,158,196,.26)',
+      outline: 'rgba(142,174,210,.27)',
+      node: 'rgba(150,178,210,.3)',
+      accent: 'rgba(94,185,164,.4)',
+      label: 'rgba(150,178,210,.3)',
     },
     connLive: 'rgba(94,185,164,.58)',
     connPending: 'rgba(122,148,184,.17)',
@@ -147,22 +123,21 @@ const PALETTE: Record<'light' | 'dark', Palette> = {
     cardSub: '#667085',
     wordmarkGradient:
       'linear-gradient(120deg,#0c9a83 0%,#16202e 25%,#5849cf 50%,#16202e 75%,#0c9a83 100%)',
-    wordmarkGlow: 'drop-shadow(0 4px 20px rgba(12,154,131,.2))',
-    wordmarkGlowStrong: 'drop-shadow(0 4px 32px rgba(12,154,131,.38))',
+    wordmarkGlow: 'drop-shadow(0 4px 22px rgba(12,154,131,.24))',
     subCopy: '#667085',
-    flowStroke: 'rgba(70,100,140,.2)',
-    pulse: 'rgba(12,154,131,.6)',
+    flowStroke: 'rgba(70,100,140,.16)',
     ctaBg: '#0c9a83',
     ctaText: '#ffffff',
     ctaShadow: '0 6px 16px rgba(12,154,131,.2)',
     ctaShadowHover: '0 10px 22px rgba(12,154,131,.28)',
-    schematic: {
+    circuit: {
       bg: '#f4f6f9',
-      line: 'rgba(46,74,110,.08)',
-      rail: 'rgba(46,74,110,.12)',
-      comp: 'rgba(46,74,110,.13)',
-      node: 'rgba(46,74,110,.22)',
-      active: 'rgba(12,154,131,.26)',
+      trace: 'rgba(46,74,110,.15)',
+      traceStrong: 'rgba(46,74,110,.22)',
+      outline: 'rgba(46,74,110,.26)',
+      node: 'rgba(46,74,110,.3)',
+      accent: 'rgba(12,154,131,.4)',
+      label: 'rgba(46,74,110,.3)',
     },
     connLive: 'rgba(12,154,131,.48)',
     connPending: 'rgba(70,96,140,.15)',
@@ -179,22 +154,34 @@ export function HomePage() {
   const [active, setActive] = useState<Set<string> | null>(null);
   const idleTimer = useRef<number>();
   const revertTimer = useRef<number>();
+  /**
+   * Mirrors `active` so the mousemove handler can skip the state write when
+   * there is nothing lit. Without it every single pointer move re-rendered the
+   * whole hero — that, not the artwork, is what made the page feel heavy.
+   */
+  const activeRef = useRef<Set<string> | null>(null);
 
   const clearTimers = () => {
     if (idleTimer.current) window.clearTimeout(idleTimer.current);
     if (revertTimer.current) window.clearTimeout(revertTimer.current);
   };
 
+  const setLit = useCallback((next: Set<string> | null) => {
+    if (activeRef.current === next) return;
+    activeRef.current = next;
+    setActive(next);
+  }, []);
+
   const onStageMouseMove = useCallback(() => {
     clearTimers();
-    setActive(null);
+    setLit(null);
     idleTimer.current = window.setTimeout(() => {
       const n = 1 + Math.floor(Math.random() * 5);
       const shuffled = [...HERO_SERVICES].sort(() => Math.random() - 0.5);
-      setActive(new Set(shuffled.slice(0, n).map((s) => s.name)));
-      revertTimer.current = window.setTimeout(() => setActive(null), 5000);
+      setLit(new Set(shuffled.slice(0, n).map((s) => s.name)));
+      revertTimer.current = window.setTimeout(() => setLit(null), 5000);
     }, 450);
-  }, []);
+  }, [setLit]);
 
   useEffect(() => () => clearTimers(), []);
 
@@ -202,21 +189,13 @@ export function HomePage() {
     <AppShell>
       <Box
         onMouseMove={onStageMouseMove}
-        onMouseLeave={() => { clearTimers(); setActive(null); }}
+        onMouseLeave={() => { clearTimers(); setLit(null); }}
         sx={{
           position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden',
           background: pal.stageBg,
           transition: 'background .3s',
           display: 'grid', placeItems: 'center',
           perspective: '1400px', perspectiveOrigin: '50% 45%',
-          '@keyframes sirenDrift': {
-            from: { backgroundPosition: '0 0' },
-            to: { backgroundPosition: '0 -800px' },
-          },
-          '@keyframes sirenGlow': {
-            '0%,100%': { opacity: 0.75 },
-            '50%': { opacity: 1 },
-          },
           '@keyframes sirenRise': {
             from: { opacity: 0, transform: 'translateY(14px)' },
             to: { opacity: 1, transform: 'translateY(0)' },
@@ -225,22 +204,21 @@ export function HomePage() {
             '0%,100%': { backgroundPosition: '0% 50%' },
             '50%': { backgroundPosition: '100% 50%' },
           },
-          '@keyframes sirenPulseGlow': {
-            '0%,100%': { filter: pal.wordmarkGlow },
-            '50%': { filter: pal.wordmarkGlowStrong },
-          },
         }}
       >
-        {/* back-most layer — one connected analog circuit filling the stage */}
-        <AnalogSchematic pal={pal.schematic} />
+        {/*
+          Back-most layer — a static chip/PCB illustration baked to one image.
+          Everything painted over it below is static too: the only thing that
+          animates forever on this page is the wordmark's sheen, and the only
+          thing that animates at all on mount is the one-shot `sirenRise`.
+        */}
+        <CircuitBackdrop pal={pal.circuit} />
 
-        {/* aurora backdrop */}
+        {/* aurora backdrop — plain radial gradients, no blur filter to rasterise */}
         <Box
           sx={{
-            position: 'absolute', inset: '-30%', pointerEvents: 'none',
+            position: 'absolute', inset: 0, pointerEvents: 'none',
             background: pal.aurora,
-            filter: 'blur(20px)',
-            animation: 'sirenGlow 16s ease-in-out infinite',
             transition: 'background .3s',
           }}
         />
@@ -253,7 +231,6 @@ export function HomePage() {
             transform: 'rotateX(74deg)',
             backgroundImage: pal.gridLine,
             backgroundSize: '80px 80px',
-            animation: 'sirenDrift 18s linear infinite',
             maskImage: pal.gridMask,
             WebkitMaskImage: pal.gridMask,
             pointerEvents: 'none',
@@ -261,17 +238,17 @@ export function HomePage() {
           }}
         />
 
-        {/* flow lines — lanes converging up into the wordmark */}
+        {/* flow lines and service connectors — one SVG, no SMIL, no dash animation */}
         <Box
           component="svg"
           viewBox="0 0 100 100"
           preserveAspectRatio="none"
           sx={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
         >
-          {FLOW_PATHS.map((d, i) => (
+          {/* lanes converging up into the wordmark */}
+          {FLOW_PATHS.map((d) => (
             <path
               key={d}
-              id={`siren-flow-${i}`}
               d={d}
               fill="none"
               stroke={pal.flowStroke}
@@ -279,101 +256,25 @@ export function HomePage() {
               strokeDasharray="1.6 1.4"
               strokeLinecap="round"
               vectorEffect="non-scaling-stroke"
-              style={{ animation: `flowdash ${2.4 + i * 0.3}s linear infinite` }}
             />
           ))}
-          {FLOW_PATHS.map((d, i) => (
-            <circle key={`p-${d}`} r={0.38} fill={pal.pulse} opacity={0}>
-              <animateMotion dur={`${3.2 + i * 0.5}s`} begin={`${i * 0.6}s`} repeatCount="indefinite" rotate="auto">
-                <mpath href={`#siren-flow-${i}`} />
-              </animateMotion>
-              <animate
-                attributeName="opacity"
-                values="0;1;1;0"
-                keyTimes="0;0.08;0.92;1"
-                dur={`${3.2 + i * 0.5}s`}
-                begin={`${i * 0.6}s`}
-                repeatCount="indefinite"
-              />
-            </circle>
-          ))}
-        </Box>
-
-        {/* faint circuit traces behind each service card */}
-        <Box
-          component="svg"
-          viewBox="0 0 100 100"
-          preserveAspectRatio="none"
-          sx={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
-        >
-          {HERO_SERVICES.map((svc, i) => {
-            const trace = circuitTrace(svc.x, svc.y, 100 + i);
-            return (
-              <g key={svc.name}>
-                <path
-                  d={trace.d}
-                  fill="none"
-                  stroke={pal.schematic.line}
-                  strokeWidth={0.9}
-                  vectorEffect="non-scaling-stroke"
-                />
-                {trace.vias.map((v, vi) => (
-                  <ellipse key={vi} cx={v.x} cy={v.y} rx={0.12} ry={0.24} fill={pal.schematic.node} />
-                ))}
-              </g>
-            );
-          })}
-        </Box>
-
-        {/* service connectors */}
-        <Box
-          component="svg"
-          viewBox="0 0 100 100"
-          preserveAspectRatio="none"
-          sx={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
-        >
-          {HERO_SERVICES.map((svc, i) => {
-            const d = connectorPath(svc.x, svc.y);
+          {/* each service card wired into the hub */}
+          {HERO_SERVICES.map((svc) => {
             const dim = active !== null && !active.has(svc.name);
             return (
               <path
                 key={svc.name}
-                id={`siren-conn-${i}`}
-                d={d}
+                d={connectorPath(svc.x, svc.y)}
                 fill="none"
                 stroke={svc.connected ? pal.connLive : pal.connPending}
                 strokeWidth={svc.connected ? 0.22 : 0.14}
                 strokeDasharray={svc.connected ? '1.3 1.1' : '0.4 2.4'}
                 strokeLinecap="round"
                 vectorEffect="non-scaling-stroke"
-                style={{
-                  opacity: dim ? 0.12 : 1,
-                  transition: 'opacity .5s ease',
-                  ...(svc.connected ? { animation: `flowdash ${2.6 + i * 0.35}s linear infinite` } : {}),
-                }}
+                style={{ opacity: dim ? 0.12 : 1, transition: 'opacity .5s ease' }}
               />
             );
           })}
-          {HERO_SERVICES.filter((s) => s.connected).map((svc, i) => (
-            <circle key={`p-${svc.name}`} r={0.38} fill={pal.connLive} opacity={0}>
-              <animateMotion
-                dur={`${3 + i * 0.6}s`}
-                begin={`${i * 0.7}s`}
-                repeatCount="indefinite"
-                rotate="auto"
-              >
-                <mpath href={`#siren-conn-${HERO_SERVICES.findIndex((s) => s.name === svc.name)}`} />
-              </animateMotion>
-              <animate
-                attributeName="opacity"
-                values="0;1;1;0"
-                keyTimes="0;0.1;0.9;1"
-                dur={`${3 + i * 0.6}s`}
-                begin={`${i * 0.7}s`}
-                repeatCount="indefinite"
-              />
-            </circle>
-          ))}
         </Box>
 
         {/* stage */}
@@ -476,10 +377,12 @@ export function HomePage() {
                 background: pal.wordmarkGradient,
                 backgroundSize: '220% auto',
                 WebkitBackgroundClip: 'text', backgroundClip: 'text', WebkitTextFillColor: 'transparent',
+                // Static glow: animating a drop-shadow filter on text this large
+                // repaints it every frame, which is most of what made the hero stutter.
+                filter: pal.wordmarkGlow,
                 animation:
                   'sirenRise .8s cubic-bezier(.2,.8,.3,1) both, '
-                  + 'sirenSheen 7s ease-in-out 1s infinite, '
-                  + 'sirenPulseGlow 3.6s ease-in-out 1s infinite',
+                  + 'sirenSheen 7s ease-in-out 1s infinite',
               }}
             >
               SIREN
