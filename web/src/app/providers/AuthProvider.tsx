@@ -96,6 +96,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const data = decodeURIComponent(cookieData);
         const userInfo = JSON.parse(data.replace(/\\n/g, '').replace(/\\r/g, '').replace(/\\t/g, ''));
         setUserSystemInfo(userInfo);
+
+        // ADFSLogin이 ADSSO_RETURN_URL로 돌아오면서 붙이는 ?auth={uuid}를 주소창에서 지운다.
+        const url = new URL(window.location.href);
+        if (url.searchParams.has('auth')) {
+          url.searchParams.delete('auth');
+          window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+        }
       } else {
         Cookies.set('ADSSO_RETURN_URL', window.location.href);
         window.location.href = `${import.meta.env.MOBILAVE}/Account/ADFSLogin?client=${window.location.origin}`;

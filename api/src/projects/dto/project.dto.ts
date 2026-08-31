@@ -26,6 +26,8 @@ export interface ProjectDetailDto {
   /** 과제 공통 일정 — 항상 start 오름차순. workflow phase의 초기값이기도 하다. */
   milestones: MilestoneDto[];
   members: ProjectMemberDto[];
+  /** 마일스톤을 수정할 수 있는 Project Manager의 knoxId 목록 (Workflow.owners와는 별개 role). */
+  managers: string[];
 }
 
 export function toMilestoneDto(m: Milestone): MilestoneDto {
@@ -46,5 +48,6 @@ export function toProjectDetailDto(project: ProjectDocument): ProjectDetailDto {
       department: m.department,
       addedAt: m.addedAt,
     })),
+    managers: [...(project.managers ?? [])],
   };
 }

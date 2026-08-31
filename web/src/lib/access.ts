@@ -24,3 +24,16 @@ export const canManageProject = (
   workflows?: { myAccess: 'edit' | 'view' }[] | null,
   isAdmin?: boolean,
 ): boolean => !!isAdmin || (workflows ?? []).some((workflow) => workflow.myAccess === 'edit');
+
+/**
+ * 과제 마일스톤(공통 일정) 편집 권한 (2026-08-31 결정).
+ *
+ * 위 canManageProject(어느 workflow든 Edit 권한이 있으면 통과)와는 별개 게이트다 —
+ * 마일스톤은 workflow owners가 아니라 Project.managers(Project Manager role)로 판단한다.
+ * Workflow 하나의 Edit 권한자라고 해서 과제 전체의 공통 일정까지 고칠 수 있는 것은 아니다.
+ */
+export const canEditMilestones = (
+  project?: { managers?: string[] } | null,
+  isAdmin?: boolean,
+  myKnoxId?: string,
+): boolean => !!isAdmin || (!!myKnoxId && !!project?.managers?.includes(myKnoxId));

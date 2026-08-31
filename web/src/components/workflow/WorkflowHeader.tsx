@@ -102,6 +102,12 @@ export function WorkflowHeader({
         </SirenButton>
       )}
 
+      <Tooltip title="Edit access — who can edit this workflow's canvas and schedule">
+        <SirenButton variant="ghost" onClick={onOpenPermissions} sx={{ padding: '6px 8px' }}>
+          <Icon name="shield" />
+        </SirenButton>
+      </Tooltip>
+
       <SirenButton onClick={onOpenHld}>
         <Icon name="grid" /> HLD Release
       </SirenButton>

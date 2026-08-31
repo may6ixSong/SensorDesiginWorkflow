@@ -79,6 +79,16 @@ export class Project {
   @Prop({ type: [MilestoneSchema], default: [] })
   milestones: Milestone[];
 
+  /**
+   * 과제 마일스톤(공통 일정)을 수정할 수 있는 사람 — Workflow의 owners(Edit 권한)와는
+   * 별개 역할이다. Edit 권한이 있어도 Manager가 아니면 마일스톤을 못 고치고, 반대로
+   * Manager라도 어느 workflow의 owner가 아니면 그 workflow의 캔버스/phase는 못 고친다.
+   * KnoxID 문자열 배열인 이유는 Workflow.owners/viewGrants와 같은 패턴 — 이후 다른 role이
+   * 필요해지면 이 옆에 새 배열 필드를 추가하면 된다(제너릭 role 테이블 대신).
+   */
+  @Prop({ type: [String], default: [] })
+  managers: string[];
+
   @Prop({ default: 'ACTIVE' })
   status: string;
 

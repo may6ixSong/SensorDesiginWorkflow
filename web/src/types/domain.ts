@@ -59,6 +59,8 @@ export interface ProjectDetailDto extends ProjectDto {
    * DEPARTMENTS 같은 고정 상수가 아니다 (PATCH /projects/:id/workflow-domains).
    */
   workflowDomains: string[];
+  /** 마일스톤(공통 일정)을 수정할 수 있는 Project Manager의 knoxId 목록 — Workflow의 owners(Edit 권한)와는 별개 role. */
+  managers: string[];
 }
 
 export interface ViewGrantDto {
