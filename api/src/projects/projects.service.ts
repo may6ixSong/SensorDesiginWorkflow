@@ -166,6 +166,30 @@ export class ProjectsService {
   }
 
   /**
+   * Project Manager 추가 — 이 과제의 마일스톤(공통 일정)을 수정할 수 있는 사람.
+   * Workflow.addOwner와 같은 패턴이되, 부서 제한은 없다(Manager는 Analog 한정이 아니다).
+   */
+  async addManager(id: string, knoxId: string, actor: Actor) {
+    await this.assertManageAccess(id, actor);
+    const project = await this.findByIdOrThrow(id);
+    if (!project.managers.includes(knoxId)) {
+      project.managers.push(knoxId);
+      await project.save();
+      await this.audit.log(actor.knoxId, 'PROJECT_MANAGER_ADD', 'project', project._id, { knoxId });
+    }
+    return this.findDetailOrThrow(id, actor.knoxId);
+  }
+
+  async removeManager(id: string, knoxId: string, actor: Actor) {
+    await this.assertManageAccess(id, actor);
+    const project = await this.findByIdOrThrow(id);
+    project.managers = project.managers.filter((m) => m !== knoxId);
+    await project.save();
+    await this.audit.log(actor.knoxId, 'PROJECT_MANAGER_REMOVE', 'project', project._id, { knoxId });
+    return this.findDetailOrThrow(id, actor.knoxId);
+  }
+
+  /**
    * Project Information 페이지 상세 조회. 개인 접근 권한으로 막지 않는다 - 어떤 과제를
    * 보여줄지는 web이 사용자 Group(Admin이면 super)과 workflow의 owners/viewGrants로 판단한다
    * (2026-08-25 결정, src/common/guards/workflow-access.guard.ts 참고).

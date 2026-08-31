@@ -6,6 +6,7 @@ import { WorkflowsService } from '../workflows/workflows.service';
 import { toWorkflowDto } from '../workflows/dto/workflow.dto';
 import { toProjectDetailDto } from './dto/project.dto';
 import { AddMemberDto } from './dto/add-member.dto';
+import { AddProjectManagerDto } from './dto/manage-project-managers.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { UpdateMilestonesDto } from './dto/update-milestones.dto';
 import { UpdateWorkflowDomainsDto } from './dto/update-workflow-domains.dto';
@@ -46,6 +47,23 @@ export class ProjectsController {
     @CurrentActor() me: Actor,
   ) {
     const project = await this.projects.updateMilestones(id, body.milestones, me);
+    return { data: toProjectDetailDto(project) };
+  }
+
+  /** Project Manager 추가 — 마일스톤(공통 일정)을 수정할 수 있는 사람. */
+  @Post(':id/managers')
+  async addManager(@Param('id') id: string, @Body() body: AddProjectManagerDto, @CurrentActor() me: Actor) {
+    const project = await this.projects.addManager(id, body.knoxId, me);
+    return { data: toProjectDetailDto(project) };
+  }
+
+  @Delete(':id/managers/:knoxId')
+  async removeManager(
+    @Param('id') id: string,
+    @Param('knoxId') knoxId: string,
+    @CurrentActor() me: Actor,
+  ) {
+    const project = await this.projects.removeManager(id, knoxId, me);
     return { data: toProjectDetailDto(project) };
   }
 

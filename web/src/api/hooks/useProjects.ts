@@ -133,6 +133,32 @@ export function useRemoveProjectMember(projectId: string) {
   });
 }
 
+/**
+ * Project Manager 추가 — 마일스톤(공통 일정)을 수정할 수 있는 사람. Workflow owners(Edit
+ * 권한)와는 별개 role이라 department 없이 knoxId만 받는다.
+ */
+export function useAddProjectManager(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (knoxId: string) => {
+      const res = await apiClient.post<ApiEnvelope<ProjectDetailDto>>(`/projects/${projectId}/managers`, { knoxId });
+      return res.data.data;
+    },
+    onSuccess: (project) => qc.setQueryData(queryKeys.project(projectId), project),
+  });
+}
+
+export function useRemoveProjectManager(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (knoxId: string) => {
+      const res = await apiClient.delete<ApiEnvelope<ProjectDetailDto>>(`/projects/${projectId}/managers/${knoxId}`);
+      return res.data.data;
+    },
+    onSuccess: (project) => qc.setQueryData(queryKeys.project(projectId), project),
+  });
+}
+
 /** 과제 공통 일정(마일스톤) 조회 — 수정은 useUpdateMilestones 참고. */
 export function useProjectMilestones(projectId: string | undefined) {
   return useQuery({

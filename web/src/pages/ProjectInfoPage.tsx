@@ -11,6 +11,8 @@ import { SirenButton } from '@/components/common/SirenButton';
 import { Icon } from '@/components/common/Icon';
 import { toast } from '@/store/toastStore';
 import { T } from '@/theme/tokens';
+import { canEditMilestones } from '@/lib/access';
+import { useAuth } from '@/app/providers/AuthProvider';
 
 export function ProjectInfoPage() {
   return (
@@ -22,8 +24,8 @@ export function ProjectInfoPage() {
             projectName={project.name}
             projectCode={project.code}
             milestones={project.milestones}
+            managers={project.managers}
             workflows={workflows}
-            own={own}
             workflowDomains={project.workflowDomains ?? []}
           />
           <DesignDomainsSection
@@ -46,15 +48,17 @@ export function ProjectInfoPage() {
  * 고친다(phase가 workflow 소유 데이터이기 때문). 그래서 버튼 이름도 "Edit milestones"다.
  */
 function MilestonesSection({
-  projectId, projectName, projectCode, milestones, workflows, own, workflowDomains,
+  projectId, projectName, projectCode, milestones, managers, workflows, workflowDomains,
 }: {
   projectId: string; projectName: string; projectCode: string;
-  milestones: Milestone[]; workflows: WorkflowDto[]; own: boolean; workflowDomains: string[];
+  milestones: Milestone[]; managers: string[]; workflows: WorkflowDto[]; workflowDomains: string[];
 }) {
+  const { user, isAdmin } = useAuth();
   const updateMilestones = useUpdateMilestones(projectId);
   const [editOpen, setEditOpen] = useState(false);
   const [editErr, setEditErr] = useState<string | null>(null);
   const [workflowOpen, setWorkflowOpen] = useState(false);
+  const canEditSchedule = canEditMilestones({ managers }, isAdmin, user?.KnoxID);
 
   return (
     <>
@@ -69,7 +73,7 @@ function MilestonesSection({
         <SirenButton variant="on" onClick={() => setWorkflowOpen(true)}>
           <Icon name="grid" /> Design workflow
         </SirenButton>
-        {own && (
+        {canEditSchedule && (
           <SirenButton onClick={() => { setEditErr(null); setEditOpen(true); }}>
             <Icon name="calendar" /> Edit milestones
           </SirenButton>
