@@ -7,7 +7,8 @@ import { useCanvasStore } from '@/store/canvasStore';
 import { useDownloadVersion } from '@/api/hooks/useDeliverables';
 import { toast } from '@/store/toastStore';
 import { RECEIVABLE_DEPARTMENTS, departmentName } from '@/shared/constants/departments';
-import { DirectoryUser, findDirectoryUser } from '@/shared/constants/mock-users';
+import { useDirectory } from '@/app/providers/DirectoryProvider';
+import { UserSearchDialog } from '@/components/dialogs/UserSearchDialog';
 import { ModalShell } from '@/components/common/ModalShell';
 import { SirenButton, Badge, Chip } from '@/components/common/SirenButton';
 import { Card, Ey, Field, Row, SelectInput, TextInput } from '@/components/common/Panel';
@@ -18,8 +19,6 @@ import { CURSOR_POINTER, FONT_MONO, T } from '@/theme/tokens';
 interface Props {
   node: CanvasNode | null;
   phases: WorkflowPhase[];
-  /** recvContact 후보 (목업 사용자 디렉토리). */
-  users: DirectoryUser[];
   /** 목업 own = isOwn(workflow) && !S.recv */
   own: boolean;
   /** 수신 workflow 셀렉트 박스용 — 과제 소속 workflow 전체(id/name/color). */
@@ -40,7 +39,7 @@ interface Props {
  * 잇는 것으로만 하고, 이 화면에는 "무엇과 이어져 있는지" 읽기 전용 목록만 남긴다.
  */
 export function DeliverableDialog({
-  node: d, phases, users, own, workflowDirectory, onClose,
+  node: d, phases, own, workflowDirectory, onClose,
   onSaveInfo, onUpload, onRelease, onSaveRecv,
 }: Props) {
   const tab = useCanvasStore((s) => s.tab);
@@ -109,7 +108,7 @@ export function DeliverableDialog({
       )}
       {tab === 'versions' && <VersionsTab d={d} />}
       {tab === 'recv' && (
-        <RecvTab d={d} own={own} users={users} workflowDirectory={workflowDirectory} onSave={onSaveRecv} />
+        <RecvTab d={d} own={own} workflowDirectory={workflowDirectory} onSave={onSaveRecv} />
       )}
     </ModalShell>
   );
@@ -412,6 +411,7 @@ function OverviewTab({
 
 /* ── 버전 이력 탭 ── */
 function VersionsTab({ d }: { d: CanvasNode }) {
+  const { resolveUser } = useDirectory();
   const list = d.versions;
   if (!list.length) {
     return <Card sx={{ color: T.dm2, fontSize: 12 }}>No versions yet.</Card>;
@@ -445,7 +445,7 @@ function VersionsTab({ d }: { d: CanvasNode }) {
           </Box>
           <Box sx={{ fontSize: 12, color: T.dm, mt: '4px' }}>{v.note}</Box>
           <Box sx={{ fontFamily: FONT_MONO, fontSize: 10, color: T.dm2, mt: '4px', wordBreak: 'break-all' }}>
-            {v.file || '(none)'} · {findDirectoryUser(v.by).name} · {fmtAt(v.at)}
+            {v.file || '(none)'} · {resolveUser(v.by).name} · {fmtAt(v.at)}
           </Box>
         </Box>
       ))}
@@ -455,15 +455,17 @@ function VersionsTab({ d }: { d: CanvasNode }) {
 
 /* ── 전달 탭 ── */
 function RecvTab({
-  d, own, users, workflowDirectory, onSave,
+  d, own, workflowDirectory, onSave,
 }: {
-  d: CanvasNode; own: boolean; users: DirectoryUser[];
+  d: CanvasNode; own: boolean;
   workflowDirectory: WorkflowBriefDto[]; onSave: Props['onSaveRecv'];
 }) {
+  const { resolveUser } = useDirectory();
   const [dept, setDept] = useState(d.recvDept ?? '');
   const [contact, setContact] = useState(d.recvContact ?? '');
   const [recvWorkflow, setRecvIp] = useState(d.recvWorkflowId ?? '');
   const [sourceDept, setSourceDept] = useState(d.sourceDept ?? '');
+  const [contactSearchOpen, setContactSearchOpen] = useState(false);
   useEffect(() => {
     setDept(d.recvDept ?? ''); setContact(d.recvContact ?? ''); setRecvIp(d.recvWorkflowId ?? '');
     setSourceDept(d.sourceDept ?? '');
@@ -483,8 +485,8 @@ function RecvTab({
               <Badge color={T.dm} bg={T.sf2} borderColor={T.ln}>{departmentName(d.recvDept)}</Badge>
               {d.recvContact && (
                 <>
-                  <UserAvatar user={findDirectoryUser(d.recvContact)} size={24} />
-                  <Box sx={{ fontSize: 13 }}>{findDirectoryUser(d.recvContact).name}</Box>
+                  <UserAvatar user={resolveUser(d.recvContact)} size={24} />
+                  <Box sx={{ fontSize: 13 }}>{resolveUser(d.recvContact).name}</Box>
                 </>
               )}
             </Box>
@@ -515,8 +517,7 @@ function RecvTab({
     );
   }
 
-  // 부서를 지정하면 그 부서 소속자만 후보로 (UX 편의 — 실제 검증은 BE, 설계서 3.4)
-  const contacts = users.filter((u) => !dept || u.department === dept);
+  const contactUser = contact ? resolveUser(contact) : null;
 
   return (
     <>
@@ -531,19 +532,35 @@ function RecvTab({
             />
           </Field>
         </Row>
-        <Row sx={{ mt: '11px' }}>
+        <Row sx={{ mt: '11px', alignItems: 'flex-end' }}>
           <Field label="Individual contact" sx={{ flex: 1, mb: 0 }}>
-            <SelectInput
-              value={contact}
-              onChange={setContact}
-              options={[
-                { value: '', label: 'Not set' },
-                ...contacts.map((u) => ({ value: u.knoxId, label: `${u.name} · ${departmentName(u.department)}` })),
-              ]}
-            />
+            {contactUser ? (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: '9px', padding: '4px 0' }}>
+                <UserAvatar user={contactUser} size={24} />
+                <Box sx={{ fontSize: 13 }}>{contactUser.name}</Box>
+              </Box>
+            ) : (
+              <Box sx={{ fontSize: 12, color: T.dm2, padding: '8px 0' }}>Not set</Box>
+            )}
           </Field>
+          <SirenButton onClick={() => setContactSearchOpen(true)}>
+            <Icon name="search" /> {contact ? 'Change' : 'Set contact'}
+          </SirenButton>
+          {contact && (
+            <SirenButton variant="ghost" onClick={() => setContact('')}>
+              <Icon name="x" />
+            </SirenButton>
+          )}
         </Row>
       </Card>
+
+      {contactSearchOpen && (
+        <UserSearchDialog
+          title="Set individual contact"
+          onClose={() => setContactSearchOpen(false)}
+          onConfirm={(knoxId) => { setContact(knoxId); setContactSearchOpen(false); }}
+        />
+      )}
 
       <Card sx={{ mb: '12px' }}>
         <Ey sx={{ mb: '9px' }}>Recipient workflow</Ey>

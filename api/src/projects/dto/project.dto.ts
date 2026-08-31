@@ -19,8 +19,7 @@ export interface ProjectDetailDto {
   _id: string;
   code: string;
   name: string;
-  domain: string;
-  /** 이 과제의 workflow가 고를 수 있는 설계 도메인 목록 — 과제 자신의 domain과는 다른 축이다. */
+  /** 이 과제의 workflow가 고를 수 있는 설계 도메인 목록. */
   workflowDomains: string[];
   status: string;
   /** 과제 공통 일정 — 항상 start 오름차순. workflow phase의 초기값이기도 하다. */
@@ -39,7 +38,6 @@ export function toProjectDetailDto(project: ProjectDocument): ProjectDetailDto {
     _id: project._id.toString(),
     code: project.code,
     name: project.name,
-    domain: project.domain,
     workflowDomains: [...(project.workflowDomains ?? [])],
     status: project.status,
     milestones: sortSchedule(project.milestones ?? []).map(toMilestoneDto),

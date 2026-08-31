@@ -3,7 +3,7 @@ import { Box } from '@mui/material';
 import { HldReleaseDto, WorkflowPhase } from '@/types/domain';
 import { CanvasNode } from '@/lib/canvasModel';
 import { departmentName } from '@/shared/constants/departments';
-import { findDirectoryUser } from '@/shared/constants/mock-users';
+import { useDirectory } from '@/app/providers/DirectoryProvider';
 import { ModalShell } from '@/components/common/ModalShell';
 import { Badge } from '@/components/common/SirenButton';
 import { Card, Ey } from '@/components/common/Panel';
@@ -31,6 +31,7 @@ interface Props {
 export function HldReleaseDialog({
   workflowName, releases, nodes, phases, selectedId, onSelect, onClose, onOpenRow,
 }: Props) {
+  const { resolveUser } = useDirectory();
   const sorted = useMemo(() => [...releases].sort((a, b) => (a.date < b.date ? 1 : -1)), [releases]);
 
   if (!sorted.length) {
@@ -62,7 +63,7 @@ export function HldReleaseDialog({
       : a.x - b.x,
   );
 
-  const by = findDirectoryUser(cur.releasedBy);
+  const by = resolveUser(cur.releasedBy);
 
   return (
     <ModalShell

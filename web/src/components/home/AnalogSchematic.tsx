@@ -57,16 +57,16 @@ export interface SchematicPalette {
 
 const REF_W = 2400;
 const REF_H = 1350;
-/** Routing grid pitch, in reference units. */
-const PITCH = 42;
+/** Routing grid pitch, in reference units — smaller pitch reads as a much denser board. */
+const PITCH = 27;
 /** Every Nth grid row carries a full-width bus. */
-const H_BUS_EVERY = 4;
+const H_BUS_EVERY = 3;
 /** Every Nth grid column carries a full-height bus. */
-const V_BUS_EVERY = 7;
+const V_BUS_EVERY = 4;
 /** Corner cut length that gives traces their chamfered PCB look. */
-const CHAMFER = 7;
+const CHAMFER = 6;
 /** Uniform stroke width for every trace/outline, in reference units. */
-const SW = 1.9;
+const SW = 1.7;
 
 /* ── model ──────────────────────────────────────────────────────────────── */
 
@@ -153,14 +153,14 @@ function buildBoard(seed: number) {
   /* pads where buses cross */
   busRows.forEach((r) =>
     busCols.forEach((c) => {
-      if (rand() < 0.6) D(gx(c), gy(r), rand() < 0.3);
+      if (rand() < 0.78) D(gx(c), gy(r), rand() < 0.3);
     }),
   );
 
   /* branch traces breaking off the horizontal buses, ending in a pad */
   busRows.forEach((r) => {
     for (let c = 1; c < cols - 1; c += 1) {
-      if (rand() < 0.65) continue;
+      if (rand() < 0.42) continue;
       const dir = rand() < 0.5 ? -1 : 1;
       const v1 = 1 + Math.floor(rand() * 2);
       const pts: Pt[] = [{ x: gx(c), y: gy(r) }, { x: gx(c), y: gy(r + dir * v1) }];
@@ -183,8 +183,8 @@ function buildBoard(seed: number) {
 
   /* short parallel companion traces beside a bus — the "ribbon" look */
   busRows.forEach((r) => {
-    for (let n = 0; n < 3; n++) {
-      if (rand() < 0.55) continue;
+    for (let n = 0; n < 5; n++) {
+      if (rand() < 0.35) continue;
       const c0 = Math.floor(rand() * Math.max(1, cols - 7));
       const len = 3 + Math.floor(rand() * 6);
       const off = (rand() < 0.5 ? -1 : 1) * ch * 0.36;
@@ -199,7 +199,7 @@ function buildBoard(seed: number) {
   });
 
   /* IC footprints — a rounded body with pin ticks each side, sitting near a bus */
-  const chipCount = Math.max(6, Math.round((cols * rows) / 150));
+  const chipCount = Math.max(10, Math.round((cols * rows) / 70));
   for (let n = 0; n < chipCount; n++) {
     const r = busRows[Math.floor(rand() * busRows.length)] + (rand() < 0.5 ? 2 : -2);
     const c = 1 + Math.floor(rand() * Math.max(1, cols - 5));
@@ -231,13 +231,13 @@ function buildBoard(seed: number) {
   /* inline parts along the buses — real component symbols, not blank marks */
   busRows.forEach((r) => {
     for (let c = 1; c < cols - 1; c += 2) {
-      if (rand() < 0.55) continue;
+      if (rand() < 0.3) continue;
       parts.push({ kind: pickKind(), x: gx(c) + cw / 2, y: gy(r), rot: 0 });
     }
   });
   busCols.forEach((c) => {
     for (let r = 1; r < rows - 1; r += 2) {
-      if (rand() < 0.65) continue;
+      if (rand() < 0.38) continue;
       parts.push({ kind: pickKind(), x: gx(c), y: gy(r) + ch / 2, rot: 90 });
     }
   });
@@ -247,7 +247,7 @@ function buildBoard(seed: number) {
   for (let r = 0; r < rows; r++) {
     if (busRows.includes(r)) continue;
     for (let c = 1; c < cols - 1; c += 2) {
-      if (rand() < 0.85) continue;
+      if (rand() < 0.6) continue;
       const len = 1 + Math.floor(rand() * 2);
       const dir = rand() < 0.5 ? -1 : 1;
       const y2 = gy(Math.max(0, Math.min(rows - 1, r + dir * len)));
@@ -395,7 +395,7 @@ export function AnalogSchematic({ pal, seed = 11 }: { pal: SchematicPalette; see
 
   /** Small subset of pads that stay live and pulse, layered over the baked image. */
   const breathingPads = useMemo(
-    () => board.pads.filter((_, i) => i % 6 === 0).slice(0, 40),
+    () => board.pads.filter((_, i) => i % 9 === 0).slice(0, 70),
     [board],
   );
 

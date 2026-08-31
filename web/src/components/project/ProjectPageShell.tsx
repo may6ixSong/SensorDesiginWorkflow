@@ -1,15 +1,12 @@
-import { ReactNode, useMemo, useState } from 'react';
+import { ReactNode, useMemo } from 'react';
 import { Box, CircularProgress, Stack, Typography } from '@mui/material';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { WorkflowDto, ProjectDetailDto } from '@/types/domain';
-import { useProject, useProjectWorkflows, useUpdateProject } from '@/api/hooks/useProjects';
+import { useProject, useProjectWorkflows } from '@/api/hooks/useProjects';
 import { AppShell } from '@/components/layout/AppShell';
-import { SirenButton } from '@/components/common/SirenButton';
 import { Card, Ey } from '@/components/common/Panel';
 import { Icon } from '@/components/common/Icon';
-import { EditProjectDialog } from '@/components/dialogs/EditProjectDialog';
 import { progressOf } from '@/lib/projectProgress';
-import { toast } from '@/store/toastStore';
 import { FONT_DISPLAY, FONT_MONO, T } from '@/theme/tokens';
 import { canManageProject } from '@/lib/access';
 import { useAuth } from '@/app/providers/AuthProvider';
@@ -33,9 +30,6 @@ export function ProjectPageShell({ children }: Props) {
   const { pathname } = useLocation();
   const { data: project, isLoading: projectLoading, isError } = useProject(projectId);
   const { data: workflows, isLoading: ipsLoading } = useProjectWorkflows(projectId);
-  const updateProject = useUpdateProject(projectId ?? '');
-  const [editOpen, setEditOpen] = useState(false);
-  const [editErr, setEditErr] = useState<string | null>(null);
   const { isAdmin } = useAuth();
 
   const own = useMemo(() => canManageProject(workflows, isAdmin), [workflows, isAdmin]);
@@ -95,17 +89,16 @@ export function ProjectPageShell({ children }: Props) {
                 >
                   {project.status}
                 </Box>
-                <Box component="span" sx={{ fontSize: 11.5, color: T.dm }}>{project.domain}</Box>
               </Box>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <Box sx={{ fontFamily: FONT_DISPLAY, fontSize: 27, fontWeight: 800, letterSpacing: '-.02em' }}>
+                <Box
+                  sx={{
+                    fontFamily: FONT_DISPLAY, fontSize: 27, fontWeight: 700, letterSpacing: '-.005em',
+                    lineHeight: 1.35, py: '2px',
+                  }}
+                >
                   {project.name}
                 </Box>
-                {own && (
-                  <SirenButton onClick={() => { setEditErr(null); setEditOpen(true); }}>
-                    <Icon name="edit" /> Edit
-                  </SirenButton>
-                )}
               </Box>
             </Box>
 
@@ -155,22 +148,6 @@ export function ProjectPageShell({ children }: Props) {
           {children({ project, workflows: workflows ?? [], own })}
         </Box>
       </Box>
-
-      {editOpen && (
-        <EditProjectDialog
-          project={project}
-          saving={updateProject.isPending}
-          error={editErr}
-          onClose={() => setEditOpen(false)}
-          onSave={(p) => {
-            setEditErr(null);
-            updateProject.mutate(p, {
-              onSuccess: () => { setEditOpen(false); toast('Project updated'); },
-              onError: (e: any) => setEditErr(e?.response?.data?.message ?? 'Failed to save'),
-            });
-          }}
-        />
-      )}
     </AppShell>
   );
 }

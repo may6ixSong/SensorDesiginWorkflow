@@ -214,10 +214,10 @@ export class ProjectsService {
     await this.findByIdOrThrow(id);
   }
 
-  /** 과제 메타데이터(이름/코드/도메인/상태) 수정 — 마일스톤은 updateMilestones가 따로 다룬다. */
+  /** 과제 메타데이터(이름/코드/상태) 수정 — 마일스톤은 updateMilestones가 따로 다룬다. */
   async updateProject(
     id: string,
-    dto: { name?: string; code?: string; domain?: string; status?: string },
+    dto: { name?: string; code?: string; status?: string },
     actor: Actor,
   ) {
     await this.assertManageAccess(id, actor);
@@ -231,7 +231,6 @@ export class ProjectsService {
       project.code = dto.code;
     }
     if (dto.name !== undefined) project.name = dto.name;
-    if (dto.domain !== undefined) project.domain = dto.domain;
     if (dto.status !== undefined) project.status = dto.status;
 
     await project.save();

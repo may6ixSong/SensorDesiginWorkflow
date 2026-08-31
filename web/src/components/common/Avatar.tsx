@@ -1,5 +1,5 @@
 import { Box } from '@mui/material';
-import { DirectoryUser } from '@/shared/constants/mock-users';
+import { DirectoryUser } from '@/app/providers/DirectoryProvider';
 import { T } from '@/theme/tokens';
 
 /** "Sunwoo Kim" → "SK" — first letter of up to the first two space-separated words. */

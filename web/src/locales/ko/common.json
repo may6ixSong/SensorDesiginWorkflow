@@ -1,7 +1,44 @@
 {
   "appShell": {
     "notices": {
-      "empty": "등록된 공지사항이 없습니다."
+      "empty": "아직 알림이 없습니다."
     }
+  },
+  "members": {
+    "addMember": "멤버 추가",
+    "addManager": "매니저 추가",
+    "searchBy": "검색 기준",
+    "knoxId": "Knox ID",
+    "name": "이름",
+    "searchPlaceholderId": "Knox ID를 입력하세요",
+    "searchPlaceholderName": "이름을 입력하세요",
+    "search": "검색",
+    "searching": "검색 중…",
+    "searchHint": "Knox ID 또는 이름으로 추가할 사용자를 검색하세요.",
+    "noResults": "일치하는 사용자가 없습니다.",
+    "alreadyAdded": "이미 추가됨",
+    "select": "선택",
+    "selectedUser": "선택된 사용자",
+    "department": "부서",
+    "back": "뒤로",
+    "confirmAdd": "추가",
+    "searchFailed": "사용자 검색에 실패했습니다.",
+    "cancel": "취소",
+    "remove": "삭제",
+    "confirmDeleteMemberTitle": "멤버 삭제",
+    "confirmDeleteMemberMessage": "{{dept}} 명단에서 {{name}}({{knoxId}})님을 삭제하시겠습니까?",
+    "confirmDeleteMemberWarning": "이 작업은 되돌릴 수 없습니다.",
+    "confirmRemoveManagerTitle": "매니저 권한 제거",
+    "confirmRemoveManagerMessage": "{{name}}({{knoxId}})님의 프로젝트 매니저 권한을 제거하시겠습니까?"
+  },
+  "workflow": {
+    "editPhases": "일정 편집",
+    "permissions": "담당자 및 권한",
+    "addOwner": "편집 권한 추가",
+    "addViewGrant": "열람 권한 추가",
+    "confirmRemoveOwnerTitle": "편집 권한 제거",
+    "confirmRemoveOwnerMessage": "{{name}}({{knoxId}})님의 이 workflow 편집 권한을 제거하시겠습니까?",
+    "confirmRemoveViewGrantTitle": "열람 권한 제거",
+    "confirmRemoveViewGrantMessage": "{{name}}({{knoxId}})님의 이 workflow 열람 권한을 제거하시겠습니까?"
   }
 }

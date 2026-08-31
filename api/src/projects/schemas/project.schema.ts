@@ -63,9 +63,6 @@ export class Project {
   @Prop({ required: true, trim: true })
   name: string;
 
-  @Prop({ default: 'ANALOG' })
-  domain: string;
-
   /**
    * 이 과제의 workflow가 고를 수 있는 설계 도메인 후보 목록 (Workflow.domain에 들어갈 값).
    * 위 domain(과제 자신의 분류)과는 다른 축이다 - 이쪽은 과제마다 자유롭게 편집하는

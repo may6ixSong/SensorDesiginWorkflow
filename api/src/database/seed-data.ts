@@ -454,7 +454,7 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
    * members: 과제 단위 부서별 팀원 로스터 (Project Info 페이지) — workflow owners/viewGrants
    * (접근 권한)와는 별개의 정보성 명단이라 여기 department는 실제 소속과 다를 수 있다. */
   const p1 = await ProjectModel.create({
-    code: 'CIS-A7', name: '50MP Mobile CIS', domain: 'ANALOG', workflowDomains: WORKFLOW_DOMAINS,
+    code: 'CIS-A7', name: '50MP Mobile CIS', workflowDomains: WORKFLOW_DOMAINS,
     milestones: MILESTONES, status: 'ACTIVE', isMock: true,
     // 일부러 u7/u8은 비워둔다 - "부서별 멤버 추가" UI를 실제로 시연/검증할 후보가 남아있어야
     // 하고, 빈 상태(empty state) 렌더링도 함께 보여주기 때문.
@@ -468,7 +468,7 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
     ],
   });
   const p2 = await ProjectModel.create({
-    code: 'CIS-B3', name: '8MP Automotive CIS', domain: 'ANALOG', workflowDomains: WORKFLOW_DOMAINS,
+    code: 'CIS-B3', name: '8MP Automotive CIS', workflowDomains: WORKFLOW_DOMAINS,
     milestones: MILESTONES, status: 'ACTIVE', isMock: true,
   });
 

@@ -24,7 +24,6 @@ import {
 import { useMemos } from '@/api/hooks/useMemos';
 import { useEdges } from '@/api/hooks/useEdges';
 import { useHldReleases } from '@/api/hooks/useHld';
-import { useUsers } from '@/api/hooks/useUsers';
 import { usePutCanvas } from '@/api/hooks/useCanvas';
 import { useCanvasStore } from '@/store/canvasStore';
 import { useAuth } from '@/app/providers/AuthProvider';
@@ -51,7 +50,6 @@ export function BoardPage() {
   const { data: memos } = useMemos(workflowId);
   const { data: edges } = useEdges(workflowId);
   const { data: hlds } = useHldReleases(workflowId);
-  const { data: users } = useUsers();
 
   const st = useCanvasStore;
   const edit = useCanvasStore((s) => s.edit);
@@ -261,7 +259,6 @@ export function BoardPage() {
             <DeliverableDialog
               node={openNode}
               phases={phaseList}
-              users={users ?? []}
               own={own}
               workflowDirectory={workflowDirectory ?? []}
               onClose={closeDeliverable}
@@ -379,7 +376,6 @@ export function BoardPage() {
           {ownerDlg && (
             <WorkflowPermissionDialog
               workflow={workflow}
-              users={users ?? []}
               own={!!isOwner}
               onClose={() => st.getState().setOwnerDlg(false)}
               onAddOwner={(knoxId, department) =>
