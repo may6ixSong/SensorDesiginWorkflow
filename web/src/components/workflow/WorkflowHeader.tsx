@@ -17,8 +17,8 @@ interface WorkflowHeaderProps {
   onEditPhases?: () => void;
 }
 
-/** Edit phases / Owners & permissions 아이콘 버튼 크기 — 기존 권한 dialog 버튼(shield, 13px)의 2배. */
-const ICON_BUTTON_SIZE = 26;
+/** Edit phases / Owners & permissions 아이콘 버튼 크기 — 이전 크기(26px, shield 13px의 2배)의 3/4. */
+const ICON_BUTTON_SIZE = 19.5;
 
 /**
  * workflow명, 일정 편집 · 권한 관리 아이콘 버튼(모두 왼쪽 정렬, workflow명 옆), HLD 버튼.
