@@ -28,6 +28,8 @@ export const AUDIT_ACTIONS = [
   'PROJECT_MILESTONES_UPDATE',
   'PROJECT_WORKFLOW_DOMAINS_UPDATE',
   'WORKFLOW_DOMAIN_SET',
+  'PROJECT_MANAGER_ADD',
+  'PROJECT_MANAGER_REMOVE',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
