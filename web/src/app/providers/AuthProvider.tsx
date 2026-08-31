@@ -138,14 +138,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         });
         Cookies.set('loginSIREN', new Date().toISOString());
       }
-    } catch (err) {
-      // 진짜 미등록 신규 사용자(404)일 때만 기본값으로 등록한다. 그 외 오류(네트워크
-      // 오류/5xx/타임아웃)까지 여기서 등록해버리면, 실제로는 Admin인 기존 사용자가
-      // 일시적 조회 실패 한 번으로 Group='Developer'로 재등록되어(서버가 upsert라면
-      // 실제 DB까지) Admin 권한을 잃는 문제가 있었다.
-      if (axios.isAxiosError(err) && err.response?.status === 404) {
-        await createPlatformUser(user);
-      }
+    } catch {
+      await createPlatformUser(user);
     } finally {
       setUser(user);
       openGate(true);
