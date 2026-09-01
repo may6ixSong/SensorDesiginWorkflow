@@ -27,7 +27,7 @@ export interface DirectoryUser {
 }
 
 const AVATAR_COLORS = [
-  '#0c9a83', '#5849cf', '#2563c9', '#ac6f08', '#c8352c',
+  '#2f6b4a', '#6b5083', '#2563c9', '#ac6f08', '#c8352c',
   '#3aa66b', '#b3521e', '#7a4fbf', '#1d7ec2', '#a13d8f',
 ];
 const FALLBACK_COLOR = '#5c6d84';

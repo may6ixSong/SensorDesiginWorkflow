@@ -113,7 +113,7 @@ export function ProjectPageShell({ children }: Props) {
                 <Box
                   sx={{
                     width: `${pct}%`, height: '100%', borderRadius: 999,
-                    background: `linear-gradient(90deg, ${T.tl}, ${T.vi})`,
+                    background: T.tl,
                   }}
                 />
               </Box>

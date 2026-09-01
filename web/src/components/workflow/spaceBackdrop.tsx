@@ -26,9 +26,9 @@ const SPACE_PALETTE: Record<'light' | 'dark', SpacePalette> = {
   dark: {
     wash: '#070a12',
     aurora:
-      'radial-gradient(58% 40% at 18% 10%, rgba(46,230,197,.07), transparent 70%),'
-      + 'radial-gradient(52% 44% at 86% 78%, rgba(154,139,255,.065), transparent 72%),'
-      + 'radial-gradient(44% 36% at 60% 44%, rgba(74,163,255,.045), transparent 70%)',
+      'radial-gradient(58% 40% at 18% 10%, rgba(107,199,154,.06), transparent 70%),'
+      + 'radial-gradient(52% 44% at 86% 78%, rgba(183,155,201,.05), transparent 72%),'
+      + 'radial-gradient(44% 36% at 60% 44%, rgba(110,161,255,.04), transparent 70%)',
     star: 'rgba(210,225,255,.55)',
     starBright: 'rgba(255,255,255,.9)',
     panelBg: 'rgba(14,19,30,.78)',

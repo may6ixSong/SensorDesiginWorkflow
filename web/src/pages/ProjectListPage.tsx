@@ -189,8 +189,8 @@ function ProjectCard({ project, view }: { project: ProjectDto; view: View }) {
         gap: row ? '18px' : undefined,
         '&:hover': { transform: 'translateY(-3px)', boxShadow: T.sl, borderColor: T.ln2 },
         '&::before': {
-          content: '""', position: 'absolute', left: 0, top: 0, bottom: 0, width: 3,
-          background: `linear-gradient(180deg, ${T.tl}, ${T.vi})`,
+          content: '""', position: 'absolute', left: 0, top: 0, bottom: 0, width: 2,
+          background: T.tl, opacity: 0.7,
         },
       }}
     >
@@ -238,7 +238,7 @@ function ProjectCard({ project, view }: { project: ProjectDto; view: View }) {
           <Box
             sx={{
               width: `${pct}%`, height: '100%', borderRadius: 999,
-              background: `linear-gradient(90deg, ${T.tl}, ${T.vi})`,
+              background: T.tl,
               transition: 'width .5s cubic-bezier(.2,.8,.3,1)',
             }}
           />
