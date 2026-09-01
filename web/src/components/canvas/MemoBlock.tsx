@@ -20,6 +20,10 @@ export function MemoBlock({
   n, edit, isSel, onHl, hasHl, onGripDown, registerRef,
   onPointerDown, onPointerMove, onPointerUp,
 }: Props) {
+  // DeliverableNode와 동일한 flow 하이라이트 규칙 — 켜져 있는데(hasHl) 이 메모는 그
+  // 흐름에 안 걸려 있으면(!onHl, 메모는 edge가 없어 항상 그렇다) 살짝 흐리게 한다.
+  const connected = onHl && hasHl;
+  const unrelated = hasHl && !onHl;
   return (
     <Box
       ref={(el: HTMLDivElement | null) => registerRef(n.id, el)}
@@ -44,8 +48,10 @@ export function MemoBlock({
         cursor: edit ? 'grab' : 'default',
         touchAction: 'none',
         overflow: 'hidden',
-        outline: onHl && hasHl ? `3px solid ${T.vi}` : 'none',
-        outlineOffset: onHl && hasHl ? '3px' : 0,
+        outline: connected ? `5px solid ${T.vi}` : 'none',
+        outlineOffset: connected ? '4px' : 0,
+        opacity: unrelated ? 0.6 : 1,
+        transition: 'opacity .15s',
       }}
     >
       <Box component="span" sx={{ fontFamily: FONT_MONO, fontSize: 12, letterSpacing: '.12em', color: T.dm2, display: 'block', mb: '7px' }}>

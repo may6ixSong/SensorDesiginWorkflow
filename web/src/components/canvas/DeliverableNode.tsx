@@ -62,6 +62,10 @@ export function DeliverableNode({
   // 유실 표시는 다른 어떤 스타일보다 우선한다 — 받은 산출물이든 아니든, 일정이 없어진
   // 사실이 가장 먼저 눈에 들어와야 한다.
   const edgeColor = orphan ? T.rd : isSel ? T.tl : dimLink ? T.vi : showIncomingStyle ? srcColor : T.ln2;
+  // 클릭으로 flow 하이라이트가 켜져 있는데(hasHl) 이 블록은 그 흐름에 안 걸려 있으면(!onHl)
+  // 살짝 흐리게 — 연결된 것들이 상대적으로 더 눈에 띄게 한다.
+  const connected = onHl && hasHl;
+  const unrelated = hasHl && !onHl;
 
   return (
     <Box
@@ -89,20 +93,21 @@ export function DeliverableNode({
         border: `2px ${orphan || showIncomingStyle ? 'dashed' : 'solid'} ${edgeColor}`,
         boxShadow: orphan
           ? `0 0 0 3px ${T.rd2}, ${T.sm}`
-          : isSel ? `0 0 0 4px ${T.tl2}, ${T.sm}` : T.sm,
+          : isSel ? `0 0 0 4px ${T.tl2}, ${T.sm}`
+          : connected ? `0 0 0 4px ${T.vi3}, ${T.sl}` : T.sm,
         overflow: 'visible',
         // 유실 리본이 좌상단을 통째로 차지하므로 그만큼 위를 비워 준다 — 안 그러면
         // 리본이 산출물 이름 위에 그대로 올라탄다(실측 확인).
         padding: orphan ? '30px 13px 10px' : '12px 13px 10px',
-        outline: onHl && hasHl ? `3px solid ${T.vi}` : 'none',
-        outlineOffset: onHl && hasHl ? '3px' : 0,
+        outline: connected ? `5px solid ${T.vi}` : 'none',
+        outlineOffset: connected ? '4px' : 0,
         // 다른 workflow 소유(incoming)는 같은 Phase 안에서만 옮길 수 있는 제한된 영역임을
         // edit 모드에서 낮은 opacity로 드러낸다 — pin(연결)·같은 Phase 내 드래그 모두
-        // opacity와 무관하게 계속 동작한다.
-        opacity: edit && incoming ? 0.45 : 1,
+        // opacity와 무관하게 계속 동작한다. unrelated는 그 아래(view 모드 flow 하이라이트) 우선순위.
+        opacity: edit && incoming ? 0.45 : unrelated ? 0.6 : 1,
         cursor: edit && canEdit ? 'grab' : CURSOR_POINTER,
         touchAction: 'none',
-        transition: edit ? 'opacity .15s' : 'box-shadow .15s, transform .15s, border-color .14s',
+        transition: edit ? 'opacity .15s' : 'box-shadow .15s, transform .15s, border-color .14s, opacity .15s',
         '&:hover': edit ? {} : { transform: 'translateY(-3px)', boxShadow: T.sl, borderColor: showIncomingStyle ? srcColor : T.ln3 },
         '&::before': {
           content: '""', position: 'absolute', top: 10, left: 10, width: 6, height: 6,
