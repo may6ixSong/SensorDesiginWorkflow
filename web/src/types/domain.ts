@@ -87,6 +87,8 @@ export interface WorkflowDto {
   domain?: string | null;
   /** 이 workflow만의 일정 — 항상 start 오름차순으로 내려온다. */
   phases: WorkflowPhase[];
+  /** 캔버스 Phase 레인 폭(phase.id → px) — 지정 안 된 phase는 FE가 기본값을 쓴다. */
+  phaseWidths: Record<string, number>;
   /** Edit 권한자의 knoxId 목록 — [0]이 Primary Owner. */
   owners: string[];
   viewGrants: ViewGrantDto[];

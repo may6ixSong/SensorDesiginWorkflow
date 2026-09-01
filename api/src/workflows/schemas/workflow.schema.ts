@@ -80,6 +80,13 @@ export class Workflow {
   phases: WorkflowPhase[];
 
   /**
+   * 캔버스에서 사용자가 조절한 Phase 레인 폭. phase.id → px. 지정하지 않은 phase는
+   * FE가 DEFAULT_PW를 쓴다. 캔버스 PUT(설계서 5.5)과 함께 저장된다.
+   */
+  @Prop({ type: Object, default: {} })
+  phaseWidths: Record<string, number>;
+
+  /**
    * owners[0] = 대표 담당자. KnoxID 문자열 배열이다.
    * Edit 권한은 Analog 부서만 가질 수 있으나(설계서 3.3, 4.5), api는 사용자의 소속을
    * 조회할 수 없으므로 owner 추가 요청이 함께 보낸 department 값으로 검증한다.

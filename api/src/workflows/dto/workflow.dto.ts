@@ -19,6 +19,8 @@ export interface WorkflowDto {
   color: string;
   /** 이 workflow만의 일정 — 항상 start 오름차순으로 정렬해서 내려간다. */
   phases: WorkflowPhaseDto[];
+  /** 캔버스 Phase 레인 폭(phase.id → px) — 지정 안 된 phase는 FE가 기본값을 쓴다. */
+  phaseWidths: Record<string, number>;
   /** KnoxID 목록 - 이름/부서/아바타는 web이 공통 플랫폼에서 조회한다. */
   owners: string[];
   viewGrants: { knoxId: string; department: string; grantedAt: Date }[];
@@ -42,6 +44,7 @@ export function toWorkflowDto(workflow: WorkflowDocument, me: Actor): WorkflowDt
     description: workflow.description,
     color: workflow.color,
     phases: sortSchedule(workflow.phases ?? []).map(toPhaseDto),
+    phaseWidths: workflow.phaseWidths ?? {},
     owners: [...workflow.owners],
     viewGrants: workflow.viewGrants.map((g) => ({
       knoxId: g.knoxId,

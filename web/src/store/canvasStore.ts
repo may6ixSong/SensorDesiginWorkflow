@@ -74,7 +74,10 @@ interface CanvasState {
 
   setVP: (z: number, x: number, y: number) => void;
   setPan: (x: number) => void;
-  hydrate: (workflowId: string, d: { nodes: CanvasNode[]; memos: CanvasMemo[]; edges: CanvasEdge[] }) => void;
+  hydrate: (
+    workflowId: string,
+    d: { nodes: CanvasNode[]; memos: CanvasMemo[]; edges: CanvasEdge[]; phaseWidths?: Record<string, number> },
+  ) => void;
   setNodes: (nodes: CanvasNode[]) => void;
   setMemos: (memos: CanvasMemo[]) => void;
   setEdges: (edges: CanvasEdge[]) => void;
@@ -152,8 +155,9 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       nodes: d.nodes,
       memos: d.memos,
       edges: d.edges,
-      // IP가 바뀌면 레인 폭/선택/뷰포트 초기화
-      phasePW: s.loadedWorkflowId === workflowId ? s.phasePW : {},
+      // IP가 바뀌면(또는 첫 로드면) 레인 폭을 서버 저장값으로 되돌린다 — 같은 IP를 보는
+      // 중이면(예: 다른 필드 갱신으로 인한 재hydrate) 편집 중일 수 있는 로컬 값을 덮지 않는다.
+      phasePW: s.loadedWorkflowId === workflowId ? s.phasePW : (d.phaseWidths ?? {}),
       sel: s.loadedWorkflowId === workflowId ? s.sel : null,
       hlSet: s.loadedWorkflowId === workflowId ? s.hlSet : null,
       x: s.loadedWorkflowId === workflowId ? s.x : 0,

@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsBoolean, IsNumber, IsOptional, IsString, ValidateNested } from 'class-validator';
+import { IsArray, IsBoolean, IsNumber, IsObject, IsOptional, IsString, ValidateNested } from 'class-validator';
 
 /**
  * class-validator 데코레이터가 전혀 없으면 전역 ValidationPipe({ whitelist: true })가
@@ -82,4 +82,9 @@ export class PutCanvasDto {
   @ValidateNested({ each: true })
   @Type(() => CanvasEdgeInput)
   edges: CanvasEdgeInput[];
+
+  /** Phase 레인 폭(phase.id → px). 조절한 적 없으면 생략 — 기존 저장값을 그대로 둔다. */
+  @IsOptional()
+  @IsObject()
+  phaseWidths?: Record<string, number>;
 }

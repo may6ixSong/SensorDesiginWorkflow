@@ -7,6 +7,8 @@ export interface PutCanvasPayload {
   deliverables: { id: string; layout: Layout; phaseId: string }[];
   memos: { phaseId: string; text: string; layout: Layout }[];
   edges: { fromId: string; toId: string; bidirectional: boolean; auto: boolean }[];
+  /** 이번 편집 세션에서 Phase 레인 폭을 조절했을 때만 보낸다 — 생략하면 기존 저장값이 유지된다. */
+  phaseWidths?: Record<string, number>;
 }
 
 export interface PutCanvasResult {
@@ -30,6 +32,7 @@ export function usePutCanvas(workflowId: string) {
       qc.invalidateQueries({ queryKey: queryKeys.deliverables(workflowId) });
       qc.invalidateQueries({ queryKey: queryKeys.memos(workflowId) });
       qc.invalidateQueries({ queryKey: queryKeys.edges(workflowId) });
+      qc.invalidateQueries({ queryKey: queryKeys.workflow(workflowId) });
     },
   });
 }

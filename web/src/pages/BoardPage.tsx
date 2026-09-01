@@ -106,6 +106,7 @@ export function BoardPage() {
       ],
       memos: memos.map(toCanvasMemo),
       edges: edges.map(toCanvasEdge),
+      phaseWidths: workflow?.phaseWidths,
     });
     const s = st.getState();
     placeIncomingNodes(s.nodes, workflow?.phases ?? [], s.phasePW);
@@ -120,7 +121,7 @@ export function BoardPage() {
       }
     });
     s.bumpBlocks();
-  }, [workflowId, deliverables, incoming, memos, edges, workflow?.phases, st]);
+  }, [workflowId, deliverables, incoming, memos, edges, workflow?.phases, workflow?.phaseWidths, st]);
 
   /**
    * 편집 모드로 둔 채 이 페이지를 떠나면(다른 workflow로 이동 포함) 캔버스 편집 상태가
@@ -181,6 +182,7 @@ export function BoardPage() {
           bidirectional: e.bidirectional,
           auto: e.auto,
         })),
+        phaseWidths: s.phasePW,
       },
       {
         onSuccess: () => { toast('Layout saved'); onSettled?.(); },

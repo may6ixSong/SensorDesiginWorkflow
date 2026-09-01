@@ -76,6 +76,14 @@ export class CanvasService {
 
     await this.edges.replaceAllForWorkflow(workflow._id.toString(), dto.edges, workflow.isMock);
 
+    // phaseWidths는 캔버스 편집 중 조절이 없었으면 생략되어 온다 — 그때는 기존 저장값을
+    // 그대로 둔다. phase가 삭제돼도(위 주석 참고) 그 id를 가리키는 값은 그냥 버려둔다 —
+    // 다시 조회되지 않을 뿐 해가 없다.
+    if (dto.phaseWidths) {
+      workflow.phaseWidths = this.sanitizePhaseWidths(dto.phaseWidths);
+      await workflow.save();
+    }
+
     await this.audit.log(actor.knoxId, 'LAYOUT_UPDATE', 'workflow', workflow._id, {
       deliverableCount: dto.deliverables.length,
       memoCount: dto.memos.length,
@@ -87,6 +95,15 @@ export class CanvasService {
       memos: await this.memos.listForWorkflow(workflow._id.toString()),
       edges: await this.edges.listForWorkflow(workflow._id.toString()),
     };
+  }
+
+  /** 숫자가 아니거나 0 이하인 값은 걷어낸다 — 나머지는 그대로 신뢰한다(위 클래스 주석). */
+  private sanitizePhaseWidths(widths: Record<string, number>): Record<string, number> {
+    const out: Record<string, number> = {};
+    for (const [id, w] of Object.entries(widths)) {
+      if (Number.isFinite(w) && w > 0) out[id] = w;
+    }
+    return out;
   }
 
   private assertValidLayouts(dto: PutCanvasDto) {

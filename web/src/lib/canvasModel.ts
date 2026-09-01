@@ -299,9 +299,13 @@ export function minPW(blocks: Blk[], pid: string) {
 }
 
 /**
- * Phase 폭 변경. phasePW만 갱신하고 blocks는 절대 건드리지 않는다 — 겹침이
- * 허용되므로(사용자 요청) 폭을 조절해도 내가 직접 옮기지 않은 블록은 제자리에
- * 그대로 남아야 한다. 레인 배경/경계만 새 폭을 따라 다시 그려진다.
+ * Phase 폭 변경. phasePW를 갱신하고, 폭이 늘어나는 경우에는 뒤 phase들의 레인
+ * 경계가 밀리는 만큼 그 phase에 속한 블록들도 같이 밀어 준다 — 그대로 두면 늘어난
+ * 레인이 다음 phase 블록 자리를 침범해 resolveNodePhases가 그 블록을 이 phase
+ * 소속으로 잘못 재배정해 버린다(사용자가 겪은 "phase가 바뀌는" 역효과).
+ * 폭이 줄어드는 경우는 다음 phase를 침범할 일이 없으므로(겹침 허용, 사용자 요청)
+ * 블록을 건드리지 않는다. 리사이즈 중인 phase 자신과 그 이전 phase들의 블록은
+ * 늘어나는 경우에도 절대 움직이지 않는다.
  */
 export function resizePhase(
   blocks: Blk[],
@@ -316,6 +320,14 @@ export function resizePhase(
   const nw = Math.max(minPW(blocks, pid), Math.round(rawNewW));
   const oldW = getPW(phasePW, pid);
   if (nw === oldW) return phasePW;
+
+  if (nw > oldW) {
+    const dx = nw - oldW;
+    const laterPhaseIds = new Set(phases.slice(idx + 1).map((p) => p.id));
+    blocks.forEach((b) => {
+      if (laterPhaseIds.has(b.phase)) b.x = snp(b.x + dx);
+    });
+  }
 
   return { ...phasePW, [pid]: nw };
 }
