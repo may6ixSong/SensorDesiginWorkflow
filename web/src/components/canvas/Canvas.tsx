@@ -5,7 +5,7 @@ import { useCanvasStore } from '@/store/canvasStore';
 import { toast } from '@/store/toastStore';
 import {
   CanvasMemo, CanvasNode, connectedSet, countOrphans, isOrphanPhase, laneG, getPW,
-  phaseAtX, resizePhase, wallAdj, todayX, autoFit as computeAutoFit,
+  phaseAtX, resizePhase, wallAdj, todayX,
   resolveNodePhases,
 } from '@/lib/canvasModel';
 import {
@@ -37,7 +37,7 @@ type Blk = CanvasNode | CanvasMemo;
 /**
  * 보드 캔버스 — 목업 render()/bindAll()의 이벤트 전체를 이식했다.
  * 줌/팬, 자유 드래그 + Phase 벽 저항, grip 리사이즈, pin 연결, Phase 레인 폭 조절,
- * flow 하이라이트, Auto Fit 이 모두 여기서 완결된다 (설계서 3.7~3.9, 7.1).
+ * flow 하이라이트가 모두 여기서 완결된다 (설계서 3.7~3.9, 7.1, 부록 A.7).
  */
 export function Canvas({ workflow, phases, canEdit, onOpenIncoming, workflowDirectory, onSaveLayout }: Props) {
   const workflowById = useMemo(() => new Map(workflowDirectory.map((d) => [d.id, d])), [workflowDirectory]);
@@ -484,19 +484,6 @@ export function Canvas({ workflow, phases, canEdit, onOpenIncoming, workflowDire
     st.getState().cancelEdit();
     toast('Changes cancelled');
   };
-  const handleAutoFit = () => {
-    const s = st.getState();
-    const { positions, phasePW: nextPW } = computeAutoFit(s.nodes, s.edges, phases);
-    s.nodes.forEach((n) => {
-      const p = positions[n.id];
-      if (p) {
-        n.x = p.x;
-        n.y = p.y;
-      }
-    });
-    s.setPhasePW(nextPW);
-    toast('Re-laid out');
-  };
   const handleAddNote = () => {
     const s = st.getState();
     const g = lanes[phases[0].id] ?? { x: 0 };
@@ -749,9 +736,9 @@ export function Canvas({ workflow, phases, canEdit, onOpenIncoming, workflowDire
           edit={edit}
           onToggleEdit={handleToggleEdit}
           onCancel={handleCancel}
-          onAdd={() => st.getState().setAddDlg(true)}
+          onAdd={() => st.getState().setAddDlg(true, 'own')}
+          onAddReceived={() => st.getState().setAddDlg(true, 'received')}
           onNote={handleAddNote}
-          onAutoFit={handleAutoFit}
         />
       </Box>
     </>

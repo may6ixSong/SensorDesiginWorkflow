@@ -115,6 +115,23 @@ export class Deliverable {
   @Prop({ type: String, default: null })
   sourceDept: string | null;
 
+  /**
+   * 이 산출물을 실제로 보낼 것으로 기대하는, 이 시스템에 등록된 workflow(같은 project
+   * 안이어야 함). recvWorkflowId의 반대 방향이지만 서로 자동으로 연동되지 않는다 —
+   * 상대 workflow가 실제로 recvWorkflowId를 이걸로 맞춰 걸어야 진짜 연결이 되는데,
+   * 그 실시간 상태 동기화·일정 불일치 알림은 아직 구현하지 않았다(TODO, 설계서 §8.1
+   * 로드맵 참고). 지금은 "누구에게 받기로 했는지"를 캔버스에 표시하는 참고 정보일 뿐이다.
+   */
+  @Prop({ type: SchemaTypes.ObjectId, ref: 'Workflow', default: null })
+  sourceWorkflowId: Types.ObjectId | null;
+
+  /**
+   * 외부(sourceDept)로부터 받을 때의 개별 연락처 — 시스템 계정(KnoxID)이 없는 경우가
+   * 대부분이라 recvContact와 달리 이름/이메일/전화 등 자유 텍스트다.
+   */
+  @Prop({ type: String, default: null })
+  sourceContact: string | null;
+
   @Prop({ type: LayoutSchema, required: true })
   layout: Layout;
 
@@ -141,3 +158,4 @@ export const DeliverableSchema = SchemaFactory.createForClass(Deliverable);
 DeliverableSchema.index({ workflowId: 1, phaseId: 1 });
 DeliverableSchema.index({ series: 1 });
 DeliverableSchema.index({ recvWorkflowId: 1 });
+DeliverableSchema.index({ sourceWorkflowId: 1 });

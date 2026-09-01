@@ -16,7 +16,7 @@ export interface PutCanvasResult {
 }
 
 /**
- * 드래그·Auto Fit·레인 폭 변경은 모두 FE 메모리에서 계산되고,
+ * 드래그·레인 폭 변경은 모두 FE 메모리에서 계산되고,
  * 편집 세션 종료 시 최종 상태를 한 번에 PUT한다 (설계서 5.5, 7.1).
  */
 export function usePutCanvas(workflowId: string) {

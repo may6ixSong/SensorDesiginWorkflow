@@ -10,7 +10,7 @@ import { AuditService } from '../audit/audit.service';
 import { PutCanvasDto } from './dto/put-canvas.dto';
 
 /**
- * 캔버스(레이아웃/연결) 일괄 PUT (설계서 5.5). 배치·Auto Fit·series 일정 변경은
+ * 캔버스(레이아웃/연결) 일괄 PUT (설계서 5.5). 배치·series 일정 변경은
  * 전부 FE 메모리에서 계산되고, BE는 좌표의 최소 유효성만 검사한 뒤 신뢰하고 저장한다.
  * 단 phaseKey가 실제 프로젝트 Phase 목록에 존재하는지는 검증한다.
  */

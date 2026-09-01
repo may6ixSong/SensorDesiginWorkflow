@@ -73,6 +73,28 @@ export function useUpdateWorkflowDomains(projectId: string) {
 }
 
 /**
+ * 이 과제의 부서 목록 교체 — 목록 전체를 보낸다(workflow-domains와 같은 방식). 산출물
+ * "Received from" 화면의 후보 목록이라 workflow-domains와 달리 사용 중이어도 자유롭게
+ * 지울 수 있다(BE가 막지 않는다).
+ */
+export function useUpdateProjectDepartments(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (departments: string[]) => {
+      const res = await apiClient.patch<ApiEnvelope<ProjectDetailDto>>(
+        `/projects/${projectId}/departments`,
+        { departments },
+      );
+      return res.data.data;
+    },
+    onSuccess: (project) => {
+      qc.setQueryData(queryKeys.project(projectId), project);
+      qc.invalidateQueries({ queryKey: queryKeys.projects });
+    },
+  });
+}
+
+/**
  * workflow 하나를 이 과제의 도메인에 배정한다 (빈 문자열이면 배정 해제).
  * projectIps를 반드시 무효화해야 한다 — 그 목록이 Total workflow view의 buildDomainModel
  * 입력이라, 여기서 안 갱신하면 우주 지도의 항성계가 예전 도메인으로 남는다.

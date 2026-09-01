@@ -13,7 +13,9 @@ import { AddDeliverableDialog } from '@/components/dialogs/AddDeliverableDialog'
 import { NoteDialog } from '@/components/dialogs/NoteDialog';
 import { WorkflowPhasesDialog } from '@/components/dialogs/WorkflowPhasesDialog';
 import { Toast } from '@/components/common/Toast';
-import { useProjectWorkflowDirectory, useProjectWorkflows, useProjectMilestones, useProjects } from '@/api/hooks/useProjects';
+import {
+  useProject, useProjectWorkflowDirectory, useProjectWorkflows, useProjectMilestones, useProjects,
+} from '@/api/hooks/useProjects';
 import {
   useAddOwner, useAddViewGrant, useWorkflow, useRemoveOwner, useRemoveViewGrant, useUpdateWorkflowPhases,
 } from '@/api/hooks/useWorkflow';
@@ -39,6 +41,8 @@ export function BoardPage() {
   const { user: me, isAdmin } = useAuth();
 
   const { data: projects } = useProjects();
+  /** 부서 목록(Received from 셀렉트용)을 포함한 과제 상세. */
+  const { data: projectDetail } = useProject(projectId);
   /** 과제 공통 일정 — 캔버스는 쓰지 않고, "과제 일정으로 되돌리기"에만 필요하다. */
   const { data: milestones } = useProjectMilestones(projectId);
   const { data: workflows } = useProjectWorkflows(projectId);
@@ -59,6 +63,7 @@ export function BoardPage() {
   const openId = useCanvasStore((s) => s.openId);
   const noteDlg = useCanvasStore((s) => s.noteDlg);
   const addDlg = useCanvasStore((s) => s.addDlg);
+  const addDlgIntent = useCanvasStore((s) => s.addDlgIntent);
   const hldDlg = useCanvasStore((s) => s.hldDlg);
   const hldSel = useCanvasStore((s) => s.hldSel);
   const hldBack = useCanvasStore((s) => s.hldBack);
@@ -115,6 +120,20 @@ export function BoardPage() {
     });
     s.bumpBlocks();
   }, [workflowId, deliverables, incoming, memos, edges, workflow?.phases, st]);
+
+  /**
+   * 편집 모드로 둔 채 이 페이지를 떠나면(다른 workflow로 이동 포함) 캔버스 편집 상태가
+   * zustand 전역 store에 그대로 남아 있어, 저장하지 않고 나갔다가 다시 들어와도 계속
+   * "편집 중"으로 보이는 버그가 있었다 — canvasStore는 컴포넌트가 언마운트돼도 초기화되지
+   * 않는 모듈 상태이기 때문이다. 페이지를 떠날 때(=이 effect가 정리될 때) 편집 중이면
+   * 미저장 변경을 취소하고 편집 모드를 강제로 끈다. 나중에 들어올 동시수정 방지 기능도
+   * 이 지점(페이지 이탈 = 편집 세션 종료)에 편집 잠금 해제를 걸면 된다.
+   */
+  useEffect(() => {
+    return () => {
+      if (useCanvasStore.getState().edit) useCanvasStore.getState().cancelEdit();
+    };
+  }, [workflowId]);
 
   const isOwner = canEditWorkflow(workflow, isAdmin); // Admin(Group==='Admin')은 owner가 아니어도 편집 가능
   const canEdit = !!isOwner && !recv; // 목업 canEd()
@@ -195,6 +214,8 @@ export function BoardPage() {
           recvContact: d.recvContact,
           recvWorkflowId: d.recvWorkflowId,
           sourceDept: d.sourceDept,
+          sourceWorkflowId: d.sourceWorkflowId,
+          sourceContact: d.sourceContact,
           versions: d.versions ?? [],
           canEdit: d.canEdit,
         };
@@ -261,6 +282,7 @@ export function BoardPage() {
               phases={phaseList}
               own={own}
               workflowDirectory={workflowDirectory ?? []}
+              projectDepartments={projectDetail?.departments ?? []}
               onClose={closeDeliverable}
               onSaveInfo={({ name, net, type, phaseIds }) => {
                 updateDeliverable.mutate(
@@ -323,9 +345,14 @@ export function BoardPage() {
                   { onSuccess: () => toast('Released'), onError: () => toast('Release failed') },
                 )
               }
-              onSaveRecv={({ recvDept, recvContact, recvWorkflowId, sourceDept }) =>
+              onSaveRecv={({
+                recvDept, recvContact, recvWorkflowId, sourceDept, sourceWorkflowId, sourceContact,
+              }) =>
                 updateRecv.mutate(
-                  { id: openNode.id, recvDept, recvContact, recvWorkflowId, sourceDept },
+                  {
+                    id: openNode.id, recvDept, recvContact, recvWorkflowId,
+                    sourceDept, sourceWorkflowId, sourceContact,
+                  },
                   {
                     onSuccess: () => toast('Handoff info saved'),
                     onError: () => toast('Failed to save recipient department'),
@@ -400,6 +427,7 @@ export function BoardPage() {
               onClose={() => st.getState().setAddDlg(false)}
               onCreate={({ name, phaseIds, docType, network }) => {
                 const [firstPhase, ...rest] = phaseIds;
+                const wasReceived = addDlgIntent === 'received';
                 createDeliverable.mutate(
                   { name, phaseId: firstPhase, docType, network },
                   {
@@ -409,20 +437,23 @@ export function BoardPage() {
                       placeInLane(fresh, phaseList, s.phasePW);
                       s.setNodes([...s.nodes, fresh]);
                       st.getState().setAddDlg(false);
+                      // "받아야 할 산출물"로 추가한 경우, 부서/시스템 출처를 바로 채우도록
+                      // Handoff 탭을 열어 준다 — 그 외엔 기존과 동일하게 포커스만 이동.
+                      if (wasReceived) st.getState().openDeliverable(fresh.id, 'recv');
                       if (rest.length) {
                         updateSchedule.mutate(
                           { id: created.id, phaseIds },
                           {
                             onSuccess: (list) => {
                               mergeDeliverableResults(list, phaseList);
-                              st.getState().setFocusReq(created.id);
+                              if (!wasReceived) st.getState().setFocusReq(created.id);
                               toast(`Deliverable added across ${phaseIds.length} phases`);
                             },
                             onError: () => toast('Deliverable added, but failed to set the extra phases'),
                           },
                         );
                       } else {
-                        st.getState().setFocusReq(fresh.id);
+                        if (!wasReceived) st.getState().setFocusReq(fresh.id);
                         toast('Deliverable added');
                       }
                     },

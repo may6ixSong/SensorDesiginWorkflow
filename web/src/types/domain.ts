@@ -58,6 +58,11 @@ export interface ProjectDetailDto extends ProjectDto {
    * (PATCH /projects/:id/workflow-domains).
    */
   workflowDomains: string[];
+  /**
+   * 산출물 "Received from" 후보 부서 목록 — 과제마다 자유롭게 추가/삭제한다
+   * (PATCH /projects/:id/departments). 새 과제는 기본 6개로 시작한다.
+   */
+  departments: string[];
   /** 마일스톤(공통 일정)을 수정할 수 있는 Project Manager의 knoxId 목록 — Workflow의 owners(Edit 권한)와는 별개 role. */
   managers: string[];
 }
@@ -144,6 +149,14 @@ export interface DeliverableDto {
    * own처럼 자유롭게(여러 phase 포함) 편집할 수 있다.
    */
   sourceDept: string | null;
+  /**
+   * 이 산출물을 실제로 보낼 것으로 기대하는, 이 시스템에 등록된 workflow — 설정되면
+   * 캔버스/Handoff 탭에 "Expecting from <workflow>"로 표시된다. recvWorkflowId의 반대
+   * 방향이지만 서로 자동 연동되지는 않는다(TODO: 실시간 상태/일정 불일치 알림 연동).
+   */
+  sourceWorkflowId: string | null;
+  /** 외부(sourceDept)로부터 받을 때의 개별 연락처 — 자유 텍스트(이름/이메일/전화 등). */
+  sourceContact: string | null;
   /** 권한에 맞게 이미 필터링된 버전 목록 */
   versions: DeliverableVersionDto[];
   releasedVersion: DeliverableVersionDto | null;

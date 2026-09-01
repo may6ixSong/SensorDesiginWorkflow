@@ -85,6 +85,8 @@ export class DeliverablesService {
       seriesTotal: 1,
       recvDept: null,
       recvContact: null,
+      sourceWorkflowId: null,
+      sourceContact: null,
       layout: { x: 0, y: 0, w: 160, h: 82 },
       versions: [],
       createdBy: actor.knoxId,
@@ -140,15 +142,29 @@ export class DeliverablesService {
       }
     }
 
+    if (dto.sourceWorkflowId) {
+      if (dto.sourceWorkflowId === d.workflowId.toString()) {
+        throw new BadRequestException('A deliverable cannot list its own Workflow as the source Workflow.');
+      }
+      const sourceIp = await this.workflowModel.findById(dto.sourceWorkflowId).exec();
+      if (!sourceIp) throw new NotFoundException('Source Workflow not found.');
+      if (sourceIp.projectId.toString() !== d.projectId.toString()) {
+        throw new BadRequestException('Source Workflow must belong to the same project.');
+      }
+    }
+
     d.recvDept = dto.recvDept ?? null;
     d.recvContact = dto.recvContact ?? null;
     d.recvWorkflowId = dto.recvWorkflowId ? new Types.ObjectId(dto.recvWorkflowId) : null;
     d.sourceDept = dto.sourceDept?.trim() || null;
+    d.sourceWorkflowId = dto.sourceWorkflowId ? new Types.ObjectId(dto.sourceWorkflowId) : null;
+    d.sourceContact = dto.sourceContact?.trim() || null;
     await d.save();
     await this.audit.log(actor.knoxId, 'RECV_UPDATE', 'deliverable', d._id, {
       recvDept: d.recvDept,
       recvContact: d.recvContact,
       recvWorkflowId: d.recvWorkflowId,
+      sourceWorkflowId: d.sourceWorkflowId,
     });
     return d;
   }
@@ -284,6 +300,8 @@ export class DeliverablesService {
           recvContact: origin.recvContact,
           recvWorkflowId: origin.recvWorkflowId,
           sourceDept: origin.sourceDept,
+          sourceWorkflowId: origin.sourceWorkflowId,
+          sourceContact: origin.sourceContact,
           layout: {
             x: origin.layout.x + 40,
             y: origin.layout.y + 40,

@@ -1,7 +1,7 @@
 /**
  * 캔버스 작업 모델 + 순수 계산 로직.
  * 목업(analog-dashboard-v15.html)의 laneG/phaseAtX/reflowLane/resolve/wallAdj/
- * autoFit/connectedSet/orth/stOf/todayX 를 1:1로 이식한 것이다.
+ * connectedSet/orth/stOf/todayX 를 1:1로 이식한 것이다(autoFit은 이후 제거, 부록 A.7).
  *
  * 설계서 1.3·5.5에 따라 이 계산은 전부 FE에서 완결되고, BE는 결과 좌표만 저장한다.
  */
@@ -45,6 +45,10 @@ export interface CanvasNode {
   recvWorkflowId: string | null;
   /** 이 시스템에 없는 외부 부서로부터 받았음을 나타내는 자유 텍스트 — own 그대로라 자유 편집 가능. */
   sourceDept: string | null;
+  /** 이 산출물을 실제로 보낼 것으로 기대하는, 이 시스템에 등록된 workflow. */
+  sourceWorkflowId: string | null;
+  /** 외부로부터 받을 때의 개별 연락처 — 자유 텍스트. */
+  sourceContact: string | null;
   /** 'incoming'이면 다른 IP가 이 IP로 보낸 산출물 — 드래그/리사이즈 불가, 저장 대상 아님. */
   origin: 'own' | 'incoming';
   /** origin==='incoming'일 때만 채워진다 — 이 산출물을 준 workflow. */
@@ -105,6 +109,8 @@ export function toCanvasNode(d: DeliverableDto, origin: 'own' | 'incoming' = 'ow
     recvContact: d.recvContact,
     recvWorkflowId: d.recvWorkflowId,
     sourceDept: d.sourceDept ?? null,
+    sourceWorkflowId: d.sourceWorkflowId ?? null,
+    sourceContact: d.sourceContact ?? null,
     origin,
     sourceWorkflow: d.sourceWorkflow ?? null,
     sourcePhase: d.sourcePhase ?? null,
@@ -534,123 +540,3 @@ export function todayX(phases: WorkflowPhase[], phasePW: Record<string, number>,
   return prev ? (prev as { edge: number }).edge : 0;
 }
 
-/**
- * Auto Fit — 지그재그 토폴로지 배치 (목업 autoFit, 설계서 3.8).
- * blocks/phasePW를 새로 계산해 반환한다.
- */
-export function autoFit(
-  nodes: CanvasNode[],
-  edges: CanvasEdge[],
-  phases: WorkflowPhase[],
-): { positions: Record<string, { x: number; y: number }>; phasePW: Record<string, number> } {
-  const allIds = nodes.map((d) => d.id);
-  const visSet = new Set(allIds);
-
-  const inDeg: Record<string, number> = {};
-  const adj: Record<string, string[]> = {};
-  allIds.forEach((id) => {
-    inDeg[id] = 0;
-    adj[id] = [];
-  });
-  edges.filter((e) => visSet.has(e.from) && visSet.has(e.to)).forEach((e) => {
-    if (!adj[e.from].includes(e.to)) adj[e.from].push(e.to);
-    inDeg[e.to] = (inDeg[e.to] || 0) + 1;
-  });
-
-  const queue = allIds.filter((id) => (inDeg[id] || 0) === 0);
-  const order: string[] = [];
-  const vis = new Set<string>();
-  while (queue.length) {
-    const id = queue.shift()!;
-    if (vis.has(id)) continue;
-    vis.add(id);
-    order.push(id);
-    adj[id].forEach((n) => {
-      inDeg[n]--;
-      if (inDeg[n] <= 0 && !vis.has(n)) queue.push(n);
-    });
-  }
-  allIds.forEach((id) => {
-    if (!vis.has(id)) order.push(id);
-  });
-
-  const depth: Record<string, number> = {};
-  order.forEach((id) => {
-    let d = 0;
-    allIds.forEach((src) => {
-      if (adj[src] && adj[src].includes(id)) d = Math.max(d, (depth[src] ?? -1) + 1);
-    });
-    depth[id] = d;
-  });
-
-  const ZDXR = Math.round(NW * 0.55);
-  const ZDY = Math.round(NH * 0.7);
-
-  const nextPW: Record<string, number> = {};
-  phases.forEach((p) => {
-    const days = Math.max(1, Math.round((dayMs(p.end) - dayMs(p.start)) / DAY_MS));
-    const cols = days >= 56 ? 3 : days >= 28 ? 2 : 1;
-    nextPW[p.id] = Math.max(DEFAULT_PW, LANE_PAD * 2 + cols * NW + (cols - 1) * GAP + ZDXR);
-  });
-  const { lanes } = laneG(phases, nextPW);
-
-  const byId = new Map(nodes.map((n) => [n.id, n]));
-  const placed: Record<string, { x: number; y: number }> = {};
-
-  phases.forEach((p) => {
-    const g = lanes[p.id];
-    if (!g) return;
-    const pbs = order.filter((id) => byId.get(id)?.phase === p.id);
-    if (!pbs.length) return;
-    const minD = Math.min(...pbs.map((id) => depth[id] ?? 0));
-    const byD: Record<number, string[]> = {};
-    pbs.forEach((id) => {
-      const d = depth[id] ?? 0;
-      (byD[d] || (byD[d] = [])).push(id);
-    });
-    let rowY = TOP_PAD;
-    Object.keys(byD)
-      .map(Number)
-      .sort((a, b) => a - b)
-      .forEach((d) => {
-        const row = byD[d];
-        const isOdd = (d - minD) % 2 === 1;
-        let cx = g.x + LANE_PAD + (isOdd ? ZDXR : 0);
-        let maxH = 0;
-        row.forEach((id) => {
-          const bk = byId.get(id);
-          if (!bk) return;
-          if (cx + bk.w > g.x + g.w - LANE_PAD) {
-            cx = g.x + LANE_PAD + (isOdd ? ZDXR : 0);
-            rowY += maxH + GAP;
-            maxH = 0;
-          }
-          placed[id] = { x: snp(cx), y: snp(rowY) };
-          cx += bk.w + GAP;
-          maxH = Math.max(maxH, bk.h);
-        });
-        rowY += maxH + ZDY;
-      });
-  });
-
-  // AutoFit 내 겹침 방지 — 같은 Phase 내만 (설계서 3.8-5)
-  for (let it = 0; it < 8; it++) {
-    let mv = false;
-    for (let i = 0; i < nodes.length; i++) {
-      const A = nodes[i];
-      const pa = placed[A.id] ?? { x: A.x, y: A.y };
-      for (let j = i + 1; j < nodes.length; j++) {
-        const B = nodes[j];
-        if (A.phase !== B.phase) continue;
-        const pb = placed[B.id] ?? { x: B.x, y: B.y };
-        if (pa.x < pb.x + B.w + GAP && pa.x + A.w + GAP > pb.x && pa.y < pb.y + B.h + GAP && pa.y + A.h + GAP > pb.y) {
-          placed[B.id] = { x: pb.x, y: snp(pa.y + A.h + GAP) };
-          mv = true;
-        }
-      }
-    }
-    if (!mv) break;
-  }
-
-  return { positions: placed, phasePW: nextPW };
-}

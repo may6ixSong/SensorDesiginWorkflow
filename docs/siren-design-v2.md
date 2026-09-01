@@ -506,6 +506,8 @@ async addOwner(ipId: string, userId: string) {
 | 5 | HPC 경로 유효성 검증(존재 여부, 최종 수정일) |
 | 6 | Dark 모드 |
 | 7 | Release 시 recvDept/recvContact 대상 알림 발송 |
+| 8 | Deliverable.sourceWorkflowId를 실제 시스템 연동으로 승격 — 지금은 "누구에게 받기로 했는지"만 표시하는 참고 정보이고, 상대 workflow의 실시간 상태·버전을 자동으로 끌어오지 않는다(부록 A.7) |
+| 9 | 산출물 일정(내 needBy vs 제공 workflow/부서의 실제 일정) 불일치 감지 및 알림 — 상태 전이 시점에만, 받는 쪽에만 발송하는 형태로 설계 논의됨(자동 강제 동기화는 하지 않는다) |
 
 ### 8.2 결정 필요 (구현 착수 전)
 
@@ -585,6 +587,36 @@ phase가 workflow마다 다르므로, 주는 쪽의 `phaseId`는 받는 쪽 캔�
 상세의 Flow links 카드는 읽기 전용 목록이다.
 
 ### A.6 화면
+
+### A.7 Auto Fit 제거 (2026-09-01)
+
+3.7의 "Auto Fit(정리 기능)" 항목과 3.8 "Auto Fit 알고리즘" 전체를 제거했다. 캔버스 편집은
+자유 배치(3.7의 나머지 규칙 — Phase 소속 자동 갱신, Phase 벽 저항, Phase 레인 폭 조절)만
+지원하며, 위상정렬 기반 지그재그 재배치 버튼/로직은 FE(Toolbox, canvasModel.ts의 `autoFit`)
+와 문서 양쪽에서 삭제되었다.
+
+### A.8 산출물을 "누구에게 받는지" 등록 (2026-09-01)
+
+Deliverable에 받는 쪽(own)이 직접 채우는 필드 두 개를 추가했다 — 기존 sourceDept(자유
+텍스트, 시스템 밖 출처 표시)와 짝을 이룬다:
+
+- `sourceWorkflowId` — 이 산출물을 실제로 보낼 것으로 기대하는, 같은 project 안의 다른
+  workflow. recvWorkflowId의 반대 방향이지만 **자동으로 연동되지 않는다** — 상대가
+  recvWorkflowId를 이걸로 맞춰 걸어야 진짜 연결이고, 지금은 그냥 참고 표시일 뿐이다
+  (§8.1 로드맵 8번, 9번이 그 다음 단계).
+- `sourceContact` — 외부로부터 받을 때의 개별 연락처. recvContact와 달리 KnoxID 계정을
+  전제하지 않는 자유 텍스트(이름/이메일/전화 등)다.
+
+부서 후보 목록도 새로 하나 생겼다 — `Project.departments`(string[])는 "Received from"
+셀렉트가 보여줄 후보를 과제마다 자유롭게 추가/삭제한다. 전사 고정 `DEPARTMENTS`(6종,
+§4.2, recvDept 검증에 계속 쓰임)와는 완전히 별개 축이다 — 설계 도메인이 아닌 부서는
+이 시스템 자체를 아예 안 쓸 수 있어, 그 목록을 전사 고정값으로 묶어두지 않는다. 새
+과제는 항상 그 6개 이름으로 시작하고(`ProjectsService.ensureDepartments` — departments가
+없는 과거 과제 문서를 처음 조회하는 순간 채워 저장한다, 별도 마이그레이션 스크립트 없음),
+그 뒤로는 프로젝트 설정 화면(`DepartmentsSection`)에서 완전히 독립적으로 관리한다.
+과제 관리자는 사용 중이어도 자유롭게 지울 수 있다 — workflowDomains와 달리 "아직 쓰이는
+중이면 삭제 거부" 규칙을 두지 않았다(이 목록은 권한도, 배정 대상도 아닌 표시용 라벨
+후보이기 때문).
 
 - **Project Information → Schedule**: x축이 실제 날짜인 타임라인. 위에 과제 마일스톤 띠,
   아래에 도메인 → workflow 행마다 자기 phase 막대. 축 범위는 마일스톤 ∪ 모든 workflow phase다.

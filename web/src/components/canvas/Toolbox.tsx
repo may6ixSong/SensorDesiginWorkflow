@@ -8,12 +8,12 @@ interface Props {
   onToggleEdit: () => void;
   onCancel: () => void;
   onAdd: () => void;
+  onAddReceived: () => void;
   onNote: () => void;
-  onAutoFit: () => void;
 }
 
 /** 목업 .toolbox — 캔버스 좌하단 플로팅 툴박스 */
-export function Toolbox({ canEdit, edit, onToggleEdit, onCancel, onAdd, onNote, onAutoFit }: Props) {
+export function Toolbox({ canEdit, edit, onToggleEdit, onCancel, onAdd, onAddReceived, onNote }: Props) {
   if (!canEdit) return null;
   return (
     <Box
@@ -37,10 +37,9 @@ export function Toolbox({ canEdit, edit, onToggleEdit, onCancel, onAdd, onNote, 
           </Group>
           <Group>
             <TbBtn title="Add deliverable" icon="plus" onClick={onAdd} />
+            <TbBtn title="Add artifact I need to receive" icon="dn" onClick={onAddReceived} />
             <Sep />
             <TbBtn title="Add memo" icon="note" onClick={onNote} />
-            <Sep />
-            <TbBtn title="Auto Fit" icon="fit" onClick={onAutoFit} />
           </Group>
         </>
       )}

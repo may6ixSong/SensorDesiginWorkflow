@@ -72,6 +72,31 @@ export class Project {
   @Prop({ type: [String], default: [] })
   workflowDomains: string[];
 
+  /**
+   * 이 과제가 산출물 전달 부서로 인정하는 부서 목록 — 전사 고정 DEPARTMENTS(analog 등
+   * 6종, common/constants/departments.ts)와는 별개 축이다. 그쪽은 recvDept(전달) 검증에
+   * 계속 쓰이는 고정값이고, 이 목록은 "산출물을 누구/어느 부서로부터 받는지"(신규 기능,
+   * Deliverable.sourceWorkflowId/sourceDept)를 표시할 때 프로젝트마다 자유롭게 추가/삭제하는
+   * 후보 목록이다 - 설계 도메인이 아닌 부서는 이 시스템을 아예 쓰지 않을 수도 있어
+   * 전사 고정값으로 두지 않는다(PATCH /projects/:id/departments).
+   *
+   * 신규 과제는 늘 이 6개로 시작한다: Analog · Digital · APS · PI/PD · Solution · PTE.
+   * 이 필드가 없는(과거) 과제 문서는 ProjectsService.ensureDepartments가 처음 조회되는
+   * 시점에 이 기본값으로 채워 저장한다 - 별도 마이그레이션 스크립트를 두지 않는다.
+   */
+  @Prop({ type: [String], default: [] })
+  departments: string[];
+
+  /**
+   * 내부 마이그레이션 플래그 — departments를 한 번이라도 기본값으로 채운 적이 있는지.
+   * departments.length===0만으로는 "아직 한 번도 안 채워진 과거 문서"와 "사용자가 전부
+   * 지운 상태"를 구분할 수 없어서(둘 다 빈 배열) 별도 플래그를 둔다. true가 되고 나면
+   * ProjectsService.ensureDepartments는 다시는 손대지 않는다 - 그래야 부서를 전부
+   * 지우는 것도 정말로 "전부 지운" 상태로 유지된다. API 응답에는 노출하지 않는다.
+   */
+  @Prop({ default: false })
+  departmentsSeeded: boolean;
+
   /** 과제 공통 일정. workflow phase의 기본값이자, 타임라인/3D 뷰의 배경 구간이 된다. */
   @Prop({ type: [MilestoneSchema], default: [] })
   milestones: Milestone[];

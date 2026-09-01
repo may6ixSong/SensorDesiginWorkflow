@@ -64,6 +64,16 @@ export class UpdateRecvDto {
   @IsString()
   @MinLength(1)
   sourceDept: string | null;
+
+  /** 이 산출물을 실제로 보낼 것으로 기대하는, 이 시스템에 등록된 workflow (같은 project). */
+  @IsOptional()
+  @IsMongoId()
+  sourceWorkflowId: string | null;
+
+  /** 외부로부터 받을 때의 개별 연락처 (KnoxID 계정이 없을 수 있어 자유 텍스트). */
+  @IsOptional()
+  @IsString()
+  sourceContact: string | null;
 }
 
 export class UpdateScheduleDto {

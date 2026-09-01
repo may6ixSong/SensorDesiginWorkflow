@@ -6,6 +6,7 @@ import { ProjectTimeline } from '@/components/project/ProjectTimeline';
 import { EditMilestonesDialog } from '@/components/dialogs/EditMilestonesDialog';
 import { DesignWorkflowDialog } from '@/components/workflow/DesignWorkflowDialog';
 import { DesignDomainsSection } from '@/components/project/DesignDomainsSection';
+import { DepartmentsSection } from '@/components/project/DepartmentsSection';
 import { useUpdateMilestones } from '@/api/hooks/useProjects';
 import { SirenButton } from '@/components/common/SirenButton';
 import { Icon } from '@/components/common/Icon';
@@ -33,6 +34,11 @@ export function ProjectInfoPage() {
             workflowDomains={project.workflowDomains ?? []}
             milestones={project.milestones}
             workflows={workflows}
+            own={own}
+          />
+          <DepartmentsSection
+            projectId={project._id}
+            departments={project.departments ?? []}
             own={own}
           />
         </>

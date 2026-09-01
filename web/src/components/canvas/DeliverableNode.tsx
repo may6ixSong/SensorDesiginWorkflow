@@ -49,9 +49,10 @@ export function DeliverableNode({
   const col = d.net === 'HPC' ? T.hp : d.type === 'excel' ? T.tl : T.bl;
   // 진짜 다른 workflow 소유 — 이 캔버스에서 위치 편집 불가, edit 모드에서 흐리게 처리.
   const incoming = d.origin === 'incoming';
-  // 이 시스템에 없는 외부 부서로부터 받은 것으로 표시된 own 산출물 — own이므로
-  // 위치·Phase 편집은 완전히 자유롭다. 시각적으로만 "받은 것" 느낌을 준다.
-  const externalIncoming = !incoming && !!d.sourceDept;
+  // "받아야 할 산출물"로 표시된 own 산출물 — 외부 부서(sourceDept)든 시스템에 등록된
+  // workflow를 기대 중(sourceWorkflowId)이든 own이므로 위치·Phase 편집은 완전히 자유롭다.
+  // 시각적으로만 "받은 것" 느낌을 준다.
+  const externalIncoming = !incoming && (!!d.sourceDept || !!d.sourceWorkflowId);
   const showIncomingStyle = incoming || externalIncoming;
   // 받는 산출물은 "다른 IP가 준 것"이라는 정도만 드러내고 어느 workflow/부서인지는 캔버스
   // 블록에 표시하지 않는다 — 그래서 출처 색상 대신 고정된 violet을 쓴다.

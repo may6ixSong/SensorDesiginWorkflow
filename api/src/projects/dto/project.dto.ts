@@ -21,6 +21,12 @@ export interface ProjectDetailDto {
   name: string;
   /** 이 과제의 workflow가 고를 수 있는 설계 도메인 목록. */
   workflowDomains: string[];
+  /**
+   * 산출물 "Received from" 후보 부서 목록 — 과제마다 자유롭게 추가/삭제한다
+   * (PATCH /projects/:id/departments). 새 과제는 기본 6개(Analog/Digital/APS/PI-PD/
+   * Solution/PTE)로 시작한다(ProjectsService.ensureDepartments).
+   */
+  departments: string[];
   status: string;
   /** 과제 공통 일정 — 항상 start 오름차순. workflow phase의 초기값이기도 하다. */
   milestones: MilestoneDto[];
@@ -39,6 +45,7 @@ export function toProjectDetailDto(project: ProjectDocument): ProjectDetailDto {
     code: project.code,
     name: project.name,
     workflowDomains: [...(project.workflowDomains ?? [])],
+    departments: [...(project.departments ?? [])],
     status: project.status,
     milestones: sortSchedule(project.milestones ?? []).map(toMilestoneDto),
     members: project.members.map((m) => ({

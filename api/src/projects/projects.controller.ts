@@ -11,6 +11,7 @@ import { UpdateProjectDto } from './dto/update-project.dto';
 import { UpdateMilestonesDto } from './dto/update-milestones.dto';
 import { UpdateWorkflowDomainsDto } from './dto/update-workflow-domains.dto';
 import { UpdateWorkflowDomainDto } from './dto/update-workflow-domain.dto';
+import { UpdateProjectDepartmentsDto } from './dto/update-project-departments.dto';
 import { CreateWorkflowDto } from '../workflows/dto/workflow-crud.dto';
 
 @Controller('projects')
@@ -90,6 +91,20 @@ export class ProjectsController {
     @CurrentActor() me: Actor,
   ) {
     const project = await this.projects.updateWorkflowDomain(id, workflowId, body.domain, me);
+    return { data: toProjectDetailDto(project) };
+  }
+
+  /**
+   * 이 과제의 부서 목록 교체(추가/삭제 자유) — 산출물 "Received from" 화면의 후보 목록.
+   * @Patch(':id')보다 위에 있어야 한다 - 아래에 두면 ':id'가 'departments'까지 먹는다.
+   */
+  @Patch(':id/departments')
+  async updateDepartments(
+    @Param('id') id: string,
+    @Body() body: UpdateProjectDepartmentsDto,
+    @CurrentActor() me: Actor,
+  ) {
+    const project = await this.projects.updateDepartments(id, body.departments, me);
     return { data: toProjectDetailDto(project) };
   }
 

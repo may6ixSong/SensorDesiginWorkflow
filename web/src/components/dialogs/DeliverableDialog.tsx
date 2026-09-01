@@ -23,12 +23,15 @@ interface Props {
   own: boolean;
   /** 수신 workflow 셀렉트 박스용 — 과제 소속 workflow 전체(id/name/color). */
   workflowDirectory: WorkflowBriefDto[];
+  /** "Received from" 부서 후보 — 과제마다 자유롭게 관리하는 목록(Project.departments). */
+  projectDepartments: string[];
   onClose: () => void;
   onSaveInfo: (p: { name: string; net: 'OA' | 'HPC'; type: string; phaseIds: string[] }) => void;
   onUpload: (p: { file: string; note: string; net: 'OA' | 'HPC'; type: string }) => void;
   onRelease: () => void;
   onSaveRecv: (p: {
     recvDept: string | null; recvContact: string | null; recvWorkflowId: string | null; sourceDept: string | null;
+    sourceWorkflowId: string | null; sourceContact: string | null;
   }) => void;
 }
 
@@ -39,7 +42,7 @@ interface Props {
  * 잇는 것으로만 하고, 이 화면에는 "무엇과 이어져 있는지" 읽기 전용 목록만 남긴다.
  */
 export function DeliverableDialog({
-  node: d, phases, own, workflowDirectory, onClose,
+  node: d, phases, own, workflowDirectory, projectDepartments, onClose,
   onSaveInfo, onUpload, onRelease, onSaveRecv,
 }: Props) {
   const tab = useCanvasStore((s) => s.tab);
@@ -108,7 +111,10 @@ export function DeliverableDialog({
       )}
       {tab === 'versions' && <VersionsTab d={d} />}
       {tab === 'recv' && (
-        <RecvTab d={d} own={own} workflowDirectory={workflowDirectory} onSave={onSaveRecv} />
+        <RecvTab
+          d={d} own={own} workflowDirectory={workflowDirectory} projectDepartments={projectDepartments}
+          onSave={onSaveRecv}
+        />
       )}
     </ModalShell>
   );
@@ -455,25 +461,29 @@ function VersionsTab({ d }: { d: CanvasNode }) {
 
 /* ── 전달 탭 ── */
 function RecvTab({
-  d, own, workflowDirectory, onSave,
+  d, own, workflowDirectory, projectDepartments, onSave,
 }: {
   d: CanvasNode; own: boolean;
-  workflowDirectory: WorkflowBriefDto[]; onSave: Props['onSaveRecv'];
+  workflowDirectory: WorkflowBriefDto[]; projectDepartments: string[]; onSave: Props['onSaveRecv'];
 }) {
   const { resolveUser } = useDirectory();
   const [dept, setDept] = useState(d.recvDept ?? '');
   const [contact, setContact] = useState(d.recvContact ?? '');
   const [recvWorkflow, setRecvIp] = useState(d.recvWorkflowId ?? '');
   const [sourceDept, setSourceDept] = useState(d.sourceDept ?? '');
+  const [sourceWorkflow, setSourceWorkflow] = useState(d.sourceWorkflowId ?? '');
+  const [sourceContact, setSourceContact] = useState(d.sourceContact ?? '');
   const [contactSearchOpen, setContactSearchOpen] = useState(false);
   useEffect(() => {
     setDept(d.recvDept ?? ''); setContact(d.recvContact ?? ''); setRecvIp(d.recvWorkflowId ?? '');
-    setSourceDept(d.sourceDept ?? '');
+    setSourceDept(d.sourceDept ?? ''); setSourceWorkflow(d.sourceWorkflowId ?? '');
+    setSourceContact(d.sourceContact ?? '');
   }, [d.id]); // eslint-disable-line
 
   const workflowById = new Map(workflowDirectory.map((workflow) => [workflow.id, workflow]));
   const otherIps = workflowDirectory.filter((workflow) => workflow.id !== d.workflow);
   const recvIpInfo = d.recvWorkflowId ? workflowById.get(d.recvWorkflowId) : undefined;
+  const sourceIpInfo = d.sourceWorkflowId ? workflowById.get(d.sourceWorkflowId) : undefined;
 
   if (!own) {
     return (
@@ -507,8 +517,19 @@ function RecvTab({
         </Card>
         <Card>
           <Ey sx={{ mb: '9px' }}>Received from</Ey>
-          {d.sourceDept ? (
-            <Box sx={{ fontSize: 13, padding: '9px 0' }}>{d.sourceDept}</Box>
+          {d.sourceDept || sourceIpInfo ? (
+            <Box sx={{ padding: '9px 0' }}>
+              {d.sourceDept && <Box sx={{ fontSize: 13 }}>{d.sourceDept}</Box>}
+              {sourceIpInfo && (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: '9px', mt: '6px' }}>
+                  <Box sx={{ width: 9, height: 9, borderRadius: '50%', background: sourceIpInfo.color }} />
+                  <Box sx={{ fontSize: 12.5, color: T.dm2 }}>Expecting from {sourceIpInfo.name}</Box>
+                </Box>
+              )}
+              {d.sourceContact && (
+                <Box sx={{ fontSize: 11.5, color: T.dm2, mt: '3px' }}>{d.sourceContact}</Box>
+              )}
+            </Box>
           ) : (
             <Box sx={{ fontSize: 12.5, color: T.dm2 }}>Not marked as received from anywhere.</Box>
           )}
@@ -518,6 +539,13 @@ function RecvTab({
   }
 
   const contactUser = contact ? resolveUser(contact) : null;
+  // 이 프로젝트 부서 목록에 없는 값(과거에 자유 입력했던 값)도 후보에 끼워 보여준다 —
+  // 셀렉트가 "선택 없음"으로 조용히 지워버리면 저장된 값과 화면이 어긋난다.
+  const sourceDeptOptions = [
+    { value: '', label: 'Not set' },
+    ...(sourceDept && !projectDepartments.includes(sourceDept) ? [{ value: sourceDept, label: `${sourceDept} (not in list)` }] : []),
+    ...projectDepartments.map((dp) => ({ value: dp, label: dp })),
+  ];
 
   return (
     <>
@@ -581,14 +609,41 @@ function RecvTab({
       </Card>
 
       <Card sx={{ mb: '12px' }}>
-        <Ey sx={{ mb: '9px' }}>Received from (external department)</Ey>
+        <Ey sx={{ mb: '9px' }}>Received from</Ey>
         <Box sx={{ fontSize: 11.5, color: T.dm2, mb: '9px' }}>
-          Mark this as something handed to you from a department that doesn't use this system
-          (e.g. a foundry or vendor). It stays your own deliverable — position it in any Phase(s)
-          just like anything else you own.
+          Mark this as something you're waiting to receive. Pick a department below — if the workflow
+          that will actually send it is registered in this system, also set it under "Expecting from
+          workflow". If not (e.g. a department that doesn't use this system, a foundry or vendor),
+          leave that unset and use the contact field for a name/email/phone instead. This stays your
+          own deliverable either way — position it in any Phase(s) just like anything else you own.
         </Box>
         <Field label="Department" sx={{ mb: 0 }}>
-          <TextInput value={sourceDept} onChange={setSourceDept} placeholder="e.g. Foundry" />
+          <SelectInput value={sourceDept} onChange={setSourceDept} options={sourceDeptOptions} />
+        </Field>
+      </Card>
+
+      <Card sx={{ mb: '12px' }}>
+        <Ey sx={{ mb: '9px' }}>Expecting from workflow (registered in this system)</Ey>
+        <Field label="workflow" sx={{ mb: 0 }}>
+          <SelectInput
+            value={sourceWorkflow}
+            onChange={setSourceWorkflow}
+            options={[
+              { value: '', label: 'Not set — outside this system' },
+              ...otherIps.map((workflow) => ({ value: workflow.id, label: workflow.name })),
+            ]}
+          />
+        </Field>
+        <Box sx={{ fontSize: 11, color: T.dm2, mt: '8px' }}>
+          This is a reference only — the target workflow isn't linked automatically, and its schedule
+          or status doesn't sync here yet.
+        </Box>
+      </Card>
+
+      <Card sx={{ mb: '12px' }}>
+        <Ey sx={{ mb: '9px' }}>Contact (optional)</Ey>
+        <Field label="Name, email or phone" sx={{ mb: 0 }}>
+          <TextInput value={sourceContact} onChange={setSourceContact} placeholder="e.g. Jane Doe · jane@vendor.com" />
         </Field>
       </Card>
 
@@ -597,6 +652,8 @@ function RecvTab({
         onClick={() => onSave({
           recvDept: dept || null, recvContact: contact || null, recvWorkflowId: recvWorkflow || null,
           sourceDept: sourceDept.trim() || null,
+          sourceWorkflowId: sourceWorkflow || null,
+          sourceContact: sourceContact.trim() || null,
         })}
       >
         <Icon name="check" /> Save

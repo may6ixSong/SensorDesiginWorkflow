@@ -40,6 +40,12 @@ interface CanvasState {
   tab: 'overview' | 'versions' | 'recv';
   noteDlg: string | null;
   addDlg: boolean;
+  /**
+   * addDlg가 열릴 때 "일반 산출물 추가"인지 "내가 받아야 할 산출물 추가"인지 — 후자는
+   * 생성 직후 그 산출물의 Handoff 탭을 자동으로 열어 부서/시스템 출처를 바로 채우게
+   * 유도한다(BoardPage의 addDlg onCreate 핸들러 참고).
+   */
+  addDlgIntent: 'own' | 'received';
   hldDlg: boolean;
   hldSel: string | null;
   hldBack: boolean;
@@ -80,7 +86,7 @@ interface CanvasState {
   openDeliverable: (id: string | null, tab?: CanvasState['tab']) => void;
   setTab: (t: CanvasState['tab']) => void;
   setNoteDlg: (id: string | null) => void;
-  setAddDlg: (v: boolean) => void;
+  setAddDlg: (v: boolean, intent?: CanvasState['addDlgIntent']) => void;
   setHldDlg: (v: boolean, sel?: string | null) => void;
   setHldSel: (id: string | null) => void;
   setHldBack: (v: boolean) => void;
@@ -116,6 +122,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   tab: 'overview',
   noteDlg: null,
   addDlg: false,
+  addDlgIntent: 'own',
   hldDlg: false,
   hldSel: null,
   hldBack: false,
@@ -190,7 +197,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   openDeliverable: (id, tab) => set({ openId: id, tab: tab ?? 'overview' }),
   setTab: (t) => set({ tab: t }),
   setNoteDlg: (id) => set({ noteDlg: id }),
-  setAddDlg: (v) => set({ addDlg: v }),
+  setAddDlg: (v, intent) => set({ addDlg: v, addDlgIntent: intent ?? 'own' }),
   setHldDlg: (v, sel) => set({ hldDlg: v, hldSel: sel === undefined ? null : sel }),
   setHldSel: (id) => set({ hldSel: id }),
   setHldBack: (v) => set({ hldBack: v }),

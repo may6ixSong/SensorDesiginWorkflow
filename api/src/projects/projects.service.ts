@@ -5,7 +5,7 @@ import { Project, ProjectDocument } from './schemas/project.schema';
 import { WorkflowsService } from '../workflows/workflows.service';
 import { AuditService } from '../audit/audit.service';
 import { Actor } from '../common/actor';
-import { isValidDepartment } from '../common/constants/departments';
+import { DEPARTMENTS, isValidDepartment } from '../common/constants/departments';
 import { normalizeSchedule } from '../common/schedule';
 import { Milestone } from './schemas/project.schema';
 import { CreateWorkflowDto } from '../workflows/dto/workflow-crud.dto';
@@ -166,6 +166,37 @@ export class ProjectsService {
   }
 
   /**
+   * 이 과제의 부서 목록을 통째로 교체한다(workflowDomains와 같은 방식). workflowDomains와
+   * 달리 "아직 쓰이는 중이면 삭제 거부" 규칙은 두지 않는다 - 이 목록은 권한/소속을 결정하는
+   * 값이 아니라 산출물 전달 화면의 후보 라벨일 뿐이라, 이미 어떤 산출물이 특정 부서명을
+   * sourceDept로 들고 있어도 그 문자열은 그대로 남고(자유 텍스트라 이 목록과 강결합되지
+   * 않는다) 다음부터 후보 목록에만 안 보이면 된다.
+   */
+  async updateDepartments(id: string, input: string[], actor: Actor) {
+    await this.assertManageAccess(id, actor);
+    const project = await this.findByIdOrThrow(id);
+
+    const next: string[] = [];
+    const seen = new Set<string>();
+    for (const raw of input) {
+      const name = raw.trim();
+      if (!name) continue;
+      const key = name.toUpperCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      next.push(name);
+    }
+
+    project.departments = next;
+    project.departmentsSeeded = true;
+    await project.save();
+    await this.audit.log(actor.knoxId, 'PROJECT_DEPARTMENTS_UPDATE', 'project', project._id, {
+      departments: next,
+    });
+    return this.findDetailOrThrow(id, actor.knoxId);
+  }
+
+  /**
    * Project Manager 추가 — 이 과제의 마일스톤(공통 일정)을 수정할 수 있는 사람.
    * Workflow.addOwner와 같은 패턴이되, 부서 제한은 없다(Manager는 Analog 한정이 아니다).
    */
@@ -198,6 +229,21 @@ export class ProjectsService {
   async findDetailOrThrow(id: string, _knoxId: string) {
     const project = await this.model.findById(id).exec();
     if (!project) throw new NotFoundException('Project not found.');
+    return this.ensureDepartments(project);
+  }
+
+  /**
+   * departments 없이 만들어진(과거) 과제 문서를 처음 만나는 순간 기본 6개 부서로
+   * 채워 저장한다 - 별도 마이그레이션 스크립트 없이, 화면에서 한 번이라도 조회되면
+   * DB에도 자동 반영되게 하기 위해서다. departmentsSeeded 플래그로 딱 한 번만 채우고,
+   * 그 뒤로 사용자가 부서를 전부 지워도(빈 배열) 다시 채우지 않는다.
+   */
+  private async ensureDepartments(project: ProjectDocument): Promise<ProjectDocument> {
+    if (!project.departmentsSeeded) {
+      project.departments = DEPARTMENTS.map((d) => d.name);
+      project.departmentsSeeded = true;
+      await project.save();
+    }
     return project;
   }
 
