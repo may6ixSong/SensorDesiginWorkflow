@@ -1,14 +1,15 @@
 /**
  * 캔버스 작업 모델 + 순수 계산 로직.
- * 목업(analog-dashboard-v15.html)의 laneG/phaseAtX/reflowLane/resolve/wallAdj/
+ * 목업(analog-dashboard-v15.html)의 laneG/phaseAtX/resolve/wallAdj/
  * connectedSet/orth/stOf/todayX 를 1:1로 이식한 것이다(autoFit은 이후 제거, 부록 A.7).
+ * reflowLane(레인 재배치)은 겹침 허용 결정 이후 제거됨.
  *
  * 설계서 1.3·5.5에 따라 이 계산은 전부 FE에서 완결되고, BE는 결과 좌표만 저장한다.
  */
 import { DeliverableDto, EdgeDto, MemoDto, WorkflowPhase } from '@/types/domain';
 import { DAY_MS, dayMs, matchPhaseByDate } from './schedule';
 import {
-  DEFAULT_PW, GAP, LANE_PAD, MH, MW, NH, NW, PAD, ROW_H, TOP_PAD, WALL_FORCE, snp,
+  DEFAULT_PW, GAP, LANE_PAD, MH, MW, NH, NW, ROW_H, TOP_PAD, WALL_FORCE, snp,
 } from './constants';
 import { T } from '@/theme/tokens';
 
@@ -180,40 +181,6 @@ export function phaseAtX(phases: WorkflowPhase[], phasePW: Record<string, number
 
 type Blk = { id: string; phase: string; x: number; y: number; w: number; h: number };
 
-/** 레인 밖으로 삐져나간 블록이 있는지 (목업 laneOverflow) */
-export function laneOverflow(blocks: Blk[], phases: WorkflowPhase[], phasePW: Record<string, number>, pid: string) {
-  const g = laneG(phases, phasePW).lanes[pid];
-  if (!g) return false;
-  return blocks
-    .filter((b) => b.phase === pid)
-    .some((b) => b.x < g.x + LANE_PAD || b.x + b.w > g.x + g.w - LANE_PAD);
-}
-
-/** 레인 안에서 좌→우 배치, 폭이 모자라면 아래 줄로 개행 (목업 reflowLane) */
-export function reflowLane(blocks: Blk[], phases: WorkflowPhase[], phasePW: Record<string, number>, pid: string) {
-  const g = laneG(phases, phasePW).lanes[pid];
-  if (!g) return;
-  const lx = g.x + LANE_PAD;
-  const lw = g.w - LANE_PAD * 2;
-  const bs = blocks.filter((b) => b.phase === pid);
-  if (!bs.length) return;
-  bs.sort((a, b) => (Math.abs(a.y - b.y) > ROW_H / 2 ? a.y - b.y : a.x - b.x));
-  let cx = lx;
-  let cy = TOP_PAD;
-  let rowH = 0;
-  bs.forEach((b) => {
-    if (cx > lx && cx + b.w > lx + lw) {
-      cx = lx;
-      cy += rowH + GAP;
-      rowH = 0;
-    }
-    b.x = snp(cx);
-    b.y = snp(cy);
-    cx += b.w + GAP;
-    rowH = Math.max(rowH, b.h);
-  });
-}
-
 /**
  * 새로 생성된 블록을 지정된 Phase 레인 안쪽(좌상단)에 배치한다.
  * 백엔드가 내려주는 기본 layout(0,0)은 Phase를 모르므로, FE에서 레인 좌표로 보정해야
@@ -332,8 +299,9 @@ export function minPW(blocks: Blk[], pid: string) {
 }
 
 /**
- * Phase 폭 변경 (목업 resizePhase의 좌표 재계산 부분).
- * blocks를 in-place로 옮기고, 새 phasePW를 반환한다.
+ * Phase 폭 변경. phasePW만 갱신하고 blocks는 절대 건드리지 않는다 — 겹침이
+ * 허용되므로(사용자 요청) 폭을 조절해도 내가 직접 옮기지 않은 블록은 제자리에
+ * 그대로 남아야 한다. 레인 배경/경계만 새 폭을 따라 다시 그려진다.
  */
 export function resizePhase(
   blocks: Blk[],
@@ -349,39 +317,7 @@ export function resizePhase(
   const oldW = getPW(phasePW, pid);
   if (nw === oldW) return phasePW;
 
-  const oldMap = { ...phasePW, [pid]: oldW };
-  const newMap = { ...phasePW, [pid]: nw };
-  const Gold = laneG(phases, oldMap).lanes;
-  const Gnew = laneG(phases, newMap).lanes;
-
-  phases.forEach((p, i) => {
-    if (i < idx) return;
-    const dx = (Gnew[p.id]?.x ?? 0) - (Gold[p.id]?.x ?? 0);
-    if (dx === 0) return;
-    blocks.filter((b) => b.phase === p.id).forEach((b) => {
-      b.x = snp(Math.max(PAD, b.x + dx));
-    });
-  });
-
-  if (laneOverflow(blocks, phases, newMap, pid)) reflowLane(blocks, phases, newMap, pid);
-
-  // 전체 충돌 해소 패스 (목업과 동일하게 8회 반복, 겹치면 아래로)
-  for (let iter = 0; iter < 8; iter++) {
-    blocks.sort((a, b) => (a.x !== b.x ? a.x - b.x : a.y - b.y));
-    let moved = false;
-    for (let i = 0; i < blocks.length; i++) {
-      for (let j = i + 1; j < blocks.length; j++) {
-        const A = blocks[i];
-        const B = blocks[j];
-        if (A.x < B.x + B.w + GAP && A.x + A.w + GAP > B.x && A.y < B.y + B.h + GAP && A.y + A.h + GAP > B.y) {
-          B.y = snp(A.y + A.h + GAP);
-          moved = true;
-        }
-      }
-    }
-    if (!moved) break;
-  }
-  return newMap;
+  return { ...phasePW, [pid]: nw };
 }
 
 /**
