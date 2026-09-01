@@ -305,13 +305,16 @@ export function minPW(blocks: Blk[], pid: string) {
 }
 
 /**
- * Phase 폭 변경. phasePW를 갱신하고, 폭이 늘어나는 경우에는 뒤 phase들의 레인
- * 경계가 밀리는 만큼 그 phase에 속한 블록들도 같이 밀어 준다 — 그대로 두면 늘어난
- * 레인이 다음 phase 블록 자리를 침범해 resolveNodePhases가 그 블록을 이 phase
- * 소속으로 잘못 재배정해 버린다(사용자가 겪은 "phase가 바뀌는" 역효과).
- * 폭이 줄어드는 경우는 다음 phase를 침범할 일이 없으므로(겹침 허용, 사용자 요청)
- * 블록을 건드리지 않는다. 리사이즈 중인 phase 자신과 그 이전 phase들의 블록은
- * 늘어나는 경우에도 절대 움직이지 않는다.
+ * Phase 폭 변경. phasePW를 갱신하고, 리사이즈하는 phase의 오른쪽 경계선 뒤에 있는
+ * 모든 phase의 레인 x가 그 폭 변화량(dx)만큼 통째로 밀리므로, 그 phase들에 속한
+ * 블록도 같은 dx만큼 같이 옮겨 제 레인 안의 상대 위치를 그대로 유지한다.
+ *
+ * 늘릴 때뿐 아니라 줄일 때도 반드시 옮겨야 한다 — 줄여도 뒤 phase들의 레인은
+ * 왼쪽으로 그만큼 밀리는데, 블록만 제자리에 남으면 그 블록이 이제 자기 레인
+ * 바깥(옆 phase 쪽)에 걸치게 되어 resolveNodePhases가 엉뚱한 phase로 재배정해
+ * 버린다(사용자가 겪은 "phase가 바뀌는" 역효과 — 늘릴 때만 막아서는 줄일 때
+ * 그대로 재현된다). 리사이즈 중인 phase 자신과 그 이전 phase들의 블록은 늘리든
+ * 줄이든 절대 움직이지 않는다 — 그 블록들의 레인 x 자체가 안 변하기 때문이다.
  */
 export function resizePhase(
   blocks: Blk[],
@@ -327,13 +330,11 @@ export function resizePhase(
   const oldW = getPW(phasePW, pid);
   if (nw === oldW) return phasePW;
 
-  if (nw > oldW) {
-    const dx = nw - oldW;
-    const laterPhaseIds = new Set(phases.slice(idx + 1).map((p) => p.id));
-    blocks.forEach((b) => {
-      if (laterPhaseIds.has(b.phase)) b.x = snp(b.x + dx);
-    });
-  }
+  const dx = nw - oldW;
+  const laterPhaseIds = new Set(phases.slice(idx + 1).map((p) => p.id));
+  blocks.forEach((b) => {
+    if (laterPhaseIds.has(b.phase)) b.x = snp(b.x + dx);
+  });
 
   return { ...phasePW, [pid]: nw };
 }

@@ -1,4 +1,5 @@
 import { Box } from '@mui/material';
+import { useTranslation } from 'react-i18next';
 import { Milestone, WorkflowPhase } from '@/types/domain';
 import { SirenButton } from '@/components/common/SirenButton';
 import { Icon } from '@/components/common/Icon';
@@ -26,6 +27,7 @@ interface Props {
 export function WorkflowPhasesPanel({
   phases, milestones, orphanCount, onSave, saving, error,
 }: Props) {
+  const { t } = useTranslation();
   return (
     <>
       <Box
@@ -34,9 +36,7 @@ export function WorkflowPhasesPanel({
           borderRadius: '9px', padding: '9px 11px', mb: '12px', lineHeight: 1.7,
         }}
       >
-        This schedule belongs to this workflow alone — every workflow can have a different one.
-        Removing a phase never deletes its artifacts: they stay exactly where they are on the canvas
-        and get flagged as having no release schedule until you give them one.
+        {t('workflow.phasesNote')}
       </Box>
 
       {orphanCount > 0 && (
@@ -48,9 +48,7 @@ export function WorkflowPhasesPanel({
           }}
         >
           <Icon name="warn" size={13} />
-          {orphanCount} artifact{orphanCount > 1 ? 's' : ''} in this workflow already {orphanCount > 1 ? 'have' : 'has'} no
-          release schedule. Re-adding a phase with the same dates won't re-attach them — assign them from the
-          artifact's Release schedule.
+          {t('workflow.phasesOrphanWarning', { count: orphanCount })}
         </Box>
       )}
 
@@ -63,11 +61,10 @@ export function WorkflowPhasesPanel({
         extraAction={
           milestones.length > 0 ? (
             <SirenButton
-              title="Replace this workflow's schedule with a fresh copy of the project milestones"
               onClick={() => onSave(milestones.map((m) => ({ name: m.name, start: m.start, end: m.end })))}
               disabled={saving}
             >
-              <Icon name="undo" /> Reset to project milestones
+              <Icon name="undo" /> {t('workflow.resetToMilestones')}
             </SirenButton>
           ) : null
         }

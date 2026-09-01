@@ -411,13 +411,6 @@ function OverviewTab({
         </Box>
       </Card>
 
-      {received && (
-        <Card sx={{ display: 'flex', alignItems: 'flex-start', gap: '9px', color: T.dm }}>
-          <Box component="span" sx={{ mt: '1px' }}><Icon name="info" size={13} /></Box>
-          <Box sx={{ fontSize: 12, lineHeight: 1.6 }}>{t('deliverable.receivedIntentNotice')}</Box>
-        </Card>
-      )}
-
       {own && !received && (
         <Card>
           <Ey sx={{ mb: '9px' }}>Upload new working copy — minor↑</Ey>

@@ -52,7 +52,10 @@ export function DeliverableNode({
   // 이 시스템에 없는 외부 부서로부터 받은 것으로 표시된 own 산출물 — own이므로
   // 위치·Phase 편집은 완전히 자유롭다. 시각적으로만 "받은 것" 느낌을 준다.
   const externalIncoming = !incoming && !!d.sourceDept;
-  const showIncomingStyle = incoming || externalIncoming;
+  // 이 workflow가 받기를 기다리는 자리표시자(intent==='received') — 이것도 "내가 만든
+  // 게 아니라 밖에서 온다"는 점에서 위 둘과 같은 부류라 같은 배경색을 쓴다(사용자 요청:
+  // 별도 안내 문구 대신 캔버스 배경색만으로 구분).
+  const showIncomingStyle = incoming || externalIncoming || d.intent === 'received';
   // 받는 산출물은 "다른 IP가 준 것"이라는 정도만 드러내고 어느 workflow/부서인지는 캔버스
   // 블록에 표시하지 않는다 — 그래서 출처 색상 대신 고정된 violet을 쓴다.
   const srcColor = T.vi;

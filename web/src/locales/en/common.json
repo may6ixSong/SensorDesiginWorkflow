@@ -46,7 +46,24 @@
     "confirmRemoveOwnerTitle": "Remove edit access",
     "confirmRemoveOwnerMessage": "Remove {{name}} ({{knoxId}})'s edit access to this workflow?",
     "confirmRemoveViewGrantTitle": "Remove view access",
-    "confirmRemoveViewGrantMessage": "Remove {{name}} ({{knoxId}})'s view access to this workflow?"
+    "confirmRemoveViewGrantMessage": "Remove {{name}} ({{knoxId}})'s view access to this workflow?",
+    "phasesNote": "This schedule is specific to this workflow.",
+    "phasesOrphanWarning": "{{count}} artifact(s) have no release schedule.",
+    "resetToMilestones": "Reset to project milestones"
+  },
+  "schedule": {
+    "helpText": "Overlaps are fine — canvas order follows the start date.",
+    "namePlaceholder": "e.g. KO",
+    "removeRow": "Remove",
+    "addRow": "Add {{noun}}",
+    "orderTitle": "Canvas order",
+    "overlapBadge": "OVERLAP",
+    "atLeastOneRequired": "At least one is required.",
+    "nameRequired": "Name is required.",
+    "datesRequired": "Start and end dates are required.",
+    "startAfterEnd": "Start must not be after end.",
+    "saving": "Saving…",
+    "save": "Save"
   },
   "deliverable": {
     "tabOverview": "Overview",
@@ -66,7 +83,6 @@
     "contactPlaceholder": "e.g. Jane Doe · jane@vendor.com",
     "notInList": "{{name}} (not in list)",
     "receivedFromNotSet": "Not marked as received from anywhere.",
-    "receivedIntentNotice": "This artifact represents something you're waiting to receive — someone will add it through a connected service once it's ready. It can't be uploaded directly here.",
     "deleteTitle": "Delete artifact",
     "deleteMessage": "Delete \"{{name}}\"? This removes it and its version history for everyone.",
     "deleteWarning": "This cannot be undone.",

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Box } from '@mui/material';
+import { useTranslation } from 'react-i18next';
 import { ScheduleSpan } from '@/types/domain';
 import { SirenButton } from '@/components/common/SirenButton';
 import { DateInput, Ey, TextInput } from '@/components/common/Panel';
@@ -44,6 +45,7 @@ export interface ScheduleEditorProps {
  *    좌 → 우 순서다. 그래서 행을 위아래로 옮기는 조작 자체를 두지 않는다.
  */
 export function ScheduleEditor({ spans, noun, onSubmit, saving, error, extraAction }: ScheduleEditorProps) {
+  const { t } = useTranslation();
   const [rows, setRows] = useState<Row[]>(() =>
     sortSchedule(spans).map((s) => ({ rowKey: s.id, id: s.id, name: s.name, start: s.start, end: s.end })),
   );
@@ -95,11 +97,11 @@ export function ScheduleEditor({ spans, noun, onSubmit, saving, error, extraActi
 
   const submit = () => {
     const errs: Record<string, string> = {};
-    if (!rows.length) errs.__all = `At least one ${noun} is required.`;
+    if (!rows.length) errs.__all = t('schedule.atLeastOneRequired');
     rows.forEach((r) => {
-      if (!r.name.trim()) errs[r.rowKey] = 'Name is required.';
-      else if (!r.start || !r.end) errs[r.rowKey] = 'Start and end dates are required.';
-      else if (dayMs(r.start) > dayMs(r.end)) errs[r.rowKey] = 'Start must not be after end.';
+      if (!r.name.trim()) errs[r.rowKey] = t('schedule.nameRequired');
+      else if (!r.start || !r.end) errs[r.rowKey] = t('schedule.datesRequired');
+      else if (dayMs(r.start) > dayMs(r.end)) errs[r.rowKey] = t('schedule.startAfterEnd');
     });
     setRowErr(errs);
     if (Object.keys(errs).length) return;
@@ -112,8 +114,7 @@ export function ScheduleEditor({ spans, noun, onSubmit, saving, error, extraActi
     <>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: '10px', mb: '12px' }}>
         <Box sx={{ fontSize: 11.5, color: T.dm2, flex: 1 }}>
-          Add, remove, rename and re-date freely. Overlapping {noun}s are fine — the canvas keeps them
-          ordered left → right by start date.
+          {t('schedule.helpText')}
         </Box>
         {extraAction}
       </Box>
@@ -131,7 +132,7 @@ export function ScheduleEditor({ spans, noun, onSubmit, saving, error, extraActi
               value={r.name}
               onChange={(v) => setField(r.rowKey, 'name', v)}
               error={!!rowErr[r.rowKey]}
-              placeholder="e.g. KO"
+              placeholder={t('schedule.namePlaceholder')}
             />
           </Box>
           <Box sx={{ flex: '0 0 146px' }}>
@@ -143,7 +144,7 @@ export function ScheduleEditor({ spans, noun, onSubmit, saving, error, extraActi
           </Box>
           <SirenButton
             variant="ghost"
-            title={`Remove this ${noun}`}
+            title={t('schedule.removeRow')}
             disabled={rows.length <= 1}
             onClick={() => removeRow(r.rowKey)}
             sx={{ mt: '2px' }}
@@ -154,12 +155,12 @@ export function ScheduleEditor({ spans, noun, onSubmit, saving, error, extraActi
       ))}
 
       <SirenButton onClick={addRow} sx={{ mt: '12px' }}>
-        <Icon name="plus" /> Add {noun}
+        <Icon name="plus" /> {t('schedule.addRow', { noun })}
       </SirenButton>
 
       {preview.length > 0 && (
         <Box sx={{ mt: '18px' }}>
-          <Ey sx={{ mb: '8px' }}>Order on the canvas · left → right</Ey>
+          <Ey sx={{ mb: '8px' }}>{t('schedule.orderTitle')}</Ey>
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
             {preview.map((s) => (
               <Box
@@ -174,7 +175,9 @@ export function ScheduleEditor({ spans, noun, onSubmit, saving, error, extraActi
                 }}
               >
                 {s.name}
-                {overlapping.has(s.id) && <Box component="span" sx={{ fontSize: 8, fontWeight: 700 }}>OVERLAP</Box>}
+                {overlapping.has(s.id) && (
+                  <Box component="span" sx={{ fontSize: 8, fontWeight: 700 }}>{t('schedule.overlapBadge')}</Box>
+                )}
               </Box>
             ))}
           </Box>
@@ -185,7 +188,7 @@ export function ScheduleEditor({ spans, noun, onSubmit, saving, error, extraActi
       {error && <Box sx={{ fontSize: 11.5, color: T.rd, mt: '10px' }}>{error}</Box>}
 
       <SirenButton variant="primary" onClick={submit} disabled={saving} sx={{ mt: '16px' }}>
-        <Icon name="check" /> {saving ? 'Saving…' : 'Save'}
+        <Icon name="check" /> {saving ? t('schedule.saving') : t('schedule.save')}
       </SirenButton>
     </>
   );
