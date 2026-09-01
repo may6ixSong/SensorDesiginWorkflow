@@ -42,7 +42,7 @@ export function EdgeLayer({
 
     const blocked = !bi && !latR(a) && stOf(b).lb !== 'Not submitted';
     const on = !!hlSet && hlSet.has(e.from) && hlSet.has(e.to);
-    const col = on ? '#2f6b4a' : blocked ? '#ac6f08' : '#8b99ab';
+    const col = on ? '#2f6b4a' : blocked ? '#ac6f08' : '#5c6b7d';
     const mk = on ? 'ahl' : blocked ? 'ahb' : 'ah';
     const dpath = orth(a, b);
 
@@ -51,23 +51,27 @@ export function EdgeLayer({
         key={`${e.id}-main`}
         d={dpath}
         stroke={col}
-        strokeWidth={on ? 3.1 : 2.4}
+        strokeWidth={on ? 3.6 : 3}
         fill="none"
         markerEnd={`url(#${mk})`}
         markerStart={bi ? `url(#${on ? 'ahl-s' : 'ah-s'})` : undefined}
         strokeDasharray={blocked ? '7 6' : undefined}
+        // crispEdges를 유지한다 — 픽셀 단위로 스냅해 안티에일리어싱 흐림 없이 그려서,
+        // 캔버스가 CSS scale()로 축소되는 최대 줌아웃(z=0.3)에서도 anti-aliased(흐린)
+        // 렌더링보다 오히려 더 진하고 또렷하게 남는다(실측 비교 확인). 예전에 안 보이던
+        // 것은 crispEdges 때문이 아니라 선 자체가 얇았던 탓 — 아래 폭을 굵혔다.
         shapeRendering="crispEdges"
       />,
     );
 
     if (on) {
       parts.push(
-        <path key={`${e.id}-bg`} d={dpath} stroke={col} strokeWidth={2.4} fill="none" opacity={0.18} shapeRendering="crispEdges" />,
+        <path key={`${e.id}-bg`} d={dpath} stroke={col} strokeWidth={3.6} fill="none" opacity={0.18} shapeRendering="crispEdges" />,
         <path
           key={`${e.id}-dash`}
           d={dpath}
           stroke="#2f6b4a"
-          strokeWidth={3.2}
+          strokeWidth={3.8}
           fill="none"
           strokeLinecap="round"
           strokeDasharray="12 15"
@@ -117,7 +121,7 @@ export function EdgeLayer({
         key="linkline"
         d={`M${a.x + a.w},${Math.round(a.y + a.h / 2)}H${linkPos.x}V${linkPos.y}`}
         stroke="#2f6b4a"
-        strokeWidth={2.4}
+        strokeWidth={3}
         strokeDasharray="7 6"
         fill="none"
         markerEnd="url(#ahl)"
@@ -134,7 +138,7 @@ export function EdgeLayer({
     >
       <defs>
         <marker id="ah" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
-          <path d="M0,0L12,6L0,12Z" fill="#8b99ab" />
+          <path d="M0,0L12,6L0,12Z" fill="#5c6b7d" />
         </marker>
         <marker id="ahb" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
           <path d="M0,0L12,6L0,12Z" fill="#ac6f08" />
@@ -143,7 +147,7 @@ export function EdgeLayer({
           <path d="M0,0L12,6L0,12Z" fill="#2f6b4a" />
         </marker>
         <marker id="ah-s" markerWidth="12" markerHeight="12" refX="2" refY="6" orient="auto">
-          <path d="M12,0L0,6L12,12Z" fill="#8b99ab" />
+          <path d="M12,0L0,6L12,12Z" fill="#5c6b7d" />
         </marker>
         <marker id="ahl-s" markerWidth="12" markerHeight="12" refX="2" refY="6" orient="auto">
           <path d="M12,0L0,6L12,12Z" fill="#2f6b4a" />
