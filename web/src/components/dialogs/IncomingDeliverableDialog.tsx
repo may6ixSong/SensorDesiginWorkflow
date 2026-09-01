@@ -43,6 +43,9 @@ export function IncomingDeliverableDialog({ d, onClose }: Props) {
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Ey>{ph ? `${ph.name} · ${shortDate(ph.start)} → ${shortDate(ph.end)}` : 'No schedule on the source workflow'}</Ey>
             <Box sx={{ fontSize: 18, fontWeight: 700, mt: '3px' }}>{d.name}</Box>
+            {d.artifactKey && (
+              <Box sx={{ fontFamily: FONT_MONO, fontSize: 11, color: T.dm2, mt: '2px' }}>{d.artifactKey}</Box>
+            )}
           </Box>
           <Badge color={T.vi} bg={T.vi2} borderColor={T.vi3} sx={{ mt: '6px' }}>Incoming</Badge>
         </Box>

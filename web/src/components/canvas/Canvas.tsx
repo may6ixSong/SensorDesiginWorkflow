@@ -30,6 +30,13 @@ interface Props {
   workflowDirectory: WorkflowBriefDto[];
   /** 저장 완료(성공/실패 무관) 후 호출할 콜백을 받는다 — 편집 종료를 저장 이후로 미뤄 쿼리 재활성화 레이스를 막는다. */
   onSaveLayout: (onSettled: () => void) => void;
+  /**
+   * "Cancel changes" 클릭 시 호출된다 — 이번 편집 세션 중 새로 생성된 산출물 id 목록을 그대로
+   * 넘긴다. 산출물 추가는 생성 버튼을 누르는 순간 이미 서버에 POST되어 있으므로, 로컬
+   * 스냅샷을 되돌리는 것만으로는 "추가를 취소"할 수 없다 — 호출부(BoardPage)가 그 id들을
+   * 실제로 삭제한 뒤 cancelEdit()을 호출해야 한다.
+   */
+  onCancelEdit: (sessionAddedDeliverableIds: string[]) => void;
 }
 
 type Blk = CanvasNode | CanvasMemo;
@@ -39,7 +46,9 @@ type Blk = CanvasNode | CanvasMemo;
  * 줌/팬, 자유 드래그 + Phase 벽 저항, grip 리사이즈, pin 연결, Phase 레인 폭 조절,
  * flow 하이라이트가 모두 여기서 완결된다 (설계서 3.7~3.9, 7.1, 부록 A.7).
  */
-export function Canvas({ workflow, phases, canEdit, onOpenIncoming, workflowDirectory, onSaveLayout }: Props) {
+export function Canvas({
+  workflow, phases, canEdit, onOpenIncoming, workflowDirectory, onSaveLayout, onCancelEdit,
+}: Props) {
   const workflowById = useMemo(() => new Map(workflowDirectory.map((d) => [d.id, d])), [workflowDirectory]);
   const vpRef = useRef<HTMLDivElement>(null);
   const cvRef = useRef<HTMLDivElement>(null);
@@ -481,8 +490,7 @@ export function Canvas({ workflow, phases, canEdit, onOpenIncoming, workflowDire
     onSaveLayout(() => st.getState().exitEdit());
   };
   const handleCancel = () => {
-    st.getState().cancelEdit();
-    toast('Changes cancelled');
+    onCancelEdit(st.getState().sessionAddedDeliverableIds);
   };
   const handleAddNote = () => {
     const s = st.getState();

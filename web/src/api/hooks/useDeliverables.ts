@@ -65,7 +65,9 @@ export function useCreateDeliverable(workflowId: string) {
 export function useUpdateDeliverable(workflowId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, ...patch }: { id: string; name?: string; docType?: string; network?: 'OA' | 'HPC' }) => {
+    mutationFn: async (
+      { id, ...patch }: { id: string; name?: string; artifactKey?: string; docType?: string; network?: 'OA' | 'HPC' },
+    ) => {
       const res = await apiClient.patch<ApiEnvelope<DeliverableDto>>(`/deliverables/${id}`, patch);
       return res.data.data;
     },
@@ -93,17 +95,16 @@ export function useUpdateRecv(workflowId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({
-      id, recvDept, recvContact, recvWorkflowId, sourceDept, sourceWorkflowId, sourceContact,
+      id, recvDept, recvContact, recvWorkflowId, sourceDept, sourceContact,
     }: {
       id: string; recvDept: string | null; recvContact: string | null; recvWorkflowId?: string | null;
-      sourceDept?: string | null; sourceWorkflowId?: string | null; sourceContact?: string | null;
+      sourceDept?: string | null; sourceContact?: string | null;
     }) => {
       const res = await apiClient.patch<ApiEnvelope<DeliverableDto>>(`/deliverables/${id}/recv`, {
         recvDept,
         recvContact,
         recvWorkflowId,
         sourceDept,
-        sourceWorkflowId,
         sourceContact,
       });
       return res.data.data;

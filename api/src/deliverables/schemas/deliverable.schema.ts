@@ -71,6 +71,17 @@ export class Deliverable {
   @Prop({ required: true, trim: true })
   name: string;
 
+  /**
+   * name과 분리된 안정적 식별자 — 사용자가 name을 자유롭게 바꿀 수 있게 되면서,
+   * 향후 외부 시스템과 연동할 때 이름이 아니라 이 값으로 매핑하도록 별도로 둔다
+   * (설계서 §8.1 로드맵). 지정하면 같은 workflow 안에서 유일해야 하고(DeliverablesService.update
+   * 가 검증, 아래 부분 unique 인덱스), series 인스턴스끼리는 같은 key를 공유할 수 있다
+   * (같은 실물 산출물의 회차이므로 — update()의 검증이 series 관계면 예외로 둔다).
+   * 지정하지 않아도 된다 — 미지정은 null.
+   */
+  @Prop({ type: String, default: null, trim: true })
+  artifactKey: string | null;
+
   @Prop({ required: true })
   docType: string;
 
@@ -116,18 +127,11 @@ export class Deliverable {
   sourceDept: string | null;
 
   /**
-   * 이 산출물을 실제로 보낼 것으로 기대하는, 이 시스템에 등록된 workflow(같은 project
-   * 안이어야 함). recvWorkflowId의 반대 방향이지만 서로 자동으로 연동되지 않는다 —
-   * 상대 workflow가 실제로 recvWorkflowId를 이걸로 맞춰 걸어야 진짜 연결이 되는데,
-   * 그 실시간 상태 동기화·일정 불일치 알림은 아직 구현하지 않았다(TODO, 설계서 §8.1
-   * 로드맵 참고). 지금은 "누구에게 받기로 했는지"를 캔버스에 표시하는 참고 정보일 뿐이다.
-   */
-  @Prop({ type: SchemaTypes.ObjectId, ref: 'Workflow', default: null })
-  sourceWorkflowId: Types.ObjectId | null;
-
-  /**
-   * 외부(sourceDept)로부터 받을 때의 개별 연락처 — 시스템 계정(KnoxID)이 없는 경우가
-   * 대부분이라 recvContact와 달리 이름/이메일/전화 등 자유 텍스트다.
+   * 이 산출물을 받을 때의 개별 연락처 — 시스템 계정(KnoxID)이 없는 경우가 대부분이라
+   * recvContact와 달리 이름/이메일/전화 등 자유 텍스트다. sourceWorkflowId(시스템 내
+   * workflow 참조)는 일부러 두지 않는다 — 상대가 시스템에 등록되어 있다면 그 workflow가
+   * recvWorkflowId를 이 workflow로 걸어두는 순간 이미 "Incoming from other workflows"로
+   * 자동 노출되므로(부록 A.4), 받는 쪽이 따로 대상 workflow를 지정할 이유가 없다.
    */
   @Prop({ type: String, default: null })
   sourceContact: string | null;
@@ -158,4 +162,7 @@ export const DeliverableSchema = SchemaFactory.createForClass(Deliverable);
 DeliverableSchema.index({ workflowId: 1, phaseId: 1 });
 DeliverableSchema.index({ series: 1 });
 DeliverableSchema.index({ recvWorkflowId: 1 });
-DeliverableSchema.index({ sourceWorkflowId: 1 });
+// DB 레벨 unique 인덱스로 두지 않는다 - series 인스턴스끼리는 같은 artifactKey를 정당하게
+// 공유해야 하는데(같은 실물 산출물의 회차), 그 예외를 인덱스 조건만으로 표현할 수 없다.
+// 유일성은 DeliverablesService.update()가 애플리케이션 레벨에서 검증한다.
+DeliverableSchema.index({ workflowId: 1, artifactKey: 1 });

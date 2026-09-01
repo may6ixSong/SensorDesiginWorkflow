@@ -40,5 +40,33 @@
     "confirmRemoveOwnerMessage": "Remove {{name}} ({{knoxId}})'s edit access to this workflow?",
     "confirmRemoveViewGrantTitle": "Remove view access",
     "confirmRemoveViewGrantMessage": "Remove {{name}} ({{knoxId}})'s view access to this workflow?"
+  },
+  "deliverable": {
+    "tabOverview": "Overview",
+    "tabVersions": "Version History",
+    "tabHandoff": "Handoff",
+    "notSet": "Not set",
+    "save": "Save",
+    "recipientDeptTitle": "Recipient department",
+    "recipientDeptNotSet": "No recipient department set.",
+    "individualContact": "Individual contact",
+    "setContact": "Set contact",
+    "changeContact": "Change",
+    "setContactDialogTitle": "Set individual contact",
+    "recipientWorkflowTitle": "Recipient workflow",
+    "recipientWorkflowDesc": "Set another Analog workflow that should receive this deliverable — it'll show up on that workflow's board as \"Incoming from other workflows\", showing only the version you release.",
+    "recipientWorkflowLabel": "workflow",
+    "noRecipientWorkflow": "No recipient workflow set.",
+    "receivedFromTitle": "Received from",
+    "receivedFromDesc": "Mark this as something you're waiting to receive. If the department sending it already uses this system, they'll set this workflow as their recipient workflow on their own deliverable, and it'll show up automatically under \"Incoming from other workflows\" — nothing to do here for that case. Use the fields below when it's coming from outside this system, or you just want to note who to expect it from.",
+    "departmentLabel": "Department",
+    "contactPlaceholder": "e.g. Jane Doe · jane@vendor.com",
+    "notInList": "{{name}} (not in list)",
+    "receivedFromNotSet": "Not marked as received from anywhere.",
+    "deleteTitle": "Delete artifact",
+    "deleteMessage": "Delete \"{{name}}\"? This removes it and its version history for everyone.",
+    "deleteWarning": "This cannot be undone.",
+    "delete": "Delete",
+    "cancel": "Cancel"
   }
 }

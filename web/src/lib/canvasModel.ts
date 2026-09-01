@@ -34,6 +34,8 @@ export interface CanvasNode {
    */
   phase: string;
   name: string;
+  /** name과 분리된 안정적 식별자 — 향후 외부 시스템 연동용 매핑 키. 미지정이면 null. */
+  artifactKey: string | null;
   type: string;
   net: 'OA' | 'HPC';
   series: string | null;
@@ -45,9 +47,7 @@ export interface CanvasNode {
   recvWorkflowId: string | null;
   /** 이 시스템에 없는 외부 부서로부터 받았음을 나타내는 자유 텍스트 — own 그대로라 자유 편집 가능. */
   sourceDept: string | null;
-  /** 이 산출물을 실제로 보낼 것으로 기대하는, 이 시스템에 등록된 workflow. */
-  sourceWorkflowId: string | null;
-  /** 외부로부터 받을 때의 개별 연락처 — 자유 텍스트. */
+  /** 받을 때의 개별 연락처 — 자유 텍스트. */
   sourceContact: string | null;
   /** 'incoming'이면 다른 IP가 이 IP로 보낸 산출물 — 드래그/리사이즈 불가, 저장 대상 아님. */
   origin: 'own' | 'incoming';
@@ -100,6 +100,7 @@ export function toCanvasNode(d: DeliverableDto, origin: 'own' | 'incoming' = 'ow
     workflow: d.workflowId,
     phase: d.phaseId,
     name: d.name,
+    artifactKey: d.artifactKey ?? null,
     type: d.docType,
     net: d.network,
     series: d.series,
@@ -109,7 +110,6 @@ export function toCanvasNode(d: DeliverableDto, origin: 'own' | 'incoming' = 'ow
     recvContact: d.recvContact,
     recvWorkflowId: d.recvWorkflowId,
     sourceDept: d.sourceDept ?? null,
-    sourceWorkflowId: d.sourceWorkflowId ?? null,
     sourceContact: d.sourceContact ?? null,
     origin,
     sourceWorkflow: d.sourceWorkflow ?? null,

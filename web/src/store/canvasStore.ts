@@ -63,6 +63,14 @@ interface CanvasState {
    * 바꾸면) 더 이상 유효하지 않으므로 무시한다. 세션 동안만 유지되고 서버엔 저장되지 않는다.
    */
   incomingOverrides: Record<string, { x: number; y: number; phase: string }>;
+  /**
+   * 이번 편집 세션(enterEdit ~ cancelEdit/exitEdit) 중에 새로 생성(POST)된 산출물 id 목록.
+   * 산출물 추가는 memo/레이아웃과 달리 즉시 서버에 저장되는 동작이라(생성 버튼을 누르는
+   * 순간 POST), Cancel이 로컬 상태만 스냅샷으로 되돌려서는 서버에 남은 레코드가 다음
+   * refetch 때 그대로 다시 나타난다 — 그래서 Cancel 시 이 목록에 있는 id들을 실제로
+   * DELETE한 뒤에 스냅샷을 복원해야 "추가를 취소"한 것이 된다(BoardPage의 onCancelEdit).
+   */
+  sessionAddedDeliverableIds: string[];
 
   setVP: (z: number, x: number, y: number) => void;
   setPan: (x: number) => void;
@@ -76,6 +84,7 @@ interface CanvasState {
   enterEdit: () => void;
   exitEdit: () => void;
   cancelEdit: () => void;
+  trackAddedDeliverable: (id: string) => void;
 
   setRecv: (v: boolean) => void;
   select: (id: string | null, hl: Set<string> | null) => void;
@@ -131,6 +140,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   incomingId: null,
   focusReq: null,
   incomingOverrides: {},
+  sessionAddedDeliverableIds: [],
   rev: 0,
 
   setVP: (z, x, y) => set({ z: Math.max(ZOOM_MIN, z), x, y }),
@@ -168,14 +178,17 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       link: null,
       sel: null,
       hlSet: null,
+      sessionAddedDeliverableIds: [],
     });
   },
-  exitEdit: () => set({ edit: false, snapshot: null, link: null, sel: null, hlSet: null }),
+  exitEdit: () =>
+    set({ edit: false, snapshot: null, link: null, sel: null, hlSet: null, sessionAddedDeliverableIds: [] }),
   cancelEdit: () => {
     const snap = get().snapshot;
     set((s) => ({
       edit: false,
       snapshot: null,
+      sessionAddedDeliverableIds: [],
       link: null,
       sel: null,
       hlSet: null,
@@ -207,4 +220,10 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   setFocusReq: (id) => set({ focusReq: id }),
   setIncomingOverride: (id, x, y, phase) =>
     set((s) => ({ incomingOverrides: { ...s.incomingOverrides, [id]: { x, y, phase } } })),
+  trackAddedDeliverable: (id) =>
+    set((s) => (
+      s.sessionAddedDeliverableIds.includes(id)
+        ? s
+        : { sessionAddedDeliverableIds: [...s.sessionAddedDeliverableIds, id] }
+    )),
 }));

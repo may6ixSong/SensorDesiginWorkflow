@@ -76,7 +76,7 @@ export class Project {
    * 이 과제가 산출물 전달 부서로 인정하는 부서 목록 — 전사 고정 DEPARTMENTS(analog 등
    * 6종, common/constants/departments.ts)와는 별개 축이다. 그쪽은 recvDept(전달) 검증에
    * 계속 쓰이는 고정값이고, 이 목록은 "산출물을 누구/어느 부서로부터 받는지"(신규 기능,
-   * Deliverable.sourceWorkflowId/sourceDept)를 표시할 때 프로젝트마다 자유롭게 추가/삭제하는
+   * Deliverable.sourceDept/sourceContact)를 표시할 때 프로젝트마다 자유롭게 추가/삭제하는
    * 후보 목록이다 - 설계 도메인이 아닌 부서는 이 시스템을 아예 쓰지 않을 수도 있어
    * 전사 고정값으로 두지 않는다(PATCH /projects/:id/departments).
    *

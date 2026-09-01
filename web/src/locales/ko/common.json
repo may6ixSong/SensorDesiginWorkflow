@@ -40,5 +40,33 @@
     "confirmRemoveOwnerMessage": "{{name}}({{knoxId}})님의 이 workflow 편집 권한을 제거하시겠습니까?",
     "confirmRemoveViewGrantTitle": "열람 권한 제거",
     "confirmRemoveViewGrantMessage": "{{name}}({{knoxId}})님의 이 workflow 열람 권한을 제거하시겠습니까?"
+  },
+  "deliverable": {
+    "tabOverview": "개요",
+    "tabVersions": "버전 이력",
+    "tabHandoff": "전달",
+    "notSet": "미지정",
+    "save": "저장",
+    "recipientDeptTitle": "전달 받을 부서",
+    "recipientDeptNotSet": "지정된 전달 부서가 없습니다.",
+    "individualContact": "개별 담당자",
+    "setContact": "담당자 지정",
+    "changeContact": "변경",
+    "setContactDialogTitle": "개별 담당자 지정",
+    "recipientWorkflowTitle": "전달 받을 workflow",
+    "recipientWorkflowDesc": "이 산출물을 받아야 하는 다른 Analog workflow를 지정하세요 — 그 workflow의 보드에 \"다른 workflow로부터 받음\"으로 노출되며, Release한 버전만 보입니다.",
+    "recipientWorkflowLabel": "workflow",
+    "noRecipientWorkflow": "지정된 전달 workflow가 없습니다.",
+    "receivedFromTitle": "받는 곳",
+    "receivedFromDesc": "이 산출물을 기다리고 있다는 걸 표시합니다. 보내는 부서가 이미 이 시스템을 쓰고 있다면, 그쪽에서 자기 산출물의 전달 받을 workflow로 이 workflow를 지정하는 순간 자동으로 \"다른 workflow로부터 받음\" 목록에 나타나므로 여기서 따로 할 일이 없습니다. 아래 항목은 시스템 밖에서 받는 경우, 또는 그냥 누구한테 받을지 메모해두고 싶을 때 씁니다.",
+    "departmentLabel": "부서",
+    "contactPlaceholder": "예: 홍길동 · jane@vendor.com",
+    "notInList": "{{name}} (목록에 없음)",
+    "receivedFromNotSet": "어디서 받는지 표시되어 있지 않습니다.",
+    "deleteTitle": "산출물 삭제",
+    "deleteMessage": "\"{{name}}\"을(를) 삭제하시겠습니까? 이 산출물과 버전 이력이 모두 삭제됩니다.",
+    "deleteWarning": "이 작업은 되돌릴 수 없습니다.",
+    "delete": "삭제",
+    "cancel": "취소"
   }
 }

@@ -132,6 +132,11 @@ export interface DeliverableDto {
    */
   phaseId: string;
   name: string;
+  /**
+   * name과 분리된 안정적 식별자 — 이름은 언제든 바뀔 수 있어서, 향후 외부 시스템과
+   * 연동할 때는 이 값으로 매핑하도록 둔다. 지정하지 않으면 null(설계서 §8.1 로드맵).
+   */
+  artifactKey: string | null;
   docType: string;
   network: 'OA' | 'HPC';
   series: string | null;
@@ -149,13 +154,7 @@ export interface DeliverableDto {
    * own처럼 자유롭게(여러 phase 포함) 편집할 수 있다.
    */
   sourceDept: string | null;
-  /**
-   * 이 산출물을 실제로 보낼 것으로 기대하는, 이 시스템에 등록된 workflow — 설정되면
-   * 캔버스/Handoff 탭에 "Expecting from <workflow>"로 표시된다. recvWorkflowId의 반대
-   * 방향이지만 서로 자동 연동되지는 않는다(TODO: 실시간 상태/일정 불일치 알림 연동).
-   */
-  sourceWorkflowId: string | null;
-  /** 외부(sourceDept)로부터 받을 때의 개별 연락처 — 자유 텍스트(이름/이메일/전화 등). */
+  /** 받을 때의 개별 연락처 — 자유 텍스트(이름/이메일/전화 등, 시스템 계정을 전제하지 않음). */
   sourceContact: string | null;
   /** 권한에 맞게 이미 필터링된 버전 목록 */
   versions: DeliverableVersionDto[];

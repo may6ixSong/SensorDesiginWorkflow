@@ -85,7 +85,6 @@ export class DeliverablesService {
       seriesTotal: 1,
       recvDept: null,
       recvContact: null,
-      sourceWorkflowId: null,
       sourceContact: null,
       layout: { x: 0, y: 0, w: 160, h: 82 },
       versions: [],
@@ -102,6 +101,22 @@ export class DeliverablesService {
     if (dto.name !== undefined) d.name = dto.name;
     if (dto.docType !== undefined) d.docType = dto.docType;
     if (dto.network !== undefined) d.network = dto.network;
+    if (dto.artifactKey !== undefined) {
+      const key = dto.artifactKey.trim() || null;
+      if (key) {
+        // series 인스턴스끼리는 같은 실물 산출물의 회차이므로 같은 key를 공유해도 된다 -
+        // "원본(series가 가리키는 id, 없으면 자기 자신)"이 같은지로 그 관계를 판정한다.
+        const sid = (d.series ?? d._id).toString();
+        const clash = await this.model.findOne({ workflowId: d.workflowId, artifactKey: key, _id: { $ne: d._id } }).exec();
+        if (clash) {
+          const clashSid = (clash.series ?? clash._id).toString();
+          if (clashSid !== sid) {
+            throw new BadRequestException(`Artifact key "${key}" is already used by "${clash.name}" in this workflow.`);
+          }
+        }
+      }
+      d.artifactKey = key;
+    }
     await d.save();
     return d;
   }
@@ -142,29 +157,16 @@ export class DeliverablesService {
       }
     }
 
-    if (dto.sourceWorkflowId) {
-      if (dto.sourceWorkflowId === d.workflowId.toString()) {
-        throw new BadRequestException('A deliverable cannot list its own Workflow as the source Workflow.');
-      }
-      const sourceIp = await this.workflowModel.findById(dto.sourceWorkflowId).exec();
-      if (!sourceIp) throw new NotFoundException('Source Workflow not found.');
-      if (sourceIp.projectId.toString() !== d.projectId.toString()) {
-        throw new BadRequestException('Source Workflow must belong to the same project.');
-      }
-    }
-
     d.recvDept = dto.recvDept ?? null;
     d.recvContact = dto.recvContact ?? null;
     d.recvWorkflowId = dto.recvWorkflowId ? new Types.ObjectId(dto.recvWorkflowId) : null;
     d.sourceDept = dto.sourceDept?.trim() || null;
-    d.sourceWorkflowId = dto.sourceWorkflowId ? new Types.ObjectId(dto.sourceWorkflowId) : null;
     d.sourceContact = dto.sourceContact?.trim() || null;
     await d.save();
     await this.audit.log(actor.knoxId, 'RECV_UPDATE', 'deliverable', d._id, {
       recvDept: d.recvDept,
       recvContact: d.recvContact,
       recvWorkflowId: d.recvWorkflowId,
-      sourceWorkflowId: d.sourceWorkflowId,
     });
     return d;
   }
@@ -291,6 +293,7 @@ export class DeliverablesService {
           workflowId: origin.workflowId,
           phaseId,
           name: origin.name,
+          artifactKey: origin.artifactKey,
           docType: origin.docType,
           network: origin.network,
           series: origin._id,
@@ -300,7 +303,6 @@ export class DeliverablesService {
           recvContact: origin.recvContact,
           recvWorkflowId: origin.recvWorkflowId,
           sourceDept: origin.sourceDept,
-          sourceWorkflowId: origin.sourceWorkflowId,
           sourceContact: origin.sourceContact,
           layout: {
             x: origin.layout.x + 40,

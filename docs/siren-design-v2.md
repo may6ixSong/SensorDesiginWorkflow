@@ -506,7 +506,7 @@ async addOwner(ipId: string, userId: string) {
 | 5 | HPC 경로 유효성 검증(존재 여부, 최종 수정일) |
 | 6 | Dark 모드 |
 | 7 | Release 시 recvDept/recvContact 대상 알림 발송 |
-| 8 | Deliverable.sourceWorkflowId를 실제 시스템 연동으로 승격 — 지금은 "누구에게 받기로 했는지"만 표시하는 참고 정보이고, 상대 workflow의 실시간 상태·버전을 자동으로 끌어오지 않는다(부록 A.7) |
+| 8 | 외부 시스템 연동 시 Deliverable.artifactKey를 실제 매핑 키로 사용 — 지금은 이름과 분리된 안정적 식별자를 사용자가 채워둘 수만 있고(부록 A.9), 그걸 실제로 읽어가는 연동은 아직 없다 |
 | 9 | 산출물 일정(내 needBy vs 제공 workflow/부서의 실제 일정) 불일치 감지 및 알림 — 상태 전이 시점에만, 받는 쪽에만 발송하는 형태로 설계 논의됨(자동 강제 동기화는 하지 않는다) |
 
 ### 8.2 결정 필요 (구현 착수 전)
@@ -588,6 +588,15 @@ phase가 workflow마다 다르므로, 주는 쪽의 `phaseId`는 받는 쪽 캔�
 
 ### A.6 화면
 
+- **Project Information → Schedule**: x축이 실제 날짜인 타임라인. 위에 과제 마일스톤 띠,
+  아래에 도메인 → workflow 행마다 자기 phase 막대. 축 범위는 마일스톤 ∪ 모든 workflow phase다.
+- **Design Workflow(3D)**: x = 시간(산출물은 자기 phase의 **종료일** 위치), y = workflow
+  (도메인끼리 큰 간격으로 분리), z = 자유(결정적 해시, 아무 데이터도 뜻하지 않음).
+  CSS `perspective` + `translate3d`로 실제 원근을 준다 — 그래서 카메라 레이어 아래 중간 래퍼에
+  `opacity`/`filter`를 걸면 안 된다(3D가 평면으로 눌린다). 흐림은 잎 요소에 직접 준다.
+  과제 마일스톤은 x축 전체를 세로로 가로지르는 옅은 밴드로만 그린다.
+  일정을 잃은 산출물은 날짜축 바깥의 `NO SCHEDULE` 구역에 붉게 모인다.
+
 ### A.7 Auto Fit 제거 (2026-09-01)
 
 3.7의 "Auto Fit(정리 기능)" 항목과 3.8 "Auto Fit 알고리즘" 전체를 제거했다. 캔버스 편집은
@@ -597,15 +606,18 @@ phase가 workflow마다 다르므로, 주는 쪽의 `phaseId`는 받는 쪽 캔�
 
 ### A.8 산출물을 "누구에게 받는지" 등록 (2026-09-01)
 
-Deliverable에 받는 쪽(own)이 직접 채우는 필드 두 개를 추가했다 — 기존 sourceDept(자유
-텍스트, 시스템 밖 출처 표시)와 짝을 이룬다:
+Deliverable에 받는 쪽(own)이 직접 채우는 필드를 추가했다 — 기존 sourceDept(자유 텍스트,
+시스템 밖 출처 표시)와 짝을 이룬다:
 
-- `sourceWorkflowId` — 이 산출물을 실제로 보낼 것으로 기대하는, 같은 project 안의 다른
-  workflow. recvWorkflowId의 반대 방향이지만 **자동으로 연동되지 않는다** — 상대가
-  recvWorkflowId를 이걸로 맞춰 걸어야 진짜 연결이고, 지금은 그냥 참고 표시일 뿐이다
-  (§8.1 로드맵 8번, 9번이 그 다음 단계).
-- `sourceContact` — 외부로부터 받을 때의 개별 연락처. recvContact와 달리 KnoxID 계정을
-  전제하지 않는 자유 텍스트(이름/이메일/전화 등)다.
+- `sourceContact` — 받을 때의 개별 연락처. recvContact와 달리 KnoxID 계정을 전제하지
+  않는 자유 텍스트(이름/이메일/전화 등)다.
+
+시스템에 등록된 workflow로부터 받는 경우를 위한 별도의 "출처 workflow" 필드는 **의도적으로
+두지 않는다** — 상대가 이미 이 시스템을 쓰고 있다면 그쪽이 recvWorkflowId를 이 workflow로
+걸어두는 순간 자동으로 "Incoming from other workflows"에 뜨므로(A.4), 받는 쪽이 따로
+지정할 일이 없다. 처음엔 `sourceWorkflowId`(recvWorkflowId의 반대 방향 참조)를 추가했다가,
+바로 이 이유로 A.9에서 도로 제거했다 — recvWorkflowId 하나로 "시스템 내 매핑"이 이미
+충분하다는 게 결론이었다.
 
 부서 후보 목록도 새로 하나 생겼다 — `Project.departments`(string[])는 "Received from"
 셀렉트가 보여줄 후보를 과제마다 자유롭게 추가/삭제한다. 전사 고정 `DEPARTMENTS`(6종,
@@ -618,11 +630,34 @@ Deliverable에 받는 쪽(own)이 직접 채우는 필드 두 개를 추가했�
 중이면 삭제 거부" 규칙을 두지 않았다(이 목록은 권한도, 배정 대상도 아닌 표시용 라벨
 후보이기 때문).
 
-- **Project Information → Schedule**: x축이 실제 날짜인 타임라인. 위에 과제 마일스톤 띠,
-  아래에 도메인 → workflow 행마다 자기 phase 막대. 축 범위는 마일스톤 ∪ 모든 workflow phase다.
-- **Design Workflow(3D)**: x = 시간(산출물은 자기 phase의 **종료일** 위치), y = workflow
-  (도메인끼리 큰 간격으로 분리), z = 자유(결정적 해시, 아무 데이터도 뜻하지 않음).
-  CSS `perspective` + `translate3d`로 실제 원근을 준다 — 그래서 카메라 레이어 아래 중간 래퍼에
-  `opacity`/`filter`를 걸면 안 된다(3D가 평면으로 눌린다). 흐림은 잎 요소에 직접 준다.
-  과제 마일스톤은 x축 전체를 세로로 가로지르는 옅은 밴드로만 그린다.
-  일정을 잃은 산출물은 날짜축 바깥의 `NO SCHEDULE` 구역에 붉게 모인다.
+### A.9 받는 산출물 UX 정리 · artifactKey · 캔버스 편집 버그 수정 (2026-09-01)
+
+A.8 배포 직후 사용자 피드백으로 같은 날 정리했다:
+
+- **`sourceWorkflowId` 제거.** A.8 참고 — recvWorkflowId + Incoming 자동 노출(A.4)이 이미
+  "시스템에 등록된 workflow로부터 받는다"는 경우를 완전히 커버해서, 받는 쪽에서 대상
+  workflow를 또 지정하게 하는 건 중복이었다. Handoff 탭의 "Received from" 카드는 이제
+  부서(Department) + 개별 연락처(sourceContact) 두 필드만 남았다(둘 다 own 그대로 자유
+  편집). "Recipient department/workflow"(outgoing, recvDept/recvWorkflowId)는 그대로다 —
+  받은 산출물이라도 그걸 다시 다른 workflow로 넘길 수 있으므로 무관하게 유지한다.
+- **Handoff 탭 다국어화.** 그 탭의 설명 문구는 `web/src/locales/{en,ko}/common.json`의
+  `deliverable` 네임스페이스로 옮겼다 — 시스템 언어가 한국어면 한국어로, 그 외엔 영어로
+  보인다(react-i18next, `LanguagePopover`가 이미 관리하던 사용자 언어 설정을 그대로 탄다).
+  Overview/Version History 탭 본문은 이번 범위에 넣지 않았다 — 아직 미번역이다.
+  탭 라벨(Overview/Version History/Handoff) 세 개는 같이 옮겼다.
+- **캔버스 "Cancel changes" 버그.** 산출물 추가는 메모/레이아웃과 달리 생성 버튼을 누르는
+  순간 이미 서버에 POST된다 — 그런데 Cancel은 로컬 스냅샷만 복원해서, 취소해도 다음
+  refetch 때 그 산출물이 도로 나타났다. `canvasStore.sessionAddedDeliverableIds`가 이번
+  편집 세션 중 새로 생긴 id를 추적하고, Cancel 시 `BoardPage.handleCancelEdit`이 그 id들을
+  실제로 DELETE한 뒤에야 스냅샷을 복원한다(`Canvas`의 `onCancelEdit` prop).
+- **산출물 삭제.** `DeliverablesService.remove`(기존에 있었지만 FE에서 아무도 안 부르던
+  엔드포인트)를 `DeliverableDialog`의 Overview 탭 "Delete artifact" 버튼에 연결했다 — 클릭
+  시 `ConfirmDialog`로 한 번 확인받은 뒤에만 삭제한다. 편집 모드와 무관하게(즉시 커밋되는
+  동작이라 Cancel 대상이 아니다) own 산출물에서만 노출된다.
+- **`artifactKey`.** 이름(name)을 자유롭게 바꿀 수 있게 하면서, 향후 외부 시스템 연동은
+  이름이 아니라 이 값으로 매핑하도록 분리했다(§8.1 로드맵 4번의 전제). `Deliverable.artifactKey`
+  (string | null, 기본 null) — 지정하면 같은 workflow 안에서 유일해야 하지만, **series
+  인스턴스끼리는 같은 key를 공유**한다(같은 실물 산출물의 회차이므로).  DB 유니크 인덱스로는
+  그 예외를 표현할 수 없어 `DeliverablesService.update()`가 애플리케이션 레벨에서 검증한다
+  (원본 id 기준 series 그룹이 같으면 충돌로 안 침). `DeliverableDialog` Overview 탭의
+  "Edit basic info" 카드에서 Name과 나란히 편집한다.

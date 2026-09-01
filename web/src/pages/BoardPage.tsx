@@ -20,7 +20,7 @@ import {
   useAddOwner, useAddViewGrant, useWorkflow, useRemoveOwner, useRemoveViewGrant, useUpdateWorkflowPhases,
 } from '@/api/hooks/useWorkflow';
 import {
-  useAddVersion, useCreateDeliverable, useDeliverables, useRelease,
+  useAddVersion, useCreateDeliverable, useDeleteDeliverable, useDeliverables, useRelease,
   useUpdateDeliverable, useUpdateRecv, useUpdateSchedule,
 } from '@/api/hooks/useDeliverables';
 import { useMemos } from '@/api/hooks/useMemos';
@@ -77,6 +77,7 @@ export function BoardPage() {
   const [phasesErr, setPhasesErr] = useState<string | null>(null);
   const createDeliverable = useCreateDeliverable(workflowId ?? '');
   const updateDeliverable = useUpdateDeliverable(workflowId ?? '');
+  const deleteDeliverable = useDeleteDeliverable(workflowId ?? '');
   const updateRecv = useUpdateRecv(workflowId ?? '');
   const updateSchedule = useUpdateSchedule(workflowId ?? '');
   const addVersion = useAddVersion(workflowId ?? '');
@@ -189,6 +190,23 @@ export function BoardPage() {
   };
 
   /**
+   * "Cancel changes" — 이번 편집 세션 중 새로 추가된 산출물(sessionAddedDeliverableIds)은
+   * 이미 서버에 POST되어 있어 로컬 스냅샷 복원만으로는 취소되지 않는다. 실제로 삭제한
+   * 뒤에야 cancelEdit()으로 나머지(레이아웃/메모/엣지)를 스냅샷으로 되돌린다.
+   */
+  const handleCancelEdit = (sessionAddedDeliverableIds: string[]) => {
+    const finish = () => {
+      st.getState().cancelEdit();
+      toast('Changes cancelled');
+    };
+    if (!sessionAddedDeliverableIds.length) {
+      finish();
+      return;
+    }
+    Promise.allSettled(sessionAddedDeliverableIds.map((id) => deleteDeliverable.mutateAsync(id))).then(finish);
+  };
+
+  /**
    * 산출물 생성/Release 일정(series) 변경 결과를 로컬 캔버스에 즉시 반영한다.
    * `useDeliverables` 쿼리는 편집 중엔 disabled라 invalidate만으로는 화면에 나타나지
    * 않는다(설계서 7.1) — 그래서 응답으로 받은 DTO를 직접 store에 병합한다.
@@ -205,6 +223,7 @@ export function BoardPage() {
         return {
           ...local,
           name: d.name,
+          artifactKey: d.artifactKey,
           type: d.docType,
           net: d.network,
           series: d.series,
@@ -214,7 +233,6 @@ export function BoardPage() {
           recvContact: d.recvContact,
           recvWorkflowId: d.recvWorkflowId,
           sourceDept: d.sourceDept,
-          sourceWorkflowId: d.sourceWorkflowId,
           sourceContact: d.sourceContact,
           versions: d.versions ?? [],
           canEdit: d.canEdit,
@@ -274,6 +292,7 @@ export function BoardPage() {
             onOpenIncoming={(id) => st.getState().setIncomingId(id)}
             workflowDirectory={workflowDirectory ?? []}
             onSaveLayout={saveLayout}
+            onCancelEdit={handleCancelEdit}
           />
 
           {openNode && (
@@ -284,11 +303,12 @@ export function BoardPage() {
               workflowDirectory={workflowDirectory ?? []}
               projectDepartments={projectDetail?.departments ?? []}
               onClose={closeDeliverable}
-              onSaveInfo={({ name, net, type, phaseIds }) => {
+              onSaveInfo={({ name, artifactKey, net, type, phaseIds }) => {
                 updateDeliverable.mutate(
-                  { id: openNode.id, name, docType: type, network: net },
+                  { id: openNode.id, name, artifactKey: artifactKey ?? '', docType: type, network: net },
                   {
-                    onSuccess: () => {
+                    onSuccess: (updated) => {
+                      mergeDeliverableResults([updated], phaseList);
                       const sid = openNode.series || openNode.id;
                       const before = nodes.filter((x) => (x.series || x.id) === sid).map((x) => x.phase).sort().join(',');
                       const after = [...phaseIds].sort().join(',');
@@ -308,7 +328,7 @@ export function BoardPage() {
                       }
                       closeDeliverable();
                     },
-                    onError: () => toast('Save failed'),
+                    onError: (e: any) => toast(e?.response?.data?.message ?? 'Save failed'),
                   },
                 );
               }}
@@ -346,19 +366,35 @@ export function BoardPage() {
                 )
               }
               onSaveRecv={({
-                recvDept, recvContact, recvWorkflowId, sourceDept, sourceWorkflowId, sourceContact,
+                recvDept, recvContact, recvWorkflowId, sourceDept, sourceContact,
               }) =>
                 updateRecv.mutate(
+                  { id: openNode.id, recvDept, recvContact, recvWorkflowId, sourceDept, sourceContact },
                   {
-                    id: openNode.id, recvDept, recvContact, recvWorkflowId,
-                    sourceDept, sourceWorkflowId, sourceContact,
-                  },
-                  {
-                    onSuccess: () => toast('Handoff info saved'),
+                    // useDeliverables 쿼리는 편집 중엔 disabled라, 응답을 직접 store에
+                    // 병합하지 않으면 "받은 산출물" 캔버스 배지(보라색 표시)가 편집을
+                    // 끝내기 전까지 안 나타난다 — 방금 추가한 걸 저장해도 구별이 안 되는
+                    // 버그였다.
+                    onSuccess: (updated) => {
+                      mergeDeliverableResults([updated], phaseList);
+                      toast('Handoff info saved');
+                    },
                     onError: () => toast('Failed to save recipient department'),
                   },
                 )
               }
+              onDelete={() => {
+                deleteDeliverable.mutate(openNode.id, {
+                  onSuccess: () => {
+                    const s = st.getState();
+                    s.setNodes(s.nodes.filter((n) => n.id !== openNode.id));
+                    s.setEdges(s.edges.filter((e) => e.from !== openNode.id && e.to !== openNode.id));
+                    closeDeliverable();
+                    toast('Artifact deleted');
+                  },
+                  onError: () => toast('Failed to delete artifact'),
+                });
+              }}
             />
           )}
 
@@ -437,6 +473,9 @@ export function BoardPage() {
                       placeInLane(fresh, phaseList, s.phasePW);
                       s.setNodes([...s.nodes, fresh]);
                       st.getState().setAddDlg(false);
+                      // 이번 편집 세션 중 새로 생겼다고 기록 — Cancel 시 실제로 삭제해야
+                      // "추가를 취소"한 게 된다(canvasStore.sessionAddedDeliverableIds).
+                      st.getState().trackAddedDeliverable(created.id);
                       // "받아야 할 산출물"로 추가한 경우, 부서/시스템 출처를 바로 채우도록
                       // Handoff 탭을 열어 준다 — 그 외엔 기존과 동일하게 포커스만 이동.
                       if (wasReceived) st.getState().openDeliverable(fresh.id, 'recv');
@@ -446,6 +485,7 @@ export function BoardPage() {
                           {
                             onSuccess: (list) => {
                               mergeDeliverableResults(list, phaseList);
+                              list.forEach((d) => st.getState().trackAddedDeliverable(d.id));
                               if (!wasReceived) st.getState().setFocusReq(created.id);
                               toast(`Deliverable added across ${phaseIds.length} phases`);
                             },
