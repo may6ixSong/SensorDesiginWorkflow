@@ -491,10 +491,12 @@ export function BoardPage() {
             <AddDeliverableDialog
               workflowName={workflow.name}
               phases={phaseList}
+              intent={addDlgIntent}
               onClose={() => st.getState().setAddDlg(false)}
               onCreate={({ name, phaseIds, docType, network }) => {
                 const [firstPhase, ...rest] = phaseIds;
-                const intent = addDlgIntent === 'received' ? 'received' : 'own';
+                const wasReceived = addDlgIntent === 'received';
+                const intent = wasReceived ? 'received' : 'own';
                 createDeliverable.mutate(
                   { name, phaseId: firstPhase, docType, network, intent },
                   {
@@ -507,6 +509,9 @@ export function BoardPage() {
                       // 이번 편집 세션 중 새로 생겼다고 기록 — Cancel 시 실제로 삭제해야
                       // "추가를 취소"한 게 된다(canvasStore.sessionAddedDeliverableIds).
                       st.getState().trackAddedDeliverable(created.id);
+                      // "받아야 할 산출물"로 추가한 경우, 바로 상세를 열어 기본 정보를 채우도록
+                      // 유도한다 — 전달(Handoff) 탭은 이제 없으므로 개요 탭으로 연다.
+                      if (wasReceived) st.getState().openDeliverable(fresh.id);
                       if (rest.length) {
                         updateSchedule.mutate(
                           { id: created.id, phaseIds },
@@ -514,14 +519,14 @@ export function BoardPage() {
                             onSuccess: (list) => {
                               mergeDeliverableResults(list, phaseList);
                               list.forEach((d) => st.getState().trackAddedDeliverable(d.id));
-                              st.getState().setFocusReq(created.id);
+                              if (!wasReceived) st.getState().setFocusReq(created.id);
                               toast(`Deliverable added across ${phaseIds.length} phases`);
                             },
                             onError: () => toast('Deliverable added, but failed to set the extra phases'),
                           },
                         );
                       } else {
-                        st.getState().setFocusReq(fresh.id);
+                        if (!wasReceived) st.getState().setFocusReq(fresh.id);
                         toast('Deliverable added');
                       }
                     },

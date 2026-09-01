@@ -11,6 +11,8 @@ import { CURSOR_POINTER, FONT_MONO, T } from '@/theme/tokens';
 interface Props {
   workflowName: string;
   phases: WorkflowPhase[];
+  /** 'received'면 헤더 문구가 "내가 받아야 할 산출물"로 바뀐다 — 폼 필드 자체는 동일하다. */
+  intent?: 'own' | 'received';
   onClose: () => void;
   onCreate: (p: { name: string; phaseIds: string[]; docType: string; network: 'OA' | 'HPC' }) => void;
 }
@@ -22,7 +24,7 @@ interface Props {
  *
  * 여기 뜨는 칸은 전부 "이 workflow가 정한 자기 일정"이다 — 과제 마일스톤이 아니다.
  */
-export function AddDeliverableDialog({ workflowName, phases, onClose, onCreate }: Props) {
+export function AddDeliverableDialog({ workflowName, phases, intent = 'own', onClose, onCreate }: Props) {
   const [name, setName] = useState('');
   const [picked, setPicked] = useState<Set<string>>(new Set(phases[0] ? [phases[0].id] : []));
   const [net, setNet] = useState<'OA' | 'HPC'>('OA');
@@ -55,10 +57,23 @@ export function AddDeliverableDialog({ workflowName, phases, onClose, onCreate }
       header={
         <>
           <Ey>{workflowName}</Ey>
-          <Box sx={{ fontSize: 16, fontWeight: 700, mt: '2px' }}>Add Deliverable</Box>
+          <Box sx={{ fontSize: 16, fontWeight: 700, mt: '2px' }}>
+            {intent === 'received' ? 'Add Artifact I Need to Receive' : 'Add Deliverable'}
+          </Box>
         </>
       }
     >
+      {intent === 'received' && (
+        <Box
+          sx={{
+            fontSize: 11.5, color: T.dm, background: T.sf2, border: `1px solid ${T.ln}`,
+            borderRadius: '9px', padding: '9px 11px', mb: '12px', lineHeight: 1.7,
+          }}
+        >
+          This creates a placeholder for something you're waiting to receive — someone else will add it
+          through a connected service once it's ready, so there's no upload here.
+        </Box>
+      )}
       <Field label="Name">
         <TextInput
           value={name}

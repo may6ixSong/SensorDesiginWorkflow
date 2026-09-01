@@ -154,11 +154,13 @@ function OverviewTab({
   // GET /deliverables/:id/download?major=&minor= — api/가 파일 바이트를 직접 중계한다.
   const download = useDownloadVersion();
 
+  // rev를 의존성에 넣는 이유: 캔버스 드래그로 phase가 바뀌는 건 nodes 배열 원소를
+  // in-place로 고치는 것이라(canvasStore) 배열 참조 자체는 그대로다 — rev 없이는 이
+  // useMemo가 그 변화를 못 보고 예전 release schedule을 계속 들고 있는다(실측 확인된 버그).
+  const rev = useCanvasStore((s) => s.rev);
   const sid = d.series || d.id;
-  const seriesPhases = useMemo(
-    () => new Set(nodes.filter((x) => (x.series || x.id) === sid).map((x) => x.phase)),
-    [nodes, sid],
-  );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const seriesPhases = useMemo(() => new Set(nodes.filter((x) => (x.series || x.id) === sid).map((x) => x.phase)), [nodes, sid, rev]);
 
   const [name, setName] = useState(d.name);
   const [artifactKey, setArtifactKey] = useState(d.artifactKey ?? '');
