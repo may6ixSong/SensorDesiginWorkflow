@@ -45,8 +45,6 @@ interface Palette {
   cardShadow: string;
   cardText: string;
   cardSub: string;
-  wordmarkGradient: string;
-  wordmarkGlow: string;
   subCopy: string;
   flowStroke: string;
   ctaBg: string;
@@ -66,8 +64,8 @@ const PALETTE: Record<'light' | 'dark', Palette> = {
   dark: {
     stageBg: '#0a0d14',
     aurora:
-      'radial-gradient(60% 50% at 28% 22%, rgba(72,112,146,.18), transparent 70%),' +
-      'radial-gradient(55% 46% at 76% 72%, rgba(62,84,124,.16), transparent 72%)',
+      'radial-gradient(60% 50% at 28% 22%, rgba(90,130,110,.14), transparent 70%),' +
+      'radial-gradient(55% 46% at 76% 72%, rgba(80,90,124,.13), transparent 72%)',
     gridLine:
       'linear-gradient(rgba(126,156,190,.16) 1px, transparent 1px),' +
       'linear-gradient(90deg, rgba(126,156,190,.13) 1px, transparent 1px)',
@@ -80,28 +78,25 @@ const PALETTE: Record<'light' | 'dark', Palette> = {
     cardShadow: '0 10px 28px rgba(0,0,0,.5)',
     cardText: '#e8edf5',
     cardSub: 'rgba(150,172,200,.58)',
-    wordmarkGradient:
-      'linear-gradient(120deg,#2ee6c5 0%,#f2f6fb 25%,#9a8bff 50%,#f2f6fb 75%,#2ee6c5 100%)',
-    wordmarkGlow: 'drop-shadow(0 4px 30px rgba(46,230,197,.3))',
     subCopy: 'rgba(150,172,200,.62)',
     flowStroke: 'rgba(120,158,190,.2)',
-    ctaBg: '#1c9d85',
+    ctaBg: '#3f8362',
     ctaText: '#ffffff',
-    ctaShadow: '0 6px 18px rgba(0,0,0,.4)',
-    ctaShadowHover: '0 10px 24px rgba(0,0,0,.5)',
+    ctaShadow: '0 4px 12px rgba(0,0,0,.35)',
+    ctaShadowHover: '0 7px 16px rgba(0,0,0,.42)',
     circuit: {
       bg: '#0a0d14',
       trace: 'rgba(126,158,196,.17)',
       traceStrong: 'rgba(126,158,196,.26)',
       outline: 'rgba(142,174,210,.27)',
       node: 'rgba(150,178,210,.3)',
-      accent: 'rgba(94,185,164,.4)',
+      accent: 'rgba(107,199,154,.35)',
       label: 'rgba(150,178,210,.3)',
     },
-    connLive: 'rgba(94,185,164,.58)',
+    connLive: 'rgba(107,199,154,.5)',
     connPending: 'rgba(122,148,184,.17)',
-    badgeLiveBg: 'rgba(94,185,164,.12)',
-    badgeLiveText: '#6fc7b0',
+    badgeLiveBg: 'rgba(107,199,154,.1)',
+    badgeLiveText: '#7fc79a',
     badgePendingText: 'rgba(150,172,200,.5)',
   },
   light: {
@@ -121,28 +116,25 @@ const PALETTE: Record<'light' | 'dark', Palette> = {
     cardShadow: '0 8px 22px rgba(30,42,70,.09), 0 1px 2px rgba(30,42,70,.06)',
     cardText: '#101828',
     cardSub: '#667085',
-    wordmarkGradient:
-      'linear-gradient(120deg,#0c9a83 0%,#16202e 25%,#5849cf 50%,#16202e 75%,#0c9a83 100%)',
-    wordmarkGlow: 'drop-shadow(0 4px 22px rgba(12,154,131,.24))',
     subCopy: '#667085',
     flowStroke: 'rgba(70,100,140,.16)',
-    ctaBg: '#0c9a83',
+    ctaBg: '#2f6b4a',
     ctaText: '#ffffff',
-    ctaShadow: '0 6px 16px rgba(12,154,131,.2)',
-    ctaShadowHover: '0 10px 22px rgba(12,154,131,.28)',
+    ctaShadow: '0 4px 10px rgba(47,107,74,.18)',
+    ctaShadowHover: '0 7px 14px rgba(47,107,74,.24)',
     circuit: {
       bg: '#f4f6f9',
       trace: 'rgba(46,74,110,.15)',
       traceStrong: 'rgba(46,74,110,.22)',
       outline: 'rgba(46,74,110,.26)',
       node: 'rgba(46,74,110,.3)',
-      accent: 'rgba(12,154,131,.4)',
+      accent: 'rgba(47,107,74,.35)',
       label: 'rgba(46,74,110,.3)',
     },
-    connLive: 'rgba(12,154,131,.48)',
+    connLive: 'rgba(47,107,74,.42)',
     connPending: 'rgba(70,96,140,.15)',
-    badgeLiveBg: 'rgba(12,154,131,.1)',
-    badgeLiveText: '#0a8a75',
+    badgeLiveBg: 'rgba(47,107,74,.09)',
+    badgeLiveText: '#2f6b4a',
     badgePendingText: '#8b99ab',
   },
 } as const;
@@ -200,17 +192,12 @@ export function HomePage() {
             from: { opacity: 0, transform: 'translateY(14px)' },
             to: { opacity: 1, transform: 'translateY(0)' },
           },
-          '@keyframes sirenSheen': {
-            '0%,100%': { backgroundPosition: '0% 50%' },
-            '50%': { backgroundPosition: '100% 50%' },
-          },
         }}
       >
         {/*
           Back-most layer — a static chip/PCB illustration baked to one image.
           Everything painted over it below is static too: the only thing that
-          animates forever on this page is the wordmark's sheen, and the only
-          thing that animates at all on mount is the one-shot `sirenRise`.
+          animates on this page at all is the one-shot `sirenRise` on mount.
         */}
         <CircuitBackdrop pal={pal.circuit} />
 
@@ -371,22 +358,21 @@ export function HomePage() {
             <Box
               sx={{
                 display: 'inline-block',
-                fontFamily: FONT_DISPLAY, fontWeight: 800, fontStyle: 'italic',
-                fontSize: 'clamp(64px, 9.5vw, 132px)', lineHeight: 0.9, letterSpacing: '.006em',
-                transform: 'skewX(-6deg)',
-                background: pal.wordmarkGradient,
-                backgroundSize: '220% auto',
-                WebkitBackgroundClip: 'text', backgroundClip: 'text', WebkitTextFillColor: 'transparent',
-                // Static glow: animating a drop-shadow filter on text this large
-                // repaints it every frame, which is most of what made the hero stutter.
-                filter: pal.wordmarkGlow,
-                animation:
-                  'sirenRise .8s cubic-bezier(.2,.8,.3,1) both, '
-                  + 'sirenSheen 7s ease-in-out 1s infinite',
+                fontFamily: FONT_DISPLAY, fontWeight: 800,
+                fontSize: 'clamp(56px, 8vw, 112px)', lineHeight: 0.95, letterSpacing: '-.01em',
+                color: pal.cardText,
+                animation: 'sirenRise .8s cubic-bezier(.2,.8,.3,1) both',
               }}
             >
               SIREN
             </Box>
+            <Box
+              sx={{
+                width: 46, height: 3, borderRadius: 2, mx: 'auto', mt: '14px',
+                background: pal.ctaBg,
+                animation: 'sirenRise .8s cubic-bezier(.2,.8,.3,1) .06s both',
+              }}
+            />
             <Box
               sx={{
                 fontFamily: FONT_MONO, fontSize: 10, letterSpacing: '.38em',

@@ -70,7 +70,7 @@ export interface DomainWorkflowModel {
 
 /** 도메인 헤더/사이드바 강조색 — 채도가 있어 라이트/다크 배경 모두에서 식별된다. */
 const DOMAIN_PALETTE = [
-  '#0c9a83', '#5849cf', '#2563c9', '#ac6f08', '#c8352c',
+  '#2f6b4a', '#6b5083', '#2563c9', '#ac6f08', '#c8352c',
   '#3aa66b', '#b3521e', '#7a4fbf', '#0891b2', '#be185d',
 ];
 

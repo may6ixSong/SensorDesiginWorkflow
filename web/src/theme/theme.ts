@@ -17,12 +17,12 @@ const PALETTE_HEX: Record<ThemeMode, {
   bg: string; sf: string; tx: string; dm: string; dm2: string; ln: string;
 }> = {
   light: {
-    tl: '#0c9a83', tl2: '#e0f5f0', tlHover: '#0bab90', vi: '#5849cf', rd: '#c8352c',
+    tl: '#2f6b4a', tl2: '#e6f0ea', tlHover: '#255840', vi: '#6b5083', rd: '#c8352c',
     am: '#ac6f08', bl: '#2563c9', bg: '#eceff5', sf: '#ffffff', tx: '#14202f',
     dm: '#5c6d84', dm2: '#8b99ab', ln: '#dde4ee',
   },
   dark: {
-    tl: '#2ee6c5', tl2: '#123a34', tlHover: '#23c9ac', vi: '#9a8bff', rd: '#ff6b62',
+    tl: '#6bc79a', tl2: '#142d21', tlHover: '#58b386', vi: '#b79bc9', rd: '#ff6b62',
     am: '#f0b84e', bl: '#6ea1ff', bg: '#0b0e15', sf: '#141924', tx: '#eef2f8',
     dm: '#9aa7bd', dm2: '#6b7891', ln: '#262f3f',
   },

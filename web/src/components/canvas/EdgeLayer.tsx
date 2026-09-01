@@ -42,7 +42,7 @@ export function EdgeLayer({
 
     const blocked = !bi && !latR(a) && stOf(b).lb !== 'Not submitted';
     const on = !!hlSet && hlSet.has(e.from) && hlSet.has(e.to);
-    const col = on ? '#0c9a83' : blocked ? '#ac6f08' : '#8b99ab';
+    const col = on ? '#2f6b4a' : blocked ? '#ac6f08' : '#8b99ab';
     const mk = on ? 'ahl' : blocked ? 'ahb' : 'ah';
     const dpath = orth(a, b);
 
@@ -66,7 +66,7 @@ export function EdgeLayer({
         <path
           key={`${e.id}-dash`}
           d={dpath}
-          stroke="#0c9a83"
+          stroke="#2f6b4a"
           strokeWidth={3.2}
           fill="none"
           strokeLinecap="round"
@@ -116,7 +116,7 @@ export function EdgeLayer({
       <path
         key="linkline"
         d={`M${a.x + a.w},${Math.round(a.y + a.h / 2)}H${linkPos.x}V${linkPos.y}`}
-        stroke="#0c9a83"
+        stroke="#2f6b4a"
         strokeWidth={2.4}
         strokeDasharray="7 6"
         fill="none"
@@ -140,13 +140,13 @@ export function EdgeLayer({
           <path d="M0,0L12,6L0,12Z" fill="#ac6f08" />
         </marker>
         <marker id="ahl" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
-          <path d="M0,0L12,6L0,12Z" fill="#0c9a83" />
+          <path d="M0,0L12,6L0,12Z" fill="#2f6b4a" />
         </marker>
         <marker id="ah-s" markerWidth="12" markerHeight="12" refX="2" refY="6" orient="auto">
           <path d="M12,0L0,6L12,12Z" fill="#8b99ab" />
         </marker>
         <marker id="ahl-s" markerWidth="12" markerHeight="12" refX="2" refY="6" orient="auto">
-          <path d="M12,0L0,6L12,12Z" fill="#0c9a83" />
+          <path d="M12,0L0,6L12,12Z" fill="#2f6b4a" />
         </marker>
       </defs>
       {parts}

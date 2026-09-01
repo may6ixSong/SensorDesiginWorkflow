@@ -59,9 +59,9 @@ const STATUS_COLOR = {
  * 특유의 하이라이트+발광이 겹쳐 눈이 부시다 — 이 화면 전용으로만 살짝 눌러 쓴다.
  */
 const STATUS_HEX: Record<'light' | 'dark', Record<'released' | 'inProgress' | 'notSubmitted', string>> = {
-  light: { released: '#0c9a83', inProgress: '#ac6f08', notSubmitted: '#8b99ab' },
+  light: { released: '#2f6b4a', inProgress: '#ac6f08', notSubmitted: '#8b99ab' },
   dark: {
-    released: darken('#2ee6c5', 0.22),
+    released: darken('#6bc79a', 0.22),
     inProgress: darken('#f0b84e', 0.22),
     notSubmitted: darken('#6b7891', 0.1),
   },
@@ -530,8 +530,8 @@ function TimeAxis({
               style={{ left: b.x, top, width: b.w, height: h }}
               sx={{
                 position: 'absolute',
-                background: cur ? withAlpha('#2ee6c5', 0.05) : withAlpha('#8b99ab', 0.028),
-                borderLeft: `1px ${cur ? 'solid' : 'dashed'} ${withAlpha(cur ? '#2ee6c5' : '#8b99ab', cur ? 0.4 : 0.18)}`,
+                background: cur ? withAlpha('#6bc79a', 0.05) : withAlpha('#8b99ab', 0.028),
+                borderLeft: `1px ${cur ? 'solid' : 'dashed'} ${withAlpha(cur ? '#6bc79a' : '#8b99ab', cur ? 0.4 : 0.18)}`,
               }}
             />
             <Halo
@@ -702,7 +702,7 @@ function DomainZone({
                   sx={{
                     width: 9, height: 9, borderRadius: '50%', flex: '0 0 auto',
                     background: row.workflow.color || T.tl,
-                    boxShadow: `0 0 8px ${withAlpha(row.workflow.color || '#0c9a83', 0.75)}`,
+                    boxShadow: `0 0 8px ${withAlpha(row.workflow.color || '#2f6b4a', 0.75)}`,
                   }}
                 />
                 <Halo
