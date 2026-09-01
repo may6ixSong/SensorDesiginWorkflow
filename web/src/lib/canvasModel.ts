@@ -37,6 +37,11 @@ export interface CanvasNode {
   name: string;
   /** name과 분리된 안정적 식별자 — 향후 외부 시스템 연동용 매핑 키. 미지정이면 null. */
   artifactKey: string | null;
+  /**
+   * 'own' = 이 workflow가 만들어 남에게 주는 산출물. 'received' = 이 workflow가 받기를
+   * 기다리는 자리표시자 — Upload와 전달(Handoff) 탭을 숨기는 기준이다(DeliverableDialog).
+   */
+  intent: 'own' | 'received';
   type: string;
   net: 'OA' | 'HPC';
   series: string | null;
@@ -102,6 +107,7 @@ export function toCanvasNode(d: DeliverableDto, origin: 'own' | 'incoming' = 'ow
     phase: d.phaseId,
     name: d.name,
     artifactKey: d.artifactKey ?? null,
+    intent: d.intent,
     type: d.docType,
     net: d.network,
     series: d.series,

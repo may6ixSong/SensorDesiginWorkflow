@@ -8,16 +8,16 @@ import { DeliverableDialog } from '@/components/dialogs/DeliverableDialog';
 import { IncomingDeliverableDialog } from '@/components/dialogs/IncomingDeliverableDialog';
 import { HldReleaseDialog } from '@/components/dialogs/HldReleaseDialog';
 import { PhaseInfoDialog } from '@/components/dialogs/PhaseInfoDialog';
-import { WorkflowPermissionDialog } from '@/components/dialogs/WorkflowPermissionDialog';
+import { WorkflowSettingsDialog } from '@/components/dialogs/WorkflowSettingsDialog';
 import { AddDeliverableDialog } from '@/components/dialogs/AddDeliverableDialog';
 import { NoteDialog } from '@/components/dialogs/NoteDialog';
-import { WorkflowPhasesDialog } from '@/components/dialogs/WorkflowPhasesDialog';
 import { Toast } from '@/components/common/Toast';
 import {
-  useProject, useProjectWorkflowDirectory, useProjectWorkflows, useProjectMilestones, useProjects,
+  useProjectWorkflowDirectory, useProjectWorkflows, useProjectMilestones, useProjects,
 } from '@/api/hooks/useProjects';
 import {
-  useAddOwner, useAddViewGrant, useWorkflow, useRemoveOwner, useRemoveViewGrant, useUpdateWorkflowPhases,
+  useAddOwner, useAddViewGrant, useWorkflow, useRemoveOwner, useRemoveViewGrant, useUpdateWorkflow,
+  useUpdateWorkflowPhases,
 } from '@/api/hooks/useWorkflow';
 import {
   useAddVersion, useCreateDeliverable, useDeleteDeliverable, useDeliverables, useRelease,
@@ -41,8 +41,6 @@ export function BoardPage() {
   const { user: me, isAdmin } = useAuth();
 
   const { data: projects } = useProjects();
-  /** 부서 목록(Received from 셀렉트용)을 포함한 과제 상세. */
-  const { data: projectDetail } = useProject(projectId);
   /** 과제 공통 일정 — 캔버스는 쓰지 않고, "과제 일정으로 되돌리기"에만 필요하다. */
   const { data: milestones } = useProjectMilestones(projectId);
   const { data: workflows } = useProjectWorkflows(projectId);
@@ -68,12 +66,13 @@ export function BoardPage() {
   const hldSel = useCanvasStore((s) => s.hldSel);
   const hldBack = useCanvasStore((s) => s.hldBack);
   const phInfo = useCanvasStore((s) => s.phInfo);
-  const ownerDlg = useCanvasStore((s) => s.ownerDlg);
+  const workflowSettingsTab = useCanvasStore((s) => s.workflowSettingsTab);
   const incomingId = useCanvasStore((s) => s.incomingId);
 
   const putCanvas = usePutCanvas(workflowId ?? '');
+  const updateWorkflow = useUpdateWorkflow(workflowId ?? '');
+  const [detailsErr, setDetailsErr] = useState<string | null>(null);
   const updatePhases = useUpdateWorkflowPhases(workflowId ?? '');
-  const [phasesOpen, setPhasesOpen] = useState(false);
   const [phasesErr, setPhasesErr] = useState<string | null>(null);
   const createDeliverable = useCreateDeliverable(workflowId ?? '');
   const updateDeliverable = useUpdateDeliverable(workflowId ?? '');
@@ -283,9 +282,14 @@ export function BoardPage() {
             workflow={workflow}
             recv={recv}
             orphanCount={orphanCount}
-            onOpenPermissions={() => st.getState().setOwnerDlg(true)}
             onOpenHld={() => st.getState().setHldDlg(true, null)}
-            onEditPhases={own ? () => { setPhasesErr(null); setPhasesOpen(true); } : undefined}
+            onOpenSettings={() => {
+              setDetailsErr(null); setPhasesErr(null);
+              // WorkflowSettingsDialog의 Details/Schedule 탭 노출 기준(own prop)과 맞춘다 —
+              // 그쪽은 recv 미리보기 토글과 무관하게 isOwner만 본다(권한 관리 다이얼로그의
+              // 기존 동작을 그대로 이어받음).
+              st.getState().setWorkflowSettingsTab(isOwner ? 'details' : 'permissions');
+            }}
           />
           <Canvas
             workflow={workflow}
@@ -302,8 +306,6 @@ export function BoardPage() {
               node={openNode}
               phases={phaseList}
               own={own}
-              workflowDirectory={workflowDirectory ?? []}
-              projectDepartments={projectDetail?.departments ?? []}
               onClose={closeDeliverable}
               onSaveInfo={({ name, artifactKey, net, type, phaseIds }) => {
                 updateDeliverable.mutate(
@@ -367,11 +369,9 @@ export function BoardPage() {
                   { onSuccess: () => toast('Released'), onError: () => toast('Release failed') },
                 )
               }
-              onSaveRecv={({
-                recvDept, recvContact, recvWorkflowId, sourceDept, sourceContact,
-              }) =>
+              onSaveRecv={({ recvDept, recvContact }) =>
                 updateRecv.mutate(
-                  { id: openNode.id, recvDept, recvContact, recvWorkflowId, sourceDept, sourceContact },
+                  { id: openNode.id, recvDept, recvContact },
                   {
                     // useDeliverables 쿼리는 편집 중엔 disabled라, 응답을 직접 store에
                     // 병합하지 않으면 "받은 산출물" 캔버스 배지(보라색 표시)가 편집을
@@ -438,11 +438,40 @@ export function BoardPage() {
             />
           )}
 
-          {ownerDlg && (
-            <WorkflowPermissionDialog
+          {workflowSettingsTab && (
+            <WorkflowSettingsDialog
               workflow={workflow}
               own={!!isOwner}
-              onClose={() => st.getState().setOwnerDlg(false)}
+              initialTab={workflowSettingsTab}
+              milestones={milestones ?? []}
+              orphanCount={orphanCount}
+              onClose={() => st.getState().setWorkflowSettingsTab(null)}
+              onSaveDetails={({ name, description }) => {
+                setDetailsErr(null);
+                updateWorkflow.mutate({ name, description }, {
+                  onError: (e: any) => setDetailsErr(e?.response?.data?.message ?? 'Failed to save'),
+                });
+              }}
+              savingDetails={updateWorkflow.isPending}
+              detailsError={detailsErr}
+              onSavePhases={(next) => {
+                setPhasesErr(null);
+                updatePhases.mutate(next, {
+                  onSuccess: (updated) => {
+                    // 레인 폭은 phase id 기준이라, 없어진 phase의 폭이 남아 있어도 무해하다.
+                    // 대신 유실이 새로 생겼는지 바로 알려 준다.
+                    const lost = countOrphans(st.getState().nodes, updated.phases);
+                    toast(
+                      lost > 0
+                        ? `Schedule updated — ${lost} artifact(s) now have no release schedule`
+                        : 'Schedule updated',
+                    );
+                  },
+                  onError: (e: any) => setPhasesErr(e?.response?.data?.message ?? 'Failed to save'),
+                });
+              }}
+              savingPhases={updatePhases.isPending}
+              phasesError={phasesErr}
               onAddOwner={(knoxId, department) =>
                 addOwner.mutate({ knoxId, department }, {
                   onSuccess: () => toast('Edit access added'),
@@ -465,9 +494,9 @@ export function BoardPage() {
               onClose={() => st.getState().setAddDlg(false)}
               onCreate={({ name, phaseIds, docType, network }) => {
                 const [firstPhase, ...rest] = phaseIds;
-                const wasReceived = addDlgIntent === 'received';
+                const intent = addDlgIntent === 'received' ? 'received' : 'own';
                 createDeliverable.mutate(
-                  { name, phaseId: firstPhase, docType, network },
+                  { name, phaseId: firstPhase, docType, network, intent },
                   {
                     onSuccess: (created) => {
                       const s = st.getState();
@@ -478,9 +507,6 @@ export function BoardPage() {
                       // 이번 편집 세션 중 새로 생겼다고 기록 — Cancel 시 실제로 삭제해야
                       // "추가를 취소"한 게 된다(canvasStore.sessionAddedDeliverableIds).
                       st.getState().trackAddedDeliverable(created.id);
-                      // "받아야 할 산출물"로 추가한 경우, 부서/시스템 출처를 바로 채우도록
-                      // Handoff 탭을 열어 준다 — 그 외엔 기존과 동일하게 포커스만 이동.
-                      if (wasReceived) st.getState().openDeliverable(fresh.id, 'recv');
                       if (rest.length) {
                         updateSchedule.mutate(
                           { id: created.id, phaseIds },
@@ -488,49 +514,20 @@ export function BoardPage() {
                             onSuccess: (list) => {
                               mergeDeliverableResults(list, phaseList);
                               list.forEach((d) => st.getState().trackAddedDeliverable(d.id));
-                              if (!wasReceived) st.getState().setFocusReq(created.id);
+                              st.getState().setFocusReq(created.id);
                               toast(`Deliverable added across ${phaseIds.length} phases`);
                             },
                             onError: () => toast('Deliverable added, but failed to set the extra phases'),
                           },
                         );
                       } else {
-                        if (!wasReceived) st.getState().setFocusReq(fresh.id);
+                        st.getState().setFocusReq(fresh.id);
                         toast('Deliverable added');
                       }
                     },
                     onError: () => toast('Failed to add'),
                   },
                 );
-              }}
-            />
-          )}
-
-          {phasesOpen && (
-            <WorkflowPhasesDialog
-              workflowName={workflow.name}
-              phases={phaseList}
-              milestones={milestones ?? []}
-              orphanCount={orphanCount}
-              saving={updatePhases.isPending}
-              error={phasesErr}
-              onClose={() => setPhasesOpen(false)}
-              onSave={(next) => {
-                setPhasesErr(null);
-                updatePhases.mutate(next, {
-                  onSuccess: (updated) => {
-                    setPhasesOpen(false);
-                    // 레인 폭은 phase id 기준이라, 없어진 phase의 폭이 남아 있어도 무해하다.
-                    // 대신 유실이 새로 생겼는지 바로 알려 준다.
-                    const lost = countOrphans(st.getState().nodes, updated.phases);
-                    toast(
-                      lost > 0
-                        ? `Schedule updated — ${lost} artifact(s) now have no release schedule`
-                        : 'Schedule updated',
-                    );
-                  },
-                  onError: (e: any) => setPhasesErr(e?.response?.data?.message ?? 'Failed to save'),
-                });
               }}
             />
           )}

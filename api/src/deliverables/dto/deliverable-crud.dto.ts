@@ -1,5 +1,5 @@
 import {
-  IsIn, IsInt, IsMongoId, IsOptional, IsString, Matches, Min, MinLength, MaxLength, IsArray, ArrayUnique,
+  IsIn, IsInt, IsOptional, IsString, Matches, Min, MinLength, MaxLength, IsArray, ArrayUnique,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -29,6 +29,11 @@ export class CreateDeliverableDto {
 
   @IsIn(['OA', 'HPC'])
   network: 'OA' | 'HPC';
+
+  /** 'received'면 이 workflow가 받기를 기다리는 자리표시자로 만들어진다 — 생성 후 바뀌지 않는다. */
+  @IsOptional()
+  @IsIn(['own', 'received'])
+  intent?: 'own' | 'received';
 }
 
 export class UpdateDeliverableDto {
@@ -60,6 +65,12 @@ export class UpdateDeliverableDto {
   artifactKey?: string;
 }
 
+/**
+ * recvWorkflowId(시스템 내 다른 workflow를 전달 대상으로 지정)와 sourceDept/sourceContact
+ * ("받는 곳" — 외부 출처 메모)는 더 이상 이 엔드포인트로 고칠 수 없다(사용자 요청 — 전달
+ * 탭은 전달 받을 부서만 남긴다). 이미 저장된 값은 건드리지 않고 그대로 둔다
+ * (DeliverablesService.updateRecv 참고) — 이 DTO는 새로 쓰지 않을 필드를 아예 받지 않는다.
+ */
 export class UpdateRecvDto {
   @IsOptional()
   @IsString()
@@ -69,22 +80,6 @@ export class UpdateRecvDto {
   @IsOptional()
   @IsString()
   recvContact: string | null;
-
-  /** 이 산출물을 받아야 하는 다른 Analog Workflow. recvDept(부서)와 별개 필드. */
-  @IsOptional()
-  @IsMongoId()
-  recvWorkflowId: string | null;
-
-  /** 이 시스템에 없는 외부 부서로부터 받았음을 나타내는 자유 텍스트 (예: "Foundry"). */
-  @IsOptional()
-  @IsString()
-  @MinLength(1)
-  sourceDept: string | null;
-
-  /** 받을 때의 개별 연락처 (KnoxID 계정이 없을 수 있어 자유 텍스트). */
-  @IsOptional()
-  @IsString()
-  sourceContact: string | null;
 }
 
 export class UpdateScheduleDto {

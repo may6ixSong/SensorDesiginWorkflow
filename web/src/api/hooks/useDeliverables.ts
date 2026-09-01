@@ -54,7 +54,11 @@ function invalidateAllDeliverables(qc: ReturnType<typeof useQueryClient>) {
 export function useCreateDeliverable(workflowId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (payload: { name: string; phaseId: string; docType: string; network: 'OA' | 'HPC' }) => {
+    mutationFn: async (
+      payload: {
+        name: string; phaseId: string; docType: string; network: 'OA' | 'HPC'; intent?: 'own' | 'received';
+      },
+    ) => {
       const res = await apiClient.post<ApiEnvelope<DeliverableDto>>(`/workflows/${workflowId}/deliverables`, payload);
       return res.data.data;
     },
@@ -88,24 +92,20 @@ export function useDeleteDeliverable(workflowId: string) {
 
 /**
  * BE가 recvDept(Analog 제외)와 recvContact.department===recvDept를 다시 검증한다 (설계서 3.4).
- * recvIpId는 이 산출물을 받아야 하는 다른 Analog workflow — 설정하면 그 IP의 보드에
- * Incoming으로 즉시 노출된다.
+ * recvWorkflowId·sourceDept·sourceContact는 더 이상 이 엔드포인트로 고칠 수 없다(사용자
+ * 요청 — 전달 탭은 전달 받을 부서만 남긴다).
  */
 export function useUpdateRecv(workflowId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({
-      id, recvDept, recvContact, recvWorkflowId, sourceDept, sourceContact,
+      id, recvDept, recvContact,
     }: {
-      id: string; recvDept: string | null; recvContact: string | null; recvWorkflowId?: string | null;
-      sourceDept?: string | null; sourceContact?: string | null;
+      id: string; recvDept: string | null; recvContact: string | null;
     }) => {
       const res = await apiClient.patch<ApiEnvelope<DeliverableDto>>(`/deliverables/${id}/recv`, {
         recvDept,
         recvContact,
-        recvWorkflowId,
-        sourceDept,
-        sourceContact,
       });
       return res.data.data;
     },

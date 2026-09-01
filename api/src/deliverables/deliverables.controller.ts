@@ -142,6 +142,9 @@ export class DeliverablesController {
       throw new BadRequestException('A file is required (multipart form field "file").');
     }
     const d = await this.deliverables.findOrThrow(id);
+    if (d.intent === 'received') {
+      throw new BadRequestException('This artifact is a placeholder for something you are waiting to receive — it cannot be uploaded here directly.');
+    }
     const storageKey = this.storage.buildStorageKey(
       workflow._id.toString(),
       d._id.toString(),

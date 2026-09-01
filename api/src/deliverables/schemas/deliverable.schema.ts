@@ -88,6 +88,15 @@ export class Deliverable {
   @Prop({ type: String, required: true, enum: ['OA', 'HPC'] })
   network: NetworkKind;
 
+  /**
+   * 'own' = 이 workflow가 만들어 남에게 주는 산출물(기본값). 'received' = 이 workflow가
+   * 받기를 기다리는 산출물 자리표시자 — 실물은 연동된 서비스를 통해 누군가 올려줄 것이라
+   * 이 화면에서 직접 업로드/전달(Handoff) 편집을 허용하지 않는다(addVersion이 거절, FE는
+   * 그 탭 자체를 숨긴다). 생성 시점에만 정해지고 이후에는 바뀌지 않는다.
+   */
+  @Prop({ type: String, default: 'own', enum: ['own', 'received'] })
+  intent: 'own' | 'received';
+
   /** null이면 원본. 회차 인스턴스는 원본의 _id를 담는다 (설계서 3.6, 4.6). */
   @Prop({ type: SchemaTypes.ObjectId, ref: 'Deliverable', default: null })
   series: Types.ObjectId | null;

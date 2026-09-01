@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Box } from '@mui/material';
 import { useTranslation } from 'react-i18next';
-import { WorkflowBriefDto, WorkflowPhase } from '@/types/domain';
+import { WorkflowPhase } from '@/types/domain';
 import { shortDate } from '@/lib/schedule';
 import { CanvasNode, VersionView, fmtAt, hasW, isOrphanPhase, latA, latR, stOf, vstr } from '@/lib/canvasModel';
 import { useCanvasStore } from '@/store/canvasStore';
@@ -23,18 +23,11 @@ interface Props {
   phases: WorkflowPhase[];
   /** 목업 own = isOwn(workflow) && !S.recv */
   own: boolean;
-  /** 수신 workflow 셀렉트 박스용 — 과제 소속 workflow 전체(id/name/color). */
-  workflowDirectory: WorkflowBriefDto[];
-  /** "Received from" 부서 후보 — 과제마다 자유롭게 관리하는 목록(Project.departments). */
-  projectDepartments: string[];
   onClose: () => void;
   onSaveInfo: (p: { name: string; artifactKey: string | null; net: 'OA' | 'HPC'; type: string; phaseIds: string[] }) => void;
   onUpload: (p: { file: string; note: string; net: 'OA' | 'HPC'; type: string }) => void;
   onRelease: () => void;
-  onSaveRecv: (p: {
-    recvDept: string | null; recvContact: string | null; recvWorkflowId: string | null; sourceDept: string | null;
-    sourceContact: string | null;
-  }) => void;
+  onSaveRecv: (p: { recvDept: string | null; recvContact: string | null }) => void;
   /** 삭제 확인 후 호출된다 — 실제 삭제 API 호출과 dialog 닫기는 호출부(BoardPage) 책임. */
   onDelete: () => void;
 }
@@ -46,11 +39,11 @@ interface Props {
  * 잇는 것으로만 하고, 이 화면에는 "무엇과 이어져 있는지" 읽기 전용 목록만 남긴다.
  */
 export function DeliverableDialog({
-  node: d, phases, own, workflowDirectory, projectDepartments, onClose,
+  node: d, phases, own, onClose,
   onSaveInfo, onUpload, onRelease, onSaveRecv, onDelete,
 }: Props) {
   const { t } = useTranslation();
-  const tab = useCanvasStore((s) => s.tab);
+  const storeTab = useCanvasStore((s) => s.tab);
   const setTab = useCanvasStore((s) => s.setTab);
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
@@ -60,6 +53,10 @@ export function DeliverableDialog({
   const ph = phases.find((p) => p.id === d.phase);
   const orphan = isOrphanPhase(phases, d.phase);
   const st = stOf(d);
+  // "받아야 할 산출물" 자리표시자는 전달(Handoff) 탭 자체가 없다 — 다른 산출물을 보다가
+  // 그 탭에 있던 상태로 넘어왔을 수 있으니 그 경우에만 개요로 되돌린다.
+  const received = d.intent === 'received';
+  const tab = received && storeTab === 'recv' ? 'overview' : storeTab;
 
   return (
     <ModalShell
@@ -93,10 +90,10 @@ export function DeliverableDialog({
         <Box sx={{ display: 'flex', gap: '2px', mt: '11px', borderBottom: `1px solid ${T.ln}` }}>
           {(
             [
-              ['overview', t('deliverable.tabOverview')],
-              ['versions', t('deliverable.tabVersions')],
-              ['recv', t('deliverable.tabHandoff')],
-            ] as const
+              ['overview', t('deliverable.tabOverview')] as const,
+              ['versions', t('deliverable.tabVersions')] as const,
+              ...(received ? [] : [['recv', t('deliverable.tabHandoff')] as const]),
+            ]
           ).map(([k, l]) => (
             <Box
               key={k}
@@ -123,12 +120,7 @@ export function DeliverableDialog({
         />
       )}
       {tab === 'versions' && <VersionsTab d={d} />}
-      {tab === 'recv' && (
-        <RecvTab
-          d={d} own={own} workflowDirectory={workflowDirectory} projectDepartments={projectDepartments}
-          onSave={onSaveRecv}
-        />
-      )}
+      {tab === 'recv' && <RecvTab d={d} own={own} onSave={onSaveRecv} />}
 
       {confirmDeleteOpen && (
         <ConfirmDialog
@@ -155,6 +147,7 @@ function OverviewTab({
   onRelease: Props['onRelease']; onRequestDelete: () => void;
 }) {
   const { t } = useTranslation();
+  const received = d.intent === 'received';
   const rel = latR(d);
   const work = hasW(d) ? latA(d) : null;
   const cur = own ? latA(d)?.file : rel?.file;
@@ -416,7 +409,14 @@ function OverviewTab({
         </Box>
       </Card>
 
-      {own && (
+      {received && (
+        <Card sx={{ display: 'flex', alignItems: 'flex-start', gap: '9px', color: T.dm }}>
+          <Box component="span" sx={{ mt: '1px' }}><Icon name="info" size={13} /></Box>
+          <Box sx={{ fontSize: 12, lineHeight: 1.6 }}>{t('deliverable.receivedIntentNotice')}</Box>
+        </Card>
+      )}
+
+      {own && !received && (
         <Card>
           <Ey sx={{ mb: '9px' }}>Upload new working copy — minor↑</Ey>
           <Row>
@@ -521,95 +521,47 @@ function VersionsTab({ d }: { d: CanvasNode }) {
 }
 
 /* ── 전달 탭 ──
- * "Recipient department/workflow"는 own = 이 workflow가 만들어 남에게 준다(outgoing).
- * "Received from"는 이 workflow가 받기를 기다린다(incoming) — 시스템에 등록된 workflow가
- * 보내는 경우는 그쪽에서 recvWorkflowId를 이걸로 걸면 "Incoming from other workflows"에
- * 자동으로 뜨므로(부록 A.4), 여기서는 부서 + 개별 연락처만 받는다. 시스템 내 workflow를
- * 수동으로 지정하는 별도 필드는 두지 않는다 — recvWorkflowId 쪽이 이미 그 역할을 한다.
+ * own = 이 workflow가 만들어 남에게 준다(outgoing) — 전달 받을 부서(+ 개별 담당자)만
+ * 남긴다(사용자 요청). 시스템에 등록된 workflow끼리의 전달은 받는 쪽이 자기 workflow에
+ * 그 산출물을 "받아야 할 산출물"로 직접 등록하므로, 주는 쪽에서 대상 workflow를 따로
+ * 지정하는 필드는 두지 않는다 — 이 시스템에 없는 부서를 위한 자유 입력만 남는다.
  */
-function RecvTab({
-  d, own, workflowDirectory, projectDepartments, onSave,
-}: {
-  d: CanvasNode; own: boolean;
-  workflowDirectory: WorkflowBriefDto[]; projectDepartments: string[]; onSave: Props['onSaveRecv'];
-}) {
+function RecvTab({ d, own, onSave }: { d: CanvasNode; own: boolean; onSave: Props['onSaveRecv'] }) {
   const { t } = useTranslation();
   const { resolveUser } = useDirectory();
   const [dept, setDept] = useState(d.recvDept ?? '');
   const [contact, setContact] = useState(d.recvContact ?? '');
-  const [recvWorkflow, setRecvIp] = useState(d.recvWorkflowId ?? '');
-  const [sourceDept, setSourceDept] = useState(d.sourceDept ?? '');
-  const [sourceContact, setSourceContact] = useState(d.sourceContact ?? '');
   const [contactSearchOpen, setContactSearchOpen] = useState(false);
   useEffect(() => {
-    setDept(d.recvDept ?? ''); setContact(d.recvContact ?? ''); setRecvIp(d.recvWorkflowId ?? '');
-    setSourceDept(d.sourceDept ?? ''); setSourceContact(d.sourceContact ?? '');
+    setDept(d.recvDept ?? ''); setContact(d.recvContact ?? '');
   }, [d.id]); // eslint-disable-line
-
-  const workflowById = new Map(workflowDirectory.map((workflow) => [workflow.id, workflow]));
-  const otherIps = workflowDirectory.filter((workflow) => workflow.id !== d.workflow);
-  const recvIpInfo = d.recvWorkflowId ? workflowById.get(d.recvWorkflowId) : undefined;
 
   if (!own) {
     return (
-      <>
-        <Card sx={{ mb: '12px' }}>
-          <Ey sx={{ mb: '9px' }}>{t('deliverable.recipientDeptTitle')}</Ey>
-          {d.recvDept ? (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: '9px', padding: '9px 0' }}>
-              <Badge color={T.dm} bg={T.sf2} borderColor={T.ln}>{departmentName(d.recvDept)}</Badge>
-              {d.recvContact && (
-                <>
-                  <UserAvatar user={resolveUser(d.recvContact)} size={24} />
-                  <Box sx={{ fontSize: 13 }}>{resolveUser(d.recvContact).name}</Box>
-                </>
-              )}
-            </Box>
-          ) : (
-            <Box sx={{ fontSize: 12.5, color: T.dm2 }}>{t('deliverable.recipientDeptNotSet')}</Box>
-          )}
-        </Card>
-        <Card sx={{ mb: '12px' }}>
-          <Ey sx={{ mb: '9px' }}>{t('deliverable.recipientWorkflowTitle')}</Ey>
-          {recvIpInfo ? (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: '9px', padding: '9px 0' }}>
-              <Box sx={{ width: 9, height: 9, borderRadius: '50%', background: recvIpInfo.color }} />
-              <Box sx={{ fontSize: 13 }}>{recvIpInfo.name}</Box>
-            </Box>
-          ) : (
-            <Box sx={{ fontSize: 12.5, color: T.dm2 }}>{t('deliverable.noRecipientWorkflow')}</Box>
-          )}
-        </Card>
-        <Card>
-          <Ey sx={{ mb: '9px' }}>{t('deliverable.receivedFromTitle')}</Ey>
-          {d.sourceDept || d.sourceContact ? (
-            <Box sx={{ padding: '9px 0' }}>
-              {d.sourceDept && <Box sx={{ fontSize: 13 }}>{d.sourceDept}</Box>}
-              {d.sourceContact && (
-                <Box sx={{ fontSize: 11.5, color: T.dm2, mt: '3px' }}>{d.sourceContact}</Box>
-              )}
-            </Box>
-          ) : (
-            <Box sx={{ fontSize: 12.5, color: T.dm2 }}>{t('deliverable.receivedFromNotSet')}</Box>
-          )}
-        </Card>
-      </>
+      <Card>
+        <Ey sx={{ mb: '9px' }}>{t('deliverable.recipientDeptTitle')}</Ey>
+        {d.recvDept ? (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: '9px', padding: '9px 0' }}>
+            <Badge color={T.dm} bg={T.sf2} borderColor={T.ln}>{departmentName(d.recvDept)}</Badge>
+            {d.recvContact && (
+              <>
+                <UserAvatar user={resolveUser(d.recvContact)} size={24} />
+                <Box sx={{ fontSize: 13 }}>{resolveUser(d.recvContact).name}</Box>
+              </>
+            )}
+          </Box>
+        ) : (
+          <Box sx={{ fontSize: 12.5, color: T.dm2 }}>{t('deliverable.recipientDeptNotSet')}</Box>
+        )}
+      </Card>
     );
   }
 
   const contactUser = contact ? resolveUser(contact) : null;
-  // 이 프로젝트 부서 목록에 없는 값(과거에 자유 입력했던 값)도 후보에 끼워 보여준다 —
-  // 셀렉트가 "선택 없음"으로 조용히 지워버리면 저장된 값과 화면이 어긋난다.
-  const sourceDeptOptions = [
-    { value: '', label: t('deliverable.notSet') },
-    ...(sourceDept && !projectDepartments.includes(sourceDept)
-      ? [{ value: sourceDept, label: t('deliverable.notInList', { name: sourceDept }) }] : []),
-    ...projectDepartments.map((dp) => ({ value: dp, label: dp })),
-  ];
 
   return (
     <>
-      <Card sx={{ mb: '12px' }}>
+      <Card>
         <Ey sx={{ mb: '9px' }}>{t('deliverable.recipientDeptTitle')}</Ey>
         <Row>
           <Field label={t('deliverable.departmentLabel')} sx={{ flex: 1, mb: 0 }}>
@@ -650,44 +602,10 @@ function RecvTab({
         />
       )}
 
-      <Card sx={{ mb: '12px' }}>
-        <Ey sx={{ mb: '9px' }}>{t('deliverable.recipientWorkflowTitle')}</Ey>
-        <Box sx={{ fontSize: 11.5, color: T.dm2, mb: '9px' }}>
-          {t('deliverable.recipientWorkflowDesc')}
-        </Box>
-        <Field label={t('deliverable.recipientWorkflowLabel')} sx={{ mb: 0 }}>
-          <SelectInput
-            value={recvWorkflow}
-            onChange={setRecvIp}
-            options={[
-              { value: '', label: t('deliverable.notSet') },
-              ...otherIps.map((workflow) => ({ value: workflow.id, label: workflow.name })),
-            ]}
-          />
-        </Field>
-      </Card>
-
-      <Card>
-        <Ey sx={{ mb: '9px' }}>{t('deliverable.receivedFromTitle')}</Ey>
-        <Box sx={{ fontSize: 11.5, color: T.dm2, mb: '9px' }}>
-          {t('deliverable.receivedFromDesc')}
-        </Box>
-        <Field label={t('deliverable.departmentLabel')}>
-          <SelectInput value={sourceDept} onChange={setSourceDept} options={sourceDeptOptions} />
-        </Field>
-        <Field label={t('deliverable.individualContact')} sx={{ mb: 0 }}>
-          <TextInput value={sourceContact} onChange={setSourceContact} placeholder={t('deliverable.contactPlaceholder')} />
-        </Field>
-      </Card>
-
       <SirenButton
         variant="primary"
         sx={{ mt: '12px' }}
-        onClick={() => onSave({
-          recvDept: dept || null, recvContact: contact || null, recvWorkflowId: recvWorkflow || null,
-          sourceDept: sourceDept.trim() || null,
-          sourceContact: sourceContact.trim() || null,
-        })}
+        onClick={() => onSave({ recvDept: dept || null, recvContact: contact || null })}
       >
         <Icon name="check" /> {t('deliverable.save')}
       </SirenButton>

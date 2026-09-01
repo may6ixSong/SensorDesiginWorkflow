@@ -3,7 +3,6 @@ import { Box } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import { WorkflowDto } from '@/types/domain';
 import { useDirectory } from '@/app/providers/DirectoryProvider';
-import { ModalShell } from '@/components/common/ModalShell';
 import { SirenButton, Chip } from '@/components/common/SirenButton';
 import { Card, Ey } from '@/components/common/Panel';
 import { Icon } from '@/components/common/Icon';
@@ -15,7 +14,6 @@ import { T } from '@/theme/tokens';
 interface Props {
   workflow: WorkflowDto;
   own: boolean;
-  onClose: () => void;
   /** api/는 사용자를 조회할 수 없으므로 department도 함께 보낸다 (BE가 'analog'인지 재검증). */
   onAddOwner: (knoxId: string, department: string) => void;
   onRemoveOwner: (knoxId: string) => void;
@@ -26,9 +24,11 @@ interface Props {
 /**
  * 목업 ownerDlgH() — 담당자·권한. Owner(Edit) 후보는 Analog 부서로 고정된다
  * (실제 방어는 BE, 설계서 3.3, 6.2) — SDP 검색으로 아무나 찾은 뒤 'analog' 소속으로 추가한다.
+ *
+ * Workflow settings dialog의 "Permissions" 탭 내용.
  */
-export function WorkflowPermissionDialog({
-  workflow, own, onClose, onAddOwner, onRemoveOwner, onAddViewGrant, onRemoveViewGrant,
+export function WorkflowPermissionPanel({
+  workflow, own, onAddOwner, onRemoveOwner, onAddViewGrant, onRemoveViewGrant,
 }: Props) {
   const { t } = useTranslation();
   const { resolveUser } = useDirectory();
@@ -40,17 +40,7 @@ export function WorkflowPermissionDialog({
   const [removeViewTarget, setRemoveViewTarget] = useState<string | null>(null);
 
   return (
-    <ModalShell
-      open
-      onClose={onClose}
-      width={560}
-      header={
-        <>
-          <Ey>{workflow.name}</Ey>
-          <Box sx={{ fontSize: 17, fontWeight: 700, mt: '2px' }}>{t('workflow.permissions')}</Box>
-        </>
-      }
-    >
+    <>
       <Card sx={{ mb: '12px' }}>
         <Ey sx={{ mb: '9px' }}>Primary Owner</Ey>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: '9px' }}>
@@ -173,6 +163,6 @@ export function WorkflowPermissionDialog({
           onConfirm={() => { onRemoveViewGrant(removeViewTarget); setRemoveViewTarget(null); }}
         />
       )}
-    </ModalShell>
+    </>
   );
 }

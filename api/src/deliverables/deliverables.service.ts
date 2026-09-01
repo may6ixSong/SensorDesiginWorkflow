@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { Model } from 'mongoose';
 import { Deliverable, DeliverableDocument } from './schemas/deliverable.schema';
 import { Workflow, WorkflowDocument } from '../workflows/schemas/workflow.schema';
 import { Actor } from '../common/actor';
@@ -86,6 +86,7 @@ export class DeliverablesService {
       recvDept: null,
       recvContact: null,
       sourceContact: null,
+      intent: dto.intent === 'received' ? 'received' : 'own',
       layout: { x: 0, y: 0, w: 160, h: 82 },
       versions: [],
       createdBy: actor.knoxId,
@@ -132,6 +133,11 @@ export class DeliverablesService {
    * recvDept는 Analog 제외 5개 중 하나 (설계서 3.4, 4.6, BE 검증).
    * recvContact는 KnoxID 문자열이며 "그 부서 소속인지"는 api가 조회할 수 없으므로
    * recvDept가 함께 지정되었는지까지만 검증한다 - 소속 판정은 web(공통 플랫폼 조회)의 몫이다.
+   *
+   * recvWorkflowId·sourceDept·sourceContact는 더 이상 이 메서드로 고치지 않는다(사용자
+   * 요청 — 전달 탭은 전달 받을 부서만 남긴다). UpdateRecvDto에서 이미 걷어냈으므로 여기서는
+   * 아예 손대지 않고 기존 저장값을 그대로 둔다 — 이미 연결돼 있던 "Incoming from other
+   * workflows"·"받는 곳" 표시는 이 산출물을 다시 저장해도 끊어지지 않는다.
    */
   async updateRecv(id: string, dto: UpdateRecvDto, actor: Actor) {
     const d = await this.findOrThrow(id);
@@ -146,34 +152,27 @@ export class DeliverablesService {
       throw new BadRequestException('A recipient department is required when a recipient contact is set.');
     }
 
-    if (dto.recvWorkflowId) {
-      if (dto.recvWorkflowId === d.workflowId.toString()) {
-        throw new BadRequestException('A deliverable cannot list its own Workflow as the recipient Workflow.');
-      }
-      const targetIp = await this.workflowModel.findById(dto.recvWorkflowId).exec();
-      if (!targetIp) throw new NotFoundException('Recipient Workflow not found.');
-      if (targetIp.projectId.toString() !== d.projectId.toString()) {
-        throw new BadRequestException('Recipient Workflow must belong to the same project.');
-      }
-    }
-
     d.recvDept = dto.recvDept ?? null;
     d.recvContact = dto.recvContact ?? null;
-    d.recvWorkflowId = dto.recvWorkflowId ? new Types.ObjectId(dto.recvWorkflowId) : null;
-    d.sourceDept = dto.sourceDept?.trim() || null;
-    d.sourceContact = dto.sourceContact?.trim() || null;
     await d.save();
     await this.audit.log(actor.knoxId, 'RECV_UPDATE', 'deliverable', d._id, {
       recvDept: d.recvDept,
       recvContact: d.recvContact,
-      recvWorkflowId: d.recvWorkflowId,
     });
     return d;
   }
 
-  /** 업로드 = minor +1 (최초는 v0.1) (설계서 3.5). */
+  /**
+   * 업로드 = minor +1 (최초는 v0.1) (설계서 3.5).
+   * intent==='received'인 산출물은 이 workflow가 직접 만드는 게 아니라 연동된 서비스가
+   * 채워줄 자리표시자라 여기로 직접 업로드하는 것을 막는다(사용자 요청) — FE가 그 UI
+   * 자체를 숨기지만, API를 직접 두드리는 경우까지 막기 위해 여기서도 거절한다.
+   */
   async addVersion(id: string, dto: AddVersionDto, actor: Actor) {
     const d = await this.findOrThrow(id);
+    if (d.intent === 'received') {
+      throw new BadRequestException('This artifact is a placeholder for something you are waiting to receive — it cannot be uploaded here directly.');
+    }
     if (d.network === 'OA' && !dto.storageKey) {
       throw new BadRequestException('OA-network deliverables require a storageKey.');
     }
@@ -304,6 +303,7 @@ export class DeliverablesService {
           recvWorkflowId: origin.recvWorkflowId,
           sourceDept: origin.sourceDept,
           sourceContact: origin.sourceContact,
+          intent: origin.intent,
           layout: {
             x: origin.layout.x + 40,
             y: origin.layout.y + 40,

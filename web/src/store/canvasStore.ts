@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { CanvasEdge, CanvasMemo, CanvasNode } from '@/lib/canvasModel';
 import { ZOOM_MIN } from '@/lib/constants';
+import { WorkflowSettingsTab } from '@/components/dialogs/WorkflowSettingsDialog';
 
 /**
  * 클라이언트 전용 상태 (목업의 VP + S). 서버로 보내지 않는다 (설계서 7.1).
@@ -50,7 +51,12 @@ interface CanvasState {
   hldSel: string | null;
   hldBack: boolean;
   phInfo: string | null;
-  ownerDlg: boolean;
+  /**
+   * Workflow settings dialog(Details/Schedule/Permissions 탭) 열림 여부 — 열려 있으면 그
+   * 초기 탭, 닫혀 있으면 null. 예전에는 "Edit phases"/"Owners & permissions" 버튼이
+   * 따로 있었지만(사용자 요청으로 통합) 지금은 이 하나의 진입점만 남았다.
+   */
+  workflowSettingsTab: WorkflowSettingsTab | null;
   /** Incoming 카드 클릭 시 선택된 산출물 id — 읽기 전용 상세 dialog에 쓰인다. */
   incomingId: string | null;
   /** 새로 추가된 블록 id — 설정되면 Canvas가 뷰포트를 그 블록으로 이동시키고 비운다. */
@@ -103,7 +109,7 @@ interface CanvasState {
   setHldSel: (id: string | null) => void;
   setHldBack: (v: boolean) => void;
   setPhInfo: (id: string | null) => void;
-  setOwnerDlg: (v: boolean) => void;
+  setWorkflowSettingsTab: (tab: WorkflowSettingsTab | null) => void;
   setIncomingId: (id: string | null) => void;
   setFocusReq: (id: string | null) => void;
   setIncomingOverride: (id: string, x: number, y: number, phase: string) => void;
@@ -139,7 +145,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   hldSel: null,
   hldBack: false,
   phInfo: null,
-  ownerDlg: false,
+  workflowSettingsTab: null,
   incomingId: null,
   focusReq: null,
   incomingOverrides: {},
@@ -219,7 +225,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   setHldSel: (id) => set({ hldSel: id }),
   setHldBack: (v) => set({ hldBack: v }),
   setPhInfo: (id) => set({ phInfo: id }),
-  setOwnerDlg: (v) => set({ ownerDlg: v }),
+  setWorkflowSettingsTab: (tab) => set({ workflowSettingsTab: tab }),
   setIncomingId: (id) => set({ incomingId: id }),
   setFocusReq: (id) => set({ focusReq: id }),
   setIncomingOverride: (id, x, y, phase) =>

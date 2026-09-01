@@ -11,23 +11,24 @@ interface WorkflowHeaderProps {
   recv: boolean;
   /** 이 workflow에서 일정을 잃은 산출물 수 — 0보다 크면 헤더에 경고 chip이 붙는다. */
   orphanCount: number;
-  onOpenPermissions: () => void;
   onOpenHld: () => void;
-  /** 일정(phase) 편집 — Edit 권한자에게만 뜬다. */
-  onEditPhases?: () => void;
+  /** Workflow settings(Details/Schedule/Permissions 탭) 열기. */
+  onOpenSettings: () => void;
 }
 
-/** Edit phases / Owners & permissions 아이콘 버튼 크기 — 이전 크기(26px, shield 13px의 2배)의 3/4. */
+/** Workflow settings 아이콘 버튼 크기 — 이전 크기(26px, shield 13px의 2배)의 3/4. */
 const ICON_BUTTON_SIZE = 19.5;
 
 /**
- * workflow명, 일정 편집 · 권한 관리 아이콘 버튼(모두 왼쪽 정렬, workflow명 옆), HLD 버튼.
+ * workflow명, 설정(연필) 아이콘 버튼(workflow명 옆), HLD 버튼.
  *
- * 일정 편집이 여기 붙는 이유: phase는 이제 workflow가 소유한 데이터라 과제 화면이 아니라
- * 이 workflow의 보드가 제자리다(과제 화면에서 고치는 것은 공통 마일스톤뿐이다).
+ * 예전에는 일정 편집·권한 관리 아이콘 버튼이 따로 있었지만(사용자 요청으로 통합),
+ * 지금은 이 연필 버튼 하나가 WorkflowSettingsDialog를 열고 그 안에서 탭으로 갈라진다 —
+ * 일정 편집이 여기 딸린 이유는 그대로다: phase는 이제 workflow가 소유한 데이터라
+ * 과제 화면이 아니라 이 workflow의 보드가 제자리다.
  */
 export function WorkflowHeader({
-  workflow, recv, orphanCount, onOpenPermissions, onOpenHld, onEditPhases,
+  workflow, recv, orphanCount, onOpenHld, onOpenSettings,
 }: WorkflowHeaderProps) {
   const { t } = useTranslation();
 
@@ -50,17 +51,9 @@ export function WorkflowHeader({
           </Typography>
         </Box>
 
-        {onEditPhases && (
-          <Tooltip title={t('workflow.editPhases')}>
-            <SirenButton variant="ghost" onClick={onEditPhases} sx={{ padding: '6px 8px' }} aria-label={t('workflow.editPhases')}>
-              <Icon name="calendar" size={ICON_BUTTON_SIZE} />
-            </SirenButton>
-          </Tooltip>
-        )}
-
-        <Tooltip title={t('workflow.permissions')}>
-          <SirenButton variant="ghost" onClick={onOpenPermissions} sx={{ padding: '6px 8px' }} aria-label={t('workflow.permissions')}>
-            <Icon name="shield" size={ICON_BUTTON_SIZE} />
+        <Tooltip title={t('workflow.settings')}>
+          <SirenButton variant="ghost" onClick={onOpenSettings} sx={{ padding: '6px 8px' }} aria-label={t('workflow.settings')}>
+            <Icon name="edit" size={ICON_BUTTON_SIZE} />
           </SirenButton>
         </Tooltip>
       </Stack>

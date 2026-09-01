@@ -14,6 +14,22 @@ export function useWorkflow(workflowId: string | undefined) {
   });
 }
 
+/** workflow의 이름/설명(/색상)을 고친다. 값을 보내지 않은 필드는 그대로 유지된다. */
+export function useUpdateWorkflow(workflowId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (patch: { name?: string; description?: string; color?: string }) => {
+      const res = await apiClient.patch<ApiEnvelope<WorkflowDto>>(`/workflows/${workflowId}`, patch);
+      return res.data.data;
+    },
+    onSuccess: (workflow) => {
+      qc.setQueryData(queryKeys.workflow(workflowId), workflow);
+      qc.invalidateQueries({ queryKey: queryKeys.projectWorkflows(workflow.projectId) });
+      qc.invalidateQueries({ queryKey: queryKeys.projectWorkflowDirectory(workflow.projectId) });
+    },
+  });
+}
+
 /**
  * 이 workflow만의 일정을 통째로 교체한다 — 추가/삭제/개명/재일정, 그리고 서로 겹치는
  * 일정까지 전부 허용된다. id를 비워 보내면 새 phase, 보내지 않은 기존 id는 삭제다.

@@ -145,6 +145,12 @@ export interface DeliverableDto {
   seriesIdx: number;
   seriesTotal: number;
   layout: Layout;
+  /**
+   * 'own' = 이 workflow가 만들어 남에게 주는 산출물(기본값). 'received' = 이 workflow가
+   * 받기를 기다리는 자리표시자 — 실물은 연동된 서비스로 올라올 것이라 이 화면에서
+   * 직접 업로드하거나 전달(Handoff) 정보를 편집할 수 없다. 생성 시점에만 정해진다.
+   */
+  intent: 'own' | 'received';
   recvDept: string | null;
   /** 수신 담당자의 knoxId. */
   recvContact: string | null;
