@@ -1,0 +1,692 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SIREN 오케스트레이션 맵</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+:root{
+  --ground:#0a0e14;
+  --ground-2:#0d1219;
+  --slab:#161e29;
+  --slab-hi:#1d2733;
+  --rim:#0a0f16;
+  --line:#26313f;
+  --line-soft:#1b232e;
+  --ink:#e8edf4;
+  --ink-2:#9aa5b6;
+  --ink-3:#67717f;
+  --siren:#0c9a83;
+  --siren-dim:#0a6d5e;
+  --observe:#f0a23c;
+  --identity:#7b7ee8;
+  --lock:#e05c5c;
+  --font-ui:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+  --font-mono:"IBM Plex Mono","SFMono-Regular",Menlo,monospace;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;
+  background:var(--ground);
+  color:var(--ink);
+  font-family:var(--font-ui);
+  font-size:15px;
+  line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1180px;margin:0 auto;padding:34px 22px 64px}
+
+/* ---------- header ---------- */
+.masthead{display:flex;flex-wrap:wrap;gap:20px 34px;align-items:flex-end;justify-content:space-between;padding-bottom:20px;border-bottom:1px solid var(--line-soft)}
+.eyebrow{
+  font-family:var(--font-mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--siren);margin:0 0 8px
+}
+h1{font-size:clamp(28px,4.4vw,42px);line-height:1.12;font-weight:700;letter-spacing:-.02em;margin:0;text-wrap:balance}
+.thesis{margin:12px 0 0;max-width:56ch;color:var(--ink-2);font-size:15px}
+.thesis b{color:var(--ink);font-weight:600}
+.legend{display:flex;flex-direction:column;gap:9px;font-size:12.5px;color:var(--ink-2)}
+.legend-row{display:flex;align-items:center;gap:9px;white-space:nowrap}
+.swatch{width:22px;height:3px;border-radius:2px;flex:none}
+.swatch.up{background:linear-gradient(90deg,rgba(240,162,60,.15),var(--observe))}
+.swatch.down{background:linear-gradient(90deg,var(--identity),rgba(123,126,232,.15))}
+.swatch.hold{background:var(--ink-3);height:9px;width:9px;border-radius:2px}
+
+/* ---------- controls ---------- */
+.controls{display:flex;flex-wrap:wrap;gap:10px 22px;align-items:center;margin:22px 0 6px}
+.segmented{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--ground-2)}
+.segmented button{
+  appearance:none;border:0;background:transparent;color:var(--ink-2);
+  font-family:var(--font-ui);font-size:12.5px;font-weight:500;padding:8px 14px;cursor:pointer;
+  border-right:1px solid var(--line-soft)
+}
+.segmented button:last-child{border-right:0}
+.segmented button[aria-pressed="true"]{background:rgba(12,154,131,.16);color:#8ff0dc}
+.segmented button:hover:not([aria-pressed="true"]){color:var(--ink);background:rgba(255,255,255,.03)}
+.segmented button:focus-visible{outline:2px solid var(--siren);outline-offset:-2px}
+.ctl-label{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);margin-right:-12px}
+.hint{margin-left:auto;font-size:12px;color:var(--ink-3);font-family:var(--font-mono)}
+
+/* ---------- 3D stage ---------- */
+.stage{
+  position:relative;height:620px;margin:6px -22px 0;
+  perspective:1600px;perspective-origin:50% 48%;
+  touch-action:none;cursor:grab;overflow:hidden;
+  background:
+    radial-gradient(120% 78% at 50% 96%,rgba(12,154,131,.10),transparent 62%),
+    radial-gradient(90% 60% at 50% 8%,rgba(123,126,232,.07),transparent 70%);
+}
+.stage:active{cursor:grabbing}
+.stage:focus-visible{outline:2px solid var(--siren);outline-offset:-4px}
+.camera{
+  position:absolute;left:50%;top:50%;width:0;height:0;
+  transform-style:preserve-3d;
+  transform:translateY(76px) scale(var(--s,1)) rotateX(var(--rx,44deg)) rotateZ(var(--rz,-14deg));
+  transition:transform .12s linear;
+}
+.layer{position:absolute;left:0;top:0;transform-style:preserve-3d}
+
+/* ground grid */
+.grid-plane{
+  width:1160px;height:560px;margin-left:-580px;margin-top:-250px;
+  transform:translateZ(-34px);
+  background-image:
+    linear-gradient(var(--line-soft) 1px,transparent 1px),
+    linear-gradient(90deg,var(--line-soft) 1px,transparent 1px);
+  background-size:58px 58px;
+  -webkit-mask-image:radial-gradient(58% 62% at 50% 50%,#000 32%,transparent 78%);
+  mask-image:radial-gradient(58% 62% at 50% 50%,#000 32%,transparent 78%);
+  opacity:.62;
+}
+
+/* ---------- SIREN glass plane ---------- */
+.siren-plane{
+  width:940px;height:250px;margin-left:-470px;margin-top:-125px;
+  transform:translateZ(292px);
+  border:1px dashed rgba(12,154,131,.5);
+  border-radius:12px;
+  background:linear-gradient(160deg,rgba(12,154,131,.13),rgba(12,154,131,.04) 55%,rgba(10,14,20,.22));
+  box-shadow:0 0 0 1px rgba(12,154,131,.10) inset, 0 26px 60px -30px rgba(12,154,131,.6);
+  transform-style:preserve-3d;
+}
+.plane-tag{
+  position:absolute;top:-30px;left:14px;display:flex;align-items:baseline;gap:10px;white-space:nowrap
+}
+.plane-tag .nm{font-size:15px;font-weight:700;letter-spacing:.01em;color:#7fe8d3}
+.plane-tag .sub{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--siren)}
+.plane-note{
+  position:absolute;right:14px;top:-26px;font-size:11.5px;color:var(--ink-3);
+  font-family:var(--font-mono);white-space:nowrap
+}
+.lane{
+  position:absolute;top:44px;height:158px;width:224px;border-left:1px solid rgba(12,154,131,.22);
+}
+.lane .lane-nm{
+  position:absolute;top:-22px;left:9px;font-family:var(--font-mono);font-size:10.5px;
+  letter-spacing:.1em;color:var(--siren-dim)
+}
+.snapbar{
+  position:absolute;left:14px;right:14px;bottom:10px;height:26px;border-radius:6px;
+  border:1px solid rgba(240,162,60,.28);background:rgba(240,162,60,.07);
+  display:flex;align-items:center;gap:10px;padding:0 11px;
+  font-family:var(--font-mono);font-size:10.5px;color:#f5c07d;letter-spacing:.05em;
+  opacity:0;transition:opacity .25s ease
+}
+.stage[data-mode="release"] .snapbar{opacity:1}
+.snapbar .pins{margin-left:auto;display:flex;gap:7px;color:var(--observe)}
+
+/* SIREN node (reference only) */
+.node{
+  position:absolute;width:172px;padding:9px 11px 10px;border-radius:8px;
+  border:1px solid rgba(12,154,131,.42);
+  background:linear-gradient(180deg,rgba(19,32,38,.92),rgba(13,20,26,.9));
+  cursor:pointer;transform-style:preserve-3d;
+  transition:border-color .18s ease,box-shadow .18s ease,transform .18s ease
+}
+.node:hover{border-color:rgba(12,154,131,.85);transform:translateZ(10px)}
+.node[data-sel="1"]{border-color:var(--observe);box-shadow:0 0 0 1px rgba(240,162,60,.45),0 12px 26px -12px rgba(240,162,60,.7)}
+.node:focus-visible{outline:2px solid var(--siren);outline-offset:3px}
+.node .n-top{display:flex;align-items:center;gap:6px;margin-bottom:5px}
+.node .n-name{font-size:12.5px;font-weight:600;letter-spacing:-.01em;line-height:1.25;color:var(--ink)}
+.node .n-map{
+  font-family:var(--font-mono);font-size:9.5px;letter-spacing:.06em;color:#7fe8d3;
+  border:1px solid rgba(12,154,131,.4);border-radius:3px;padding:1px 5px;background:rgba(12,154,131,.12);
+  white-space:nowrap
+}
+.node .n-meta{display:flex;align-items:center;justify-content:space-between;gap:8px;font-family:var(--font-mono);font-size:10px;color:var(--ink-3)}
+.node .n-ver{color:var(--observe);font-weight:500}
+.node .n-ref{
+  margin-top:6px;font-family:var(--font-mono);font-size:9px;color:var(--ink-3);
+  letter-spacing:.02em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  border-top:1px dashed var(--line);padding-top:5px
+}
+.node.is-locked{border-color:rgba(224,92,92,.5);background:linear-gradient(180deg,rgba(38,20,22,.92),rgba(16,11,13,.9))}
+.node.is-locked .n-ver,.node.is-locked .n-ref{color:var(--lock)}
+.lockmark{
+  display:none;font-family:var(--font-mono);font-size:9px;letter-spacing:.08em;
+  color:var(--lock);border:1px solid rgba(224,92,92,.45);border-radius:3px;padding:1px 5px;
+  background:rgba(224,92,92,.1)
+}
+.node.is-locked .lockmark{display:inline-block}
+.node.is-locked .n-map{display:none}
+
+/* ---------- membrane ---------- */
+.membrane{
+  width:940px;height:74px;margin-left:-470px;margin-top:-37px;
+  transform:translateZ(150px);
+  border-radius:10px;border:1px solid var(--line);
+  background:linear-gradient(180deg,rgba(22,30,41,.72),rgba(13,18,25,.55));
+  display:flex;align-items:center;gap:8px;padding:0 16px;
+  transform-style:preserve-3d
+}
+.membrane .m-tag{
+  font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--ink-3);margin-right:6px;white-space:nowrap
+}
+.hook{
+  font-family:var(--font-mono);font-size:10.5px;padding:4px 9px;border-radius:5px;
+  border:1px solid var(--line);background:var(--ground-2);white-space:nowrap;letter-spacing:.01em
+}
+.hook.up{color:#f6c586;border-color:rgba(240,162,60,.35);background:rgba(240,162,60,.08)}
+.hook.down{color:#b6b8f3;border-color:rgba(123,126,232,.35);background:rgba(123,126,232,.08)}
+
+/* ---------- service slabs ---------- */
+.slab{
+  position:absolute;width:206px;padding:12px 13px 14px;border-radius:9px;
+  background:linear-gradient(178deg,var(--slab-hi),var(--slab) 60%,#111823);
+  border:1px solid var(--line);border-bottom:none;
+  box-shadow:0 30px 46px -26px rgba(0,0,0,.95);
+  cursor:pointer;transform-style:preserve-3d;
+  transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease
+}
+.slab::after{ /* extruded front rim -> reads as a solid block */
+  content:"";position:absolute;left:-1px;right:-1px;top:100%;height:22px;
+  background:linear-gradient(180deg,#0f151d,var(--rim));
+  border:1px solid var(--line);border-top:none;border-radius:0 0 9px 9px;
+  transform-origin:50% 0;transform:rotateX(-90deg)
+}
+.slab:hover{transform:translateZ(16px)}
+.slab[data-sel="1"]{border-color:rgba(240,162,60,.7);box-shadow:0 0 0 1px rgba(240,162,60,.4),0 30px 46px -22px rgba(240,162,60,.35)}
+.slab:focus-visible{outline:2px solid var(--observe);outline-offset:3px}
+.s-head{display:flex;align-items:center;gap:7px;padding-bottom:9px;border-bottom:1px solid var(--line-soft)}
+.s-dot{width:7px;height:7px;border-radius:50%;background:var(--siren);flex:none;box-shadow:0 0 8px rgba(12,154,131,.8)}
+.s-name{font-size:13.5px;font-weight:700;letter-spacing:-.01em}
+.s-badge{
+  margin-left:auto;font-family:var(--font-mono);font-size:9px;color:var(--ink-3);
+  border:1px solid var(--line);border-radius:3px;padding:1px 5px;white-space:nowrap
+}
+.s-kind{font-size:11px;color:var(--ink-3);margin:8px 0 2px}
+.s-art{font-size:12.5px;font-weight:600;color:var(--ink);line-height:1.3;margin-bottom:9px}
+.s-sec{font-family:var(--font-mono);font-size:9px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-3);margin:0 0 5px}
+.vstack{display:flex;flex-direction:column;gap:3px;margin-bottom:10px}
+.vrow{
+  display:flex;align-items:center;gap:7px;font-family:var(--font-mono);font-size:10px;
+  padding:3px 7px;border-radius:4px;background:rgba(255,255,255,.028);color:var(--ink-3);
+  font-variant-numeric:tabular-nums
+}
+.vrow.cur{background:rgba(240,162,60,.13);color:#f7cd96;border:1px solid rgba(240,162,60,.3);padding:2px 6px}
+.vrow.rel{color:#7fe8d3}
+.vrow .tag{margin-left:auto;font-size:8.5px;letter-spacing:.07em}
+.perm{display:flex;flex-wrap:wrap;gap:4px}
+.chip{
+  font-family:var(--font-mono);font-size:9px;letter-spacing:.03em;padding:2px 6px;border-radius:3px;
+  border:1px solid var(--line);color:var(--ink-2);background:rgba(255,255,255,.03);white-space:nowrap
+}
+.chip.own{border-color:rgba(12,154,131,.45);color:#7fe8d3;background:rgba(12,154,131,.1)}
+.slab.is-locked{filter:saturate(.35)}
+.slab.is-locked .s-dot{background:var(--lock);box-shadow:0 0 8px rgba(224,92,92,.7)}
+
+/* ---------- beams ---------- */
+.beam{position:absolute;width:0;height:0;transform-style:preserve-3d}
+.ribbon{
+  position:absolute;transform-origin:50% 0;
+  border-radius:2px;pointer-events:none;
+}
+.ribbon.a{transform:rotateX(90deg)}
+.ribbon.b{transform:rotateX(90deg) rotateY(90deg)}
+.beam .up-r{
+  width:14px;height:292px;margin-left:-20px;
+  background:
+    linear-gradient(180deg,rgba(240,162,60,.10) 0%,rgba(240,162,60,.55) 55%,rgba(240,162,60,.16) 100%),
+    repeating-linear-gradient(0deg,rgba(255,204,128,.95) 0 11px,rgba(255,204,128,0) 11px 46px);
+  background-size:100% 100%,100% 46px;
+  box-shadow:0 0 26px rgba(240,162,60,.5);
+  animation:flowUp 1.9s linear infinite;
+}
+.beam .dn-r{
+  width:8px;height:292px;margin-left:13px;
+  background:
+    linear-gradient(180deg,rgba(123,126,232,.45) 0%,rgba(123,126,232,.10) 96%),
+    repeating-linear-gradient(0deg,rgba(170,173,250,.85) 0 7px,rgba(170,173,250,0) 7px 54px);
+  background-size:100% 100%,100% 54px;
+  box-shadow:0 0 18px rgba(123,126,232,.42);
+  animation:flowDown 2.6s linear infinite;
+}
+@keyframes flowUp{to{background-position:0 0,0 -44px}}
+@keyframes flowDown{to{background-position:0 0,0 52px}}
+.beam.is-locked .up-r,.beam.is-locked .dn-r{
+  background:repeating-linear-gradient(0deg,rgba(224,92,92,.30) 0 5px,rgba(224,92,92,0) 5px 14px);
+  animation:none
+}
+.beam.is-dim .up-r{opacity:.28}
+.beam.is-dim .dn-r{opacity:.2}
+.stage[data-mode="release"] .beam .up-r{animation-play-state:paused;background-size:100% 100%,100% 44px}
+.pin{
+  position:absolute;top:-4px;left:-20px;width:17px;height:17px;border-radius:50%;
+  border:2px solid var(--observe);background:rgba(10,14,20,.9);
+  display:none;align-items:center;justify-content:center;
+  font-family:var(--font-mono);font-size:8px;color:var(--observe);
+  transform:translateZ(294px)
+}
+.stage[data-mode="release"] .pin{display:flex}
+
+/* ---------- detail ---------- */
+.below{display:grid;grid-template-columns:1.32fr 1fr;gap:26px;margin-top:34px}
+.panel{border:1px solid var(--line-soft);border-radius:11px;background:var(--ground-2);padding:20px 22px 22px}
+.p-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px}
+.p-head h2{font-size:17px;font-weight:700;letter-spacing:-.01em;margin:0}
+.p-head .who{font-family:var(--font-mono);font-size:11px;color:var(--observe)}
+.p-sub{margin:0 0 18px;font-size:12.5px;color:var(--ink-3)}
+.split{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.col-t{
+  display:flex;align-items:center;gap:7px;font-family:var(--font-mono);font-size:10px;
+  letter-spacing:.12em;text-transform:uppercase;margin:0 0 10px;padding-bottom:8px;border-bottom:1px solid var(--line-soft)
+}
+.col-t.up{color:var(--observe)}
+.col-t.hold{color:var(--ink-2)}
+.col-t .arw{font-size:12px}
+dl{margin:0;display:flex;flex-direction:column;gap:11px}
+.kv dt{font-size:11.5px;color:var(--ink-3);margin-bottom:2px}
+.kv dd{margin:0;font-family:var(--font-mono);font-size:11.5px;color:var(--ink);word-break:break-all;line-height:1.45}
+.kv dd.amber{color:#f7cd96}
+.holds{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:9px}
+.holds li{position:relative;padding-left:15px;font-size:12.5px;color:var(--ink-2);line-height:1.5}
+.holds li::before{content:"";position:absolute;left:0;top:8px;width:7px;height:7px;border-radius:2px;background:var(--ink-3)}
+.holds li b{color:var(--ink);font-weight:600}
+.down-note{
+  margin-top:18px;padding:12px 14px;border-radius:8px;
+  border:1px solid rgba(123,126,232,.28);background:rgba(123,126,232,.07);
+  font-size:12.5px;color:#c2c4f6;line-height:1.55
+}
+.down-note b{color:#e0e1fb;font-weight:600}
+.down-note .mono{font-family:var(--font-mono);font-size:11.5px}
+
+/* rules */
+.rules{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:0}
+.rules li{padding:14px 0;border-bottom:1px solid var(--line-soft)}
+.rules li:last-child{border-bottom:0;padding-bottom:0}
+.rules .r-k{
+  display:inline-block;font-family:var(--font-mono);font-size:9.5px;letter-spacing:.11em;
+  text-transform:uppercase;padding:2px 7px;border-radius:3px;margin-bottom:7px
+}
+.r-k.siren{color:#7fe8d3;background:rgba(12,154,131,.13);border:1px solid rgba(12,154,131,.35)}
+.r-k.svc{color:#f7cd96;background:rgba(240,162,60,.11);border:1px solid rgba(240,162,60,.32)}
+.r-k.both{color:#b6b8f3;background:rgba(123,126,232,.11);border:1px solid rgba(123,126,232,.32)}
+.rules p{margin:0;font-size:13px;color:var(--ink-2);line-height:1.6}
+.rules p b{color:var(--ink);font-weight:600}
+.rules code{font-family:var(--font-mono);font-size:11.5px;color:#f7cd96;background:rgba(255,255,255,.04);padding:1px 5px;border-radius:3px}
+
+.foot{margin-top:30px;padding-top:16px;border-top:1px solid var(--line-soft);font-size:12px;color:var(--ink-3);max-width:74ch}
+.foot b{color:var(--ink-2);font-weight:500}
+
+@media (max-width:900px){
+  .below{grid-template-columns:1fr}
+  .split{grid-template-columns:1fr;gap:22px}
+  .stage{height:440px}
+  .hint{display:none}
+}
+@media (prefers-reduced-motion:reduce){
+  .beam .up-r,.beam .dn-r{animation:none}
+  .camera{transition:none}
+  .node,.slab{transition:none}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <div>
+      <p class="eyebrow">CIS Design · Artifact Orchestration</p>
+      <h1>SIREN 오케스트레이션 맵</h1>
+      <p class="thesis">산출물의 <b>실물 데이터·버전 이력·접근 권한은 각 서비스 안에</b> 그대로 남는다. SIREN은 그 위에 떠서 <b>참조만 관측</b>하고, 대신 프로젝트·부서·멤버를 아래로 내려보낸다.</p>
+    </div>
+    <div class="legend">
+      <div class="legend-row"><span class="swatch up"></span> 관측 — 버전 ref · 링크 · 변경 이벤트 (서비스 → SIREN)</div>
+      <div class="legend-row"><span class="swatch down"></span> 신원 — 프로젝트 · 부서 · 멤버 (SIREN → 서비스)</div>
+      <div class="legend-row"><span class="swatch hold"></span> 서비스 내부에 머무는 것 — 파일 · 전체 이력 · 권한 판정</div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <span class="ctl-label">보기</span>
+    <div class="segmented" role="group" aria-label="보기 모드">
+      <button type="button" data-mode-btn="observe" aria-pressed="true">관측 흐름</button>
+      <button type="button" data-mode-btn="release" aria-pressed="false">Release 스냅샷</button>
+    </div>
+    <span class="ctl-label">시점</span>
+    <div class="segmented" role="group" aria-label="사용자 시점">
+      <button type="button" data-view-btn="member" aria-pressed="true">권한 있는 사용자</button>
+      <button type="button" data-view-btn="outsider" aria-pressed="false">권한 없는 사용자</button>
+    </div>
+    <span class="hint">드래그 · 방향키로 궤도 회전</span>
+  </div>
+
+  <div class="stage" id="stage" data-mode="observe" data-view="member" tabindex="0" role="application" aria-label="SIREN과 산출물 서비스의 3D 관계도. 방향키로 회전, 탭으로 서비스 선택">
+    <div class="camera" id="camera">
+      <div class="layer grid-plane"></div>
+
+      <div class="layer siren-plane" id="sirenPlane">
+        <div class="plane-tag"><span class="nm">SIREN</span><span class="sub">Orchestration · 참조만 보관</span></div>
+        <div class="plane-note">노드 위치 · flow · phase · Release 스냅샷</div>
+        <div id="lanes"></div>
+        <div id="nodes"></div>
+        <div class="snapbar">
+          <span>HLD RELEASE v2.0 · 2026-09-02 · 각 산출물 버전 고정</span>
+          <span class="pins">📌 4 pinned</span>
+        </div>
+      </div>
+
+      <div class="layer membrane">
+        <span class="m-tag">Observer 계약 v1</span>
+        <span class="hook up">↑ GET currentVersion</span>
+        <span class="hook up">↑ GET viewUrl</span>
+        <span class="hook up">↑ POST /events/version</span>
+        <span class="hook down">↓ GET /members?project&amp;dept</span>
+      </div>
+
+      <div class="layer" id="slabs"></div>
+      <div class="layer" id="beams"></div>
+    </div>
+  </div>
+
+  <div class="below">
+    <section class="panel">
+      <div class="p-head">
+        <h2>경계 확인</h2>
+        <span class="who" id="selName">SSM</span>
+      </div>
+      <p class="p-sub" id="selSub">서비스를 클릭하면 그 산출물의 소유 경계가 바뀝니다.</p>
+
+      <div class="split">
+        <div>
+          <p class="col-t up"><span class="arw">↑</span> SIREN이 가져온 것</p>
+          <dl class="kv" id="pulled"></dl>
+        </div>
+        <div>
+          <p class="col-t hold">■ 서비스가 계속 갖고 있는 것</p>
+          <ul class="holds" id="kept"></ul>
+        </div>
+      </div>
+
+      <p class="down-note">
+        <b>↓ 반대 방향</b> — 이 서비스의 권한 화면이 보여주는 담당자 후보는 자기 DB가 아니라 SIREN이
+        내려보낸 <span class="mono">CIS-A7 / Analog · Digital · APS · PI/PD · Solution · PTE</span> 멤버 목록이다.
+        조직 이동이 생기면 SIREN 한 곳만 고치면 된다.
+      </p>
+    </section>
+
+    <section class="panel">
+      <div class="p-head"><h2>세 가지 소유 규칙</h2></div>
+      <p class="p-sub">이 그림이 전제하는 경계</p>
+      <ul class="rules">
+        <li>
+          <span class="r-k svc">버전 = 서비스</span>
+          <p>산출물의 버전 이력과 <b>새 working 버전 업로드는 전부 그 서비스 안에서</b> 일어난다. SIREN의 "Upload new working"은 사라지고 <code>viewUrl</code> 링크만 남는다 — 버전 라벨은 그대로 표기.</p>
+        </li>
+        <li>
+          <span class="r-k siren">Release = SIREN</span>
+          <p>워크플로우 Release는 그 시점 각 산출물의 <b>버전 ref를 얼려서</b> 스냅샷으로 박는다. 서비스가 그 뒤로 버전을 더 올려도 과거 Release는 그때 그 버전을 계속 가리킨다 — 그래서 ref는 불변이어야 한다.</p>
+        </li>
+        <li>
+          <span class="r-k both">권한 = 두 겹</span>
+          <p>워크플로우 <b>구성</b> 권한(캔버스 편집)은 SIREN, 산출물 <b>데이터</b> 접근은 서비스가 판정한다. View를 전사에 열어도 노드만 보이고 버전·링크·파일은 잠긴다.</p>
+        </li>
+      </ul>
+    </section>
+  </div>
+
+  <p class="foot"><b>표기 주의</b> — 서비스명(SSM · SimHub · LayoutDB · File Vault)과 버전·경로 값은 구조를 보여주기 위한 예시다. File Vault는 별도 서비스가 아니라 Word/Excel 업로드를 담당하는 <b>내장 서비스 #0</b>으로, 레지스트리의 첫 번째 항목으로 취급된다.</p>
+
+</div>
+
+<script>
+const SERVICES = [
+  {
+    id:"ssm", x:-345, phase:"ML2",
+    svc:"SSM", rev:"v2.0", kind:"스펙 관리 서비스",
+    artifact:"Sensor Spec Sheet",
+    cur:"v3.1", released:"v3.0", ref:"ssm:spec/8842@r31",
+    hist:[["v3.1","working"],["v3.0","released"],["v2.4",""],["v2.3",""]],
+    net:"OA", depts:["Analog","Digital","PTE"],
+    ev:"2026-09-02 09:14",
+    url:"ssm.local/spec/8842",
+    locked:false,
+    kept:[
+      "Spec 문서 원본과 <b>스펙 항목별 리비전 이력 전체</b>",
+      "새 리비전 작성·검토·승인 플로우",
+      "Digital / PTE에게 열어준 <b>산출물 단위 열람 권한</b>",
+      "다운로드 요청 시 요청자 권한 재검증"
+    ]
+  },
+  {
+    id:"simhub", x:-115, phase:"ML3",
+    svc:"SimHub", rev:"v1.4", kind:"시뮬레이션 서비스",
+    artifact:"Pre-layout Sim 결과",
+    cur:"v1.2", released:"v1.0", ref:"sim:run/PLL_MAIN@1.2",
+    hist:[["v1.2","working"],["v1.1",""],["v1.0","released"],["v0.4",""]],
+    net:"HPC", depts:["Analog","PI/PD"],
+    ev:"2026-09-01 22:07",
+    url:"simhub.local/run/PLL_MAIN",
+    locked:true,
+    kept:[
+      "<b>/vwp/... HPC 경로의 실제 결과 파일</b> (SIREN은 바이트를 경유하지 않음)",
+      "corner 별 재실행 이력과 실행 로그",
+      "PI/PD에게만 열어준 결과 열람 권한",
+      "재실행 트리거 · working 버전 생성"
+    ]
+  },
+  {
+    id:"layoutdb", x:115, phase:"MDR",
+    svc:"LayoutDB", rev:"v5.2", kind:"레이아웃 DB",
+    artifact:"PLL_MAIN Layout",
+    cur:"v2.0", released:"v2.0", ref:"ldb:cell/PLL_MAIN@v2.0",
+    hist:[["v2.0","released"],["v1.9",""],["v1.8",""],["v1.7",""]],
+    net:"HPC", depts:["Analog","APS"],
+    ev:"2026-08-28 16:40",
+    url:"layoutdb.local/cell/PLL_MAIN",
+    locked:true,
+    kept:[
+      "셀 라이브러리와 <b>레이아웃 DB 리비전</b>",
+      "DRC/LVS 결과와 서명 이력",
+      "APS에게 열어준 셀 접근 권한",
+      "체크인 · 체크아웃 잠금 관리"
+    ]
+  },
+  {
+    id:"vault", x:345, phase:"FDR",
+    svc:"File Vault", rev:"내장 #0", kind:"일반 파일 업로드",
+    artifact:"Timing Budget.xlsx",
+    cur:"v0.3", released:"—", ref:"vault:obj/9f2c@0.3",
+    hist:[["v0.3","working"],["v0.2",""],["v0.1",""]],
+    net:"OA", depts:["Analog","Solution"],
+    ev:"2026-09-02 11:52",
+    url:"siren.local/vault/9f2c",
+    locked:false,
+    kept:[
+      "S3에 올라간 <b>xlsx 실물 파일</b>",
+      "업로드 단위 minor 버전 이력",
+      "Solution에게 열어준 다운로드 권한",
+      "presigned URL 발급과 만료 관리"
+    ]
+  }
+];
+
+const LANES = ["ML2","ML3","MDR","FDR"];
+const stage = document.getElementById("stage");
+const camera = document.getElementById("camera");
+let selected = "ssm";
+
+/* ---- build lanes ---- */
+document.getElementById("lanes").innerHTML = LANES.map((nm,i)=>
+  `<div class="lane" style="left:${8+i*231}px"><span class="lane-nm">${nm}</span></div>`
+).join("");
+
+/* ---- build SIREN nodes ---- */
+document.getElementById("nodes").innerHTML = SERVICES.map((s,i)=>`
+  <div class="node" data-id="${s.id}" tabindex="0" role="button"
+       aria-label="${s.artifact}, ${s.svc}에 매핑됨"
+       style="left:${25+i*231}px;top:64px">
+    <div class="n-top">
+      <span class="n-name">${s.artifact}</span>
+    </div>
+    <div class="n-meta">
+      <span class="n-map">→ ${s.svc}</span>
+      <span class="lockmark">🔒 NO ACCESS</span>
+      <span class="n-ver">${s.cur}</span>
+    </div>
+    <div class="n-ref">${s.ref}</div>
+  </div>
+`).join("");
+
+/* ---- build service slabs ---- */
+document.getElementById("slabs").innerHTML = SERVICES.map(s=>`
+  <div class="slab" data-id="${s.id}" tabindex="0" role="button"
+       aria-label="${s.svc} 서비스, ${s.artifact} 보관"
+       style="left:${s.x-103}px;top:-96px">
+    <div class="s-head">
+      <span class="s-dot"></span>
+      <span class="s-name">${s.svc}</span>
+      <span class="s-badge">${s.rev}</span>
+    </div>
+    <p class="s-kind">${s.kind}</p>
+    <p class="s-art">${s.artifact}</p>
+
+    <p class="s-sec">버전 이력 · 이 안에서 관리</p>
+    <div class="vstack">
+      ${s.hist.map(([v,t])=>`
+        <div class="vrow ${t==="working"?"cur":""} ${t==="released"?"rel":""}">
+          <span>${v}</span>${t?`<span class="tag">${t.toUpperCase()}</span>`:""}
+        </div>`).join("")}
+    </div>
+
+    <p class="s-sec">접근 권한 · 이 안에서 판정</p>
+    <div class="perm">
+      ${s.depts.map((d,i)=>`<span class="chip ${i===0?"own":""}">${d}</span>`).join("")}
+      <span class="chip">${s.net}</span>
+    </div>
+  </div>
+`).join("");
+
+/* ---- build beams ---- */
+document.getElementById("beams").innerHTML = SERVICES.map(s=>`
+  <div class="beam" data-id="${s.id}" style="left:${s.x}px;top:24px">
+    <div class="ribbon a up-r"></div><div class="ribbon b up-r"></div>
+    <div class="ribbon a dn-r"></div><div class="ribbon b dn-r"></div>
+    <div class="pin">📌</div>
+  </div>
+`).join("");
+
+/* ---- selection ---- */
+function render(){
+  const outsider = stage.dataset.view === "outsider";
+  SERVICES.forEach(s=>{
+    const hidden = outsider && s.locked;
+    const sel = s.id === selected;
+    document.querySelectorAll(`[data-id="${s.id}"]`).forEach(el=>{
+      el.dataset.sel = sel ? "1" : "0";
+      el.classList.toggle("is-locked", hidden);
+      el.classList.toggle("is-dim", !sel);
+    });
+    const node = document.querySelector(`.node[data-id="${s.id}"]`);
+    node.querySelector(".n-ver").textContent = hidden ? "잠김" : s.cur;
+    node.querySelector(".n-ref").textContent = hidden ? "버전 정보 비공개" : s.ref;
+  });
+  paintDetail(SERVICES.find(s=>s.id===selected), outsider);
+}
+
+function paintDetail(s, outsider){
+  const hidden = outsider && s.locked;
+  document.getElementById("selName").textContent = `${s.svc} · ${s.artifact}`;
+  document.getElementById("selSub").textContent = hidden
+    ? "이 시점 사용자는 노드가 있다는 사실만 본다 — 버전도 링크도 내려주지 않는다."
+    : `${s.kind} · ${s.net} · 워크플로우 PLL_MAIN의 ${s.phase} phase에 배치됨`;
+
+  document.getElementById("pulled").innerHTML = hidden ? `
+    <div><dt>접근 판정</dt><dd class="amber">DENIED — 서비스가 거절</dd></div>
+    <div><dt>SIREN이 내려주는 것</dt><dd>산출물 이름 · phase · flow 뿐</dd></div>
+    <div><dt>버전 · 링크 · 파일</dt><dd>응답에서 제외 (BE 마스킹)</dd></div>
+  ` : `
+    <div><dt>현재 버전 라벨</dt><dd class="amber">${s.cur}</dd></div>
+    <div><dt>불변 버전 ref (Release 고정용)</dt><dd>${s.ref}</dd></div>
+    <div><dt>바로가기 링크</dt><dd>${s.url}</dd></div>
+    <div><dt>마지막 버전 이벤트 수신</dt><dd>${s.ev}</dd></div>
+  `;
+  document.getElementById("kept").innerHTML = s.kept.map(k=>`<li>${k}</li>`).join("");
+}
+
+document.getElementById("stage").addEventListener("click", e=>{
+  const t = e.target.closest("[data-id]");
+  if(!t) return;
+  selected = t.dataset.id; render();
+});
+document.getElementById("stage").addEventListener("keydown", e=>{
+  const t = e.target.closest("[data-id]");
+  if(t && (e.key === "Enter" || e.key === " ")){ e.preventDefault(); selected = t.dataset.id; render(); }
+});
+
+/* ---- toggles ---- */
+function bindToggle(attr, key){
+  document.querySelectorAll(`[${attr}]`).forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      document.querySelectorAll(`[${attr}]`).forEach(b=>b.setAttribute("aria-pressed","false"));
+      btn.setAttribute("aria-pressed","true");
+      stage.dataset[key] = btn.getAttribute(attr);
+      render();
+    });
+  });
+}
+bindToggle("data-mode-btn","mode");
+bindToggle("data-view-btn","view");
+
+/* ---- orbit ---- */
+let rx = 44, rz = -14, dragging = false, px = 0, py = 0;
+function apply(){
+  camera.style.setProperty("--rx", rx + "deg");
+  camera.style.setProperty("--rz", rz + "deg");
+}
+function fit(){
+  const w = stage.clientWidth;
+  camera.style.setProperty("--s", Math.max(0.4, Math.min(1, (w - 40) / 1060)).toFixed(3));
+}
+stage.addEventListener("pointerdown", e=>{
+  if(e.target.closest("[data-id]")) return;
+  dragging = true; px = e.clientX; py = e.clientY;
+  stage.setPointerCapture(e.pointerId);
+});
+stage.addEventListener("pointermove", e=>{
+  if(!dragging) return;
+  rz = Math.max(-46, Math.min(46, rz + (e.clientX - px) * 0.28));
+  rx = Math.max(16, Math.min(74, rx - (e.clientY - py) * 0.22));
+  px = e.clientX; py = e.clientY; apply();
+});
+["pointerup","pointercancel"].forEach(ev=>stage.addEventListener(ev, ()=>{ dragging = false; }));
+stage.addEventListener("keydown", e=>{
+  const step = 4;
+  if(e.key === "ArrowLeft"){ rz = Math.max(-46, rz - step); }
+  else if(e.key === "ArrowRight"){ rz = Math.min(46, rz + step); }
+  else if(e.key === "ArrowUp"){ rx = Math.min(74, rx + step); }
+  else if(e.key === "ArrowDown"){ rx = Math.max(16, rx - step); }
+  else return;
+  e.preventDefault(); apply();
+});
+window.addEventListener("resize", fit);
+
+fit(); apply(); render();
+</script>
+</body>
+</html>
