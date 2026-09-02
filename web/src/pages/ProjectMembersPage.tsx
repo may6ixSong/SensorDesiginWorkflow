@@ -9,7 +9,7 @@ import { useAuth } from '@/app/providers/AuthProvider';
 import { useDirectory } from '@/app/providers/DirectoryProvider';
 import { canEditMilestones } from '@/lib/access';
 import { ProjectPageShell } from '@/components/project/ProjectPageShell';
-import { DepartmentsSection } from '@/components/project/DepartmentsSection';
+import { DepartmentsDialog } from '@/components/dialogs/DepartmentsDialog';
 import { UserSearchDialog } from '@/components/dialogs/UserSearchDialog';
 import { ConfirmDialog } from '@/components/dialogs/ConfirmDialog';
 import { SirenButton } from '@/components/common/SirenButton';
@@ -34,21 +34,10 @@ export function ProjectMembersPage() {
               canManage={canManageManagers}
             />
 
-            {/*
-              Departments 관리를 여기 둔다 — Team Members를 추가하는 곳과 같은 화면이어야
-              새 부서를 만들고 바로 그 부서에 멤버를 추가하는 흐름이 자연스럽다(사용자 요청).
-            */}
-            <DepartmentsSection projectId={project._id} departments={project.departments} own={own} />
-
-            <Box sx={{ fontSize: 15, fontWeight: 700, letterSpacing: '-.01em', mt: '26px', mb: '12px' }}>
-              Team Members
-              <Box component="span" sx={{ fontWeight: 400, color: T.dm2, ml: '7px', fontSize: 13 }}>
-                {project.members.length} people
-              </Box>
-            </Box>
+            <DepartmentsButton projectId={project._id} departments={project.departments} members={project.members} own={own} />
             {project.departments.length === 0 ? (
               <Box sx={{ fontSize: 12, color: T.dm2 }}>
-                Add a department above before adding team members.
+                Add a department via "Manage departments" above before adding team members.
               </Box>
             ) : (
               <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(300px,1fr))', gap: '14px' }}>
@@ -70,6 +59,47 @@ export function ProjectMembersPage() {
         );
       }}
     </ProjectPageShell>
+  );
+}
+
+/**
+ * "Team Members" 헤더 + 그 옆 "Manage departments" 버튼. Team Members를 추가하는 곳과
+ * 같은 화면에서 부서를 관리할 수 있어야 새 부서를 만들고 바로 그 부서에 멤버를 추가하는
+ * 흐름이 자연스럽다(사용자 요청) — 그래서 별도 섹션 대신 다이얼로그로 열게 했다. 다이얼로그
+ * 안에서의 각 추가/삭제는 project 쿼리 캐시에 즉시 반영되므로, 다이얼로그를 닫으면 아래
+ * Team Members 카드들이 이미 최신 부서 목록으로 보인다.
+ */
+function DepartmentsButton({
+  projectId, departments, members, own,
+}: {
+  projectId: string; departments: string[]; members: ProjectMemberDto[]; own: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: '10px', mt: '26px', mb: '12px' }}>
+      <Box sx={{ fontSize: 15, fontWeight: 700, letterSpacing: '-.01em' }}>
+        Team Members
+        <Box component="span" sx={{ fontWeight: 400, color: T.dm2, ml: '7px', fontSize: 13 }}>
+          {members.length} people
+        </Box>
+      </Box>
+      <Box sx={{ flex: 1 }} />
+      {own && (
+        <SirenButton onClick={() => setOpen(true)}>
+          <Icon name="grid" /> Manage departments
+        </SirenButton>
+      )}
+
+      {open && (
+        <DepartmentsDialog
+          projectId={projectId}
+          departments={departments}
+          members={members}
+          onClose={() => setOpen(false)}
+        />
+      )}
+    </Box>
   );
 }
 
