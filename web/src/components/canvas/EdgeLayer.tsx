@@ -42,7 +42,7 @@ export function EdgeLayer({
 
     const blocked = !bi && !latR(a) && stOf(b).lb !== 'Not submitted';
     const on = !!hlSet && hlSet.has(e.from) && hlSet.has(e.to);
-    // 선택된 산출물과 무관한 flow — 관련 없는 블록을 흐리게 하는 것과 같은 기준(0.6)으로
+    // 선택된 산출물과 무관한 flow — 관련 없는 블록을 흐리게 하는 것과 같은 기준(0.4)으로
     // 같이 낮춘다. <g>로 묶어야 marker(화살촉)까지 함께 흐려진다.
     const unrelated = !!hlSet && !on;
     const col = on ? '#2f6b4a' : blocked ? '#ac6f08' : '#5c6b7d';
@@ -117,7 +117,7 @@ export function EdgeLayer({
     }
 
     parts.push(
-      <g key={e.id} opacity={unrelated ? 0.6 : 1}>
+      <g key={e.id} opacity={unrelated ? 0.4 : 1}>
         {segs}
       </g>,
     );

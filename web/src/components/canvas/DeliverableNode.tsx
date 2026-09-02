@@ -104,7 +104,7 @@ export function DeliverableNode({
         // 다른 workflow 소유(incoming)는 같은 Phase 안에서만 옮길 수 있는 제한된 영역임을
         // edit 모드에서 낮은 opacity로 드러낸다 — pin(연결)·같은 Phase 내 드래그 모두
         // opacity와 무관하게 계속 동작한다. unrelated는 그 아래(view 모드 flow 하이라이트) 우선순위.
-        opacity: edit && incoming ? 0.45 : unrelated ? 0.6 : 1,
+        opacity: edit && incoming ? 0.45 : unrelated ? 0.4 : 1,
         cursor: edit && canEdit ? 'grab' : CURSOR_POINTER,
         touchAction: 'none',
         transition: edit ? 'opacity .15s' : 'box-shadow .15s, transform .15s, border-color .14s, opacity .15s',
