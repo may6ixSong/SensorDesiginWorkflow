@@ -245,7 +245,6 @@ function OverviewTab({
         </Box>
         <Box sx={{ flex: 1, fontSize: 12.5 }}>
           {other.name}
-          {other.seriesTotal > 1 && <Seq>{other.seriesIdx}/{other.seriesTotal}</Seq>}
         </Box>
         <Box component="span" sx={{ fontFamily: FONT_MONO, fontSize: 10.5, color: op ? T.dm2 : T.rd }}>
           {op?.name ?? 'no schedule'}
@@ -592,19 +591,5 @@ function RecvTab({ d, own, onSave }: { d: CanvasNode; own: boolean; onSave: Prop
         <Icon name="check" /> {t('deliverable.save')}
       </SirenButton>
     </>
-  );
-}
-
-function Seq({ children }: { children: React.ReactNode }) {
-  return (
-    <Box
-      component="span"
-      sx={{
-        fontFamily: FONT_MONO, fontSize: 9, fontWeight: 600, padding: '1px 5px', ml: '4px',
-        borderRadius: '9px', background: T.vi2, color: T.vi, border: `1px solid ${T.vi3}`,
-      }}
-    >
-      {children}
-    </Box>
   );
 }

@@ -238,19 +238,6 @@ export function DeliverableNode({
         >
           {d.name}
         </Box>
-        {d.seriesTotal > 1 && (
-          <Box
-            component="span"
-            title={`Release schedule ${d.seriesIdx}/${d.seriesTotal}`}
-            sx={{
-              fontFamily: FONT_MONO, fontSize: 15, fontWeight: 600, padding: '2px 8px',
-              borderRadius: '13px', background: T.vi2, color: T.vi, border: `1px solid ${T.vi3}`,
-              flex: '0 0 auto', mt: '1px',
-            }}
-          >
-            {d.seriesIdx}/{d.seriesTotal}
-          </Box>
-        )}
       </Box>
 
       <Box

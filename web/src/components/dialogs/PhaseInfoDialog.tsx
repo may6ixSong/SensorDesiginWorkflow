@@ -79,17 +79,6 @@ export function PhaseInfoDialog({ workflowName, phase: p, nodes, onClose, onOpen
                 </Box>
                 <Box sx={{ flex: 1, fontSize: 13, fontWeight: 500 }}>
                   {d.name}
-                  {d.seriesTotal > 1 && (
-                    <Box
-                      component="span"
-                      sx={{
-                        fontFamily: FONT_MONO, fontSize: 9, fontWeight: 600, padding: '1px 5px', ml: '4px',
-                        borderRadius: '9px', background: T.vi2, color: T.vi, border: `1px solid ${T.vi3}`,
-                      }}
-                    >
-                      {d.seriesIdx}/{d.seriesTotal}
-                    </Box>
-                  )}
                 </Box>
                 <Box component="span" sx={{ fontFamily: FONT_MONO, fontSize: 11, color: T.dm2 }}>
                   {r ? `v${r.major}.${r.minor}` : ''}
