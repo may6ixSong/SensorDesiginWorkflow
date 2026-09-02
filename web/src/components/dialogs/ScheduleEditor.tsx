@@ -112,12 +112,11 @@ export function ScheduleEditor({ spans, noun, onSubmit, saving, error, extraActi
 
   return (
     <>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: '10px', mb: '12px' }}>
-        <Box sx={{ fontSize: 11.5, color: T.dm2, flex: 1 }}>
-          {t('schedule.helpText')}
+      {extraAction && (
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: '12px' }}>
+          {extraAction}
         </Box>
-        {extraAction}
-      </Box>
+      )}
 
       {rows.map((r) => (
         <Box

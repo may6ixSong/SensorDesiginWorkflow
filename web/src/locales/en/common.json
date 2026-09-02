@@ -47,12 +47,10 @@
     "confirmRemoveOwnerMessage": "Remove {{name}} ({{knoxId}})'s edit access to this workflow?",
     "confirmRemoveViewGrantTitle": "Remove view access",
     "confirmRemoveViewGrantMessage": "Remove {{name}} ({{knoxId}})'s view access to this workflow?",
-    "phasesNote": "This schedule is specific to this workflow.",
     "phasesOrphanWarning": "{{count}} artifact(s) have no release schedule.",
     "resetToMilestones": "Reset to project milestones"
   },
   "schedule": {
-    "helpText": "Overlaps are fine — canvas order follows the start date.",
     "namePlaceholder": "e.g. KO",
     "removeRow": "Remove",
     "addRow": "Add {{noun}}",

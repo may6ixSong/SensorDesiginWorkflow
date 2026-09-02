@@ -1,11 +1,13 @@
-import { ReactNode, useMemo } from 'react';
-import { Box, CircularProgress, Stack, Typography } from '@mui/material';
+import { ReactNode, useMemo, useState } from 'react';
+import { Box, CircularProgress, Stack, Tooltip, Typography } from '@mui/material';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { WorkflowDto, ProjectDetailDto } from '@/types/domain';
 import { useProject, useProjectWorkflows } from '@/api/hooks/useProjects';
 import { AppShell } from '@/components/layout/AppShell';
 import { Card, Ey } from '@/components/common/Panel';
 import { Icon } from '@/components/common/Icon';
+import { SirenButton } from '@/components/common/SirenButton';
+import { DesignWorkflowDialog } from '@/components/workflow/DesignWorkflowDialog';
 import { progressOf } from '@/lib/projectProgress';
 import { FONT_DISPLAY, FONT_MONO, T } from '@/theme/tokens';
 import { canManageProject } from '@/lib/access';
@@ -31,6 +33,7 @@ export function ProjectPageShell({ children }: Props) {
   const { data: project, isLoading: projectLoading, isError } = useProject(projectId);
   const { data: workflows, isLoading: ipsLoading } = useProjectWorkflows(projectId);
   const { isAdmin } = useAuth();
+  const [workflowOpen, setWorkflowOpen] = useState(false);
 
   const own = useMemo(() => canManageProject(workflows, isAdmin), [workflows, isAdmin]);
   const { pct, current, done, total } = useMemo(
@@ -99,6 +102,16 @@ export function ProjectPageShell({ children }: Props) {
                 >
                   {project.name}
                 </Box>
+                <Tooltip title="Design workflow">
+                  <SirenButton
+                    variant="ghost"
+                    onClick={() => setWorkflowOpen(true)}
+                    sx={{ padding: '6px 8px' }}
+                    aria-label="Design workflow"
+                  >
+                    <Icon name="grid" size={17} />
+                  </SirenButton>
+                </Tooltip>
               </Box>
             </Box>
 
@@ -148,6 +161,17 @@ export function ProjectPageShell({ children }: Props) {
           {children({ project, workflows: workflows ?? [], own })}
         </Box>
       </Box>
+
+      <DesignWorkflowDialog
+        open={workflowOpen}
+        onClose={() => setWorkflowOpen(false)}
+        projectId={project._id}
+        projectName={project.name}
+        projectCode={project.code}
+        milestones={project.milestones}
+        workflows={workflows ?? []}
+        workflowDomains={project.workflowDomains ?? []}
+      />
     </AppShell>
   );
 }

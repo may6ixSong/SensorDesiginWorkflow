@@ -47,12 +47,10 @@
     "confirmRemoveOwnerMessage": "{{name}}({{knoxId}})님의 이 workflow 편집 권한을 제거하시겠습니까?",
     "confirmRemoveViewGrantTitle": "열람 권한 제거",
     "confirmRemoveViewGrantMessage": "{{name}}({{knoxId}})님의 이 workflow 열람 권한을 제거하시겠습니까?",
-    "phasesNote": "이 일정은 이 workflow만의 것입니다.",
     "phasesOrphanWarning": "{{count}}개의 artifact에 일정이 없습니다.",
     "resetToMilestones": "과제 일정으로 되돌리기"
   },
   "schedule": {
-    "helpText": "겹쳐도 됩니다 — 캔버스 순서는 시작일 기준입니다.",
     "namePlaceholder": "예: KO",
     "removeRow": "삭제",
     "addRow": "{{noun}} 추가",

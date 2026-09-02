@@ -30,15 +30,6 @@ export function WorkflowPhasesPanel({
   const { t } = useTranslation();
   return (
     <>
-      <Box
-        sx={{
-          fontSize: 11.5, color: T.dm, background: T.sf2, border: `1px solid ${T.ln}`,
-          borderRadius: '9px', padding: '9px 11px', mb: '12px', lineHeight: 1.7,
-        }}
-      >
-        {t('workflow.phasesNote')}
-      </Box>
-
       {orphanCount > 0 && (
         <Box
           sx={{
