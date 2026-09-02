@@ -12,8 +12,19 @@ function resolveMongodbUri(): string {
   return decrypt(connection, aesKey);
 }
 
+/**
+ * IIS(iisnode) 아래에서는 PORT에 숫자가 아니라 명명된 파이프(`\\.\pipe\...`)가 주입된다.
+ * parseInt하면 NaN이 되어 리스닝이 실패하므로, 숫자로 해석되지 않는 값은 문자열
+ * 그대로 통과시킨다. main.ts가 타입을 보고 listen 호출을 나눈다.
+ */
+function resolvePort(): string | number {
+  const raw = process.env.PORT?.trim() || '3000';
+  const parsed = Number(raw);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : raw;
+}
+
 export default () => ({
-  port: parseInt(process.env.PORT ?? '3000', 10),
+  port: resolvePort(),
   apiPrefix: process.env.API_PREFIX ?? 'api/v1',
   corsOrigin: process.env.CORS_ORIGIN ?? 'http://localhost:5173',
   mongodbUri: resolveMongodbUri(),
