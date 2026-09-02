@@ -73,11 +73,19 @@ export class DeliverablesService {
   }
 
   async create(workflow: WorkflowDocument, dto: CreateDeliverableDto, actor: Actor) {
+    const key = dto.artifactKey?.trim() || null;
+    if (key) {
+      const clash = await this.model.findOne({ workflowId: workflow._id, phaseId: dto.phaseId, artifactKey: key }).exec();
+      if (clash) {
+        throw new BadRequestException(`Artifact key "${key}" is already used in this phase by "${clash.name}".`);
+      }
+    }
     const d = await this.model.create({
       projectId: workflow.projectId,
       workflowId: workflow._id,
       phaseId: dto.phaseId,
       name: dto.name,
+      artifactKey: key,
       docType: dto.docType,
       network: dto.network,
       series: null,

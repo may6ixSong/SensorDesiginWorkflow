@@ -12,13 +12,15 @@ interface Props {
   /** 헤더 아래 탭 등 고정 영역 */
   belowHeader?: ReactNode;
   children: ReactNode;
+  /** 본문 스크롤과 무관하게 하단에 고정되는 영역(예: 삭제 버튼). */
+  footer?: ReactNode;
 }
 
 /**
  * 목업 .scrim/.modal/.mh/.mb 구조.
  * 헤더는 흰 배경(.mh), 본문은 옅은 배경(.mb)에 스크롤.
  */
-export function ModalShell({ open, onClose, width = 640, header, belowHeader, children }: Props) {
+export function ModalShell({ open, onClose, width = 640, header, belowHeader, children, footer }: Props) {
   return (
     <Dialog
       open={open}
@@ -49,6 +51,11 @@ export function ModalShell({ open, onClose, width = 640, header, belowHeader, ch
       <Box sx={{ padding: '15px 20px 20px', overflowY: 'auto', background: T.sf2, flex: 1 }}>
         {children}
       </Box>
+      {footer && (
+        <Box sx={{ padding: '12px 20px', borderTop: `1px solid ${T.ln}`, background: T.sf, flex: '0 0 auto' }}>
+          {footer}
+        </Box>
+      )}
     </Dialog>
   );
 }

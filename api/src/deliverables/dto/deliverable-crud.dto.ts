@@ -34,6 +34,20 @@ export class CreateDeliverableDto {
   @IsOptional()
   @IsIn(['own', 'received'])
   intent?: 'own' | 'received';
+
+  /**
+   * 이 phase에 이미 같은 key를 가진 산출물이 있으면 생성을 거절한다(DeliverablesService.create
+   * 가 검증) — 산출물은 이제 phase마다 하나씩 개별로 추가하므로, 같은 phase에 같은 key가
+   * 겹치는 것은 실수(중복 생성)로 본다. 다른 phase에 같은 key를 쓰는 것은 "여러 phase에
+   * 걸쳐 release되는 같은 산출물"을 나타내는 정상적인 방법이라 허용한다.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  @Matches(/^[A-Za-z0-9_.-]*$/, {
+    message: 'Artifact key may only contain letters, numbers, dot, underscore and hyphen.',
+  })
+  artifactKey?: string;
 }
 
 export class UpdateDeliverableDto {

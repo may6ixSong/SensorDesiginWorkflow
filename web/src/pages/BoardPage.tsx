@@ -22,7 +22,7 @@ import {
 } from '@/api/hooks/useWorkflow';
 import {
   useAddVersion, useCreateDeliverable, useDeleteDeliverable, useDeliverables, useRelease,
-  useUpdateDeliverable, useUpdateRecv, useUpdateSchedule,
+  useUpdateDeliverable, useUpdateRecv,
 } from '@/api/hooks/useDeliverables';
 import { useMemos } from '@/api/hooks/useMemos';
 import { useEdges } from '@/api/hooks/useEdges';
@@ -84,7 +84,6 @@ export function BoardPage() {
   const updateDeliverable = useUpdateDeliverable(workflowId ?? '');
   const deleteDeliverable = useDeleteDeliverable(workflowId ?? '');
   const updateRecv = useUpdateRecv(workflowId ?? '');
-  const updateSchedule = useUpdateSchedule(workflowId ?? '');
   const addVersion = useAddVersion(workflowId ?? '');
   const release = useRelease(workflowId ?? '');
   const addOwner = useAddOwner(workflowId ?? '');
@@ -318,30 +317,14 @@ export function BoardPage() {
               phases={phaseList}
               own={own}
               onClose={closeDeliverable}
-              onSaveInfo={({ name, artifactKey, net, type, phaseIds }) => {
+              onSaveInfo={({ name, artifactKey, net, type }) => {
                 updateDeliverable.mutate(
                   { id: openNode.id, name, artifactKey: artifactKey ?? '', docType: type, network: net },
                   {
                     onSuccess: (updated) => {
                       mergeDeliverableResults([updated], phaseList);
-                      const sid = openNode.series || openNode.id;
-                      const before = nodes.filter((x) => (x.series || x.id) === sid).map((x) => x.phase).sort().join(',');
-                      const after = [...phaseIds].sort().join(',');
-                      if (before !== after) {
-                        updateSchedule.mutate(
-                          { id: sid, phaseIds },
-                          {
-                            onSuccess: (list) => {
-                              mergeDeliverableResults(list, phaseList);
-                              toast(`Release schedule: ${phaseIds.length} phase(s)`);
-                            },
-                            onError: () => toast('Failed to update release schedule'),
-                          },
-                        );
-                      } else {
-                        toast('Saved');
-                      }
                       closeDeliverable();
+                      toast('Saved');
                     },
                     onError: (e: any) => toast(e?.response?.data?.message ?? 'Save failed'),
                   },
@@ -515,12 +498,11 @@ export function BoardPage() {
               phases={phaseList}
               intent={addDlgIntent}
               onClose={() => st.getState().setAddDlg(false)}
-              onCreate={({ name, phaseIds, docType, network }) => {
-                const [firstPhase, ...rest] = phaseIds;
+              onCreate={({ name, phaseId, docType, network, artifactKey }) => {
                 const wasReceived = addDlgIntent === 'received';
                 const intent = wasReceived ? 'received' : 'own';
                 createDeliverable.mutate(
-                  { name, phaseId: firstPhase, docType, network, intent },
+                  { name, phaseId, docType, network, intent, artifactKey },
                   {
                     onSuccess: (created) => {
                       const s = st.getState();
@@ -534,25 +516,10 @@ export function BoardPage() {
                       // "받아야 할 산출물"로 추가한 경우, 바로 상세를 열어 기본 정보를 채우도록
                       // 유도한다 — 전달(Handoff) 탭은 이제 없으므로 개요 탭으로 연다.
                       if (wasReceived) st.getState().openDeliverable(fresh.id);
-                      if (rest.length) {
-                        updateSchedule.mutate(
-                          { id: created.id, phaseIds },
-                          {
-                            onSuccess: (list) => {
-                              mergeDeliverableResults(list, phaseList);
-                              list.forEach((d) => st.getState().trackAddedDeliverable(d.id));
-                              if (!wasReceived) st.getState().setFocusReq(created.id);
-                              toast(`Deliverable added across ${phaseIds.length} phases`);
-                            },
-                            onError: () => toast('Deliverable added, but failed to set the extra phases'),
-                          },
-                        );
-                      } else {
-                        if (!wasReceived) st.getState().setFocusReq(fresh.id);
-                        toast('Deliverable added');
-                      }
+                      else st.getState().setFocusReq(fresh.id);
+                      toast('Deliverable added');
                     },
-                    onError: () => toast('Failed to add'),
+                    onError: (e: any) => toast(e?.response?.data?.message ?? 'Failed to add'),
                   },
                 );
               }}

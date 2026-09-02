@@ -57,6 +57,7 @@ export function useCreateDeliverable(workflowId: string) {
     mutationFn: async (
       payload: {
         name: string; phaseId: string; docType: string; network: 'OA' | 'HPC'; intent?: 'own' | 'received';
+        artifactKey?: string | null;
       },
     ) => {
       const res = await apiClient.post<ApiEnvelope<DeliverableDto>>(`/workflows/${workflowId}/deliverables`, payload);

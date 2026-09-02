@@ -81,8 +81,7 @@
     "contactPlaceholder": "e.g. Jane Doe · jane@vendor.com",
     "notInList": "{{name}} (not in list)",
     "receivedFromNotSet": "Not marked as received from anywhere.",
-    "deleteTitle": "Delete artifact",
-    "deleteMessage": "Delete \"{{name}}\"? This removes it and its version history for everyone.",
+    "deleteMessage": "Delete \"{{name}}\" from this phase? This removes only this phase's copy and its version history — other phases keep their own copy.",
     "deleteWarning": "This cannot be undone.",
     "delete": "Delete",
     "cancel": "Cancel"

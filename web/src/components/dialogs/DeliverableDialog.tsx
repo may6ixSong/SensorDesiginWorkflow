@@ -18,13 +18,19 @@ import { DocIcon, Icon } from '@/components/common/Icon';
 import { UserAvatar } from '@/components/common/Avatar';
 import { CURSOR_POINTER, FONT_MONO, T } from '@/theme/tokens';
 
+/**
+ * 삭제는 이 phase에 걸린 산출물 사본 하나만 지운다(다른 phase의 사본에는 영향 없음) —
+ * 그 의미를 시스템 언어와 무관하게 항상 영어로 고정 표시한다(사용자 요청).
+ */
+const DELETE_LABEL = 'Delete artifact for this phase';
+
 interface Props {
   node: CanvasNode | null;
   phases: WorkflowPhase[];
   /** 목업 own = isOwn(workflow) && !S.recv */
   own: boolean;
   onClose: () => void;
-  onSaveInfo: (p: { name: string; artifactKey: string | null; net: 'OA' | 'HPC'; type: string; phaseIds: string[] }) => void;
+  onSaveInfo: (p: { name: string; artifactKey: string | null; net: 'OA' | 'HPC'; type: string }) => void;
   onUpload: (p: { file: string; note: string; net: 'OA' | 'HPC'; type: string }) => void;
   onRelease: () => void;
   onSaveRecv: (p: { recvDept: string | null; recvContact: string | null }) => void;
@@ -111,12 +117,22 @@ export function DeliverableDialog({
           ))}
         </Box>
       }
+      footer={own && (
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <SirenButton
+            variant="ghost"
+            onClick={() => setConfirmDeleteOpen(true)}
+            sx={{ color: T.rd, borderColor: T.rd3 }}
+          >
+            <Icon name="trash" /> {DELETE_LABEL}
+          </SirenButton>
+        </Box>
+      )}
     >
       {tab === 'overview' && (
         <OverviewTab
           d={d} phases={phases} own={own} nodes={nodes} edges={edges}
           onSaveInfo={onSaveInfo} onUpload={onUpload} onRelease={onRelease}
-          onRequestDelete={() => setConfirmDeleteOpen(true)}
         />
       )}
       {tab === 'versions' && <VersionsTab d={d} />}
@@ -124,7 +140,7 @@ export function DeliverableDialog({
 
       {confirmDeleteOpen && (
         <ConfirmDialog
-          title={t('deliverable.deleteTitle')}
+          title={DELETE_LABEL}
           message={t('deliverable.deleteMessage', { name: d.name })}
           warning={t('deliverable.deleteWarning')}
           confirmLabel={t('deliverable.delete')}
@@ -139,14 +155,13 @@ export function DeliverableDialog({
 
 /* ── 개요 탭 ── */
 function OverviewTab({
-  d, phases, own, nodes, edges, onSaveInfo, onUpload, onRelease, onRequestDelete,
+  d, phases, own, nodes, edges, onSaveInfo, onUpload, onRelease,
 }: {
   d: CanvasNode; phases: WorkflowPhase[]; own: boolean;
   nodes: CanvasNode[]; edges: ReturnType<typeof useCanvasStore.getState>['edges'];
   onSaveInfo: Props['onSaveInfo']; onUpload: Props['onUpload'];
-  onRelease: Props['onRelease']; onRequestDelete: () => void;
+  onRelease: Props['onRelease'];
 }) {
-  const { t } = useTranslation();
   const received = d.intent === 'received';
   const rel = latR(d);
   const work = hasW(d) ? latA(d) : null;
@@ -159,21 +174,30 @@ function OverviewTab({
   // useMemo가 그 변화를 못 보고 예전 release schedule을 계속 들고 있는다(실측 확인된 버그).
   const rev = useCanvasStore((s) => s.rev);
   const sid = d.series || d.id;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const seriesPhases = useMemo(() => new Set(nodes.filter((x) => (x.series || x.id) === sid).map((x) => x.phase)), [nodes, sid, rev]);
+  // 이 산출물과 "같은 실물"로 볼 다른 캔버스 block들 — 옛 series 연결(원본/회차)과, 이제
+  // phase마다 개별로 추가하면서 같은 Artifact key를 붙인 block들을 모두 아우른다. 산출물은
+  // 더 이상 여기서 여러 phase를 한번에 고를 수 없으므로(사용자 요청), Release schedule은
+  // 이 집합을 읽기 전용으로만 보여준다 — phase별 추가/삭제는 각 phase의 캔버스에서 한다.
+  const relatedPhases = useMemo(
+    () => new Set(
+      nodes
+        .filter((x) => (x.series || x.id) === sid || (!!d.artifactKey && x.artifactKey === d.artifactKey))
+        .map((x) => x.phase),
+    ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [nodes, sid, d.artifactKey, rev],
+  );
 
   const [name, setName] = useState(d.name);
   const [artifactKey, setArtifactKey] = useState(d.artifactKey ?? '');
   const [net, setNet] = useState<'OA' | 'HPC'>(d.net);
   const [type, setType] = useState(d.type);
-  const [picked, setPicked] = useState<Set<string>>(new Set(seriesPhases));
   const [nameErr, setNameErr] = useState(false);
   const [keyErr, setKeyErr] = useState('');
-  const [schedErr, setSchedErr] = useState('');
 
   useEffect(() => {
     setName(d.name); setArtifactKey(d.artifactKey ?? ''); setNet(d.net); setType(d.type);
-    setPicked(new Set(seriesPhases)); setKeyErr('');
+    setKeyErr('');
   }, [d.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 업로드 폼
@@ -189,19 +213,6 @@ function OverviewTab({
   // 이 산출물(또는 같은 series의 회차)이 지금 살아 있는 phase 중 어디에도 안 걸려 있으면
   // "일정 유실" 상태다 — 사라진 phase를 가리키고 있다는 뜻이다.
   const orphan = isOrphanPhase(phases, d.phase);
-  const livePicked = useMemo(
-    () => new Set([...picked].filter((id) => phases.some((p) => p.id === id))),
-    [picked, phases],
-  );
-
-  const togglePick = (k: string) => {
-    setPicked((prev) => {
-      const n = new Set(prev);
-      if (n.has(k)) n.delete(k);
-      else n.add(k);
-      return n;
-    });
-  };
 
   const submitInfo = () => {
     if (!name.trim()) { setNameErr(true); return; }
@@ -210,14 +221,8 @@ function OverviewTab({
       setKeyErr('Only letters, numbers, dot, underscore and hyphen are allowed.');
       return;
     }
-    if (!livePicked.size) { setSchedErr('Pick at least one phase — an artifact with no phase has no release schedule.'); return; }
     setKeyErr('');
-    setSchedErr('');
-    // 사라진 phase의 id는 보내지 않는다 — 서버가 거절하기도 하고, 여기서 일정을 다시
-    // 고르는 것이 곧 "유실 상태를 푸는" 행위이기 때문이다.
-    onSaveInfo({
-      name: name.trim(), artifactKey: key || null, net, type: net === 'HPC' ? 'path' : type, phaseIds: [...livePicked],
-    });
+    onSaveInfo({ name: name.trim(), artifactKey: key || null, net, type: net === 'HPC' ? 'path' : type });
   };
 
   const submitUpload = () => {
@@ -289,7 +294,7 @@ function OverviewTab({
               />
               {keyErr && <Box sx={{ fontSize: 11, color: T.rd, mt: '5px' }}>{keyErr}</Box>}
             </Field>
-            <Field label="Release schedule — every phase of this workflow this artifact is due in">
+            <Field label="Release schedule — read only, every phase this artifact (or its other phase copies) is due in">
               {orphan && (
                 <Box
                   sx={{
@@ -299,25 +304,20 @@ function OverviewTab({
                   }}
                 >
                   <Box component="span" sx={{ mt: '1px' }}><Icon name="warn" size={12} /></Box>
-                  The phase this artifact was on no longer exists in this workflow's schedule. It kept its
-                  place on the canvas, but it has no release date until you pick one below.
+                  The phase this artifact was on no longer exists in this workflow's schedule.
                 </Box>
               )}
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
                 {phases.map((p) => (
                   <Box
                     key={p.id}
-                    component="button"
-                    type="button"
                     title={`${shortDate(p.start)} → ${shortDate(p.end)}`}
-                    onClick={() => togglePick(p.id)}
                     sx={{
                       fontFamily: FONT_MONO, fontSize: 11, fontWeight: 600, padding: '5px 10px',
-                      borderRadius: '7px', transition: '.14s', cursor: CURSOR_POINTER,
-                      background: picked.has(p.id) ? T.tl2 : T.sf,
-                      border: `1px solid ${picked.has(p.id) ? T.tl : T.ln2}`,
-                      color: picked.has(p.id) ? T.tl : T.dm,
-                      '&:hover': { background: picked.has(p.id) ? T.tl2 : T.sf3 },
+                      borderRadius: '7px', cursor: 'default',
+                      background: relatedPhases.has(p.id) ? T.tl2 : T.sf,
+                      border: `1px solid ${relatedPhases.has(p.id) ? T.tl : T.ln2}`,
+                      color: relatedPhases.has(p.id) ? T.tl : T.dm2,
                     }}
                   >
                     {p.name}
@@ -329,7 +329,10 @@ function OverviewTab({
                   </Box>
                 )}
               </Box>
-              {schedErr && <Box sx={{ fontSize: 11, color: T.rd, mt: '7px' }}>{schedErr}</Box>}
+              <Box sx={{ fontSize: 11, color: T.dm2, mt: '7px' }}>
+                Add or remove a phase for this artifact from that phase's own canvas — same Artifact key,
+                one at a time — not from here.
+              </Box>
             </Field>
             <SirenButton variant="primary" onClick={submitInfo}>
               <Icon name="check" /> Save
@@ -454,18 +457,6 @@ function OverviewTab({
             </SirenButton>
           </Box>
         </Card>
-      )}
-
-      {own && (
-        <Box sx={{ mt: '12px', display: 'flex', justifyContent: 'flex-end' }}>
-          <SirenButton
-            variant="ghost"
-            onClick={onRequestDelete}
-            sx={{ color: T.rd, borderColor: T.rd3 }}
-          >
-            <Icon name="trash" /> {t('deliverable.deleteTitle')}
-          </SirenButton>
-        </Box>
       )}
     </>
   );

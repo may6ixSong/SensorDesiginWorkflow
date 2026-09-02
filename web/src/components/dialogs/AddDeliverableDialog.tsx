@@ -14,39 +14,37 @@ interface Props {
   /** 'received'면 헤더 문구가 "내가 받아야 할 산출물"로 바뀐다 — 폼 필드 자체는 동일하다. */
   intent?: 'own' | 'received';
   onClose: () => void;
-  onCreate: (p: { name: string; phaseIds: string[]; docType: string; network: 'OA' | 'HPC' }) => void;
+  onCreate: (p: { name: string; phaseId: string; docType: string; network: 'OA' | 'HPC'; artifactKey: string | null }) => void;
 }
 
 /**
- * 산출물 추가. 같은 산출물이 여러 phase에 걸쳐 반복 전달되는 경우가 있어(설계서 3.6의
- * Release 일정과 같은 개념) phase를 다중 선택할 수 있다. 첫 선택 phase에 원본을 만들고,
- * 나머지는 즉시 Release 일정(series)으로 이어붙인다.
+ * 산출물 추가 — 항상 phase 하나에 하나씩 만든다. 같은 산출물이 여러 phase에 걸쳐
+ * 반복 release되는 경우엔, 그 phase마다 이 다이얼로그를 다시 열어 같은 Artifact key로
+ * 따로 추가한다(한 번에 여러 phase를 골라 일괄 생성하던 방식은 더 이상 지원하지 않는다
+ * — 사용자 요청). 같은 phase에 이미 같은 key가 있으면 BE가 생성을 거절한다.
  *
- * 여기 뜨는 칸은 전부 "이 workflow가 정한 자기 일정"이다 — 과제 마일스톤이 아니다.
+ * 여기 뜨는 phase는 전부 "이 workflow가 정한 자기 일정"이다 — 과제 마일스톤이 아니다.
  */
 export function AddDeliverableDialog({ workflowName, phases, intent = 'own', onClose, onCreate }: Props) {
   const [name, setName] = useState('');
-  const [picked, setPicked] = useState<Set<string>>(new Set(phases[0] ? [phases[0].id] : []));
+  const [phaseId, setPhaseId] = useState<string>(phases[0]?.id ?? '');
+  const [artifactKey, setArtifactKey] = useState('');
   const [net, setNet] = useState<'OA' | 'HPC'>('OA');
   const [type, setType] = useState('word');
   const [err, setErr] = useState(false);
-
-  const togglePick = (k: string) => {
-    setPicked((prev) => {
-      const n = new Set(prev);
-      if (n.has(k)) {
-        if (n.size <= 1) return n; // 최소 1개 유지
-        n.delete(k);
-      } else n.add(k);
-      return n;
-    });
-  };
+  const [keyErr, setKeyErr] = useState('');
 
   const submit = () => {
-    if (!name.trim() || !picked.size) { setErr(true); return; }
-    // phases는 이미 시작일 오름차순이다 — 그 첫 번째가 원본 산출물이 생성되는 phase다.
-    const phaseIds = phases.filter((p) => picked.has(p.id)).map((p) => p.id);
-    onCreate({ name: name.trim(), phaseIds, docType: net === 'HPC' ? 'path' : type, network: net });
+    if (!name.trim() || !phaseId) { setErr(true); return; }
+    const key = artifactKey.trim();
+    if (key && !/^[A-Za-z0-9_.-]+$/.test(key)) {
+      setKeyErr('Only letters, numbers, dot, underscore and hyphen are allowed.');
+      return;
+    }
+    setKeyErr('');
+    onCreate({
+      name: name.trim(), phaseId, docType: net === 'HPC' ? 'path' : type, network: net, artifactKey: key || null,
+    });
   };
 
   return (
@@ -82,7 +80,7 @@ export function AddDeliverableDialog({ workflowName, phases, intent = 'own', onC
           placeholder="e.g. Startup Sequence Verification Results"
         />
       </Field>
-      <Field label="Release schedule — pick every phase this deliverable is due in">
+      <Field label="Phase — this deliverable is created for one phase at a time">
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
           {phases.map((p) => (
             <Box
@@ -90,14 +88,14 @@ export function AddDeliverableDialog({ workflowName, phases, intent = 'own', onC
               component="button"
               type="button"
               title={`${shortDate(p.start)} → ${shortDate(p.end)}`}
-              onClick={() => togglePick(p.id)}
+              onClick={() => { setPhaseId(p.id); setErr(false); }}
               sx={{
                 fontFamily: FONT_MONO, fontSize: 11, fontWeight: 600, padding: '5px 10px',
                 borderRadius: '7px', transition: '.14s', cursor: CURSOR_POINTER,
-                background: picked.has(p.id) ? T.tl2 : T.sf,
-                border: `1px solid ${picked.has(p.id) ? T.tl : T.ln2}`,
-                color: picked.has(p.id) ? T.tl : T.dm,
-                '&:hover': { background: picked.has(p.id) ? T.tl2 : T.sf3 },
+                background: phaseId === p.id ? T.tl2 : T.sf,
+                border: `1px solid ${phaseId === p.id ? T.tl : T.ln2}`,
+                color: phaseId === p.id ? T.tl : T.dm,
+                '&:hover': { background: phaseId === p.id ? T.tl2 : T.sf3 },
               }}
             >
               {p.name}
@@ -109,6 +107,17 @@ export function AddDeliverableDialog({ workflowName, phases, intent = 'own', onC
             </Box>
           )}
         </Box>
+      </Field>
+      <Field
+        label="Artifact key — optional; use the same key when adding this artifact again in another phase"
+      >
+        <TextInput
+          value={artifactKey}
+          onChange={(v) => { setArtifactKey(v); setKeyErr(''); }}
+          error={!!keyErr}
+          placeholder="e.g. PLL_MAIN.DESIGN_REVIEW_PACKAGE"
+        />
+        {keyErr && <Box sx={{ fontSize: 11, color: T.rd, mt: '5px' }}>{keyErr}</Box>}
       </Field>
       <Row>
         <Field label="Network" sx={{ width: 90 }}>
