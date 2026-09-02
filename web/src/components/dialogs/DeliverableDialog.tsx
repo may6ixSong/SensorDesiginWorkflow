@@ -294,7 +294,10 @@ function OverviewTab({
               />
               {keyErr && <Box sx={{ fontSize: 11, color: T.rd, mt: '5px' }}>{keyErr}</Box>}
             </Field>
-            <Field label="Release schedule — read only, every phase this artifact (or its other phase copies) is due in">
+            <SirenButton variant="primary" onClick={submitInfo}>
+              <Icon name="check" /> Save
+            </SirenButton>
+            <Field label="Release schedule — view only" sx={{ mt: '13px', mb: 0 }}>
               {orphan && (
                 <Box
                   sx={{
@@ -329,14 +332,7 @@ function OverviewTab({
                   </Box>
                 )}
               </Box>
-              <Box sx={{ fontSize: 11, color: T.dm2, mt: '7px' }}>
-                Add or remove a phase for this artifact from that phase's own canvas — same Artifact key,
-                one at a time — not from here.
-              </Box>
             </Field>
-            <SirenButton variant="primary" onClick={submitInfo}>
-              <Icon name="check" /> Save
-            </SirenButton>
           </Card>
 
         </>
