@@ -5,7 +5,7 @@ import { Project, ProjectDocument } from './schemas/project.schema';
 import { WorkflowsService } from '../workflows/workflows.service';
 import { AuditService } from '../audit/audit.service';
 import { Actor } from '../common/actor';
-import { DEPARTMENTS, isValidDepartment } from '../common/constants/departments';
+import { DEPARTMENTS } from '../common/constants/departments';
 import { normalizeSchedule } from '../common/schedule';
 import { Milestone } from './schemas/project.schema';
 import { CreateWorkflowDto } from '../workflows/dto/workflow-crud.dto';
@@ -36,22 +36,41 @@ export class ProjectsService {
   }
 
   /**
-   * 이 과제 도메인 아래에 workflow를 새로 만든다. phase는 이 과제의 마일스톤 복사본으로
+   * 이 과제 아래에 workflow를 새로 만든다. phase는 이 과제의 마일스톤 복사본으로
    * 시작한다(WorkflowsService.create) — 그래서 이 라우트가 ProjectsController에 있다:
    * 마일스톤을 아는 곳은 Project 모델을 가진 여기뿐이다.
+   *
+   * workflow의 부서(domain)는 예전처럼 후보 목록에서 자유롭게 고르는 게 아니라, 만든
+   * 사람이 이 과제의 팀원 명단(Project.members)에서 실제로 속한 부서 중 하나여야 한다:
+   *  - 소속 부서가 하나도 없는 사람은 workflow를 만들 수 없다. 단, admin은 예외로
+   *    허용하되 그렇게 만든 workflow는 unassigned(빈 문자열)로 남는다 — admin 여부는
+   *    api가 독립적으로 확인할 수 없어(Actor에는 knoxId만 있다, src/common/actor.ts)
+   *    요청이 함께 보낸 creatorIsAdmin을 신뢰한다(addOwner의 department 신뢰와 같은 패턴).
+   *  - 소속 부서가 있는 사람은 그중 하나를 반드시 골라야 한다(자기 부서가 아닌 값은 거부).
    */
   async createWorkflow(id: string, dto: CreateWorkflowDto, actor: Actor) {
     await this.assertManageAccess(id, actor);
     const project = await this.findByIdOrThrow(id);
 
-    const wanted = dto.domain.trim();
+    const member = project.members.find((m) => m.knoxId === actor.knoxId);
+    const memberDepts = member?.departments ?? [];
+
     let resolved = '';
-    if (wanted) {
-      const match = (project.workflowDomains ?? []).find(
-        (d) => d.trim().toUpperCase() === wanted.toUpperCase(),
-      );
+    if (memberDepts.length === 0) {
+      if (!dto.creatorIsAdmin) {
+        throw new BadRequestException(
+          'You must belong to a department in this project to create a workflow.',
+        );
+      }
+      // admin이면서 소속 부서가 없다 — unassigned(빈 문자열)로 남긴다.
+    } else {
+      const wanted = dto.domain.trim();
+      if (!wanted) {
+        throw new BadRequestException("Select one of your departments for this workflow's domain.");
+      }
+      const match = memberDepts.find((d) => d.trim().toUpperCase() === wanted.toUpperCase());
       if (!match) {
-        throw new BadRequestException(`'${wanted}' is not one of this project's design domains.`);
+        throw new BadRequestException(`'${wanted}' is not one of your departments in this project.`);
       }
       resolved = match.trim();
     }
@@ -60,58 +79,12 @@ export class ProjectsService {
   }
 
   /**
-   * 이 과제의 Workflow 도메인 후보 목록을 통째로 교체한다.
+   * Workflow 하나를 부서에 재배정한다. 빈 문자열이면 배정 해제(unassigned).
    *
-   * 정규화: 앞뒤 공백 제거 → 빈 값 제외 → 대소문자 무시 중복 제거(첫 표기를 남긴다).
-   * FE의 domainOf()가 대문자로 올려 묶으므로(web/src/lib/domainWorkflow.ts) 'Analog'와
-   * 'ANALOG'가 목록에 같이 있으면 화면에서 한 항성계로 합쳐져 목록과 어긋난다.
-   *
-   * 아직 workflow가 붙어 있는 도메인은 지울 수 없다 - 지우면 그 workflow의 domain 값만 목록에서
-   * 사라진 채 남아(orphan) 화면에는 계속 도메인으로 뜨는데 목록에서는 안 보이게 된다.
-   */
-  async updateWorkflowDomains(id: string, input: string[], actor: Actor) {
-    await this.assertManageAccess(id, actor);
-    const project = await this.findByIdOrThrow(id);
-
-    const next: string[] = [];
-    const seen = new Set<string>();
-    for (const raw of input) {
-      const name = raw.trim();
-      if (!name) continue;
-      const key = name.toUpperCase();
-      if (seen.has(key)) continue;
-      seen.add(key);
-      next.push(name);
-    }
-
-    const removed = (project.workflowDomains ?? []).filter((d) => !seen.has(d.trim().toUpperCase()));
-    if (removed.length > 0) {
-      const removedKeys = new Set(removed.map((d) => d.trim().toUpperCase()));
-      const workflows = await this.workflows.listAccessibleForProject(id, actor.knoxId);
-      const blocked = workflows.filter((workflow) => removedKeys.has((workflow.domain ?? '').trim().toUpperCase()));
-      if (blocked.length > 0) {
-        throw new BadRequestException(
-          `Reassign these Workflows before removing that domain: ${blocked.map((workflow) => workflow.name).join(', ')}`,
-        );
-      }
-    }
-
-    project.workflowDomains = next;
-    await project.save();
-    await this.audit.log(actor.knoxId, 'PROJECT_WORKFLOW_DOMAINS_UPDATE', 'project', project._id, {
-      workflowDomains: next,
-    });
-    return this.findDetailOrThrow(id, actor.knoxId);
-  }
-
-  /**
-   * Workflow 하나를 이 과제의 도메인 중 하나에 배정한다. 빈 문자열이면 배정 해제.
-   *
-   * 라우트가 /workflows/:workflowId 가 아니라 /projects/:id/workflows/:workflowId/domain 인 이유: 후보 목록이
-   * 과제에 있어서 검증에 Project와 Workflow 모델이 둘 다 필요한데, 그 둘을 함께 가진 곳은
-   * ProjectsController(ProjectsModule이 IpsModule을 import)뿐이다. 반대 방향으로 붙이면
-   * IpsModule에 Project 모델을 중복 등록해야 하고, 인메모리 모드에서 가짜 컬렉션이
-   * 두 개로 갈린다(src/database/model-registration.ts).
+   * 예전에는 과제의 도메인 후보 목록에서 아무거나 고를 수 있었지만, 이제는 요청한 사람
+   * 본인이 이 과제에서 실제로 속한 부서(Project.members) 중 하나여야 한다 — createWorkflow와
+   * 같은 신뢰 모델. 이 검증에 Project와 Workflow 모델이 둘 다 필요해 그 둘을 함께 가진
+   * 곳(ProjectsController, ProjectsModule이 IpsModule을 import)에 둔다.
    */
   async updateWorkflowDomain(id: string, workflowId: string, domain: string, actor: Actor) {
     await this.assertManageAccess(id, actor);
@@ -124,12 +97,12 @@ export class ProjectsService {
     const wanted = domain.trim();
     let resolved = '';
     if (wanted) {
+      const member = project.members.find((m) => m.knoxId === actor.knoxId);
+      const memberDepts = member?.departments ?? [];
       // 목록에 등록된 표기를 그대로 저장한다 - 사용자가 'analog'로 보내도 'Analog'로.
-      const match = (project.workflowDomains ?? []).find(
-        (d) => d.trim().toUpperCase() === wanted.toUpperCase(),
-      );
+      const match = memberDepts.find((d) => d.trim().toUpperCase() === wanted.toUpperCase());
       if (!match) {
-        throw new BadRequestException(`'${wanted}' is not one of this project's design domains.`);
+        throw new BadRequestException(`'${wanted}' is not one of your departments in this project.`);
       }
       resolved = match.trim();
     }
@@ -166,11 +139,11 @@ export class ProjectsService {
   }
 
   /**
-   * 이 과제의 부서 목록을 통째로 교체한다(workflowDomains와 같은 방식). workflowDomains와
-   * 달리 "아직 쓰이는 중이면 삭제 거부" 규칙은 두지 않는다 - 이 목록은 권한/소속을 결정하는
-   * 값이 아니라 산출물 전달 화면의 후보 라벨일 뿐이라, 이미 어떤 산출물이 특정 부서명을
-   * sourceDept로 들고 있어도 그 문자열은 그대로 남고(자유 텍스트라 이 목록과 강결합되지
-   * 않는다) 다음부터 후보 목록에만 안 보이면 된다.
+   * 이 과제의 부서 목록을 통째로 교체한다. "아직 쓰이는 중이면 삭제 거부" 규칙은 두지
+   * 않는다 - 목록에서 부서를 지워도 그 부서를 이미 가진 ProjectMember.departments나
+   * Workflow.domain, 산출물의 sourceDept 문자열은 그대로 남는다(전부 자유 텍스트라 이
+   * 목록과 강결합되지 않는다) - 다음부터 이 목록(멤버 추가, workflow domain 재배정,
+   * "Received from" 후보)에만 안 보이면 된다.
    */
   async updateDepartments(id: string, input: string[], actor: Actor) {
     await this.assertManageAccess(id, actor);
@@ -284,27 +257,56 @@ export class ProjectsService {
     return this.findDetailOrThrow(id, actor.knoxId);
   }
 
-  /** 과제 팀원 명단(부서별 로스터)에 인원을 추가한다 — Workflow owners/viewGrants(접근 권한)와는 별개 개념. */
+  /**
+   * 과제 팀원 명단(부서별 로스터)에 인원을 추가한다 — Workflow owners/viewGrants(접근 권한)와는
+   * 별개 개념. department는 이 과제의 자유 부서 목록(Project.departments)에 있는 값이어야
+   * 한다 - 전사 고정 6부서(DEPARTMENTS)는 더 이상 이 명단의 검증 기준이 아니다. 이미 다른
+   * 부서에 속한 멤버를 또 다른 부서 카드에서 추가하면 그 부서가 목록에 더해진다(한 멤버가
+   * 여러 부서에 속할 수 있다) — 완전히 새 멤버일 때만 새 로스터 항목을 만든다.
+   */
   async addMember(id: string, knoxId: string, department: string, actor: Actor) {
-    if (!isValidDepartment(department)) {
-      throw new BadRequestException('Unknown department.');
-    }
     await this.assertManageAccess(id, actor);
     const project = await this.findByIdOrThrow(id);
-    if (!project.members.some((m) => m.knoxId === knoxId)) {
-      project.members.push({ knoxId, department, addedAt: new Date() });
+
+    const wanted = department.trim();
+    const match = project.departments.find((d) => d.trim().toUpperCase() === wanted.toUpperCase());
+    if (!match) {
+      throw new BadRequestException(`'${department}' is not one of this project's departments.`);
+    }
+    const dept = match.trim();
+
+    const existing = project.members.find((m) => m.knoxId === knoxId);
+    if (existing) {
+      if (!existing.departments.some((d) => d.trim().toUpperCase() === dept.toUpperCase())) {
+        existing.departments.push(dept);
+        await project.save();
+        await this.audit.log(actor.knoxId, 'PROJECT_MEMBER_DEPARTMENT_ADD', 'project', project._id, {
+          knoxId, department: dept,
+        });
+      }
+    } else {
+      project.members.push({ knoxId, departments: [dept], addedAt: new Date() });
       await project.save();
-      await this.audit.log(actor.knoxId, 'PROJECT_MEMBER_ADD', 'project', project._id, { knoxId, department });
+      await this.audit.log(actor.knoxId, 'PROJECT_MEMBER_ADD', 'project', project._id, { knoxId, department: dept });
     }
     return this.findDetailOrThrow(id, actor.knoxId);
   }
 
-  async removeMember(id: string, knoxId: string, actor: Actor) {
+  /** 멤버를 지정한 부서 카드에서 뺀다 — 그 부서가 마지막 소속이었으면 명단에서 완전히 사라진다. */
+  async removeMember(id: string, knoxId: string, department: string, actor: Actor) {
     await this.assertManageAccess(id, actor);
     const project = await this.findByIdOrThrow(id);
-    project.members = project.members.filter((m) => m.knoxId !== knoxId);
-    await project.save();
-    await this.audit.log(actor.knoxId, 'PROJECT_MEMBER_REMOVE', 'project', project._id, { knoxId });
+
+    const member = project.members.find((m) => m.knoxId === knoxId);
+    if (member) {
+      const wanted = department.trim().toUpperCase();
+      member.departments = member.departments.filter((d) => d.trim().toUpperCase() !== wanted);
+      if (member.departments.length === 0) {
+        project.members = project.members.filter((m) => m.knoxId !== knoxId);
+      }
+      await project.save();
+      await this.audit.log(actor.knoxId, 'PROJECT_MEMBER_REMOVE', 'project', project._id, { knoxId, department });
+    }
     return this.findDetailOrThrow(id, actor.knoxId);
   }
 }

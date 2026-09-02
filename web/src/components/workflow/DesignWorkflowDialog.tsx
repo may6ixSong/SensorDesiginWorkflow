@@ -87,8 +87,8 @@ interface Props {
   /** 과제 공통 일정 — x축 배경 밴드이자 날짜축 범위의 일부다. */
   milestones: Milestone[];
   workflows: WorkflowDto[];
-  /** 과제에 등록된 도메인 목록 — 도메인 모델을 만들 때 빈 도메인도 알아보기 위해 쓴다. */
-  workflowDomains: string[];
+  /** 과제에 등록된 부서 목록(Project.departments) — 도메인 모델을 만들 때 빈 부서도 알아보기 위해 쓴다. */
+  departments: string[];
 }
 
 export function DesignWorkflowDialog(props: Props) {
@@ -115,7 +115,7 @@ export function DesignWorkflowDialog(props: Props) {
 /* ══════════════════════════════════════════════════════════════ Stage ═══ */
 
 function WorkflowStage({
-  onClose, projectId, projectName, projectCode, milestones, workflows, workflowDomains,
+  onClose, projectId, projectName, projectCode, milestones, workflows, departments,
 }: Props) {
   const navigate = useNavigate();
   const pal = useSpacePalette();
@@ -190,9 +190,9 @@ function WorkflowStage({
     return m;
   }, [byWorkflow]);
 
-  const domainSig = workflowDomains.join('|');
+  const domainSig = departments.join('|');
   const model: DomainWorkflowModel = useMemo(
-    () => buildDomainModel(workflows, byWorkflow, workflowDomains),
+    () => buildDomainModel(workflows, byWorkflow, departments),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [workflows, byWorkflow, domainSig],
   );

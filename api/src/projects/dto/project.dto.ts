@@ -4,7 +4,8 @@ import { sortSchedule } from '../../common/schedule';
 export interface ProjectMemberDto {
   /** KnoxID - 이름/부서/아바타는 web이 공통 플랫폼에서 조회한다. */
   knoxId: string;
-  department: string;
+  /** 이 멤버가 속한 부서(팀) 목록 — 한 멤버가 여러 부서에 동시에 속할 수 있다. */
+  departments: string[];
   addedAt: Date;
 }
 
@@ -19,8 +20,6 @@ export interface ProjectDetailDto {
   _id: string;
   code: string;
   name: string;
-  /** 이 과제의 workflow가 고를 수 있는 설계 도메인 목록. */
-  workflowDomains: string[];
   /**
    * 산출물 "Received from" 후보 부서 목록 — 과제마다 자유롭게 추가/삭제한다
    * (PATCH /projects/:id/departments). 새 과제는 기본 6개(Analog/Digital/APS/PI-PD/
@@ -44,13 +43,12 @@ export function toProjectDetailDto(project: ProjectDocument): ProjectDetailDto {
     _id: project._id.toString(),
     code: project.code,
     name: project.name,
-    workflowDomains: [...(project.workflowDomains ?? [])],
     departments: [...(project.departments ?? [])],
     status: project.status,
     milestones: sortSchedule(project.milestones ?? []).map(toMilestoneDto),
     members: project.members.map((m) => ({
       knoxId: m.knoxId,
-      department: m.department,
+      departments: [...(m.departments ?? [])],
       addedAt: m.addedAt,
     })),
     managers: [...(project.managers ?? [])],

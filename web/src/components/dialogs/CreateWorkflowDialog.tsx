@@ -9,36 +9,49 @@ import { shortDate } from '@/lib/schedule';
 import { FONT_MONO, T } from '@/theme/tokens';
 
 interface Props {
-  /** 이 과제에 등록된 설계 도메인 목록 — workflow는 반드시 이 중 하나(또는 미지정)에 속한다. */
-  workflowDomains: string[];
+  /** 만드는 사람이 이 과제에서 실제로 속한 부서 — workflow의 domain은 이 중 하나여야 한다. */
+  myDepartments: string[];
+  /** 만드는 사람이 admin인지 — 소속 부서가 없어도 admin이면 unassigned로 만들 수 있다. */
+  isAdmin: boolean;
   /** 새 workflow가 물려받을 과제 공통 일정 — 무엇이 복사되는지 미리 보여 준다. */
   milestones: Milestone[];
-  /** 목록에서 도메인을 눌러 들어왔으면 그 값이 기본 선택된다. */
-  defaultDomain?: string;
   onClose: () => void;
-  onCreate: (p: { name: string; domain: string; description: string }) => void;
+  onCreate: (p: { name: string; domain: string; creatorIsAdmin: boolean; description: string }) => void;
   saving?: boolean;
   error?: string | null;
 }
 
 /**
- * 도메인 아래에 workflow를 새로 만든다.
+ * workflow를 새로 만든다.
  *
  * 일정은 여기서 정하지 않는다 — 만들어질 때 과제 마일스톤이 그대로 복사되고(사용자 요청:
  * "default로는 과제의 milestone이 들어가고"), 그 뒤에 이 workflow의 "Edit phases"에서
  * 자유롭게 고친다. 그래서 무엇이 복사되는지만 미리 보여 준다.
+ *
+ * domain(부서)은 예전처럼 자유 선택이 아니다 — 만드는 사람이 이 과제에서 실제로 속한
+ * 부서 중 하나로만 정해진다: 부서가 하나면 자동으로 그 값, 여러 개면 그중 하나를 고르는
+ * picker, 하나도 없으면(그리고 admin이 아니면) 애초에 workflow를 만들 수 없다 — admin은
+ * 예외로 unassigned로 만들 수 있다.
  */
 export function CreateWorkflowDialog({
-  workflowDomains, milestones, defaultDomain, onClose, onCreate, saving, error,
+  myDepartments, isAdmin, milestones, onClose, onCreate, saving, error,
 }: Props) {
   const [name, setName] = useState('');
-  const [domain, setDomain] = useState(defaultDomain ?? workflowDomains[0] ?? '');
+  const [domain, setDomain] = useState(myDepartments[0] ?? '');
   const [description, setDescription] = useState('');
   const [nameErr, setNameErr] = useState(false);
 
+  const blocked = myDepartments.length === 0 && !isAdmin;
+
   const submit = () => {
+    if (blocked) return;
     if (!name.trim()) { setNameErr(true); return; }
-    onCreate({ name: name.trim(), domain, description: description.trim() });
+    onCreate({
+      name: name.trim(),
+      domain: myDepartments.length > 0 ? domain : '',
+      creatorIsAdmin: isAdmin,
+      description: description.trim(),
+    });
   };
 
   return (
@@ -53,28 +66,44 @@ export function CreateWorkflowDialog({
         </>
       }
     >
-      <Field label="Name">
-        <TextInput
-          value={name}
-          onChange={(v) => { setName(v); setNameErr(false); }}
-          error={nameErr}
-          placeholder="e.g. ADC_RAMP"
-        />
-      </Field>
-      <Field label="Design domain">
-        <SelectInput
-          value={domain}
-          onChange={setDomain}
-          options={[
-            { value: '', label: 'Unassigned' },
-            ...workflowDomains.map((d) => ({ value: d, label: d })),
-          ]}
-        />
-      </Field>
-      <Field label="Description">
-        <TextInput value={description} onChange={setDescription} placeholder="One line about what this workflow covers" />
-      </Field>
+      {blocked ? (
+        <Box
+          sx={{
+            fontSize: 12, color: T.rd, background: T.rd2, border: `1px solid ${T.rd3}`,
+            borderRadius: '9px', padding: '10px 12px', mb: '14px', lineHeight: 1.6,
+          }}
+        >
+          You don't belong to any department in this project yet, so you can't create a workflow.
+          Ask a project manager to add you to a department first.
+        </Box>
+      ) : (
+        <>
+          <Field label="Name">
+            <TextInput
+              value={name}
+              onChange={(v) => { setName(v); setNameErr(false); }}
+              error={nameErr}
+              placeholder="e.g. ADC_RAMP"
+            />
+          </Field>
+          {myDepartments.length > 1 ? (
+            <Field label="Department">
+              <SelectInput value={domain} onChange={setDomain} options={myDepartments.map((d) => ({ value: d, label: d }))} />
+            </Field>
+          ) : (
+            <Field label="Department">
+              <Box sx={{ fontSize: 13, padding: '8px 0', color: myDepartments.length ? T.tx : T.dm2 }}>
+                {myDepartments.length ? myDepartments[0] : 'Unassigned (you have no department in this project)'}
+              </Box>
+            </Field>
+          )}
+          <Field label="Description">
+            <TextInput value={description} onChange={setDescription} placeholder="One line about what this workflow covers" />
+          </Field>
+        </>
+      )}
 
+      {!blocked && (
       <Box
         sx={{
           background: T.sf2, border: `1px solid ${T.ln}`, borderRadius: '9px',
@@ -109,12 +138,15 @@ export function CreateWorkflowDialog({
           </Box>
         )}
       </Box>
+      )}
 
       {error && <Box sx={{ fontSize: 11.5, color: T.rd, mb: '10px' }}>{error}</Box>}
 
-      <SirenButton variant="primary" onClick={submit} disabled={saving}>
-        <Icon name="plus" /> {saving ? 'Creating…' : 'Create workflow'}
-      </SirenButton>
+      {!blocked && (
+        <SirenButton variant="primary" onClick={submit} disabled={saving}>
+          <Icon name="plus" /> {saving ? 'Creating…' : 'Create workflow'}
+        </SirenButton>
+      )}
     </ModalShell>
   );
 }

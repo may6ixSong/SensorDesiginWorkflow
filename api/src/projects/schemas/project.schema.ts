@@ -35,8 +35,9 @@ export const MilestoneSchema = SchemaFactory.createForClass(Milestone);
 /**
  * 과제(Project) 단위 부서별 팀원 로스터 — workflow의 owners/viewGrants(접근 권한)와는
  * 별개 개념이다. 이 프로젝트에 실제로 참여하는 인원을 부서별로 보여주기 위한
- * 정보성 명단이며, department는 부여 시점에 자유 입력(사용자의 실제 소속과
- * 다를 수 있음 — ViewGrant.department와 동일한 패턴).
+ * 정보성 명단이며, departments는 부여 시점에 자유 입력(사용자의 실제 소속과
+ * 다를 수 있음 — ViewGrant.department와 동일한 패턴). 한 멤버가 여러 부서(팀)에
+ * 동시에 속할 수 있어 배열이다.
  *
  * 사용자는 KnoxID 문자열로만 참조한다 (api에는 users 컬렉션이 없다).
  */
@@ -45,8 +46,8 @@ export class ProjectMember {
   @Prop({ required: true, trim: true })
   knoxId: string;
 
-  @Prop({ required: true })
-  department: string;
+  @Prop({ type: [String], default: [] })
+  departments: string[];
 
   @Prop({ default: () => new Date() })
   addedAt: Date;
@@ -64,21 +65,15 @@ export class Project {
   name: string;
 
   /**
-   * 이 과제의 workflow가 고를 수 있는 설계 도메인 후보 목록 (Workflow.domain에 들어갈 값).
-   * 위 domain(과제 자신의 분류)과는 다른 축이다 - 이쪽은 과제마다 자유롭게 편집하는
-   * 목록이라 DEPARTMENTS 같은 전사 고정 상수로 두지 않는다
-   * (PATCH /projects/:id/workflow-domains, ProjectsService.updateWorkflowDomains).
-   */
-  @Prop({ type: [String], default: [] })
-  workflowDomains: string[];
-
-  /**
-   * 이 과제가 산출물 전달 부서로 인정하는 부서 목록 — 전사 고정 DEPARTMENTS(analog 등
-   * 6종, common/constants/departments.ts)와는 별개 축이다. 그쪽은 recvDept(전달) 검증에
-   * 계속 쓰이는 고정값이고, 이 목록은 "산출물을 누구/어느 부서로부터 받는지"(신규 기능,
-   * Deliverable.sourceDept/sourceContact)를 표시할 때 프로젝트마다 자유롭게 추가/삭제하는
-   * 후보 목록이다 - 설계 도메인이 아닌 부서는 이 시스템을 아예 쓰지 않을 수도 있어
-   * 전사 고정값으로 두지 않는다(PATCH /projects/:id/departments).
+   * 이 과제가 인정하는 부서(팀) 목록 — 전사 고정 DEPARTMENTS(analog 등 6종,
+   * common/constants/departments.ts)와는 별개 축이며, 프로젝트마다 자유롭게
+   * 추가/삭제한다(PATCH /projects/:id/departments). 세 가지 용도로 쓰인다:
+   *  1) 산출물을 누구/어느 부서로부터 받는지 표시할 때의 후보 목록
+   *     (Deliverable.sourceDept/sourceContact)
+   *  2) 프로젝트 멤버(ProjectMember.departments)가 속할 수 있는 부서 후보
+   *  3) workflow를 만든 사람의 소속 부서가 곧 그 workflow의 분류(Workflow.domain)가
+   *     된다 — 예전의 "설계 도메인" 시스템(workflowDomains/workflow-domains 라우트)은
+   *     완전히 폐지되었고, 이 필드가 그 자리를 대신한다.
    *
    * 신규 과제는 늘 이 6개로 시작한다: Analog · Digital · APS · PI/PD · Solution · PTE.
    * 이 필드가 없는(과거) 과제 문서는 ProjectsService.ensureDepartments가 처음 조회되는

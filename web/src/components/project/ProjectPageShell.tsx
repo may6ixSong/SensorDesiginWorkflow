@@ -170,7 +170,7 @@ export function ProjectPageShell({ children }: Props) {
         projectCode={project.code}
         milestones={project.milestones}
         workflows={workflows ?? []}
-        workflowDomains={project.workflowDomains ?? []}
+        departments={project.departments ?? []}
       />
     </AppShell>
   );

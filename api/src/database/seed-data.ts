@@ -58,12 +58,6 @@ function seedXY(laneIndex: number, row: number, w: number, h: number) {
   };
 }
 
-/* ── workflow 도메인 후보 ──
- * Project.workflowDomains에 들어가는 "그 과제에서 고를 수 있는 설계 도메인" 목록이다.
- * 전사 고정 상수가 아니라 과제마다 편집하는 데이터이므로 common/constants가 아니라
- * 시드에만 둔다 (DEPARTMENTS처럼 FE/BE 중복 정의하지 않는다). */
-const WORKFLOW_DOMAINS = ['Analog', 'Digital', 'ISP', 'APS', 'FW', 'PM', 'PTE', 'Security', 'ACI'];
-
 /* ── 과제 공통 일정(마일스톤) ──
  * 이름은 전부 사내에서 쓰는 짧은 표기 그대로다. full name(예: 'ML1' = 무엇의 약자인지)은
  * 저장하지 않는다 — workflow마다 일정을 다르게 잡을 수 있게 되면서 이 약어가 무엇을
@@ -452,23 +446,27 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
    * workflow들은 일부러 저마다 다른 phase를 들고 시작한다("일정은 workflow마다 다르다"를
    * 화면에서 바로 확인할 수 있어야 하므로).
    * members: 과제 단위 부서별 팀원 로스터 (Project Info 페이지) — workflow owners/viewGrants
-   * (접근 권한)와는 별개의 정보성 명단이라 여기 department는 실제 소속과 다를 수 있다. */
+   * (접근 권한)와는 별개의 정보성 명단이라 여기 departments는 실제 소속과 다를 수 있다.
+   * departments 필드는 일부러 세팅하지 않는다 - ProjectsService.ensureDepartments가 처음
+   * 조회되는 시점에 기본 6개로 채우는 경로를 목업에서도 그대로 타게 하기 위해서다.
+   * u1/u2는 일부러 두 부서에 걸쳐 있다 - 한 멤버가 여러 부서(팀)에 속할 수 있음을
+   * 시연한다. */
   const p1 = await ProjectModel.create({
-    code: 'CIS-A7', name: '50MP Mobile CIS', workflowDomains: WORKFLOW_DOMAINS,
+    code: 'CIS-A7', name: '50MP Mobile CIS',
     milestones: MILESTONES, status: 'ACTIVE', isMock: true,
     // 일부러 u7/u8은 비워둔다 - "부서별 멤버 추가" UI를 실제로 시연/검증할 후보가 남아있어야
     // 하고, 빈 상태(empty state) 렌더링도 함께 보여주기 때문.
     members: [
-      { knoxId: U.u1, department: 'analog', addedAt: new Date('2026-01-05') },
-      { knoxId: U.u2, department: 'analog', addedAt: new Date('2026-01-05') },
-      { knoxId: U.u6, department: 'analog', addedAt: new Date('2026-01-06') },
-      { knoxId: U.u3, department: 'digital', addedAt: new Date('2026-01-07') },
-      { knoxId: U.u4, department: 'solution', addedAt: new Date('2026-01-08') },
-      { knoxId: U.u5, department: 'pte', addedAt: new Date('2026-01-08') },
+      { knoxId: U.u1, departments: ['Analog', 'Digital'], addedAt: new Date('2026-01-05') },
+      { knoxId: U.u2, departments: ['Analog', 'Digital'], addedAt: new Date('2026-01-05') },
+      { knoxId: U.u6, departments: ['Analog'], addedAt: new Date('2026-01-06') },
+      { knoxId: U.u3, departments: ['Digital'], addedAt: new Date('2026-01-07') },
+      { knoxId: U.u4, departments: ['Solution'], addedAt: new Date('2026-01-08') },
+      { knoxId: U.u5, departments: ['PTE'], addedAt: new Date('2026-01-08') },
     ],
   });
   const p2 = await ProjectModel.create({
-    code: 'CIS-B3', name: '8MP Automotive CIS', workflowDomains: WORKFLOW_DOMAINS,
+    code: 'CIS-B3', name: '8MP Automotive CIS',
     milestones: MILESTONES, status: 'ACTIVE', isMock: true,
   });
 

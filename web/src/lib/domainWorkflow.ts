@@ -5,9 +5,9 @@
  * 연결선이 필요 없다는 게 이 화면의 전제다(요청). 대신 같은 workflow 안의 산출물↔산출물
  * flow(EdgeDto)는 web/src/lib/designWorkflowLayout.ts가 와이어로 그린다.
  *
- * 도메인 섹션 목록은 IP가 가진 도메인 + `knownDomains`(= 과제에 등록된 Project.workflowDomains)의
- * 합집합이다. 그래서 아직 IP가 배정되지 않은 도메인도 빈 섹션으로 자리를 잡는다 —
- * "이 과제에 어떤 도메인이 있는지"가 화면에 그대로 보이는 게 목적이다.
+ * 도메인 섹션 목록은 IP가 가진 도메인 + `knownDomains`(= 과제에 등록된 Project.departments,
+ * 예전 workflowDomains를 대신한다)의 합집합이다. 그래서 아직 IP가 배정되지 않은 부서도
+ * 빈 섹션으로 자리를 잡는다 — "이 과제에 어떤 부서가 있는지"가 화면에 그대로 보이는 게 목적이다.
  *
  * React/DOM을 전혀 모르는 순수 함수만 모아 뒀다.
  */
@@ -100,9 +100,9 @@ function assignColors(keys: string[]): Map<string, string> {
  * workflow 목록 + IP별 산출물(own)로 도메인 모델을 만든다.
  * @param deliverablesByIp workflowId → 그 IP가 주는 산출물(own). incoming은 반대편에서
  *   이미 한 번 세므로 넣지 않는다(항로 중복 방지).
- * @param knownDomains 과제에 등록된 도메인 목록(Project.workflowDomains). IP가 하나도 배정되지
- *   않은 도메인도 빈 섹션으로 보여 주기 위한 것 — 이걸 넘기지 않으면 IP가 실제로 가진
- *   도메인만 나온다. 대소문자는 domainOf()와 같은 기준으로 올려 맞춘다.
+ * @param knownDomains 과제에 등록된 부서 목록(Project.departments). IP가 하나도 배정되지
+ *   않은 부서도 빈 섹션으로 보여 주기 위한 것 — 이걸 넘기지 않으면 IP가 실제로 가진
+ *   부서만 나온다. 대소문자는 domainOf()와 같은 기준으로 올려 맞춘다.
  */
 export function buildDomainModel(
   workflows: WorkflowDto[],

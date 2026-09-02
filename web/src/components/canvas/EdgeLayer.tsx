@@ -42,11 +42,15 @@ export function EdgeLayer({
 
     const blocked = !bi && !latR(a) && stOf(b).lb !== 'Not submitted';
     const on = !!hlSet && hlSet.has(e.from) && hlSet.has(e.to);
+    // 선택된 산출물과 무관한 flow — 관련 없는 블록을 흐리게 하는 것과 같은 기준(0.6)으로
+    // 같이 낮춘다. <g>로 묶어야 marker(화살촉)까지 함께 흐려진다.
+    const unrelated = !!hlSet && !on;
     const col = on ? '#2f6b4a' : blocked ? '#ac6f08' : '#5c6b7d';
     const mk = on ? 'ahl' : blocked ? 'ahb' : 'ah';
     const dpath = orth(a, b);
+    const segs: JSX.Element[] = [];
 
-    parts.push(
+    segs.push(
       <path
         key={`${e.id}-main`}
         d={dpath}
@@ -65,7 +69,7 @@ export function EdgeLayer({
     );
 
     if (on) {
-      parts.push(
+      segs.push(
         <path key={`${e.id}-bg`} d={dpath} stroke={col} strokeWidth={3.6} fill="none" opacity={0.18} shapeRendering="crispEdges" />,
         <path
           key={`${e.id}-dash`}
@@ -83,7 +87,7 @@ export function EdgeLayer({
 
     if (bi && !edit) {
       const c = biIconPos(a, b);
-      parts.push(
+      segs.push(
         <g key={`${e.id}-cyc`} transform={`translate(${c.x - 16},${c.y - 16}) scale(1.47)`} pointerEvents="none">
           <path d="M16.8 9.8A5.4 5.4 0 0 0 6.8 8.9" stroke="#bc4f1a" strokeWidth="1.9" fill="none" strokeLinecap="round" />
           <path d="M5.2 13.2a5.4 5.4 0 0 0 9.8 1.1" stroke="#bc4f1a" strokeWidth="1.9" fill="none" strokeLinecap="round" />
@@ -94,7 +98,7 @@ export function EdgeLayer({
     }
 
     if (edit && canEdit) {
-      parts.push(
+      segs.push(
         <path
           key={`${e.id}-hit`}
           d={dpath}
@@ -111,6 +115,12 @@ export function EdgeLayer({
         </path>,
       );
     }
+
+    parts.push(
+      <g key={e.id} opacity={unrelated ? 0.6 : 1}>
+        {segs}
+      </g>,
+    );
   });
 
   // 연결 중 커서를 따라가는 안내선

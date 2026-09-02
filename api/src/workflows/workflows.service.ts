@@ -153,11 +153,11 @@ export class WorkflowsService {
   }
 
   /**
-   * workflow의 설계 도메인을 바꾼다. 빈 문자열은 "도메인 미지정"(FE에서 UNASSIGNED)으로 허용한다.
+   * workflow의 부서(domain)를 바꾼다. 빈 문자열은 "미지정"(FE에서 UNASSIGNED)으로 허용한다.
    *
-   * 이 값이 과제의 후보 목록(Project.workflowDomains) 안에 있는지는 여기서 검증하지 않는다 -
+   * 이 값이 요청한 사람 본인이 속한 부서(Project.members)인지는 여기서 검증하지 않는다 -
    * WorkflowsModule에는 Project 모델이 없고, 여기에 등록하면 인메모리 모드에서 별개의 가짜
-   * 컬렉션이 하나 더 생겨 버린다(src/database/model-registration.ts). 그래서 목록 검증은
+   * 컬렉션이 하나 더 생겨 버린다(src/database/model-registration.ts). 그래서 검증은
    * 두 모델을 모두 가진 ProjectsService.updateWorkflowDomain이 하고, 이 메서드는 쓰기만 한다.
    */
   async setDomain(workflowId: string, domain: string, actor: Actor) {

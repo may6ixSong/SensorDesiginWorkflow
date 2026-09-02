@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Milestone, WorkflowDto } from '@/types/domain';
 import { ModalShell } from '@/components/common/ModalShell';
 import { SirenButton } from '@/components/common/SirenButton';
-import { Ey, Field, TextInput } from '@/components/common/Panel';
+import { Ey, Field, SelectInput, TextInput } from '@/components/common/Panel';
 import { Icon } from '@/components/common/Icon';
 import { CURSOR_POINTER, T } from '@/theme/tokens';
 import { ScheduleDraft } from './ScheduleEditor';
@@ -25,6 +25,11 @@ interface Props {
   onSaveDetails: (p: { name: string; description: string }) => void;
   savingDetails?: boolean;
   detailsError?: string | null;
+
+  /** 편집자 본인이 이 과제에서 속한 부서 — Details 탭의 department 재배정 picker가 이 중에서만 고를 수 있게 한다. */
+  myDepartments: string[];
+  onChangeDomain: (domain: string) => void;
+  changingDomain?: boolean;
 
   onSavePhases: (phases: ScheduleDraft[]) => void;
   savingPhases?: boolean;
@@ -49,6 +54,7 @@ interface Props {
 export function WorkflowSettingsDialog({
   workflow, own, initialTab, milestones, orphanCount, onClose,
   onSaveDetails, savingDetails, detailsError,
+  myDepartments, onChangeDomain, changingDomain,
   onSavePhases, savingPhases, phasesError,
   onAddOwner, onRemoveOwner, onAddViewGrant, onRemoveViewGrant,
 }: Props) {
@@ -94,7 +100,15 @@ export function WorkflowSettingsDialog({
       }
     >
       {tab === 'details' && (
-        <DetailsTab workflow={workflow} onSave={onSaveDetails} saving={savingDetails} error={detailsError} />
+        <DetailsTab
+          workflow={workflow}
+          onSave={onSaveDetails}
+          saving={savingDetails}
+          error={detailsError}
+          myDepartments={myDepartments}
+          onChangeDomain={onChangeDomain}
+          changingDomain={changingDomain}
+        />
       )}
       {tab === 'schedule' && (
         <WorkflowPhasesPanel
@@ -121,9 +135,10 @@ export function WorkflowSettingsDialog({
 }
 
 function DetailsTab({
-  workflow, onSave, saving, error,
+  workflow, onSave, saving, error, myDepartments, onChangeDomain, changingDomain,
 }: {
   workflow: WorkflowDto; onSave: Props['onSaveDetails']; saving?: boolean; error?: string | null;
+  myDepartments: string[]; onChangeDomain: (domain: string) => void; changingDomain?: boolean;
 }) {
   const { t } = useTranslation();
   const [name, setName] = useState(workflow.name);
@@ -134,6 +149,18 @@ function DetailsTab({
     if (!name.trim()) { setNameErr(true); return; }
     onSave({ name: name.trim(), description: description.trim() });
   };
+
+  const currentDomain = (workflow.domain ?? '').trim();
+  // 지금 배정된 부서가 편집자 본인의 부서 목록에 없을 수 있다(다른 사람이 만들었거나,
+  // 그 사람이 그 사이 다른 부서로 옮겨졌거나) — 그 값을 셀렉트에서 지워버리면 화면이
+  // "Unassigned"라고 거짓말을 하게 되니 옵션에 그대로 끼워 보여준다.
+  const domainOptions = [
+    { value: '', label: 'Unassigned' },
+    ...(currentDomain && !myDepartments.includes(currentDomain)
+      ? [{ value: currentDomain, label: `${currentDomain} (not your department)` }]
+      : []),
+    ...myDepartments.map((d) => ({ value: d, label: d })),
+  ];
 
   return (
     <>
@@ -149,6 +176,24 @@ function DetailsTab({
       <SirenButton variant="primary" onClick={submit} disabled={saving}>
         <Icon name="check" /> {saving ? 'Saving…' : t('workflow.saveDetails')}
       </SirenButton>
+
+      <Box sx={{ mt: '22px', pt: '18px', borderTop: `1px solid ${T.ln}` }}>
+        <Field label="Department">
+          {myDepartments.length === 0 ? (
+            <Box sx={{ fontSize: 12, color: T.dm2 }}>
+              You don't belong to any department in this project, so you can't reassign this workflow.
+              {currentDomain ? ` Currently: ${currentDomain}.` : ' Currently unassigned.'}
+            </Box>
+          ) : (
+            <SelectInput
+              value={currentDomain}
+              disabled={changingDomain}
+              onChange={onChangeDomain}
+              options={domainOptions}
+            />
+          )}
+        </Field>
+      </Box>
     </>
   );
 }

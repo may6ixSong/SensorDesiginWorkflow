@@ -13,7 +13,8 @@ import { AddDeliverableDialog } from '@/components/dialogs/AddDeliverableDialog'
 import { NoteDialog } from '@/components/dialogs/NoteDialog';
 import { Toast } from '@/components/common/Toast';
 import {
-  useProjectWorkflowDirectory, useProjectWorkflows, useProjectMilestones, useProjects,
+  useProject, useProjectWorkflowDirectory, useProjectWorkflows, useProjectMilestones, useProjects,
+  useUpdateWorkflowDomain,
 } from '@/api/hooks/useProjects';
 import {
   useAddOwner, useAddViewGrant, useWorkflow, useRemoveOwner, useRemoveViewGrant, useUpdateWorkflow,
@@ -41,6 +42,11 @@ export function BoardPage() {
   const { user: me, isAdmin } = useAuth();
 
   const { data: projects } = useProjects();
+  /**
+   * Project Information 상세 — 캔버스는 쓰지 않고, workflow settings의 Details 탭에서
+   * 편집자 본인의 부서 목록(department 재배정 picker 제한)을 구하는 데만 쓴다.
+   */
+  const { data: project } = useProject(projectId);
   /** 과제 공통 일정 — 캔버스는 쓰지 않고, "과제 일정으로 되돌리기"에만 필요하다. */
   const { data: milestones } = useProjectMilestones(projectId);
   const { data: workflows } = useProjectWorkflows(projectId);
@@ -85,6 +91,11 @@ export function BoardPage() {
   const removeOwner = useRemoveOwner(workflowId ?? '');
   const addViewGrant = useAddViewGrant(workflowId ?? '');
   const removeViewGrant = useRemoveViewGrant(workflowId ?? '');
+  const updateDomain = useUpdateWorkflowDomain(projectId ?? '');
+  const myDepartments = useMemo(
+    () => project?.members.find((m) => m.knoxId === me?.KnoxID)?.departments ?? [],
+    [project, me?.KnoxID],
+  );
 
   /**
    * 서버 데이터 → 캔버스 작업 모델 (편집 중에는 덮어쓰지 않는다).
@@ -454,6 +465,17 @@ export function BoardPage() {
               }}
               savingDetails={updateWorkflow.isPending}
               detailsError={detailsErr}
+              myDepartments={myDepartments}
+              onChangeDomain={(domain) => {
+                updateDomain.mutate(
+                  { workflowId: workflowId ?? '', domain },
+                  {
+                    onSuccess: () => toast(domain ? `Assigned to ${domain}` : 'Domain cleared'),
+                    onError: (e: any) => toast(e?.response?.data?.message ?? 'Failed to reassign department'),
+                  },
+                );
+              }}
+              changingDomain={updateDomain.isPending}
               onSavePhases={(next) => {
                 setPhasesErr(null);
                 updatePhases.mutate(next, {

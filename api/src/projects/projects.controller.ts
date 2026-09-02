@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { CurrentActor } from '../common/decorators/current-actor.decorator';
 import { Actor } from '../common/actor';
 import { ProjectsService } from './projects.service';
@@ -9,7 +9,6 @@ import { AddMemberDto } from './dto/add-member.dto';
 import { AddProjectManagerDto } from './dto/manage-project-managers.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { UpdateMilestonesDto } from './dto/update-milestones.dto';
-import { UpdateWorkflowDomainsDto } from './dto/update-workflow-domains.dto';
 import { UpdateWorkflowDomainDto } from './dto/update-workflow-domain.dto';
 import { UpdateProjectDepartmentsDto } from './dto/update-project-departments.dto';
 import { CreateWorkflowDto } from '../workflows/dto/workflow-crud.dto';
@@ -69,20 +68,11 @@ export class ProjectsController {
   }
 
   /**
-   * Workflow 도메인 후보 목록 교체. @Patch(':id')보다 위에 있어야 한다 - 아래에 두면
-   * ':id'가 'workflow-domains'까지 먹어 이 라우트에 도달하지 못한다.
+   * workflow 하나를 부서에 재배정한다(빈 문자열이면 배정 해제) — unassigned 상태를 수동으로
+   * 고치거나, 잘못 배정된 workflow를 다른 부서로 옮길 때 쓴다. 요청한 사람 본인이 그
+   * 부서에 속해 있어야 한다(ProjectsService.updateWorkflowDomain). @Patch(':id')보다
+   * 위에 있어야 한다 - 아래에 두면 ':id'가 'workflows'까지 먹어 이 라우트에 도달하지 못한다.
    */
-  @Patch(':id/workflow-domains')
-  async updateWorkflowDomains(
-    @Param('id') id: string,
-    @Body() body: UpdateWorkflowDomainsDto,
-    @CurrentActor() me: Actor,
-  ) {
-    const project = await this.projects.updateWorkflowDomains(id, body.workflowDomains, me);
-    return { data: toProjectDetailDto(project) };
-  }
-
-  /** workflow 하나를 이 과제의 도메인에 배정 (빈 문자열이면 배정 해제). */
   @Patch(':id/workflows/:workflowId/domain')
   async updateWorkflowDomain(
     @Param('id') id: string,
@@ -147,20 +137,26 @@ export class ProjectsController {
     return { data: list };
   }
 
-  /** 과제 팀원(부서별 로스터) 추가 — 이 과제의 Workflow 중 하나라도 Edit 권한이 있는 사람만 관리 가능. */
+  /**
+   * 과제 팀원(부서별 로스터) 추가 — 이 과제의 Workflow 중 하나라도 Edit 권한이 있는 사람만
+   * 관리 가능. 이미 다른 부서에 속한 멤버를 또 다른 부서 카드에서 추가하면 그 부서가
+   * 목록에 더해진다(한 멤버가 여러 부서에 속할 수 있다).
+   */
   @Post(':id/members')
   async addMember(@Param('id') id: string, @Body() body: AddMemberDto, @CurrentActor() me: Actor) {
     const project = await this.projects.addMember(id, body.knoxId, body.department, me);
     return { data: toProjectDetailDto(project) };
   }
 
+  /** 멤버를 지정한 부서 카드에서 뺀다 — 그 부서가 그 멤버의 마지막 부서였으면 명단에서 완전히 사라진다. */
   @Delete(':id/members/:knoxId')
   async removeMember(
     @Param('id') id: string,
     @Param('knoxId') knoxId: string,
+    @Query('department') department: string,
     @CurrentActor() me: Actor,
   ) {
-    const project = await this.projects.removeMember(id, knoxId, me);
+    const project = await this.projects.removeMember(id, knoxId, department, me);
     return { data: toProjectDetailDto(project) };
   }
 }

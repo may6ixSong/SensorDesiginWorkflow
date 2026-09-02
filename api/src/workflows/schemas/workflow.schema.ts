@@ -65,7 +65,14 @@ export class Workflow {
   @Prop({ type: SchemaTypes.ObjectId, ref: 'Project', required: true, index: true })
   projectId: Types.ObjectId;
 
-  /** workflow가 속한 설계 도메인. 빈 문자열이면 FE가 UNASSIGNED로 묶는다 */
+  /**
+   * workflow가 속한 부서. 예전 "설계 도메인" 자유 선택은 폐지되었고, 지금은 이 workflow를
+   * 만든 사람이 과제 팀원 명단(Project.members)에서 실제로 속한 부서가 생성 시점에
+   * 들어간다(ProjectsService.createWorkflow) — 소속이 없는 admin이 만들면 빈 문자열로
+   * 남는다. 이후 workflow 편집 dialog의 Details 탭에서 수동으로 재배정할 수 있다
+   * (ProjectsService.updateWorkflowDomain, 편집자 본인이 속한 부서로만 제한). 빈
+   * 문자열이면 FE가 UNASSIGNED로 묶는다.
+   */
   @Prop({ default: '', trim: true, index: true })
   domain: string;
 

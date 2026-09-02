@@ -1,6 +1,6 @@
 import { Type } from 'class-transformer';
 import {
-  ArrayMinSize, IsArray, IsHexColor, IsOptional, IsString, MaxLength, MinLength, ValidateNested,
+  ArrayMinSize, IsArray, IsBoolean, IsHexColor, IsOptional, IsString, MaxLength, MinLength, ValidateNested,
 } from 'class-validator';
 
 /**
@@ -14,10 +14,23 @@ export class CreateWorkflowDto {
   @MaxLength(60)
   name: string;
 
-  /** 과제의 workflowDomains 중 하나. 빈 문자열이면 도메인 미지정. */
+  /**
+   * 만든 사람이 이 과제에서 속한 부서 중 하나여야 한다(ProjectsService.createWorkflow가
+   * 검증). 빈 문자열이면 도메인 미지정 — 소속 부서가 없는 admin만 가능하다.
+   */
   @IsString()
   @MaxLength(40)
   domain: string;
+
+  /**
+   * 만드는 사람이 admin인지 — api는 이를 독립적으로 확인할 수 없어(Actor에는 knoxId만
+   * 있다) FE가 보낸 값을 신뢰한다(WorkflowsService.addOwner의 department 신뢰와 같은
+   * 패턴). 소속 부서가 하나도 없는 사람이 workflow를 만들 때만 의미가 있다 — true면
+   * unassigned로 허용하고, 그렇지 않으면 거부된다.
+   */
+  @IsOptional()
+  @IsBoolean()
+  creatorIsAdmin?: boolean;
 
   @IsOptional()
   @IsString()

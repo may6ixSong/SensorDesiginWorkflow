@@ -9,13 +9,13 @@ import { useAuth } from '@/app/providers/AuthProvider';
 import { useDirectory } from '@/app/providers/DirectoryProvider';
 import { canEditMilestones } from '@/lib/access';
 import { ProjectPageShell } from '@/components/project/ProjectPageShell';
+import { DepartmentsSection } from '@/components/project/DepartmentsSection';
 import { UserSearchDialog } from '@/components/dialogs/UserSearchDialog';
 import { ConfirmDialog } from '@/components/dialogs/ConfirmDialog';
 import { SirenButton } from '@/components/common/SirenButton';
 import { Card, Ey } from '@/components/common/Panel';
 import { UserAvatar } from '@/components/common/Avatar';
 import { Icon } from '@/components/common/Icon';
-import { DEPARTMENTS } from '@/shared/constants/departments';
 import { toast } from '@/store/toastStore';
 import { T } from '@/theme/tokens';
 
@@ -34,25 +34,38 @@ export function ProjectMembersPage() {
               canManage={canManageManagers}
             />
 
-            <Box sx={{ fontSize: 15, fontWeight: 700, letterSpacing: '-.01em', mb: '12px' }}>
+            {/*
+              Departments 관리를 여기 둔다 — Team Members를 추가하는 곳과 같은 화면이어야
+              새 부서를 만들고 바로 그 부서에 멤버를 추가하는 흐름이 자연스럽다(사용자 요청).
+            */}
+            <DepartmentsSection projectId={project._id} departments={project.departments} own={own} />
+
+            <Box sx={{ fontSize: 15, fontWeight: 700, letterSpacing: '-.01em', mt: '26px', mb: '12px' }}>
               Team Members
               <Box component="span" sx={{ fontWeight: 400, color: T.dm2, ml: '7px', fontSize: 13 }}>
                 {project.members.length} people
               </Box>
             </Box>
-            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(300px,1fr))', gap: '14px' }}>
-              {DEPARTMENTS.map((dept) => (
-                <DepartmentMemberCard
-                  key={dept.id}
-                  projectId={project._id}
-                  deptId={dept.id}
-                  deptName={dept.name}
-                  members={project.members.filter((m) => m.department === dept.id)}
-                  takenKnoxIds={new Set(project.members.map((m) => m.knoxId))}
-                  canManage={own}
-                />
-              ))}
-            </Box>
+            {project.departments.length === 0 ? (
+              <Box sx={{ fontSize: 12, color: T.dm2 }}>
+                Add a department above before adding team members.
+              </Box>
+            ) : (
+              <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(300px,1fr))', gap: '14px' }}>
+                {project.departments.map((dept) => (
+                  <DepartmentMemberCard
+                    key={dept}
+                    projectId={project._id}
+                    deptName={dept}
+                    members={project.members.filter((m) => m.departments.includes(dept))}
+                    takenKnoxIds={new Set(
+                      project.members.filter((m) => m.departments.includes(dept)).map((m) => m.knoxId),
+                    )}
+                    canManage={own}
+                  />
+                ))}
+              </Box>
+            )}
           </>
         );
       }}
@@ -147,11 +160,17 @@ function ProjectManagersCard({
   );
 }
 
+/**
+ * 부서(팀) 하나의 멤버 카드 — 이제 project.departments(자유 목록)에서 파생되고, 한 멤버가
+ * 여러 부서 카드에 동시에 나타날 수 있다(ProjectMember.departments가 배열이라서). 그래서
+ * takenKnoxIds는 "이 프로젝트 전체에서 이미 추가된 사람"이 아니라 "이 부서에 이미 있는
+ * 사람"만 가리켜야 한다 — 다른 부서에 이미 속한 사람도 이 카드에서 추가로 고를 수 있어야
+ * 한다.
+ */
 function DepartmentMemberCard({
-  projectId, deptId, deptName, members, takenKnoxIds, canManage,
+  projectId, deptName, members, takenKnoxIds, canManage,
 }: {
   projectId: string;
-  deptId: string;
   deptName: string;
   members: ProjectMemberDto[];
   takenKnoxIds: Set<string>;
@@ -205,11 +224,11 @@ function DepartmentMemberCard({
         <UserSearchDialog
           title={`${t('members.addMember')} — ${deptName}`}
           excludeKnoxIds={takenKnoxIds}
-          fixedDepartment={deptId}
+          fixedDepartment={deptName}
           onClose={() => setSearchOpen(false)}
           onConfirm={(knoxId, department) => {
             addMember.mutate(
-              { knoxId, department: department ?? deptId },
+              { knoxId, department: department ?? deptName },
               {
                 onSuccess: () => { setSearchOpen(false); toast('Member added'); },
                 onError: (e: any) => toast(e?.response?.data?.message ?? 'Failed to add'),
@@ -228,7 +247,7 @@ function DepartmentMemberCard({
           cancelLabel={t('members.cancel')}
           busy={removeMember.isPending}
           onCancel={() => setTarget(null)}
-          onConfirm={() => removeMember.mutate(target, {
+          onConfirm={() => removeMember.mutate({ knoxId: target, department: deptName }, {
             onSuccess: () => { setTarget(null); toast('Member removed'); },
           })}
         />

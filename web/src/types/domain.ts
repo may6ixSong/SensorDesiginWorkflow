@@ -42,10 +42,13 @@ export interface ProjectDto {
   status: string;
 }
 
-/** 과제 단위 부서별 팀원 로스터 항목 — workflow owners/viewGrants(접근 권한)와는 별개의 정보성 명단. */
+/**
+ * 과제 단위 부서별 팀원 로스터 항목 — workflow owners/viewGrants(접근 권한)와는 별개의 정보성
+ * 명단. departments는 배열이다 — 한 멤버가 여러 부서(팀)에 동시에 속할 수 있다.
+ */
 export interface ProjectMemberDto {
   knoxId: string;
-  department: string;
+  departments: string[];
   addedAt: string;
 }
 
@@ -53,14 +56,10 @@ export interface ProjectMemberDto {
 export interface ProjectDetailDto extends ProjectDto {
   members: ProjectMemberDto[];
   /**
-   * 이 과제의 workflow가 고를 수 있는 설계 도메인 목록 (WorkflowDto.domain에 들어갈 값).
-   * 과제마다 편집하는 데이터라 DEPARTMENTS 같은 고정 상수가 아니다
-   * (PATCH /projects/:id/workflow-domains).
-   */
-  workflowDomains: string[];
-  /**
-   * 산출물 "Received from" 후보 부서 목록 — 과제마다 자유롭게 추가/삭제한다
-   * (PATCH /projects/:id/departments). 새 과제는 기본 6개로 시작한다.
+   * 이 과제가 인정하는 부서(팀) 목록 — 과제마다 자유롭게 추가/삭제한다
+   * (PATCH /projects/:id/departments). 새 과제는 기본 6개로 시작한다. 세 곳에 쓰인다:
+   * 산출물 "Received from" 후보, 멤버(ProjectMemberDto.departments)가 속할 수 있는 후보,
+   * 그리고 workflow를 만든 사람의 소속이 곧 그 workflow의 분류(WorkflowDto.domain)가 된다.
    */
   departments: string[];
   /** 마일스톤(공통 일정)을 수정할 수 있는 Project Manager의 knoxId 목록 — Workflow의 owners(Edit 권한)와는 별개 role. */
@@ -80,9 +79,11 @@ export interface WorkflowDto {
   description: string;
   color: string;
   /**
-   * workflow가 속한 설계 도메인(예: 'Analog', 'Digital'). Design Workflow view가 이 값으로
-   * 화면을 도메인 단위로 갈라 놓는다. 비어 있으면 UNASSIGNED로 묶인다
-   * (web/src/lib/domainWorkflow.ts의 domainOf()).
+   * workflow가 속한 부서(예: 'Analog', 'Digital'). 이 workflow를 만든 사람이 과제
+   * 팀원 명단(ProjectDetailDto.members)에서 실제로 속한 부서가 생성 시점에 자동으로
+   * 들어가고, workflow 편집 dialog의 Details 탭에서 수동으로 재배정할 수 있다(편집자
+   * 본인이 속한 부서로만 제한). Design Workflow view가 이 값으로 화면을 부서 단위로
+   * 갈라 놓는다. 비어 있으면 UNASSIGNED로 묶인다(web/src/lib/domainWorkflow.ts의 domainOf()).
    */
   domain?: string | null;
   /** 이 workflow만의 일정 — 항상 start 오름차순으로 내려온다. */
