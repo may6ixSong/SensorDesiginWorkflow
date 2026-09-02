@@ -75,17 +75,6 @@ export function DepartmentsDialog({
         </>
       }
     >
-      <Box
-        sx={{
-          fontSize: 11.5, color: T.dm, background: T.sf2, border: `1px solid ${T.ln}`,
-          borderRadius: '9px', padding: '9px 11px', mb: '14px', lineHeight: 1.7,
-        }}
-      >
-        Candidates for "Received from" on artifacts this project's workflows need — add or remove
-        freely, e.g. for departments that don't use this system yet. A department with members
-        can't be removed — take everyone out of it first.
-      </Box>
-
       {err && <Box sx={{ fontSize: 12, color: T.rd, mb: '10px' }}>{err}</Box>}
 
       <Card>
@@ -122,7 +111,7 @@ export function DepartmentsDialog({
 
         {departments.length === 0 && (
           <Box sx={{ fontSize: 12, color: T.dm2, padding: '7px 0' }}>
-            No departments yet — artifacts can still be marked as received, just without a picked label.
+            No departments yet.
           </Box>
         )}
 
