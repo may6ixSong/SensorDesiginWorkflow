@@ -297,7 +297,7 @@ function OverviewTab({
             <SirenButton variant="primary" onClick={submitInfo}>
               <Icon name="check" /> Save
             </SirenButton>
-            <Field label="Release schedule — view only" sx={{ mt: '13px', mb: 0 }}>
+            <Field label="Release schedule" sx={{ mt: '13px', mb: 0 }}>
               {orphan && (
                 <Box
                   sx={{
