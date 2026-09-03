@@ -121,7 +121,7 @@ Hub는 하나의 배포 단위가 아니다. **SIREN 안의 서비스 레지스�
 ### 3.5 새 서비스 온보딩 절차
 
 1. 서비스(또는 어댑터)가 §4의 필수 엔드포인트를 구현한다.
-2. SIREN 레지스트리에 항목을 추가한다(관리자 화면 또는 seed).
+2. **Admin 전용 레지스트리 관리 페이지**(§13.4)에서 항목을 추가한다.
 3. 테스트 산출물 하나를 그 서비스에 매핑해 버전이 캔버스에 뜨는지 확인한다.
 4. 문제없으면 해당 서비스의 `enabled`를 켠다.
 
@@ -484,6 +484,38 @@ working/released 구분 자체가 SIREN 눈에 안 보이므로 숨길 것도 �
 
 이렇게 해야 "아직 모든 산출물을 시스템에 넣지 않은" 현실에서도 워크플로우 구성이 막히지 않는다.
 
+### 11.4 File Vault 산출물의 역방향 노출 (Hub → Workflow)
+
+§11.1–11.3은 "SIREN에 노드가 먼저, 출처는 나중"이 기본값이다. **File Vault(아직 서비스가 아닌 단순
+파일형 산출물)에 한해서는 반대 방향도 지원한다** — Hub에서 만든 순간 워크플로우에 곧바로 나타나야
+사용자가 SIREN으로 돌아와 노드를 또 만드는 이중 작업을 안 하게 된다.
+
+이 흐름은 새 개념이 아니라 **v2 부록 A.4/A.8의 "Incoming from other workflows" 패턴을 그대로
+재사용**한다 — 거기서도 한 workflow의 산출물이 `recvWorkflowId`를 걸면 받는 쪽 보드에 사람이
+따로 등록할 필요 없이 자동으로 나타났다. 다만 이번엔 그 최초 산출물 레코드를 **사람이 SIREN에서
+만드는 대신 Hub가 API로 만든다.**
+
+**흐름:**
+
+1. 사용자가 File Vault에서 파일을 올릴 때 **project + department**를 지정한다.
+2. Hub는 SIREN의 `POST /hub/deliverables`(신규)를 호출해 그 department가 소유한 workflow에
+   Deliverable을 직접 생성한다 — `recvWorkflowId`가 이미 그 workflow로 걸린 채로, `layout: null`
+   (아직 캔버스 좌표 없음), `serviceKey: "file-vault"`, `externalArtifactId`, 최초 버전 엔트리
+   (tier A, `giver` = 업로드한 사용자)까지 채워서.
+3. 그 department가 그 project 안에서 **workflow를 하나만 소유**하면 자동으로 그 workflow가
+   타겟이 된다. **둘 이상 소유**하면 Hub 업로드 화면이 그중에서 고르게 한다(department 목록으로
+   후보를 좁힌 뒤 workflow 선택) — SIREN이 임의로 배분하지 않는다.
+4. 기존 Incoming 렌더링을 그대로 타므로, 워크플로우 보드에 **자동으로** 나타난다. 새로운 UI를
+   만들지 않는다.
+5. **phase 자동 매칭(`matchPhaseByDate`)은 적용되지 않는다.** 기존 Incoming은 보내는 쪽에 이미
+   `sourcePhase`가 있어 종료일로 매칭했지만, 방금 올라온 파일에는 phase 개념이 없다. Owner가
+   캔버스에 끌어놓을 때 phase를 **수동으로** 지정한다 — 이후는 기존 자유 배치 규칙(v2 §3.7)과
+   동일하다.
+
+**format 검증은 하지 않는다.** 모든 산출물 형식을 plugin으로 지원하는 건 시간이 오래 걸리므로,
+그 전까지 File Vault에 올리는 파일의 종류·이름은 **사용자가 자유롭게 정의**한다. 형식별 검증·플러그인
+인터페이스는 §16 로드맵 이후 과제로 남긴다.
+
 ---
 
 ## 12. Audit log 범위 축소
@@ -541,6 +573,17 @@ interface Actor {
 3. **Admin 판정은 ADSSO 토큰의 `User.Group` 클레임에서 직접 한다.** 별도로 관리하는 admin 목록을 SIREN이 두지 않는다 — `resolveActor()`가 토큰을 검증하는 그 자리에서 `User.Group`을 같이 읽어 `isAdmin`을 채운다. 사내 플랫폼에 전체 admin KnoxID 목록을 돌려주는 `{USER_GROUP_API}/user/admins`(응답: `string[]`)도 있지만, 지금은 필요 없다 — 상호 검증이나 감사용으로 나중에 붙일 수 있는 대안으로만 문서화해둔다.
 4. **감사 로그에 실제 행위자와 시뮬레이션 대상을 구분해 남긴다** (`actorKnoxId: admin, meta.actingAs: X`).
 5. **화면에 시뮬레이션 상태 표시가 항상 떠 있어야 한다** — Admin이 자기 권한과 착각하지 않도록. (이는 §14.1의 예외로, 시스템 설명이 아니라 **현재 상태 표시**다.)
+
+### 13.4 Admin 레지스트리 관리 페이지
+
+`artifactServices`(§3.2) 등록을 seed 스크립트가 아니라 **Admin 전용 화면**으로 관리한다. §13.3의
+Admin 판정(ADSSO `User.Group`)을 그대로 게이트로 쓴다 — 별도 권한 체계를 만들지 않는다.
+
+- 최소 기능: 서비스 추가/비활성화, `key`·`contractVersion`·`transport`·`baseUrl`·
+  `viewUrlTemplate`·`embedUploadUrlTemplate` 편집.
+- `key`는 생성 후 수정 불가(§3.2) — 편집 화면에서도 읽기 전용으로 렌더한다.
+- 이 화면 자체는 §14.1의 "컨트롤 라벨"에 해당하므로 설명 문구 없이, 레지스트리에 실제로 있는
+  데이터(등록된 서비스 목록과 그 필드값)만 보여준다.
 
 ---
 
@@ -643,9 +686,11 @@ SIREN의 역할이 "워크플로우 대시보드"에서 "산출물 서비스 오
 | HPC 공용 DB 스키마 생성 권한 | 사내 인프라에 사전 신청 필요. 필요 컬렉션 §8.8에 확정 |
 | Admin 판정 방식 | ADSSO 토큰의 `User.Group` 클레임 (§13.3) |
 | 버전 없는 HPC 경로형 산출물 | `path@registeredAt`을 버전 대체값으로 사용 (§5.2.1) — C/D 저신뢰도 산출물의 Release 참여 문제도 이걸로 해소 |
+| `sourceRefs` 필수 여부 | 선택 필드로 확정. 없으면 빈 배열 (§4.1) |
+| 레지스트리(`artifactServices`) 관리 방식 | Admin 전용 관리 페이지 (§13.4) — seed 스크립트 아님 |
+| File Vault 산출물이 workflow에 뜨는 방식 | Hub가 project+department로 Deliverable을 직접 생성, 기존 Incoming 패턴 재사용 (§11.4) |
 
-### 17.2 남은 것 — 잠정안 제시, 확인 대기
+### 17.2 남은 것
 
 1. **File Vault 실제 레포명·CI/배포 파이프라인** — 스토리지 백엔드는 정해졌지만(§3.7), 어느 사내 CI/배포 인프라에 올릴지는 아직.
-2. **`sourceRefs` 필수 여부** — 기존 시스템이 자기 입력 버전의 출처를 실제로 추적하는지는 시스템마다 다르다. **잠정안: 선택 필드로 두고, 없으면 빈 배열.** 4단계(SimHub 실증)에서 실제로 채울 수 있는지 확인한 뒤 필수 여부를 재론한다.
-3. **레지스트리(`artifactServices`) 관리 방식** — 개별 산출물의 format 지원이 아니라, Hub에 등록된 서비스 목록 자체를 관리하는 화면 얘기다. **잠정안: 초기엔 seed 스크립트로만 관리하고, 등록 서비스 수가 늘어나면 관리 화면을 추가한다.**
+2. **한 department가 한 project 안에서 workflow를 여러 개 소유할 때의 UX** — §11.4는 이 경우 Hub 업로드 화면에서 workflow를 고르게 한다고 정했는데, 실제로 이런 케이스가 흔한지에 따라 이 선택 단계가 거추장스러울 수 있다. 실 사용 패턴을 보고 재조정한다.
