@@ -37,7 +37,7 @@
       ┌─────────────────┴──────────────────────────┴─────────────────┐
       │                         Hub                                   │
       │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐     │
-      │  │File Vault│  │  SimHub  │  │   SSM    │  │ LayoutDB │ ... │
+      │  │ Calypso  │  │  SimHub  │  │   SSM    │  │ LayoutDB │ ... │
       │  │ (내장 #0)│  │          │  │          │  │          │     │
       │  └──────────┘  └──────────┘  └──────────┘  └──────────┘     │
       │  각 서비스가 소유: 실물 파일 · 전체 버전 이력 · 접근 판정      │
@@ -56,8 +56,8 @@
 | 용어 | 정의 |
 |---|---|
 | **Hub** | SIREN이 관장하는 산출물 서비스들의 집합, 그리고 그것을 등록·관리하는 레지스트리 |
-| **산출물 서비스(Artifact Service)** | 산출물의 실물 데이터와 버전 이력을 실제로 소유하는 개별 시스템. File Vault, SimHub, SSM 등 |
-| **File Vault** | Word/Excel 등 단순 파일형 산출물을 위해 **새로 구축하는** 서비스. Hub 레지스트리의 첫 번째 항목(내장 서비스 #0)이자 Observer 계약의 레퍼런스 구현 |
+| **산출물 서비스(Artifact Service)** | 산출물의 실물 데이터와 버전 이력을 실제로 소유하는 개별 시스템. Calypso, SimHub, SSM 등 |
+| **Calypso** | Word/Excel 등 단순 파일형 산출물을 위해 **새로 구축하는** 서비스. Hub 레지스트리의 첫 번째 항목(내장 서비스 #0)이자 Observer 계약의 레퍼런스 구현 |
 | **어댑터(Adapter)** | 이미 운영 중이라 Observer 계약을 직접 말하지 못하는 시스템을, 계약 모양으로 번역해주는 얇은 계층. 데이터를 소유하지 않는다 |
 | **Observer 계약** | SIREN과 산출물 서비스 사이의 인터페이스. 이 문서 §4 |
 | **통합 티어(Tier)** | 그 버전 기록을 SIREN이 얼마나 자동으로·검증 가능하게 알 수 있는지의 등급(A/B/C/D). §5 |
@@ -78,7 +78,7 @@ Hub는 하나의 배포 단위가 아니다. **SIREN 안의 서비스 레지스�
 // SIREN이 소유. 새 컬렉션 `artifactServices`
 {
   _id: ObjectId,
-  key: string,              // "file-vault" | "simhub" | "ssm" — 불변 식별자
+  key: string,              // "calypso" | "simhub" | "ssm" — 불변 식별자
   name: string,             // 화면 표시명
   contractVersion: string,  // "1.0" — 이 서비스가 구현한 Observer 계약 버전
   defaultTier: "A" | "B" | "C" | "D",
@@ -86,7 +86,7 @@ Hub는 하나의 배포 단위가 아니다. **SIREN 안의 서비스 레지스�
   baseUrl: string | null,   // transport=http일 때 어댑터/서비스 엔드포인트
   viewUrlTemplate: string | null,   // "https://ssm.local/spec/{artifactId}"
   embedUploadUrlTemplate: string | null,  // null이면 링크-아웃으로 폴백
-  isBuiltIn: boolean,       // File Vault만 true
+  isBuiltIn: boolean,       // Calypso만 true
   enabled: boolean,
   createdAt, updatedAt
 }
@@ -103,12 +103,14 @@ Hub는 하나의 배포 단위가 아니다. **SIREN 안의 서비스 레지스�
 | **SIREN** (api + web) | 현행 유지 (`SensorDesiginWorkflow`) | 오케스트레이션 본체 |
 | **SimHub** | **분리** | 자체 도메인 로직·저장소·배포 주기를 가진 실서비스 |
 | **SSM · LayoutDB 등 기존 시스템** | 각자 기존 레포 유지 | 이미 독립 운영 중 |
-| **File Vault** | **분리 권장** | 파일 저장·수명주기·바이러스 검사 등 SIREN과 무관한 관심사를 갖는다 |
+| **Calypso** | **레포는 분리 안 함** — `SensorDesiginWorkflow` 안에 `web/`·`api/`와 동급인 새 최상위 폴더(가칭 `calypso/`) | 실무 판단: 초기엔 하나의 레포로 관리하는 운영 부담이 더 싸다 |
 | **어댑터** | 대상 시스템 레포 우선, 불가하면 SIREN 레포 내 별도 모듈 | 아래 3.4 참조 |
 
 **분리 판단 기준 한 줄** — *자체 저장소를 갖고 자기 배포 주기로 도는가?* 그렇다면 분리한다. 순수 번역만 하고 상태가 없다면 어디에 두든 무방하다.
 
-**단, 물리적 위치와 무관하게 계약 경계는 반드시 지킨다.** SIREN 레포 안에 어댑터 모듈을 두더라도, SIREN의 다른 코드가 그 모듈의 서비스 클래스를 직접 import 해서는 안 되고 항상 Observer 계약과 동일한 인터페이스로만 호출한다. 이 규칙이 깨지면 나중에 프로세스를 떼어낼 때 그 지름길들을 전부 걷어내야 한다.
+**Calypso는 이 기준으로 보면 분리 후보이지만, 의도적인 예외다.** FE는 여전히 §11.4의 원칙대로 SIREN과 별개 화면/경로로 두되(다른 실서비스들과 상호작용 패턴을 맞추기 위해), 레포·배포는 같은 저장소 안 별도 폴더로 시작한다 — 코드는 분리하되 저장소 관리 부담은 늘리지 않는 절충이다. 나중에 Calypso의 배포 주기가 SIREN 본체와 실제로 갈리기 시작하면 그때 레포를 떼어내면 된다 — 폴더로 시작해도 `web/`·`api/`와 동급으로 독립된 `package.json`·자체 `.env`를 갖추면(§3.7) 분리 자체는 언제든 기계적으로 가능하다.
+
+**단, 물리적 위치와 무관하게 계약 경계는 반드시 지킨다.** SIREN 레포 안에 어댑터 모듈이나 Calypso 폴더를 두더라도, 다른 코드가 그 모듈/폴더의 서비스 클래스를 직접 import 해서는 안 되고 항상 Observer 계약과 동일한 인터페이스(HTTP)로만 호출한다. 이 규칙이 깨지면 나중에 프로세스를 떼어낼 때 그 지름길들을 전부 걷어내야 한다.
 
 ### 3.4 계약 명세의 소유와 배포
 
@@ -141,7 +143,7 @@ Hub는 하나의 배포 단위가 아니다. **SIREN 안의 서비스 레지스�
 
 ### 3.7 OA망 파일형 산출물의 오브젝트 스토리지
 
-File Vault를 포함해 아직 별도 서비스로 시스템화되지 않은 OA망 파일형 산출물은, SIREN api가
+Calypso를 포함해 아직 별도 서비스로 시스템화되지 않은 OA망 파일형 산출물은, SIREN api가
 이미 쓰고 있는 오브젝트 스토리지 설정 패턴을 그대로 따른다 — 새로 발명하지 않는다.
 
 `api/.env.example` 기준 기존 키 그대로:
@@ -149,15 +151,16 @@ File Vault를 포함해 아직 별도 서비스로 시스템화되지 않은 OA�
 ```
 S3_URI=
 S3_BUCKET_NAME=
-S3_FOLDER=            # 버킷 내 prefix. SIREN 본체는 siren-dev/siren, File Vault는 별도 prefix
+S3_FOLDER=            # 버킷 내 prefix. SIREN 본체는 siren-dev/siren, Calypso는 별도 prefix
 S3_ACCESS_KEY_ID=
 S3_SECRET_ACCESS_KEY=
 ```
 
-File Vault가 별도 레포로 분리되면(§3.3), 이 레포도 자체 `.env.production`/`.env.development`에
-같은 키 이름으로 값을 채운다. `S3_FOLDER`만 SIREN 본체와 구분되는 값을 써서, 같은 오브젝트
-스토리지를 쓰더라도 네임스페이스는 분리한다 — 이것이 "실물 파일은 각 서비스가 소유한다"는
-원칙(§1.2)을 자격증명·prefix 레벨에서도 지키는 방법이다.
+Calypso는 레포를 분리하지 않지만(§3.3), `calypso/` 폴더 자체가 `web/`·`api/`와 동급으로
+독립된 배포 단위이므로 자체 `.env.production`/`.env.development`를 따로 갖고 같은 키 이름으로
+값을 채운다. `S3_FOLDER`만 SIREN 본체와 구분되는 값을 써서, 같은 오브젝트 스토리지를 쓰더라도
+네임스페이스는 분리한다 — 이것이 "실물 파일은 각 서비스가 소유한다"는 원칙(§1.2)을
+자격증명·prefix 레벨에서도 지키는 방법이다.
 
 ---
 
@@ -189,7 +192,7 @@ interface VersionRecord {
 
 **설계 결정 두 가지를 명시한다.**
 
-- **`versionLabel`은 자유, `isReleased`는 강제.** major.minor 규칙(§6)은 SIREN이 직접 만드는 서비스(File Vault)에만 강제하고, 기존 시스템은 자기 넘버링 체계를 그대로 쓴다. 대신 "이게 릴리스인가"만 정확히 신고하면 전체 가시성 규칙이 깨지지 않는다.
+- **`versionLabel`은 자유, `isReleased`는 강제.** major.minor 규칙(§6)은 SIREN이 직접 만드는 서비스(Calypso)에만 강제하고, 기존 시스템은 자기 넘버링 체계를 그대로 쓴다. 대신 "이게 릴리스인가"만 정확히 신고하면 전체 가시성 규칙이 깨지지 않는다.
 - **`sourceRefs`는 만든 쪽이 자기신고한다.** SIREN의 캔버스 edge는 "A→B 연결이 있다"는 구조 정보일 뿐이고, "이 v1.2가 정확히 어느 입력 버전으로 만들어졌는지"는 생성 시점에 그 서비스만 안다. SIREN이 edge와 현재 버전을 조합해 추론하지 않는다.
 
 ### 4.2 엔드포인트 — 필수
@@ -238,7 +241,7 @@ GET /api/v1/hub/common?projectId={id}
 
 | 티어 | 이름 | SIREN이 아는 것 | 전형적 대상 |
 |---|---|---|---|
-| **A** | Live | 버전·giver를 동기 조회. 임베드 업로드 가능 | File Vault, 계약을 맞춘 SimHub |
+| **A** | Live | 버전·giver를 동기 조회. 임베드 업로드 가능 | Calypso, 계약을 맞춘 SimHub |
 | **B** | Synced | 버전·giver가 자동 갱신되나 이벤트 시점 기준 | HPC 생성 → 공용 DB 경유 산출물 |
 | **C** | Linked | 자동 갱신 없음. 링크만 있고 버전은 사람이 입력 | 시스템은 있으나 미연동, 미채택 부서 |
 | **D** | Attested | 시스템 자체가 없음. 출처를 자유 텍스트로 기록 | 팀·회사 밖에서 생성되는 산출물 |
@@ -519,18 +522,18 @@ working/released 구분 자체가 SIREN 눈에 안 보이므로 숨길 것도 �
 
 이렇게 해야 "아직 모든 산출물을 시스템에 넣지 않은" 현실에서도 워크플로우 구성이 막히지 않는다.
 
-### 11.4 File Vault 산출물 — Hub가 등록, workflow가 선택
+### 11.4 Calypso 산출물 — Hub가 등록, workflow가 선택
 
-**Hub가 먼저다.** Hub(File Vault)는 그 자체로 산출물 등록 시스템이고, workflow는 거기 이미
+**Hub가 먼저다.** Hub(Calypso)는 그 자체로 산출물 등록 시스템이고, workflow는 거기 이미
 등록된 산출물 중에서 **골라 쓰는 쪽**이다. §11.1–11.3의 "SIREN에 노드가 먼저, 출처는 나중"
 순서를 뒤집는 게 아니라 — 출처가 이미 Hub에 있을 때는 그 "출처 지정" 단계가 곧 "Hub에서
 선택"이 되는 것뿐이다. Hub가 특정 workflow로 밀어넣는 게 아니다.
 
-1. 사용자가 File Vault에서 파일을 등록할 때는 **project + department**만 지정한다. **workflow는
+1. 사용자가 Calypso에서 파일을 등록할 때는 **project + department**만 지정한다. **workflow는
    지정하지 않는다** — Hub는 workflow 개념을 모른다.
 2. SIREN의 산출물 "출처 지정" 단계(§11 step 2)에 **"등록된 산출물에서 선택"** 경로를 추가한다.
    그 project + 그 workflow의 department로 스코프된 Hub 산출물 목록에서 고른다.
-3. 고르면 그 workflow에 새 Deliverable(placement)이 만들어진다 — `serviceKey: "file-vault"`,
+3. 고르면 그 workflow에 새 Deliverable(placement)이 만들어진다 — `serviceKey: "calypso"`,
    `externalArtifactId`가 그 자리에서 채워지고, Tier A라 버전이 바로 보인다(§11의 "빈 상태"
    단계를 건너뛴다). phase·캔버스 좌표는 다른 산출물과 똑같이 사용자가 놓는 자리에서 정해진다.
 4. **같은 Hub 산출물을 같은 department의 다른 workflow에서도 똑같이 선택할 수 있다.** 각
@@ -542,7 +545,7 @@ working/released 구분 자체가 SIREN 눈에 안 보이므로 숨길 것도 �
    영향받지 않는다 — `DELIVERABLE_DELETE`는 그 workflow의 참조 하나만 지운다.
 
 **format 검증은 하지 않는다.** 모든 산출물 형식을 plugin으로 지원하는 건 시간이 오래 걸리므로,
-그 전까지 File Vault에 올리는 파일의 종류·이름은 **사용자가 자유롭게 정의**한다. 형식별 검증·플러그인
+그 전까지 Calypso에 올리는 파일의 종류·이름은 **사용자가 자유롭게 정의**한다. 형식별 검증·플러그인
 인터페이스는 §16 로드맵 이후 과제로 남긴다.
 
 ---
@@ -641,6 +644,21 @@ Admin 판정(ADSSO `User.Group`)을 그대로 게이트로 쓴다 — 별도 권
 
 마스킹된 필드는 **빈 값이 아니라 명시적 상태**로 그린다(`접근 권한 없음`). 데이터가 없는 것과 볼 수 없는 것은 다르다.
 
+### 14.3 My Task 필터 — 목록 페이지 필수 기능
+
+워크플로우 목록도, 각 Hub 서비스의 산출물/job 목록도 시간이 지나면 한 화면에 다 보기 힘들 만큼
+많아진다. **SIREN과 모든 Hub 서비스(Calypso 포함)의 목록 페이지는 "내가 owner이거나 편집 권한이
+있는 것만" 걸러 보는 필터를 필수로 갖는다.**
+
+- **SIREN 워크플로우 목록** — 그 workflow의 `owners`(Edit 권한자, v2 §3.3)에 내 KnoxID가 있는 것만.
+- **각 Hub 서비스의 자기 목록** — 그 서비스가 스스로 정의하는 "만들었거나 편집 권한이 있는 것"
+  기준. Calypso라면 최소한 `giver == 나`(내가 등록한 산출물)가 그 기준이 된다 — Calypso에
+  다중 편집자 개념이 생기면 그때 넓히면 된다.
+- 이 필터는 SIREN이 대신 계산해주는 게 아니라 **각 서비스가 자기 목록에서 직접 구현**한다 — 오케스트레이션과 무관한, 각 서비스 자신의 화면 책임이다.
+- 기본값은 **꺼짐(전체 보기)**으로 시작한다 — 처음 방문했을 때 자기 항목이 하나도 없어서 빈 화면을
+  보는 것보다는, 켜고 끄는 토글이 눈에 잘 띄는 게 낫다. 이 토글은 §14.1의 "컨트롤 라벨"에 해당하므로
+  이름표만 있으면 되고 별도 설명 문구는 없다(예: `My Task`라는 라벨 자체로 충분).
+
 ---
 
 ## 15. Home 대문 페이지 재설계
@@ -694,7 +712,7 @@ SIREN의 역할이 "워크플로우 대시보드"에서 "산출물 서비스 오
 | 단계 | 내용 | 산출물 |
 |---|---|---|
 | **1** | Observer 계약 v1 확정 | `docs/observer-contract-v1.yaml`, 레지스트리 스키마 |
-| **2** | File Vault 구축 (레퍼런스 구현) | 별도 레포. 필수+선택 엔드포인트 전부 구현 |
+| **2** | Calypso 구축 (레퍼런스 구현) | 같은 레포 `calypso/` 폴더. 필수+선택 엔드포인트 전부 구현 |
 | **3** | SIREN Hub 모듈 | 레지스트리 CRUD, 범용 Observer client, 버전 마스킹 단일 통로, 데이터 모델 마이그레이션 |
 | **4** | SimHub 연동 (A 티어 실증) | SimHub 레포 분리 + 계약 구현. **여기서 계약의 빈틈이 드러난다 — v1.1 개정을 예상한다** |
 | **5** | B 티어 sync job | `api/src/hub/sync/`, 공용 DB 수출/수입 테이블 |
@@ -718,8 +736,8 @@ SIREN의 역할이 "워크플로우 대시보드"에서 "산출물 서비스 오
 | 버전 없는 HPC 경로형 산출물 | `path@registeredAt`을 버전 대체값으로 사용 (§5.2.1) — C/D 저신뢰도 산출물의 Release 참여 문제도 이걸로 해소 |
 | `sourceRefs` 필수 여부 | 선택 필드로 확정. 없으면 빈 배열 (§4.1) |
 | 레지스트리(`artifactServices`) 관리 방식 | Admin 전용 관리 페이지 (§13.4) — seed 스크립트 아님 |
-| File Vault 산출물이 workflow에 뜨는 방식 | **Hub가 먼저 등록, workflow는 거기서 선택** — Hub는 project+department 스코프만 알고 workflow 개념을 모른다. 같은 산출물이 같은 department의 여러 workflow에 동시에 걸릴 수 있다 (§11.4) |
-| File Vault 배포 인프라 | 별도 결정 사항 아님 — 이미 운영 중인 다른 서비스와 같은 배포 방식을 그대로 쓴다. 스토리지는 §3.7(할당된 S3 자원)로 이미 정함 |
+| Calypso 산출물이 workflow에 뜨는 방식 | **Hub가 먼저 등록, workflow는 거기서 선택** — Hub는 project+department 스코프만 알고 workflow 개념을 모른다. 같은 산출물이 같은 department의 여러 workflow에 동시에 걸릴 수 있다 (§11.4) |
+| Calypso 배포 인프라 | 별도 결정 사항 아님 — 이미 운영 중인 다른 서비스와 같은 배포 방식을 그대로 쓴다. 스토리지는 §3.7(할당된 S3 자원)로 이미 정함 |
 
 ### 17.2 남은 것
 
