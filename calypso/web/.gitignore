@@ -4,3 +4,9 @@ dist/
 *.log
 *.tsbuildinfo
 package-lock.json
+
+# calypso/.gitignore가 백엔드 시크릿 보호용으로 .env.*를 통째로 막는데, 이 프론트엔드는
+# SIREN web(web/.gitignore)과 마찬가지로 .env.development/.env.production에 시크릿이
+# 없다 - 여기서 명시적으로 되살린다.
+!.env.development
+!.env.production

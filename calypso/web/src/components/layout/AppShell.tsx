@@ -26,7 +26,7 @@ const NAV_LABEL = 'Projects';
 export function AppShell({ children }: AppShellProps) {
   const { user } = useAuth();
   const { pathname } = useLocation();
-  const navOn = pathname === '/' || pathname.startsWith('/projects');
+  const navOn = pathname.startsWith('/projects');
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
@@ -79,7 +79,7 @@ export function AppShell({ children }: AppShellProps) {
         <Box sx={{ display: 'flex', gap: '2px' }}>
           <Box
             component={Link}
-            to="/"
+            to="/projects"
             sx={{
               fontSize: 12, fontWeight: navOn ? 600 : 500, textDecoration: 'none',
               padding: '6px 10px', borderRadius: '7px', whiteSpace: 'nowrap', flex: '0 0 auto',

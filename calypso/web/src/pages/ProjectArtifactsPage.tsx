@@ -46,7 +46,7 @@ export function ProjectArtifactsPage() {
         <Box sx={{ p: '32px 36px', maxWidth: 1100, mx: 'auto' }}>
           <Box
             component={Link}
-            to="/"
+            to="/projects"
             sx={{ fontSize: 11.5, color: T.dm, textDecoration: 'none', '&:hover': { color: T.tx } }}
           >
             ← Projects

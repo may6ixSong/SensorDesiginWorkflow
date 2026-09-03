@@ -1,6 +1,7 @@
 import { Route, Routes } from 'react-router-dom';
 import { CircularProgress, Stack } from '@mui/material';
 import { useAuth } from '@/app/providers/AuthProvider';
+import { HomePage } from '@/pages/HomePage';
 import { ProjectListPage } from '@/pages/ProjectListPage';
 import { ProjectArtifactsPage } from '@/pages/ProjectArtifactsPage';
 import { ArtifactDetailPage } from '@/pages/ArtifactDetailPage';
@@ -30,7 +31,8 @@ export default function App() {
   return (
     <LoginGate>
       <Routes>
-        <Route path="/" element={<ProjectListPage />} />
+        <Route path="/" element={<HomePage />} />
+        <Route path="/projects" element={<ProjectListPage />} />
         <Route path="/projects/:projectId" element={<ProjectArtifactsPage />} />
         <Route path="/artifacts/:id" element={<ArtifactDetailPage />} />
         <Route path="/guide" element={<GuidePage />} />
