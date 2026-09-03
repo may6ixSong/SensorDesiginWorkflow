@@ -37,12 +37,10 @@ export function AddDeliverableDialog({ workflowName, phases, intent = 'own', onC
   const [serviceKey, setServiceKey] = useState('');
   const [externalArtifactId, setExternalArtifactId] = useState('');
   const [err, setErr] = useState(false);
-  const [svcErr, setSvcErr] = useState(false);
   const [keyErr, setKeyErr] = useState('');
 
   const submit = () => {
     if (!name.trim() || !phaseId) { setErr(true); return; }
-    if (!serviceKey) { setSvcErr(true); return; }
     const key = artifactKey.trim();
     if (key && !/^[A-Za-z0-9_.-]+$/.test(key)) {
       setKeyErr('Only letters, numbers, dot, underscore and hyphen are allowed.');
@@ -119,14 +117,13 @@ export function AddDeliverableDialog({ workflowName, phases, intent = 'own', onC
       <Field label="Source — the registered system this artifact lives in">
         <SelectInput
           value={serviceKey}
-          onChange={(v) => { setServiceKey(v); setSvcErr(false); }}
+          onChange={setServiceKey}
           disabled={servicesLoading}
           options={[
-            { value: '', label: servicesLoading ? 'Loading…' : 'Select a system' },
+            { value: '', label: servicesLoading ? 'Loading…' : 'Not linked — record versions here' },
             ...(services ?? []).map((s) => ({ value: s.key, label: s.name })),
           ]}
         />
-        {svcErr && <Box sx={{ fontSize: 11, color: T.rd, mt: '5px' }}>Pick the system this artifact is registered in.</Box>}
       </Field>
       <Field label="External artifact ID — optional; fill in once it's registered there">
         <TextInput

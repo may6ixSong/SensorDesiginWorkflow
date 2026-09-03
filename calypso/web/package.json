@@ -2,7 +2,7 @@
   "name": "calypso-web",
   "version": "0.1.0",
   "private": true,
-  "description": "Calypso - 파일형 산출물 등록 창구 (SIREN Hub)",
+  "description": "[DEPRECATED - 설계서 §11.5, README.md 참고] Calypso 웹앱. 당분간 운영하지 않는다 - 산출물 등록 화면은 SIREN web에 있고 Calypso api를 직접 호출한다.",
   "type": "module",
   "scripts": {
     "dev": "vite",

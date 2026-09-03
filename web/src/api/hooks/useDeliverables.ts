@@ -138,6 +138,38 @@ export function useUpdateSchedule(workflowId: string) {
 }
 
 /**
+ * C/D 티어 수동 버전 기록 (Hub 설계서 §9) — POST /deliverables/:id/versions.
+ *
+ * 실물을 소유한 서비스가 붙어 있는 산출물(serviceKey != null)은 BE가 이 경로를
+ * 거절한다(assertManualArtifact). 아직 연동되지 않은 출처로부터 "이 버전을 받았다"를
+ * 기록하는 자리이고, 덮어쓰기 없이 append-only로 쌓인다.
+ */
+export function useAssertVersion(workflowId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      id, ...body
+    }: {
+      id: string;
+      versionLabel?: string;
+      isReleased?: boolean;
+      tier?: 'A' | 'B' | 'C' | 'D';
+      hpcPath?: string;
+      giverDept?: string;
+      viewUrl?: string;
+      note?: string;
+    }) => {
+      const res = await apiClient.post<ApiEnvelope<DeliverableDto>>(`/deliverables/${id}/versions`, body);
+      return res.data.data;
+    },
+    onSuccess: (d) => {
+      invalidateDeliverables(qc, workflowId);
+      qc.invalidateQueries({ queryKey: queryKeys.deliverableVersions(d.id) });
+    },
+  });
+}
+
+/**
  * Release는 major 버전을 올려 recvDept/recvIpId로 지정된 수신자에게 새 버전을
  * 노출시키는 행위이므로, 이 IP뿐 아니라 모든 IP의 deliverables 쿼리를 무효화해
  * 수신 측 workflow 보드가 열려 있어도(또는 다음에 열 때) 즉시 최신 Release 버전이 보이게 한다.

@@ -21,7 +21,7 @@ import {
   useUpdateWorkflowPhases,
 } from '@/api/hooks/useWorkflow';
 import {
-  useCreateDeliverable, useDeleteDeliverable, useDeliverables, useRelease,
+  useAssertVersion, useCreateDeliverable, useDeleteDeliverable, useDeliverables, useRelease,
   useUpdateDeliverable, useUpdateRecv,
 } from '@/api/hooks/useDeliverables';
 import { useMemos } from '@/api/hooks/useMemos';
@@ -84,6 +84,7 @@ export function BoardPage() {
   const updateDeliverable = useUpdateDeliverable(workflowId ?? '');
   const deleteDeliverable = useDeleteDeliverable(workflowId ?? '');
   const updateRecv = useUpdateRecv(workflowId ?? '');
+  const assertVersion = useAssertVersion(workflowId ?? '');
   const release = useRelease(workflowId ?? '');
   const addOwner = useAddOwner(workflowId ?? '');
   const removeOwner = useRemoveOwner(workflowId ?? '');
@@ -335,10 +336,30 @@ export function BoardPage() {
                   },
                 );
               }}
-              onRelease={() =>
+              onAssertVersion={({ versionLabel, note, isReleased }) =>
+                assertVersion.mutate(
+                  { id: openNode.id, versionLabel, note, isReleased, tier: 'C' },
+                  {
+                    // useDeliverables 쿼리는 편집 중엔 disabled라, 응답을 직접 store에
+                    // 병합해야 방금 기록한 버전이 트리와 캔버스 배지에 바로 반영된다.
+                    onSuccess: (updated) => {
+                      mergeDeliverableResults([updated], phaseList);
+                      toast(isReleased ? 'Version released' : 'Working version recorded');
+                    },
+                    onError: (e: any) => toast(e?.response?.data?.message ?? 'Failed to record version'),
+                  },
+                )
+              }
+              onRelease={(note) =>
                 release.mutate(
-                  { id: openNode.id },
-                  { onSuccess: () => toast('Released'), onError: () => toast('Release failed') },
+                  { id: openNode.id, note },
+                  {
+                    onSuccess: (updated) => {
+                      mergeDeliverableResults([updated], phaseList);
+                      toast('Released');
+                    },
+                    onError: (e: any) => toast(e?.response?.data?.message ?? 'Release failed'),
+                  },
                 )
               }
               onSaveRecv={({ recvDept, recvContact }) =>
