@@ -6,7 +6,7 @@ import { useDirectory } from '@/app/providers/DirectoryProvider';
 import { ModalShell } from '@/components/common/ModalShell';
 import { Badge, SirenButton } from '@/components/common/SirenButton';
 import { Card, Ey } from '@/components/common/Panel';
-import { DocIcon, Icon } from '@/components/common/Icon';
+import { Icon } from '@/components/common/Icon';
 import { UserAvatar } from '@/components/common/Avatar';
 import { toast } from '@/store/toastStore';
 import { FONT_MONO, T } from '@/theme/tokens';
@@ -28,7 +28,7 @@ export function IncomingDeliverableDialog({ d, onClose }: Props) {
   // 여기 뜨는 일정은 "주는 쪽 workflow"의 phase다 — 내 캔버스의 칸 이름이 아니다.
   const ph = d.sourcePhase;
   const rel = d.releasedVersion;
-  const by = rel ? resolveUser(rel.by) : undefined;
+  const by = rel ? resolveUser(rel.giverKnoxId ?? rel.assertedBy ?? '') : undefined;
 
   return (
     <ModalShell
@@ -37,8 +37,8 @@ export function IncomingDeliverableDialog({ d, onClose }: Props) {
       width={520}
       header={
         <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-          <Box component="span" sx={{ color: d.network === 'HPC' ? T.hp : T.bl, mt: '4px' }}>
-            <DocIcon type={d.docType} />
+          <Box component="span" sx={{ color: d.serviceKey ? T.tl : T.bl, mt: '4px' }}>
+            <Icon name={d.serviceKey ? 'link' : 'word'} />
           </Box>
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Ey>{ph ? `${ph.name} · ${shortDate(ph.start)} → ${shortDate(ph.end)}` : 'No schedule on the source workflow'}</Ey>
@@ -57,19 +57,17 @@ export function IncomingDeliverableDialog({ d, onClose }: Props) {
           <Ey>Received from</Ey>
           <Box sx={{ fontSize: 14, fontWeight: 700, mt: '2px' }}>{d.sourceWorkflow?.name ?? 'Unknown department'}</Box>
         </Box>
-        <Badge
-          color={d.network === 'HPC' ? T.hp : T.dm}
-          bg={d.network === 'HPC' ? T.hp2 : T.sf2}
-          borderColor={d.network === 'HPC' ? T.hp3 : T.ln}
-        >
-          {d.network} network
-        </Badge>
+        {d.serviceKey ? (
+          <Badge color={T.tl} bg={T.tl2} borderColor={T.tl3}>{d.serviceKey.toUpperCase()}</Badge>
+        ) : (
+          <Badge color={T.dm} bg={T.sf2} borderColor={T.ln}>Unlinked</Badge>
+        )}
       </Card>
 
       <Card sx={{ mb: '12px' }}>
         <Ey>Released version</Ey>
         <Box sx={{ fontFamily: FONT_MONO, fontSize: 21, fontWeight: 600, color: T.tl, mt: '6px' }}>
-          {rel ? `v${rel.major}.${rel.minor}` : '—'}
+          {rel ? rel.versionLabel : '—'}
         </Box>
         {rel ? (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: '7px', mt: '7px' }}>
@@ -85,24 +83,26 @@ export function IncomingDeliverableDialog({ d, onClose }: Props) {
       </Card>
 
       <Card>
-        <Ey sx={{ mb: '7px' }}>{d.network === 'HPC' ? 'HPC vwp path' : 'Current file'}</Ey>
+        <Ey sx={{ mb: '7px' }}>{rel?.hpcPath ? 'HPC vwp path' : 'View'}</Ey>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Box component="span" sx={{ color: T.dm }}><DocIcon type={d.docType} /></Box>
+          <Box component="span" sx={{ color: T.dm }}><Icon name={d.serviceKey ? 'link' : 'word'} /></Box>
           <Box component="span" sx={{ fontFamily: FONT_MONO, fontSize: 12, wordBreak: 'break-all' }}>
-            {rel?.file || 'Nothing released yet'}
+            {rel?.hpcPath || rel?.viewUrl || 'Nothing registered yet'}
           </Box>
         </Box>
         <Box sx={{ mt: '11px' }}>
-          {d.network === 'HPC' ? (
+          {rel?.hpcPath ? (
             <SirenButton
-              disabled={!rel}
-              onClick={() => { if (rel) { navigator.clipboard?.writeText(rel.file); toast('Path copied'); } }}
+              onClick={() => { navigator.clipboard?.writeText(rel.hpcPath as string); toast('Path copied'); }}
             >
               <Icon name="copy" /> Copy path
             </SirenButton>
           ) : (
-            <SirenButton disabled={!rel} onClick={() => toast('Downloads will be available once storage is connected')}>
-              <Icon name="dn" /> Download file
+            <SirenButton
+              disabled={!rel?.viewUrl}
+              onClick={() => { if (rel?.viewUrl) window.open(rel.viewUrl, '_blank', 'noopener'); }}
+            >
+              <Icon name="link" /> Open in {d.serviceKey ?? 'source'}
             </SirenButton>
           )}
         </Box>

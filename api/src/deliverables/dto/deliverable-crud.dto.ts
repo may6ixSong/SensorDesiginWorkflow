@@ -10,8 +10,14 @@ export class CreateDeliverableDto {
   @IsString()
   phaseId: string;
 
+  /**
+   * 더 이상 생성 화면에서 직접 고르지 않는다(사용자 요청) - 이제 산출물의 출처는
+   * Hub 서비스 선택(serviceKey)으로 표현하고, network은 항상 서버 기본값('OA')을 쓴다.
+   * DTO에는 하위 호환을 위해 남겨 두되 선택 필드로 낮춘다.
+   */
+  @IsOptional()
   @IsIn(['OA', 'HPC'])
-  network: 'OA' | 'HPC';
+  network?: 'OA' | 'HPC';
 
   /** 'received'면 이 workflow가 받기를 기다리는 자리표시자로 만들어진다 — 생성 후 바뀌지 않는다. */
   @IsOptional()

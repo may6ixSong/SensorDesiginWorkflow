@@ -3,9 +3,9 @@ import { Box } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import { WorkflowPhase } from '@/types/domain';
 import { shortDate } from '@/lib/schedule';
-import { CanvasNode, VersionView, fmtAt, hasW, isOrphanPhase, latA, latR, stOf, vstr } from '@/lib/canvasModel';
+import { CanvasNode, VersionView, fmtAt, hasW, isOrphanPhase, latA, latR, stOf, versionBy, vstr } from '@/lib/canvasModel';
 import { useCanvasStore } from '@/store/canvasStore';
-import { useDownloadVersion } from '@/api/hooks/useDeliverables';
+import { useArtifactServices } from '@/api/hooks/useHub';
 import { toast } from '@/store/toastStore';
 import { RECEIVABLE_DEPARTMENTS, departmentName } from '@/shared/constants/departments';
 import { useDirectory } from '@/app/providers/DirectoryProvider';
@@ -14,7 +14,7 @@ import { ConfirmDialog } from '@/components/dialogs/ConfirmDialog';
 import { ModalShell } from '@/components/common/ModalShell';
 import { SirenButton, Badge, Chip } from '@/components/common/SirenButton';
 import { Card, Ey, Field, Row, SelectInput, TextInput } from '@/components/common/Panel';
-import { DocIcon, Icon } from '@/components/common/Icon';
+import { Icon } from '@/components/common/Icon';
 import { UserAvatar } from '@/components/common/Avatar';
 import { CURSOR_POINTER, FONT_MONO, T } from '@/theme/tokens';
 
@@ -30,8 +30,10 @@ interface Props {
   /** 목업 own = isOwn(workflow) && !S.recv */
   own: boolean;
   onClose: () => void;
-  onSaveInfo: (p: { name: string; artifactKey: string | null; net: 'OA' | 'HPC'; type: string }) => void;
-  onUpload: (p: { file: string; note: string; net: 'OA' | 'HPC'; type: string }) => void;
+  onSaveInfo: (p: {
+    name: string; artifactKey: string | null;
+    serviceKey: string | null; externalArtifactId: string | null;
+  }) => void;
   onRelease: () => void;
   onSaveRecv: (p: { recvDept: string | null; recvContact: string | null }) => void;
   /** 삭제 확인 후 호출된다 — 실제 삭제 API 호출과 dialog 닫기는 호출부(BoardPage) 책임. */
@@ -46,7 +48,7 @@ interface Props {
  */
 export function DeliverableDialog({
   node: d, phases, own, onClose,
-  onSaveInfo, onUpload, onRelease, onSaveRecv, onDelete,
+  onSaveInfo, onRelease, onSaveRecv, onDelete,
 }: Props) {
   const { t } = useTranslation();
   const storeTab = useCanvasStore((s) => s.tab);
@@ -71,8 +73,8 @@ export function DeliverableDialog({
       width={640}
       header={
         <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-          <Box component="span" sx={{ color: d.net === 'HPC' ? T.hp : T.bl, mt: '4px' }}>
-            <DocIcon type={d.type} />
+          <Box component="span" sx={{ color: d.serviceKey ? T.tl : T.bl, mt: '4px' }}>
+            <Icon name={d.serviceKey ? 'link' : 'word'} />
           </Box>
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Ey>{ph ? `${ph.name} · ${shortDate(ph.start)} → ${shortDate(ph.end)}` : 'No release schedule'}</Ey>
@@ -82,14 +84,11 @@ export function DeliverableDialog({
             <Badge color={T.rd} bg={T.rd2} borderColor={T.rd3} sx={{ mt: '6px' }}>Schedule lost</Badge>
           )}
           <Badge color={st.c} bg={st.bg} borderColor={st.bd} sx={{ mt: '6px' }}>{st.lb}</Badge>
-          <Badge
-            color={d.net === 'HPC' ? T.hp : T.dm}
-            bg={d.net === 'HPC' ? T.hp2 : T.sf2}
-            borderColor={d.net === 'HPC' ? T.hp3 : T.ln}
-            sx={{ mt: '6px' }}
-          >
-            {d.net} network
-          </Badge>
+          {d.serviceKey ? (
+            <Badge color={T.tl} bg={T.tl2} borderColor={T.tl3} sx={{ mt: '6px' }}>{d.serviceKey.toUpperCase()}</Badge>
+          ) : (
+            <Badge color={T.dm} bg={T.sf2} borderColor={T.ln} sx={{ mt: '6px' }}>Unlinked</Badge>
+          )}
         </Box>
       }
       belowHeader={
@@ -132,7 +131,7 @@ export function DeliverableDialog({
       {tab === 'overview' && (
         <OverviewTab
           d={d} phases={phases} own={own} nodes={nodes} edges={edges}
-          onSaveInfo={onSaveInfo} onUpload={onUpload} onRelease={onRelease}
+          onSaveInfo={onSaveInfo} onRelease={onRelease}
         />
       )}
       {tab === 'versions' && <VersionsTab d={d} />}
@@ -155,19 +154,20 @@ export function DeliverableDialog({
 
 /* ── 개요 탭 ── */
 function OverviewTab({
-  d, phases, own, nodes, edges, onSaveInfo, onUpload, onRelease,
+  d, phases, own, nodes, edges, onSaveInfo, onRelease,
 }: {
   d: CanvasNode; phases: WorkflowPhase[]; own: boolean;
   nodes: CanvasNode[]; edges: ReturnType<typeof useCanvasStore.getState>['edges'];
-  onSaveInfo: Props['onSaveInfo']; onUpload: Props['onUpload'];
+  onSaveInfo: Props['onSaveInfo'];
   onRelease: Props['onRelease'];
 }) {
   const received = d.intent === 'received';
   const rel = latR(d);
   const work = hasW(d) ? latA(d) : null;
-  const cur = own ? latA(d)?.file : rel?.file;
-  // GET /deliverables/:id/download?major=&minor= — api/가 파일 바이트를 직접 중계한다.
-  const download = useDownloadVersion();
+  // 소유자는 작업중 버전이 있으면 그걸, 없으면 release 버전을 본다 — 그 외(받는 쪽 등)는
+  // 항상 release 버전만. 실물은 그 서비스가 갖고 있으므로 여기서는 링크로만 내보낸다.
+  const shown = own ? latA(d) : rel;
+  const { data: services } = useArtifactServices();
 
   // rev를 의존성에 넣는 이유: 캔버스 드래그로 phase가 바뀌는 건 nodes 배열 원소를
   // in-place로 고치는 것이라(canvasStore) 배열 참조 자체는 그대로다 — rev 없이는 이
@@ -190,22 +190,16 @@ function OverviewTab({
 
   const [name, setName] = useState(d.name);
   const [artifactKey, setArtifactKey] = useState(d.artifactKey ?? '');
-  const [net, setNet] = useState<'OA' | 'HPC'>(d.net);
-  const [type, setType] = useState(d.type);
+  const [serviceKey, setServiceKey] = useState(d.serviceKey ?? '');
+  const [externalArtifactId, setExternalArtifactId] = useState(d.externalArtifactId ?? '');
   const [nameErr, setNameErr] = useState(false);
   const [keyErr, setKeyErr] = useState('');
 
   useEffect(() => {
-    setName(d.name); setArtifactKey(d.artifactKey ?? ''); setNet(d.net); setType(d.type);
+    setName(d.name); setArtifactKey(d.artifactKey ?? '');
+    setServiceKey(d.serviceKey ?? ''); setExternalArtifactId(d.externalArtifactId ?? '');
     setKeyErr('');
   }, [d.id]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // 업로드 폼
-  const [fNet, setFNet] = useState<'OA' | 'HPC'>(d.net);
-  const [fType, setFType] = useState(d.type);
-  const [file, setFile] = useState('');
-  const [note, setNote] = useState('');
-  const [err, setErr] = useState('');
 
   const outs = edges.filter((e) => e.from === d.id);
   const ins = edges.filter((e) => e.to === d.id);
@@ -222,16 +216,10 @@ function OverviewTab({
       return;
     }
     setKeyErr('');
-    onSaveInfo({ name: name.trim(), artifactKey: key || null, net, type: net === 'HPC' ? 'path' : type });
-  };
-
-  const submitUpload = () => {
-    setErr('');
-    const f = file.trim();
-    if (!f) { setErr('Enter a file name or path.'); return; }
-    if (fNet === 'HPC' && !f.startsWith('/vwp/')) { setErr('HPC paths must start with /vwp/.'); return; }
-    onUpload({ file: f, note: note.trim() || 'Working copy update', net: fNet, type: fNet === 'HPC' ? 'path' : fType });
-    setFile(''); setNote('');
+    onSaveInfo({
+      name: name.trim(), artifactKey: key || null,
+      serviceKey: serviceKey || null, externalArtifactId: externalArtifactId.trim() || null,
+    });
   };
 
   const edgeRow = (e: { id: string; from: string; to: string }, dir: 'in' | 'out') => {
@@ -259,25 +247,27 @@ function OverviewTab({
         <>
           <Card sx={{ mb: '12px' }}>
             <Ey sx={{ mb: '9px' }}>Edit basic info</Ey>
+            <Field label="Name" sx={{ mb: '13px' }}>
+              <TextInput value={name} onChange={(v) => { setName(v); setNameErr(false); }} error={nameErr} />
+            </Field>
             <Row>
-              <Field label="Name" sx={{ flex: 1 }}>
-                <TextInput value={name} onChange={(v) => { setName(v); setNameErr(false); }} error={nameErr} />
-              </Field>
-              <Field label="Network" sx={{ width: 100 }}>
+              <Field label="Source — the registered system this artifact lives in" sx={{ flex: 1 }}>
                 <SelectInput
-                  value={net}
-                  onChange={(v) => { setNet(v as 'OA' | 'HPC'); if (v === 'HPC') setType('path'); else if (type === 'path') setType('word'); }}
-                  options={[{ value: 'OA', label: 'OA' }, { value: 'HPC', label: 'HPC' }]}
+                  value={serviceKey}
+                  onChange={setServiceKey}
+                  options={[
+                    { value: '', label: 'Not linked' },
+                    ...(services ?? []).map((s) => ({ value: s.key, label: s.name })),
+                  ]}
                 />
               </Field>
             </Row>
             <Row>
-              <Field label="Format" sx={{ flex: 1 }}>
-                <SelectInput
-                  value={type}
-                  disabled={net === 'HPC'}
-                  onChange={setType}
-                  options={[{ value: 'word', label: 'Word' }, { value: 'excel', label: 'Excel' }, { value: 'path', label: 'Path' }]}
+              <Field label="External artifact ID — optional" sx={{ flex: 1 }}>
+                <TextInput
+                  value={externalArtifactId}
+                  onChange={setExternalArtifactId}
+                  placeholder="e.g. the artifact's id in that system"
                 />
               </Field>
             </Row>
@@ -376,82 +366,38 @@ function OverviewTab({
         </Card>
       </Row>
 
-      <Card sx={{ mb: '12px' }}>
-        <Ey sx={{ mb: '7px' }}>{d.net === 'HPC' ? 'HPC vwp path' : 'Current file'}</Ey>
+      <Card sx={own && !received && hasW(d) ? { mb: '12px' } : undefined}>
+        <Ey sx={{ mb: '7px' }}>{shown?.hpcPath ? 'HPC vwp path' : 'View'}</Ey>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Box component="span" sx={{ color: T.dm }}><DocIcon type={d.type} /></Box>
+          <Box component="span" sx={{ color: T.dm }}><Icon name={d.serviceKey ? 'link' : 'word'} /></Box>
           <Box component="span" sx={{ fontFamily: FONT_MONO, fontSize: 12, wordBreak: 'break-all' }}>
-            {cur || 'Nothing registered yet'}
+            {shown?.hpcPath || shown?.viewUrl || 'Nothing registered yet'}
           </Box>
         </Box>
         <Box sx={{ mt: '11px' }}>
-          {d.net === 'HPC' ? (
+          {shown?.hpcPath ? (
             <SirenButton
-              disabled={!cur}
-              onClick={() => { if (cur) { navigator.clipboard?.writeText(cur); toast('Path copied'); } }}
+              onClick={() => { navigator.clipboard?.writeText(shown.hpcPath as string); toast('Path copied'); }}
             >
               <Icon name="copy" /> Copy path
             </SirenButton>
           ) : (
             <SirenButton
-              disabled={!rel || download.isPending}
-              onClick={() => {
-                if (!rel) return;
-                download.mutate(
-                  { id: d.id, major: rel.major, minor: rel.minor, fileName: rel.file },
-                  { onError: () => toast('Download failed') },
-                );
-              }}
+              disabled={!shown?.viewUrl}
+              onClick={() => { if (shown?.viewUrl) window.open(shown.viewUrl, '_blank', 'noopener'); }}
             >
-              <Icon name="dn" /> Download file
+              <Icon name="link" /> Open in {d.serviceKey ?? 'source'}
             </SirenButton>
           )}
         </Box>
       </Card>
 
-      {own && !received && (
-        <Card>
-          <Ey sx={{ mb: '9px' }}>Upload new working copy — minor↑</Ey>
-          <Row>
-            <Field label="Network" sx={{ width: 95 }}>
-              <SelectInput
-                value={fNet}
-                onChange={(v) => { setFNet(v as 'OA' | 'HPC'); if (v === 'HPC') setFType('path'); else if (fType === 'path') setFType('word'); }}
-                options={[{ value: 'OA', label: 'OA' }, { value: 'HPC', label: 'HPC' }]}
-              />
-            </Field>
-            <Field label="Format" sx={{ width: 95 }}>
-              <SelectInput
-                value={fType} disabled={fNet === 'HPC'} onChange={setFType}
-                options={[{ value: 'word', label: 'Word' }, { value: 'excel', label: 'Excel' }, { value: 'path', label: 'Path' }]}
-              />
-            </Field>
-            <Field label={fNet === 'HPC' ? 'HPC vwp path' : 'File name'} sx={{ flex: 1 }}>
-              <TextInput
-                value={file}
-                onChange={(v) => { setFile(v); setErr(''); }}
-                error={!!err}
-                placeholder={fNet === 'HPC' ? '/vwp/cis_a7/<workflow>/...' : 'spec_draft.docx'}
-              />
-            </Field>
-          </Row>
-          {err && <Box sx={{ fontSize: 11, color: T.rd, margin: '-5px 0 10px' }}>{err}</Box>}
-          <Field label="Change notes">
-            <TextInput value={note} onChange={setNote} placeholder="One line describing what changed" />
-          </Field>
-          <Box sx={{ display: 'flex', gap: '8px' }}>
-            <SirenButton variant="primary" onClick={submitUpload}>
-              <Icon name="up" /> Upload working copy
-            </SirenButton>
-            <SirenButton
-              disabled={!d.versions.length}
-              onClick={onRelease}
-              sx={{ color: T.tl, borderColor: T.tl3 }}
-            >
-              <Icon name="send" /> Release — v{(latR(d)?.major ?? 0) + 1}.0
-            </SirenButton>
-          </Box>
-        </Card>
+      {own && !received && hasW(d) && (
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <SirenButton variant="primary" onClick={onRelease} sx={{ color: T.tl, borderColor: T.tl3 }}>
+            <Icon name="send" /> Release latest version
+          </SirenButton>
+        </Box>
       )}
     </>
   );
@@ -468,32 +414,35 @@ function VersionsTab({ d }: { d: CanvasNode }) {
     <Box sx={{ perspective: '1000px', padding: '4px 0' }}>
       {list.map((v: VersionView, i: number) => (
         <Box
-          key={`${v.major}.${v.minor}-${i}`}
+          key={`${v.versionRef ?? v.versionLabel}-${i}`}
           sx={{
-            background: v.kind === 'major' ? T.sf : T.sf2,
+            background: v.isReleased ? T.sf : T.sf2,
             border: `1px solid ${T.ln}`,
-            borderLeft: `3px solid ${v.kind === 'major' ? T.tl : T.am3}`,
+            borderLeft: `3px solid ${v.isReleased ? T.tl : T.am3}`,
             borderRadius: '9px', padding: '10px 13px', mb: '6px',
             transition: 'transform .2s, box-shadow .2s', transformStyle: 'preserve-3d',
             '&:hover': { transform: 'translateZ(20px) rotateX(3deg)', boxShadow: T.sl, zIndex: 2 },
           }}
         >
           <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Box sx={{ fontFamily: FONT_MONO, fontSize: 13, fontWeight: 600, color: v.kind === 'major' ? T.tl : T.am }}>
+            <Box sx={{ fontFamily: FONT_MONO, fontSize: 13, fontWeight: 600, color: v.isReleased ? T.tl : T.am }}>
               {vstr(v)}
             </Box>
             <Badge
-              color={v.kind === 'major' ? T.tl : T.am}
-              bg={v.kind === 'major' ? T.tl2 : T.am2}
-              borderColor={v.kind === 'major' ? T.tl3 : T.am3}
+              color={v.isReleased ? T.tl : T.am}
+              bg={v.isReleased ? T.tl2 : T.am2}
+              borderColor={v.isReleased ? T.tl3 : T.am3}
             >
-              {v.kind === 'major' ? 'RELEASE' : 'WORKING'}
+              {v.isReleased ? 'RELEASE' : 'WORKING'}
+            </Badge>
+            <Badge color={T.dm} bg={T.sf2} borderColor={T.ln}>
+              {v.tier} · {v.confidence}
             </Badge>
             {i === 0 && <Chip>Latest</Chip>}
           </Box>
           <Box sx={{ fontSize: 12, color: T.dm, mt: '4px' }}>{v.note}</Box>
           <Box sx={{ fontFamily: FONT_MONO, fontSize: 10, color: T.dm2, mt: '4px', wordBreak: 'break-all' }}>
-            {v.file || '(none)'} · {resolveUser(v.by).name} · {fmtAt(v.at)}
+            {v.hpcPath || v.viewUrl || '(no link)'} · {resolveUser(versionBy(v)).name} · {fmtAt(v.at)}
           </Box>
         </Box>
       ))}

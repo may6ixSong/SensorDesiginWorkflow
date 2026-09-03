@@ -1,0 +1,30 @@
+import DarkModeRoundedIcon from '@mui/icons-material/DarkModeRounded';
+import LightModeRoundedIcon from '@mui/icons-material/LightModeRounded';
+import { useAuth, type Theme } from '@/app/providers/AuthProvider';
+import { useThemeMode } from '@/theme/ThemeModeContext';
+import { updateUserInfo } from '@/service/user-service';
+import { HeaderIconButton } from '@/components/common/HeaderIconButton';
+
+/** Light/dark switch — ported verbatim from SIREN web's ThemeTogglePlatform. */
+export function ThemeTogglePlatform() {
+  const { mode, toggle } = useThemeMode();
+  const { user, updateUserPrefs } = useAuth();
+
+  const onToggleTheme = async () => {
+    const next: Theme = mode === 'dark' ? 'light' : 'dark';
+    toggle();
+
+    const result = await updateUserInfo(user?.KnoxID ?? '', 'Theme', next);
+    if (result) {
+      updateUserPrefs('Theme', next);
+    }
+  };
+
+  return (
+    <HeaderIconButton
+      iconElement={mode === 'dark' ? <LightModeRoundedIcon sx={{ fontSize: 20 }} /> : <DarkModeRoundedIcon sx={{ fontSize: 20 }} />}
+      label={mode === 'dark' ? 'Light mode' : 'Dark mode'}
+      onClick={onToggleTheme}
+    />
+  );
+}

@@ -103,17 +103,42 @@ export interface Layout {
   h: number;
 }
 
-export type VersionKind = 'major' | 'minor';
+/** 통합 신뢰도 티어 (Hub 설계서 §5.1) — 산출물이 아니라 버전 엔트리마다 붙는다. */
+export type Tier = 'A' | 'B' | 'C' | 'D';
 
-/** BE가 목업 MV() 모양으로 내려주는 버전 (권한 필터링 완료 — 설계서 6.1) */
+export interface SourceRefDto {
+  artifactKey: string;
+  serviceKey: string;
+  versionRef: string;
+  versionLabel: string;
+  capturedAt: string | null;
+}
+
+/**
+ * 버전 엔트리 (권한 필터링 완료 — Hub 설계서 §6.2). 실물 파일은 각 산출물 서비스가
+ * 소유하고 SIREN은 참조만 갖는다 — major/minor/file 같은 파일 중심 필드는 없다.
+ */
 export interface DeliverableVersionDto {
-  major: number;
-  minor: number;
-  kind: VersionKind;
-  file: string;
+  versionLabel: string;
+  /** 가시성 판정의 유일한 근거이자, 화면의 Release/작업중 배지 기준. */
+  isReleased: boolean;
+  /** 그 서비스가 준 불변 참조. C/D 티어(수동 기록)는 null일 수 있다. */
+  versionRef: string | null;
+  tier: Tier;
+  /** 이 버전을 만들어 준 쪽 — 있으면 giver 판정(§6.2)의 근거가 된다. */
+  giverKnoxId: string | null;
+  giverDept: string | null;
+  /** 그 서비스의 산출물 상세 페이지 — SIREN은 이 링크로 내보낸다. */
+  viewUrl: string | null;
+  /** HPC망 경로형 산출물의 실물 위치. */
+  hpcPath: string | null;
   note: string;
-  /** 업로드/Release를 수행한 사용자의 knoxId. */
-  by: string;
+  sourceRefs: SourceRefDto[];
+  /** C/D 티어는 "검증된 사실"이 아니라 담당자의 주장이다(§6.3, §9.2) — 화면이 이걸로 구분한다. */
+  confidence: 'verified' | 'asserted';
+  assertedBy: string | null;
+  assertedAt: string | null;
+  observedAt: string | null;
   at: string;
 }
 
@@ -140,7 +165,15 @@ export interface DeliverableDto {
    * 연동할 때는 이 값으로 매핑하도록 둔다. 지정하지 않으면 null(설계서 §8.1 로드맵).
    */
   artifactKey: string | null;
-  docType: string;
+  /**
+   * 이 산출물의 실물을 소유한 Hub 서비스 (artifactServices.key) — null이면 아직 출처가
+   * 정해지지 않은 정상 빈 상태다(Hub 설계서 §11). 생성 화면에서 Network/Format 대신
+   * 이 값을 고른다.
+   */
+  serviceKey: string | null;
+  /** 그 서비스 안에서의 산출물 식별자 — serviceKey와 짝을 이룬다. */
+  externalArtifactId: string | null;
+  /** 레거시 필드 — 더 이상 생성/편집 화면에서 고르지 않는다(항상 서버 기본값). */
   network: 'OA' | 'HPC';
   series: string | null;
   seriesIdx: number;

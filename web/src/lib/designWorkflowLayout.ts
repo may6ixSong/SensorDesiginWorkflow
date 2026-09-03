@@ -91,7 +91,7 @@ export type BlockStatus = 'released' | 'inProgress' | 'notSubmitted';
 export interface BlockNode {
   id: string;
   name: string;
-  docType: string;
+  serviceKey: string | null;
   status: BlockStatus;
   /** 월드 절대 좌표. z는 카메라 평면 기준 깊이(음수=멀리, 양수=가까이). */
   x: number;
@@ -281,7 +281,7 @@ export function buildWorldLayout(
         // 자유분방하게 보인다).
         const dia = BLOCK_D * (0.94 + rand01(`${d.id}:d`) * 0.12);
         const block: BlockNode = {
-          id: d.id, name: d.name, docType: d.docType, status,
+          id: d.id, name: d.name, serviceKey: d.serviceKey, status,
           x, y, z, d: dia, phaseName: phase?.name ?? null, orphan,
         };
         centerOf.set(d.id, { x, y });

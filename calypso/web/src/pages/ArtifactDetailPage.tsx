@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Box, Button, Chip, Stack, TextField, Typography } from '@mui/material';
+import { AppShell } from '@/components/layout/AppShell';
 import { T, FONT_MONO } from '@/theme/tokens';
 import { getArtifact, releaseArtifact, uploadVersion } from '@/api/client';
 
@@ -29,12 +30,27 @@ export function ArtifactDetailPage() {
     },
   });
 
-  if (!artifact) return null;
+  if (!artifact) {
+    return (
+      <AppShell>
+        <Box sx={{ flex: 1 }} />
+      </AppShell>
+    );
+  }
   const latest = artifact.latestVersion;
 
   return (
+    <AppShell>
+    <Box sx={{ flex: 1, overflow: 'auto', background: T.bg }}>
     <Box sx={{ p: '32px 36px', maxWidth: 900, mx: 'auto' }}>
-      <Stack direction="row" alignItems="center" spacing={1.5}>
+      <Box
+        component={Link}
+        to={`/projects/${artifact.projectId}`}
+        sx={{ fontSize: 11.5, color: T.dm, textDecoration: 'none', '&:hover': { color: T.tx } }}
+      >
+        ← Project
+      </Box>
+      <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mt: '8px' }}>
         <Typography sx={{ fontSize: 22, fontWeight: 700 }}>{artifact.name}</Typography>
         <Chip size="small" label={artifact.department} variant="outlined" />
       </Stack>
@@ -103,5 +119,7 @@ export function ArtifactDetailPage() {
         ))}
       </Stack>
     </Box>
+    </Box>
+    </AppShell>
   );
 }

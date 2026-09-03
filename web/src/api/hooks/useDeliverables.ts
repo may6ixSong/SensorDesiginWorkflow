@@ -56,8 +56,8 @@ export function useCreateDeliverable(workflowId: string) {
   return useMutation({
     mutationFn: async (
       payload: {
-        name: string; phaseId: string; docType: string; network: 'OA' | 'HPC'; intent?: 'own' | 'received';
-        artifactKey?: string | null;
+        name: string; phaseId: string; intent?: 'own' | 'received';
+        artifactKey?: string | null; serviceKey?: string | null; externalArtifactId?: string | null;
       },
     ) => {
       const res = await apiClient.post<ApiEnvelope<DeliverableDto>>(`/workflows/${workflowId}/deliverables`, payload);
@@ -71,7 +71,10 @@ export function useUpdateDeliverable(workflowId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (
-      { id, ...patch }: { id: string; name?: string; artifactKey?: string; docType?: string; network?: 'OA' | 'HPC' },
+      { id, ...patch }: {
+        id: string; name?: string; artifactKey?: string;
+        serviceKey?: string | null; externalArtifactId?: string | null;
+      },
     ) => {
       const res = await apiClient.patch<ApiEnvelope<DeliverableDto>>(`/deliverables/${id}`, patch);
       return res.data.data;
@@ -130,80 +133,6 @@ export function useUpdateSchedule(workflowId: string) {
     onSuccess: () => {
       invalidateDeliverables(qc, workflowId);
       qc.invalidateQueries({ queryKey: queryKeys.edges(workflowId) });
-    },
-  });
-}
-
-/**
- * 파일 업로드 (S3 presigned URL 대신 api/가 바이트를 직접 중계한다).
- * POST /deliverables/:id/upload — multipart/form-data, 파일 필드명은 "file" 고정.
- * 응답의 storageKey/fileName을 그대로 useAddVersion에 넘겨 버전을 만든다(2단계 플로우).
- */
-export function useUploadFile() {
-  return useMutation({
-    mutationFn: async ({ id, file }: { id: string; file: File }) => {
-      const form = new FormData();
-      form.append('file', file);
-      const res = await apiClient.post<ApiEnvelope<{ storageKey: string; fileName: string }>>(
-        `/deliverables/${id}/upload`,
-        form,
-        { headers: { 'Content-Type': 'multipart/form-data' } },
-      );
-      return res.data.data;
-    },
-  });
-}
-
-/**
- * 특정 버전의 파일 바이트를 받아온다.
- * GET /deliverables/:id/download?major=&minor= — 응답은 파일 그 자체(blob).
- */
-export async function fetchDeliverableFile(id: string, major: number, minor: number): Promise<Blob> {
-  const res = await apiClient.get<Blob>(`/deliverables/${id}/download`, {
-    params: { major, minor },
-    responseType: 'blob',
-  });
-  return res.data;
-}
-
-/** 위 다운로드를 브라우저 저장까지 처리하는 헬퍼 — UI의 "Download file" 버튼용. */
-export function useDownloadVersion() {
-  return useMutation({
-    mutationFn: async ({
-      id, major, minor, fileName,
-    }: { id: string; major: number; minor: number; fileName?: string | null }) => {
-      const blob = await fetchDeliverableFile(id, major, minor);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = fileName || `${id}-v${major}.${minor}`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    },
-  });
-}
-
-export function useAddVersion(workflowId: string) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async ({
-      id,
-      ...body
-    }: {
-      id: string;
-      storageKey?: string;
-      hpcPath?: string;
-      fileName: string;
-      note?: string;
-    }) => {
-      const res = await apiClient.post<ApiEnvelope<DeliverableDto>>(`/deliverables/${id}/versions`, body);
-      return res.data.data;
-    },
-    onSuccess: (d) => {
-      invalidateDeliverables(qc, workflowId);
-      qc.invalidateQueries({ queryKey: queryKeys.deliverableVersions(d.id) });
     },
   });
 }

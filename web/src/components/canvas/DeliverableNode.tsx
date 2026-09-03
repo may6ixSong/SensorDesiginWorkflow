@@ -1,9 +1,9 @@
 import { Box } from '@mui/material';
-import { CanvasNode, latA, latR, hasW, stOf, vstr, fmtAt } from '@/lib/canvasModel';
+import { CanvasNode, latA, latR, hasW, stOf, vstr, versionBy, fmtAt } from '@/lib/canvasModel';
 import { WorkflowBriefDto, WorkflowPhase } from '@/types/domain';
 import { departmentName } from '@/shared/constants/departments';
 import { useDirectory } from '@/app/providers/DirectoryProvider';
-import { DocIcon, Icon } from '@/components/common/Icon';
+import { Icon } from '@/components/common/Icon';
 import { CURSOR_POINTER, FONT_MONO, T } from '@/theme/tokens';
 
 interface Props {
@@ -46,7 +46,7 @@ export function DeliverableNode({
   const work = hasW(d) ? latA(d) : null;
   const last = latA(d);
   const compact = d.h < 175;
-  const col = d.net === 'HPC' ? T.hp : d.type === 'excel' ? T.tl : T.bl;
+  const col = d.serviceKey ? T.tl : T.bl;
   // 진짜 다른 workflow 소유 — 이 캔버스에서 위치 편집 불가, edit 모드에서 흐리게 처리.
   const incoming = d.origin === 'incoming';
   // 이 시스템에 없는 외부 부서로부터 받은 것으로 표시된 own 산출물 — own이므로
@@ -171,17 +171,19 @@ export function DeliverableNode({
           <Icon name="lock" size={13} />
         </Box>
       )}
-      <Box
-        component="span"
-        sx={{
-          position: 'absolute', top: 0, right: 0, fontFamily: FONT_MONO, fontSize: 14,
-          letterSpacing: '.08em', padding: '3px 10px 4px', borderBottomLeftRadius: '12px',
-          background: d.net === 'HPC' ? T.hp2 : T.sf3,
-          color: d.net === 'HPC' ? T.hp : T.dm,
-        }}
-      >
-        {d.net}
-      </Box>
+      {d.serviceKey && (
+        <Box
+          component="span"
+          title="Source service"
+          sx={{
+            position: 'absolute', top: 0, right: 0, fontFamily: FONT_MONO, fontSize: 14,
+            letterSpacing: '.08em', padding: '3px 10px 4px', borderBottomLeftRadius: '12px',
+            background: T.tl2, color: T.tl,
+          }}
+        >
+          {d.serviceKey.toUpperCase()}
+        </Box>
+      )}
 
       {/* pin (좌: 입력, 우: 연결 시작) */}
       <Box
@@ -227,7 +229,7 @@ export function DeliverableNode({
 
       <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: '10px', pl: '12px' }}>
         <Box component="span" sx={{ color: col, flex: '0 0 auto' }}>
-          <DocIcon type={d.type} size={20} />
+          <Icon name={d.serviceKey ? 'link' : 'word'} size={20} />
         </Box>
         <Box
           sx={{
@@ -247,7 +249,7 @@ export function DeliverableNode({
         }}
       >
         {orphan ? 'Release schedule lost' : phase ? phase.name : '-'} ·{' '}
-        {last ? resolveUser(last.by).name : '—'} ·{' '}
+        {last ? resolveUser(versionBy(last)).name : '—'} ·{' '}
         {last ? fmtAt(last.at).slice(5, 16) : 'No updates'}
       </Box>
 

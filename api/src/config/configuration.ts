@@ -26,7 +26,10 @@ function resolvePort(): string | number {
 export default () => ({
   port: resolvePort(),
   apiPrefix: process.env.API_PREFIX ?? 'api/v1',
-  corsOrigin: process.env.CORS_ORIGIN ?? 'http://localhost:5173',
+  // 기본값에 Calypso web(5174)을 포함한다 - Calypso가 이제 SIREN의 Project List를
+  // 브라우저에서 직접 읽어오므로(Hub 설계서 §11.4), 별도 CORS_ORIGIN 설정 없이도
+  // 로컬 개발 환경에서 바로 동작해야 한다.
+  corsOrigin: process.env.CORS_ORIGIN ?? 'http://localhost:5173,http://localhost:5174',
   mongodbUri: resolveMongodbUri(),
   /**
    * 목업 데이터 노출 여부. true면 부팅 시 목업이 없을 때 한 번 시드하고(isMock:true 표시),

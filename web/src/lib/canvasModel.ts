@@ -6,7 +6,7 @@
  *
  * 설계서 1.3·5.5에 따라 이 계산은 전부 FE에서 완결되고, BE는 결과 좌표만 저장한다.
  */
-import { DeliverableDto, EdgeDto, MemoDto, WorkflowPhase } from '@/types/domain';
+import { DeliverableDto, DeliverableVersionDto, EdgeDto, MemoDto, WorkflowPhase } from '@/types/domain';
 import { DAY_MS, dayMs, matchPhaseByDate } from './schedule';
 import {
   DEFAULT_PW, GAP, LANE_PAD, MH, MW, NH, NW, ROW_H, TOP_PAD, WALL_FORCE, snp,
@@ -14,15 +14,8 @@ import {
 import { T } from '@/theme/tokens';
 
 /* ── 작업 모델 (목업의 ITEMS/NOTES/EDGES 원소와 같은 모양) ── */
-export interface VersionView {
-  major: number;
-  minor: number;
-  kind: 'major' | 'minor';
-  file: string;
-  note: string;
-  by: string;
-  at: string;
-}
+/** BE의 버전 엔트리 그대로 — file/major/minor 같은 파일 중심 필드는 없다(Hub 설계서 §1.2). */
+export type VersionView = DeliverableVersionDto;
 
 export interface CanvasNode {
   id: string;
@@ -42,7 +35,10 @@ export interface CanvasNode {
    * 기다리는 자리표시자 — Upload와 전달(Handoff) 탭을 숨기는 기준이다(DeliverableDialog).
    */
   intent: 'own' | 'received';
-  type: string;
+  /** 이 산출물의 실물을 소유한 Hub 서비스(artifactServices.key) — null이면 출처 미등록. */
+  serviceKey: string | null;
+  externalArtifactId: string | null;
+  /** 레거시 필드 — 더 이상 화면에서 고르지 않는다(항상 서버 기본값). */
   net: 'OA' | 'HPC';
   series: string | null;
   seriesIdx: number;
@@ -62,6 +58,9 @@ export interface CanvasNode {
   /** origin==='incoming'일 때만 채워진다 — 주는 쪽 workflow에서의 일정 구간. */
   sourcePhase: WorkflowPhase | null;
   versions: VersionView[];
+  /** BE가 이미 계산해 준 최신 released/작업중 버전 — latR/latA는 이 값을 그대로 돌려준다. */
+  releasedVersion: VersionView | null;
+  workingVersion: VersionView | null;
   canEdit: boolean;
   x: number;
   y: number;
@@ -108,7 +107,8 @@ export function toCanvasNode(d: DeliverableDto, origin: 'own' | 'incoming' = 'ow
     name: d.name,
     artifactKey: d.artifactKey ?? null,
     intent: d.intent,
-    type: d.docType,
+    serviceKey: d.serviceKey ?? null,
+    externalArtifactId: d.externalArtifactId ?? null,
     net: d.network,
     series: d.series,
     seriesIdx: d.seriesIdx,
@@ -122,6 +122,8 @@ export function toCanvasNode(d: DeliverableDto, origin: 'own' | 'incoming' = 'ow
     sourceWorkflow: d.sourceWorkflow ?? null,
     sourcePhase: d.sourcePhase ?? null,
     versions: d.versions ?? [],
+    releasedVersion: d.releasedVersion ?? null,
+    workingVersion: d.workingVersion ?? null,
     canEdit: d.canEdit,
     x: origin === 'incoming' ? 0 : d.layout?.x ?? 0,
     y: origin === 'incoming' ? 0 : d.layout?.y ?? 0,
@@ -420,14 +422,16 @@ export function biIconPos(a: Blk, b: Blk) {
   return { x: ax + 22, y: Math.max(a.y + a.h, b.y + b.h) + 26 };
 }
 
-/* ── 버전 헬퍼 (목업 latA/latR/hasW/vstr/stOf) ── */
-export const vstr = (v: VersionView) => `v${v.major}.${v.minor}`;
-export const latA = (d: CanvasNode) => d.versions[0] ?? null;
-export const latR = (d: CanvasNode) => d.versions.find((v) => v.kind === 'major') ?? null;
-export const hasW = (d: CanvasNode) => {
-  const l = latA(d);
-  return !!l && l.kind === 'minor';
-};
+/* ── 버전 헬퍼 (목업 latA/latR/hasW/vstr/stOf) ──
+ * BE가 releasedVersion/workingVersion을 이미 계산해서 내려주므로(Hub 설계서 §6.2),
+ * 여기서는 versions 배열을 다시 훑지 않고 그 값을 그대로 돌려준다. */
+export const vstr = (v: VersionView) => v.versionLabel;
+export const latR = (d: CanvasNode) => d.releasedVersion;
+/** 이 산출물의 절대 최신 버전 — 작업중인 게 있으면 그것, 없으면 release된 것. */
+export const latA = (d: CanvasNode) => d.workingVersion ?? d.releasedVersion;
+export const hasW = (d: CanvasNode) => !!d.workingVersion;
+/** 버전을 만들어 준 사람 — giver가 없으면(C/D 티어 등) 수동 기록자로 대신한다. */
+export const versionBy = (v: VersionView) => v.giverKnoxId ?? v.assertedBy ?? '';
 
 export interface StatusStyle { lb: string; c: string; bg: string; bd: string }
 export function stOf(d: CanvasNode): StatusStyle {

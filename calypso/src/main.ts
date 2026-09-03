@@ -47,7 +47,7 @@ async function bootstrap() {
   // 적용된 CORS 오리진을 함께 찍는다. iisnode 로그(iisnode/*.txt)에서 바로 확인된다.
   // eslint-disable-next-line no-console
   console.log(
-    `SIREN API (${ENV_FILE} <- ${ENV_PATH ?? 'NOT FOUND, 기본값 사용'}) ` +
+    `Calypso API (${ENV_FILE} <- ${ENV_PATH ?? 'NOT FOUND, 기본값 사용'}) ` +
       `listening on http://0.0.0.0:${port}/${config.get<string>('apiPrefix')} ` +
       `| CORS_ORIGIN=${corsOrigin || '(전면 허용)'}`,
   );

@@ -21,7 +21,7 @@ import {
   useUpdateWorkflowPhases,
 } from '@/api/hooks/useWorkflow';
 import {
-  useAddVersion, useCreateDeliverable, useDeleteDeliverable, useDeliverables, useRelease,
+  useCreateDeliverable, useDeleteDeliverable, useDeliverables, useRelease,
   useUpdateDeliverable, useUpdateRecv,
 } from '@/api/hooks/useDeliverables';
 import { useMemos } from '@/api/hooks/useMemos';
@@ -84,7 +84,6 @@ export function BoardPage() {
   const updateDeliverable = useUpdateDeliverable(workflowId ?? '');
   const deleteDeliverable = useDeleteDeliverable(workflowId ?? '');
   const updateRecv = useUpdateRecv(workflowId ?? '');
-  const addVersion = useAddVersion(workflowId ?? '');
   const release = useRelease(workflowId ?? '');
   const addOwner = useAddOwner(workflowId ?? '');
   const removeOwner = useRemoveOwner(workflowId ?? '');
@@ -235,7 +234,8 @@ export function BoardPage() {
           ...local,
           name: d.name,
           artifactKey: d.artifactKey,
-          type: d.docType,
+          serviceKey: d.serviceKey,
+          externalArtifactId: d.externalArtifactId,
           net: d.network,
           series: d.series,
           seriesIdx: d.seriesIdx,
@@ -246,6 +246,8 @@ export function BoardPage() {
           sourceDept: d.sourceDept,
           sourceContact: d.sourceContact,
           versions: d.versions ?? [],
+          releasedVersion: d.releasedVersion ?? null,
+          workingVersion: d.workingVersion ?? null,
           canEdit: d.canEdit,
         };
       }
@@ -317,9 +319,12 @@ export function BoardPage() {
               phases={phaseList}
               own={own}
               onClose={closeDeliverable}
-              onSaveInfo={({ name, artifactKey, net, type }) => {
+              onSaveInfo={({ name, artifactKey, serviceKey, externalArtifactId }) => {
                 updateDeliverable.mutate(
-                  { id: openNode.id, name, artifactKey: artifactKey ?? '', docType: type, network: net },
+                  {
+                    id: openNode.id, name, artifactKey: artifactKey ?? '',
+                    serviceKey: serviceKey ?? '', externalArtifactId: externalArtifactId ?? '',
+                  },
                   {
                     onSuccess: (updated) => {
                       mergeDeliverableResults([updated], phaseList);
@@ -327,33 +332,6 @@ export function BoardPage() {
                       toast('Saved');
                     },
                     onError: (e: any) => toast(e?.response?.data?.message ?? 'Save failed'),
-                  },
-                );
-              }}
-              onUpload={({ file, note, net, type }) => {
-                // TODO: OA 업로드는 2단계 플로우여야 한다 —
-                //   1) POST /deliverables/:id/upload (multipart/form-data, 파일 필드명 "file")
-                //      → { data: { storageKey, fileName } }   (api/hooks/useDeliverables.ts의 useUploadFile)
-                //   2) POST /deliverables/:id/versions 에 그 storageKey/fileName 전달
-                // 지금은 DeliverableDialog의 업로드 UI가 실제 <input type="file">이 아니라
-                // "파일 이름 문자열" 입력이라 보낼 File 객체가 없다. 파일 선택 UI가 생기면
-                // useUploadFile()을 먼저 호출하고 그 응답의 storageKey로 아래 addVersion을
-                // 호출하도록 바꿀 것. (HPC는 hpcPath만 쓰므로 그대로 둔다.)
-                addVersion.mutate(
-                  {
-                    id: openNode.id,
-                    fileName: file,
-                    ...(net === 'HPC' ? { hpcPath: file } : { storageKey: `mock/${file}` }),
-                    note,
-                  },
-                  {
-                    onSuccess: () => {
-                      if (net !== openNode.net || type !== openNode.type) {
-                        updateDeliverable.mutate({ id: openNode.id, network: net, docType: type });
-                      }
-                      toast('Working copy uploaded');
-                    },
-                    onError: () => toast('Upload failed'),
                   },
                 );
               }}
@@ -498,11 +476,11 @@ export function BoardPage() {
               phases={phaseList}
               intent={addDlgIntent}
               onClose={() => st.getState().setAddDlg(false)}
-              onCreate={({ name, phaseId, docType, network, artifactKey }) => {
+              onCreate={({ name, phaseId, artifactKey, serviceKey, externalArtifactId }) => {
                 const wasReceived = addDlgIntent === 'received';
                 const intent = wasReceived ? 'received' : 'own';
                 createDeliverable.mutate(
-                  { name, phaseId, docType, network, intent, artifactKey },
+                  { name, phaseId, intent, artifactKey, serviceKey, externalArtifactId },
                   {
                     onSuccess: (created) => {
                       const s = st.getState();

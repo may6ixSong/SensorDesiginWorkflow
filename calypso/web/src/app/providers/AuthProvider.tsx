@@ -1,0 +1,188 @@
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import Cookies from 'js-cookie';
+import axios from 'axios';
+import { addEventLog } from '../../service/event-log-service';
+import { useTranslation } from 'react-i18next';
+import { setApiKnoxId, setApiUserGroup } from '../../api/client';
+
+// Ported verbatim from SIREN web's AuthProvider.tsx (service name swapped to
+// Calypso only where it names the service itself — cookie name, event name).
+// Both apps share the same ADSSO/common-platform identity, so this file only
+// diverges from web/src/app/providers/AuthProvider.tsx in that one respect.
+//
+// TODO: SSO 연동 지점 - 실제 IdP 연동 시 이 파일만 교체하면 된다.
+
+export type Language = 'ko' | 'en';
+export type Theme = 'dark' | 'light';
+
+export class User {
+  KnoxID = '';
+  Name = '';
+  Department = '';
+  Group: string = 'Developer';
+  Authority: Record<string, number> = {
+    PRJCRUD: 4,
+    NOTMGR: 4,
+    ACNTMGR: 4,
+    TEMPMGR: 4,
+  };
+  GrpAuthority: Record<string, unknown> = {};
+  EnName = '';
+  EnDepartment = '';
+  Language: Language = 'en';
+  Theme: Theme = 'light';
+
+  setUserInfoFromADSSOResponse(adssoResponse: ADSSOResponse) {
+    this.KnoxID = adssoResponse.loginid;
+    this.Name = adssoResponse.username ?? '';
+    this.Department = adssoResponse.deptname ?? '';
+    this.EnName = adssoResponse.username_en ?? '';
+    this.EnDepartment = adssoResponse.deptname_en ?? '';
+  }
+}
+
+export type ADSSOResponse = {
+  loginid: string;
+  deptid?: string;
+  mail?: string;
+  deptname?: string;
+  username?: string;
+  username_en?: string;
+  deptname_en?: string;
+  intcode?: string;
+  intname?: string;
+  compname?: string;
+}
+
+type AuthContextType = {
+  user: User | null;
+  updateUserPrefs: <K extends keyof User>(field: K, value: User[K]) => void,
+  loginSuccess: boolean;
+  /** user.Group === 'Admin' — user가 바뀔 때마다 리렌더에 반영되는 파생 값. */
+  isAdmin: boolean;
+};
+
+const DEV_USER: ADSSOResponse = {
+  loginid: 'sdp.op',
+  deptname: 'Sensor 설계팀(S.LSI)',
+  username: 'SDP 시스템 운영',
+  username_en: "SDP System Operator",
+  deptname_en: 'Sensor Development Team(S.LSI)'
+};
+const isDev = import.meta.env.ENVIRONMENT === 'dev';
+
+const AuthContext = createContext<AuthContextType>({
+  user: null,
+  updateUserPrefs: (_field, _value) => {},
+  loginSuccess: false,
+  isAdmin: false,
+});
+
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+  const { i18n } = useTranslation();
+  const [user, setUser] = useState<User>({} as User);
+  const [loginSuccess, openGate] = useState<boolean>(false);
+  const isAdmin = useMemo(() => user.Group === "Admin", [user]);
+
+  useEffect(() => {
+    if (isDev) {
+      setUserSystemInfo(DEV_USER);
+    }
+    else {
+      const cookieData = Cookies.get('ADSSO_USER');
+      if (cookieData) {
+        const data = decodeURIComponent(cookieData);
+        const userInfo = JSON.parse(data.replace(/\\n/g, '').replace(/\\r/g, '').replace(/\\t/g, ''));
+        setUserSystemInfo(userInfo);
+
+        // ADFSLogin이 ADSSO_RETURN_URL로 돌아오면서 붙이는 ?auth={uuid}를 주소창에서 지운다.
+        const url = new URL(window.location.href);
+        if (url.searchParams.has('auth')) {
+          url.searchParams.delete('auth');
+          window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+        }
+      } else {
+        Cookies.set('ADSSO_RETURN_URL', window.location.href);
+        window.location.href = `${import.meta.env.MOBILAVE}/Account/ADFSLogin?client=${window.location.origin}`;
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const setUserSystemInfo = async (userInfo: ADSSOResponse) => {
+    const user: User = new User();
+    user.setUserInfoFromADSSOResponse(userInfo);
+    // Calypso api는 X-Knox-Id 헤더로만 호출자를 식별한다.
+    setApiKnoxId(user.KnoxID);
+
+    try {
+      const url = `${import.meta.env.USER_GROUP_API}/user/Information/${userInfo.loginid}`;
+      const response = await axios.get<Record<string, unknown>>(url);
+      user.Group = response.data.Group as string;
+      setApiUserGroup(user.Group ?? null);
+      user.Authority = response.data.Authority as Record<string, number>;
+      user.Language = response.data.Language as Language;
+      user.Theme = response.data.Theme as Theme;
+      i18n.changeLanguage(user.Language);
+
+      const latestLoginTime = Cookies.get('loginCalypso');
+      if (user.Group !== "Admin" && (!latestLoginTime ||
+        Date.now() - new Date(latestLoginTime).getTime() > 60 * 60 * 1000
+      )) {
+        addEventLog({
+          userId: user.KnoxID,
+          project: '',
+          event: `Login Calypso`,
+          action: 'LOGIN',
+        });
+        Cookies.set('loginCalypso', new Date().toISOString());
+      }
+    } catch {
+      await createPlatformUser(user);
+    } finally {
+      setUser(user);
+      openGate(true);
+    }
+  }
+
+  const createPlatformUser = async (user: User) => {
+    const platformRegister = {
+      Name: user.Name,
+      KnoxID: user.KnoxID,
+      Department: user.Department,
+      Group: user.Group,
+      Authority: user.Authority,
+      EnName: user.EnName,
+      EnDepartment: user.EnDepartment,
+      Language: user.Language,
+			Theme: user.Theme
+    }
+    const options = {
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+        'client-id': 'sdp.op',
+      }
+    }
+
+    return await axios.post(`${import.meta.env.USER_GROUP_API}/user`, platformRegister, options);
+  }
+
+  const updateUserPrefs = <K extends keyof User>(field: K, value: User[K]) => {
+    setUser((prev) => {
+      if (!prev) return prev;
+
+      return {
+        ...prev,
+        [field]: value,
+      } as User;
+    });
+  };
+
+  return (
+    <AuthContext.Provider value={{ user, updateUserPrefs, loginSuccess, isAdmin }}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+export const useAuth = () => useContext(AuthContext);

@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { Box } from '@mui/material';
 import { WorkflowPhase } from '@/types/domain';
 import { shortDate } from '@/lib/schedule';
+import { useArtifactServices } from '@/api/hooks/useHub';
 import { ModalShell } from '@/components/common/ModalShell';
 import { SirenButton } from '@/components/common/SirenButton';
-import { Ey, Field, Row, SelectInput, TextInput } from '@/components/common/Panel';
+import { Ey, Field, SelectInput, TextInput } from '@/components/common/Panel';
 import { Icon } from '@/components/common/Icon';
 import { CURSOR_POINTER, FONT_MONO, T } from '@/theme/tokens';
 
@@ -14,7 +15,10 @@ interface Props {
   /** 'received'면 헤더 문구가 "내가 받아야 할 산출물"로 바뀐다 — 폼 필드 자체는 동일하다. */
   intent?: 'own' | 'received';
   onClose: () => void;
-  onCreate: (p: { name: string; phaseId: string; docType: string; network: 'OA' | 'HPC'; artifactKey: string | null }) => void;
+  onCreate: (p: {
+    name: string; phaseId: string; artifactKey: string | null;
+    serviceKey: string | null; externalArtifactId: string | null;
+  }) => void;
 }
 
 /**
@@ -26,16 +30,19 @@ interface Props {
  * 여기 뜨는 phase는 전부 "이 workflow가 정한 자기 일정"이다 — 과제 마일스톤이 아니다.
  */
 export function AddDeliverableDialog({ workflowName, phases, intent = 'own', onClose, onCreate }: Props) {
+  const { data: services, isLoading: servicesLoading } = useArtifactServices();
   const [name, setName] = useState('');
   const [phaseId, setPhaseId] = useState<string>(phases[0]?.id ?? '');
   const [artifactKey, setArtifactKey] = useState('');
-  const [net, setNet] = useState<'OA' | 'HPC'>('OA');
-  const [type, setType] = useState('word');
+  const [serviceKey, setServiceKey] = useState('');
+  const [externalArtifactId, setExternalArtifactId] = useState('');
   const [err, setErr] = useState(false);
+  const [svcErr, setSvcErr] = useState(false);
   const [keyErr, setKeyErr] = useState('');
 
   const submit = () => {
     if (!name.trim() || !phaseId) { setErr(true); return; }
+    if (!serviceKey) { setSvcErr(true); return; }
     const key = artifactKey.trim();
     if (key && !/^[A-Za-z0-9_.-]+$/.test(key)) {
       setKeyErr('Only letters, numbers, dot, underscore and hyphen are allowed.');
@@ -43,7 +50,8 @@ export function AddDeliverableDialog({ workflowName, phases, intent = 'own', onC
     }
     setKeyErr('');
     onCreate({
-      name: name.trim(), phaseId, docType: net === 'HPC' ? 'path' : type, network: net, artifactKey: key || null,
+      name: name.trim(), phaseId, artifactKey: key || null,
+      serviceKey, externalArtifactId: externalArtifactId.trim() || null,
     });
   };
 
@@ -108,6 +116,25 @@ export function AddDeliverableDialog({ workflowName, phases, intent = 'own', onC
           )}
         </Box>
       </Field>
+      <Field label="Source — the registered system this artifact lives in">
+        <SelectInput
+          value={serviceKey}
+          onChange={(v) => { setServiceKey(v); setSvcErr(false); }}
+          disabled={servicesLoading}
+          options={[
+            { value: '', label: servicesLoading ? 'Loading…' : 'Select a system' },
+            ...(services ?? []).map((s) => ({ value: s.key, label: s.name })),
+          ]}
+        />
+        {svcErr && <Box sx={{ fontSize: 11, color: T.rd, mt: '5px' }}>Pick the system this artifact is registered in.</Box>}
+      </Field>
+      <Field label="External artifact ID — optional; fill in once it's registered there">
+        <TextInput
+          value={externalArtifactId}
+          onChange={setExternalArtifactId}
+          placeholder="e.g. the artifact's id in that system"
+        />
+      </Field>
       <Field
         label="Artifact key — optional; use the same key when adding this artifact again in another phase"
       >
@@ -119,23 +146,6 @@ export function AddDeliverableDialog({ workflowName, phases, intent = 'own', onC
         />
         {keyErr && <Box sx={{ fontSize: 11, color: T.rd, mt: '5px' }}>{keyErr}</Box>}
       </Field>
-      <Row>
-        <Field label="Network" sx={{ width: 90 }}>
-          <SelectInput
-            value={net}
-            onChange={(v) => { setNet(v as 'OA' | 'HPC'); if (v === 'HPC') setType('path'); else if (type === 'path') setType('word'); }}
-            options={[{ value: 'OA', label: 'OA' }, { value: 'HPC', label: 'HPC' }]}
-          />
-        </Field>
-        <Field label="Format" sx={{ width: 90 }}>
-          <SelectInput
-            value={type}
-            disabled={net === 'HPC'}
-            onChange={setType}
-            options={[{ value: 'word', label: 'Word' }, { value: 'excel', label: 'Excel' }, { value: 'path', label: 'Path' }]}
-          />
-        </Field>
-      </Row>
       <SirenButton variant="primary" onClick={submit}>
         <Icon name="plus" /> Create
       </SirenButton>

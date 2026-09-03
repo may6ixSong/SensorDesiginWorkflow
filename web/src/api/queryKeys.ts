@@ -11,4 +11,5 @@ export const queryKeys = {
   memos: (workflowId: string) => ['workflows', workflowId, 'memos'] as const,
   edges: (workflowId: string) => ['workflows', workflowId, 'edges'] as const,
   hldReleases: (workflowId: string) => ['workflows', workflowId, 'hld-releases'] as const,
+  hubServices: ['hub', 'services'] as const,
 };

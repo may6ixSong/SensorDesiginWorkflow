@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { ThemeMode } from './themeVars';
 
-const STORAGE_KEY = 'siren-theme-mode';
+const STORAGE_KEY = 'calypso-theme-mode';
 
 interface ThemeModeCtx {
   mode: ThemeMode;

@@ -64,7 +64,7 @@ export class DeliverablesService {
       // 출처는 나중에 지정해도 된다 - serviceKey가 null인 "정상 빈 상태"로 시작한다 (Hub 설계서 §11).
       serviceKey: dto.serviceKey?.trim() || null,
       externalArtifactId: dto.externalArtifactId?.trim() || null,
-      network: dto.network,
+      network: dto.network ?? 'OA',
       series: null,
       seriesIdx: 1,
       seriesTotal: 1,

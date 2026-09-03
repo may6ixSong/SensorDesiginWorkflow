@@ -8,13 +8,30 @@ export const api = axios.create({
   baseURL: import.meta.env.CALYPSO_API ?? 'http://localhost:3010/api/v1',
 });
 
-/** SSO 붙기 전까지의 임시 사용자 - SIREN의 사용자 스위처와 같은 성격이다. */
-export function currentKnoxId(): string {
-  return localStorage.getItem('calypso.knoxId') ?? 'sdp.op';
+/**
+ * 현재 호출자 식별 상태 — AuthProvider가 로그인 완료 시점에 setApiKnoxId()로 채운다
+ * (SIREN web의 api/client.ts와 동일한 패턴). 그 전까지는 dev 편의용 기본값을 쓴다.
+ */
+let currentKnoxId = localStorage.getItem('calypso.knoxId') ?? 'sdp.op';
+let currentUserGroup: string | null = null;
+
+export function setApiKnoxId(knoxId: string): void {
+  currentKnoxId = knoxId;
+  localStorage.setItem('calypso.knoxId', knoxId);
+}
+export function getApiKnoxId(): string {
+  return currentKnoxId;
+}
+/** api의 Admin 판정 근거로는 쓰지 않는다(Calypso는 자기 등록자 본인 전용 편집만 안다) — SIREN 호출용으로만 보관. */
+export function setApiUserGroup(group: string | null): void {
+  currentUserGroup = group;
+}
+export function getApiUserGroup(): string | null {
+  return currentUserGroup;
 }
 
 api.interceptors.request.use((config) => {
-  config.headers['x-knox-id'] = currentKnoxId();
+  config.headers['x-knox-id'] = currentKnoxId;
   return config;
 });
 
@@ -42,8 +59,11 @@ export interface ArtifactView {
   versions?: VersionView[];
 }
 
-export async function listArtifacts(mine: boolean): Promise<ArtifactView[]> {
-  const { data } = await api.get('/artifacts', { params: mine ? { mine: 'true' } : {} });
+export async function listArtifacts(query: { projectId?: string; mine?: boolean }): Promise<ArtifactView[]> {
+  const params: Record<string, string> = {};
+  if (query.projectId) params.projectId = query.projectId;
+  if (query.mine) params.mine = 'true';
+  const { data } = await api.get('/artifacts', { params });
   return data.data;
 }
 

@@ -6,7 +6,11 @@ import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { buildTheme } from './theme/theme';
 import { ThemeModeProvider, useThemeMode } from './theme/ThemeModeContext';
+import { AuthProvider } from './app/providers/AuthProvider';
+import { DirectoryProvider } from './app/providers/DirectoryProvider';
+import { PlatformPreferencesSync } from './components/layout/PlatformPreferencesSync';
 import App from './App';
+import './i18n';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -29,13 +33,18 @@ function MuiThemeBridge({ children }: { children: React.ReactNode }) {
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ThemeModeProvider>
-      <MuiThemeBridge>
-        <QueryClientProvider client={queryClient}>
-          <BrowserRouter>
-            <App />
-          </BrowserRouter>
-        </QueryClientProvider>
-      </MuiThemeBridge>
+      <AuthProvider>
+        <DirectoryProvider>
+          <MuiThemeBridge>
+            <PlatformPreferencesSync />
+            <QueryClientProvider client={queryClient}>
+              <BrowserRouter>
+                <App />
+              </BrowserRouter>
+            </QueryClientProvider>
+          </MuiThemeBridge>
+        </DirectoryProvider>
+      </AuthProvider>
     </ThemeModeProvider>
   </React.StrictMode>,
 );
