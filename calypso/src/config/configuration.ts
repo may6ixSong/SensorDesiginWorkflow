@@ -18,7 +18,8 @@ function resolveMongodbUri(): string {
  * 그대로 통과시킨다. main.ts가 타입을 보고 listen 호출을 나눈다.
  */
 function resolvePort(): string | number {
-  const raw = process.env.PORT?.trim() || '3000';
+  // SIREN api 기본값(3000)과 겹치지 않는 Calypso 전용 기본 포트. .env.example과 일치한다.
+  const raw = process.env.PORT?.trim() || '3010';
   const parsed = Number(raw);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : raw;
 }
