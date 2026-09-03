@@ -55,6 +55,11 @@ function MilestonesSection({
   const [editErr, setEditErr] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [createErr, setCreateErr] = useState<string | null>(null);
+  /**
+   * My Task 필터 (Hub 설계서 §14.3). 기본은 꺼짐(전체 보기) — 처음 들어와서 자기 것이
+   * 하나도 없어 빈 화면을 보는 것보다, 켜고 끄는 토글이 눈에 띄는 편이 낫다.
+   */
+  const [mineOnly, setMineOnly] = useState(false);
   const canEditSchedule = canEditMilestones({ managers }, isAdmin, user?.KnoxID);
   const myDepartments = members.find((m) => m.knoxId === user?.KnoxID)?.departments ?? [];
 
@@ -68,6 +73,12 @@ function MilestonesSection({
           </Box>
         </Box>
         <Box sx={{ flex: 1 }} />
+        <SirenButton
+          variant={mineOnly ? 'primary' : undefined}
+          onClick={() => setMineOnly((v) => !v)}
+        >
+          My Task
+        </SirenButton>
         {canEditSchedule && (
           <SirenButton onClick={() => { setEditErr(null); setEditOpen(true); }}>
             <Icon name="calendar" /> Edit milestones
@@ -77,7 +88,13 @@ function MilestonesSection({
           <Icon name="plus" /> New Workflow
         </SirenButton>
       </Box>
-      <ProjectTimeline projectId={projectId} milestones={milestones} workflows={workflows} />
+      <ProjectTimeline
+        projectId={projectId}
+        milestones={milestones}
+        workflows={workflows}
+        mineOnly={mineOnly}
+        myKnoxId={user?.KnoxID}
+      />
 
       {createOpen && (
         <CreateWorkflowDialog
