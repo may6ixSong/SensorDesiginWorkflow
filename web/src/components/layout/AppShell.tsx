@@ -47,13 +47,14 @@ export function AppShell({
   workflows, workflowId, onChangeIp,
   canToggleRecv = false, children,
 }: AppShellProps) {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const recv = useCanvasStore((s) => s.recv);
   const setRecv = useCanvasStore((s) => s.setRecv);
   const { pathname } = useLocation();
 
   const showSelects = !!onChangeProject;
   const navOn = pathname.startsWith('/projects');
+  const adminOn = pathname.startsWith('/admin');
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
@@ -117,6 +118,25 @@ export function AppShell({
           >
             {NAV_LABEL}
           </Box>
+          {/*
+            Admin 전용 진입점은 non-admin에게 아예 렌더하지 않는다 (Hub 설계서 §13.3 규칙 6).
+            AdminPage가 라우트 진입도 막고, 최종 방어선은 api의 isAdmin 재검증이다.
+          */}
+          {isAdmin && (
+            <Box
+              component={Link}
+              to="/admin"
+              sx={{
+                fontSize: 12, fontWeight: adminOn ? 600 : 500, textDecoration: 'none',
+                padding: '6px 10px', borderRadius: '7px', whiteSpace: 'nowrap', flex: '0 0 auto',
+                color: adminOn ? T.tx : T.dm,
+                background: adminOn ? T.sf3 : 'transparent',
+                '&:hover': { background: T.sf2, color: T.tx },
+              }}
+            >
+              Admin
+            </Box>
+          )}
         </Box>
 
         {showSelects && (

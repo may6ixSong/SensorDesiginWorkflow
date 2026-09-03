@@ -3,7 +3,7 @@ import Cookies from 'js-cookie';
 import axios from 'axios';
 import { addEventLog } from '../../service/event-log-service';
 import { useTranslation } from 'react-i18next';
-import { setApiKnoxId } from '../../api/client';
+import { setApiKnoxId, setApiUserGroup } from '../../api/client';
 
 // Ported from SSM_WEB's AuthProvider.tsx (service name swapped to SIREN only
 // where it names the service itself — cookie name, event name).
@@ -121,6 +121,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const url = `${import.meta.env.USER_GROUP_API}/user/Information/${userInfo.loginid}`;
       const response = await axios.get<Record<string, unknown>>(url);
       user.Group = response.data.Group as string;
+      // api의 Admin 판정 근거 (Hub 설계서 §13.3) — SIREN이 별도 admin 목록을 두지 않는다.
+      setApiUserGroup(user.Group ?? null);
       user.Authority = response.data.Authority as Record<string, number>;
       user.Language = response.data.Language as Language;
       user.Theme = response.data.Theme as Theme;
