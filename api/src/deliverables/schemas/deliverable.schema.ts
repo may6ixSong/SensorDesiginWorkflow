@@ -4,8 +4,11 @@ import { Document, Types, SchemaTypes } from 'mongoose';
 // Mongoose가 Mixed 경로를 만들고, Mixed는 캐스팅을 하지 않아 문자열 id 필터가 전부 0건이 된다.
 // (필드의 TypeScript 타입으로서의 Types.ObjectId는 그대로 쓴다.)
 
-export type VersionKind = 'major' | 'minor';
 export type NetworkKind = 'OA' | 'HPC';
+
+/** 통합 신뢰도 티어 (Hub 설계서 §5.1). 산출물이 아니라 버전 엔트리마다 붙는다. */
+export const TIERS = ['A', 'B', 'C', 'D'] as const;
+export type Tier = (typeof TIERS)[number];
 
 @Schema({ _id: false })
 export class Layout {
@@ -23,32 +26,88 @@ export class Layout {
 }
 export const LayoutSchema = SchemaFactory.createForClass(Layout);
 
+/** lineage - 이 버전이 무엇으로부터 만들어졌는가 (Hub 설계서 §4.1). */
+@Schema({ _id: false })
+export class SourceRef {
+  @Prop({ required: true })
+  artifactKey: string;
+
+  @Prop({ required: true })
+  serviceKey: string;
+
+  @Prop({ required: true })
+  versionRef: string;
+
+  @Prop({ default: '' })
+  versionLabel: string;
+
+  @Prop({ type: Date, default: null })
+  capturedAt: Date | null;
+}
+export const SourceRefSchema = SchemaFactory.createForClass(SourceRef);
+
+/**
+ * 버전 엔트리. 실물 파일과 전체 이력은 각 산출물 서비스가 소유하고, SIREN은 참조만
+ * 들고 있는다 (Hub 설계서 §1.2). storageKey/fileName/major/minor/kind는 그래서 없다.
+ */
 @Schema({ _id: false, timestamps: false })
 export class DeliverableVersion {
-  @Prop({ required: true })
-  major: number;
+  /**
+   * 이 엔트리를 SIREN이 얼마나 자동으로·검증 가능하게 알았는지 (Hub 설계서 §5.3).
+   * 산출물 단위가 아니라 엔트리 단위라서, 나중에 실연동이 붙어도 예전 수동 기록을
+   * 지우거나 옮길 필요가 없다 - 다음 엔트리가 다른 tier로 찍힐 뿐이다.
+   */
+  @Prop({ type: String, required: true, enum: TIERS, default: 'C' })
+  tier: Tier;
 
-  @Prop({ required: true })
-  minor: number;
+  /** 표시용 자유 문자열. major.minor 규칙은 우리가 직접 만드는 서비스에만 강제한다. */
+  @Prop({ required: true, trim: true })
+  versionLabel: string;
 
-  @Prop({ type: String, required: true, enum: ['major', 'minor'] })
-  kind: VersionKind;
+  /** 가시성 판정은 오직 이 필드로만 한다 (Hub 설계서 §6.2). */
+  @Prop({ required: true, default: false })
+  isReleased: boolean;
 
-  @Prop({ required: true })
-  fileName: string;
+  /**
+   * 그 서비스가 준 불변 참조. Workflow Release 스냅샷이 이 값을 고정한다.
+   * C/D 티어(수동 기록)는 참조할 실체가 없으므로 null이다.
+   */
+  @Prop({ type: String, default: null })
+  versionRef: string | null;
+
+  /** 이 버전을 만들어 제공한 쪽. SIREN이 giver 여부를 이 값으로 직접 계산한다. */
+  @Prop({ type: String, default: null })
+  giverKnoxId: string | null;
 
   @Prop({ type: String, default: null })
-  storageKey: string | null;
+  giverDept: string | null;
 
+  @Prop({ type: [SourceRefSchema], default: [] })
+  sourceRefs: SourceRef[];
+
+  /** 그 서비스의 산출물 상세 페이지. SIREN은 이 링크로 내보낸다. */
+  @Prop({ type: String, default: null })
+  viewUrl: string | null;
+
+  /** HPC망은 실물 파일 대신 경로 문자열만 갖는다 (v2 §3.11 - 티어와 직교하는 축). */
   @Prop({ type: String, default: null })
   hpcPath: string | null;
 
   @Prop({ default: '' })
   note: string;
 
-  /** 업로드한 사용자의 KnoxID (api에는 users 컬렉션이 없다 - src/common/actor.ts). */
-  @Prop({ required: true, trim: true })
-  createdBy: string;
+  // --- C/D 티어 전용 (수동 기록) ---
+  /** 이 버전을 수동으로 주장한 사용자의 KnoxID (Hub 설계서 §9.2). */
+  @Prop({ type: String, default: null })
+  assertedBy: string | null;
+
+  @Prop({ type: Date, default: null })
+  assertedAt: Date | null;
+
+  // --- A/B 티어 전용 (관측) ---
+  /** SIREN이 이 값을 관측·동기화한 시각. */
+  @Prop({ type: Date, default: null })
+  observedAt: Date | null;
 
   @Prop({ default: () => new Date() })
   createdAt: Date;
@@ -57,6 +116,13 @@ export const DeliverableVersionSchema = SchemaFactory.createForClass(Deliverable
 
 export type DeliverableDocument = Deliverable & Document;
 
+/**
+ * 산출물의 **placement**다 - 그 workflow 캔버스에서의 자리이지 산출물 그 자체가 아니다
+ * (Hub 설계서 §10.1). serviceKey + externalArtifactId가 같은 문서가 서로 다른
+ * workflowId 아래 여러 개 존재할 수 있다 - 같은 Hub 산출물이 같은 department의 여러
+ * workflow에 동시에 걸리는 경우다(§11.4). 그 문서들은 각자 다른 phaseId·layout을
+ * 갖지만 가리키는 실체(그 서비스의 버전 이력)는 하나다.
+ */
 @Schema({ timestamps: true })
 export class Deliverable {
   @Prop({ type: SchemaTypes.ObjectId, ref: 'Project', required: true, index: true })
@@ -72,32 +138,29 @@ export class Deliverable {
   name: string;
 
   /**
-   * name과 분리된 안정적 식별자 — 사용자가 name을 자유롭게 바꿀 수 있게 되면서,
-   * 향후 외부 시스템과 연동할 때 이름이 아니라 이 값으로 매핑하도록 별도로 둔다
-   * (설계서 §8.1 로드맵). 지정하면 같은 workflow 안에서 유일해야 하고(DeliverablesService.update
-   * 가 검증, 아래 부분 unique 인덱스), series 인스턴스끼리는 같은 key를 공유할 수 있다
-   * (같은 실물 산출물의 회차이므로 — update()의 검증이 series 관계면 예외로 둔다).
-   * 지정하지 않아도 된다 — 미지정은 null.
+   * 이 산출물의 실물을 소유한 Hub 서비스 (artifactServices.key). null이면 아직 출처가
+   * 정해지지 않은 "정상 빈 상태"다 - 노드는 캔버스에 있되 데이터 출처는 나중에
+   * 지정한다(Hub 설계서 §11).
    */
+  @Prop({ type: String, default: null, trim: true, index: true })
+  serviceKey: string | null;
+
+  /** 그 서비스 안에서의 산출물 식별자. serviceKey와 짝을 이룬다. */
   @Prop({ type: String, default: null, trim: true })
-  artifactKey: string | null;
+  externalArtifactId: string | null;
 
-  @Prop({ required: true })
-  docType: string;
-
-  @Prop({ type: String, required: true, enum: ['OA', 'HPC'] })
+  @Prop({ type: String, required: true, enum: ['OA', 'HPC'], default: 'OA' })
   network: NetworkKind;
 
   /**
    * 'own' = 이 workflow가 만들어 남에게 주는 산출물(기본값). 'received' = 이 workflow가
-   * 받기를 기다리는 산출물 자리표시자 — 실물은 연동된 서비스를 통해 누군가 올려줄 것이라
-   * 이 화면에서 직접 업로드/전달(Handoff) 편집을 허용하지 않는다(addVersion이 거절, FE는
-   * 그 탭 자체를 숨긴다). 생성 시점에만 정해지고 이후에는 바뀌지 않는다.
+   * 받기를 기다리는 산출물 자리표시자 - 실물은 연동된 서비스를 통해 누군가 올려줄 것이라
+   * 이 화면에서 직접 업로드/전달(Handoff) 편집을 허용하지 않는다. 생성 시점에만 정해진다.
    */
   @Prop({ type: String, default: 'own', enum: ['own', 'received'] })
   intent: 'own' | 'received';
 
-  /** null이면 원본. 회차 인스턴스는 원본의 _id를 담는다 (설계서 3.6, 4.6). */
+  /** null이면 원본. 회차 인스턴스는 원본의 _id를 담는다 (v2 §3.6). */
   @Prop({ type: SchemaTypes.ObjectId, ref: 'Deliverable', default: null })
   series: Types.ObjectId | null;
 
@@ -107,41 +170,25 @@ export class Deliverable {
   @Prop({ default: 1 })
   seriesTotal: number;
 
-  /** DEPARTMENTS 중 "analog" 제외 값만 허용 (BE 검증, 설계서 3.4, 4.6). */
+  /** DEPARTMENTS 중 "analog" 제외 값만 허용 (BE 검증, v2 §3.4). */
   @Prop({ type: String, default: null })
   recvDept: string | null;
 
-  /** 수신 담당자의 KnoxID. recvDept 소속이어야 하지만 api는 소속을 조회할 수 없으므로
-   * 요청이 함께 보낸 recvDept 값만 검증한다 (설계서 3.4, 4.6). */
+  /** 수신 담당자의 KnoxID. */
   @Prop({ type: String, default: null })
   recvContact: string | null;
 
   /**
-   * 이 산출물을 받아야 하는 다른 workflow. recvDept(부서)와 별개로, workflow끼리
-   * 서로 주고받는 산출물(예: BGR_REF → PLL_MAIN)을 표현한다. 설정되면 그 workflow의
-   * 보드에 "Incoming from other workflows" 섹션으로 노출되며, Release된 버전만 보인다.
+   * 이 산출물을 받아야 하는 다른 workflow. 설정되면 그 workflow의 보드에
+   * "Incoming from other workflows" 섹션으로 노출되며, Release된 버전만 보인다(부록 A.4).
    */
   @Prop({ type: SchemaTypes.ObjectId, ref: 'Workflow', default: null })
   recvWorkflowId: Types.ObjectId | null;
 
-  /**
-   * 이 산출물이 실제로는 이 시스템에 들어오지 않은 외부 부서(workflow도 아니고 이 앱의
-   * 사용자 조직도 아닌 곳, 예: 파운드리/외주 업체)로부터 받은 것임을 표시하는
-   * 자유 텍스트. recvWorkflowId(시스템 내 다른 workflow로부터 수신)와 달리, 이 값이 설정된
-   * 산출물은 여전히 workflowId가 가리키는 이 workflow의 "own" 산출물이다 — 그래서 위치·phase
-   * 배치(series 포함)를 own 산출물과 완전히 동일하게 자유롭게 편집할 수 있다.
-   * 오직 표시(캔버스 배지·상세 "Received from")만 다르다.
-   */
+  /** 시스템 밖 출처 표시용 자유 텍스트 (부록 A.8). D 티어의 구현체이기도 하다. */
   @Prop({ type: String, default: null })
   sourceDept: string | null;
 
-  /**
-   * 이 산출물을 받을 때의 개별 연락처 — 시스템 계정(KnoxID)이 없는 경우가 대부분이라
-   * recvContact와 달리 이름/이메일/전화 등 자유 텍스트다. sourceWorkflowId(시스템 내
-   * workflow 참조)는 일부러 두지 않는다 — 상대가 시스템에 등록되어 있다면 그 workflow가
-   * recvWorkflowId를 이 workflow로 걸어두는 순간 이미 "Incoming from other workflows"로
-   * 자동 노출되므로(부록 A.4), 받는 쪽이 따로 대상 workflow를 지정할 이유가 없다.
-   */
   @Prop({ type: String, default: null })
   sourceContact: string | null;
 
@@ -158,8 +205,6 @@ export class Deliverable {
 
   /**
    * 목업 시드가 만든 문서 표시 (MOCKUP_ENABLED). 사용자가 실제로 만든 데이터는 항상 false다.
-   * MOCKUP_ENABLED=false 로 바꾸고 재시작하면 isMock:true 문서만 일괄 삭제된다
-   * (src/database/seed-runner.service.ts) - 실제 데이터는 절대 건드리지 않는다.
    */
   @Prop({ default: false, index: true })
   isMock: boolean;
@@ -171,7 +216,6 @@ export const DeliverableSchema = SchemaFactory.createForClass(Deliverable);
 DeliverableSchema.index({ workflowId: 1, phaseId: 1 });
 DeliverableSchema.index({ series: 1 });
 DeliverableSchema.index({ recvWorkflowId: 1 });
-// DB 레벨 unique 인덱스로 두지 않는다 - series 인스턴스끼리는 같은 artifactKey를 정당하게
-// 공유해야 하는데(같은 실물 산출물의 회차), 그 예외를 인덱스 조건만으로 표현할 수 없다.
-// 유일성은 DeliverablesService.update()가 애플리케이션 레벨에서 검증한다.
-DeliverableSchema.index({ workflowId: 1, artifactKey: 1 });
+// 같은 (serviceKey, externalArtifactId)를 여러 workflow가 참조할 수 있으므로(§11.4)
+// unique가 아니다 - 조회용 복합 인덱스일 뿐이다.
+DeliverableSchema.index({ serviceKey: 1, externalArtifactId: 1 });

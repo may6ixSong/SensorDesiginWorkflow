@@ -18,8 +18,10 @@ import { DeliverableDocument } from '../deliverables/schemas/deliverable.schema'
 import { MemoDocument } from '../memos/schemas/memo.schema';
 import { EdgeDocument } from '../edges/schemas/edge.schema';
 import { HldReleaseDocument } from '../hld/schemas/hld-release.schema';
+import { ArtifactServiceDocument } from '../hub/schemas/artifact-service.schema';
 
 export interface SeedModels {
+  ArtifactService: Model<ArtifactServiceDocument>;
   Project: Model<ProjectDocument>;
   Workflow: Model<WorkflowDocument>;
   Deliverable: Model<DeliverableDocument>;
@@ -426,10 +428,29 @@ const MOCK_HLDS: { id:string; workflow:string; ver:string; date:string; by:MockU
 
 export async function seedDatabase(models: SeedModels): Promise<void> {
   const {
+    ArtifactService: ArtifactServiceModel,
     Project: ProjectModel, Workflow: WorkflowModel,
     Deliverable: DeliverableModel, Memo: MemoModel,
     Edge: EdgeModel, HldRelease: HldReleaseModel,
   } = models;
+
+  /* ── Hub 레지스트리: Calypso(내장 서비스 #0) ──
+   * 레지스트리의 첫 항목이자 Observer 계약의 레퍼런스 구현이다(Hub 설계서 §2, §16 2단계).
+   * 실서비스 등록은 Admin 관리 화면(§13.4)에서 하고, 여기서는 내장 서비스 하나만 심는다. */
+  await ArtifactServiceModel.deleteMany({ isMock: true });
+  await ArtifactServiceModel.create({
+    key: 'calypso',
+    name: 'Calypso',
+    contractVersion: '1.0',
+    defaultTier: 'A',
+    transport: 'http',
+    baseUrl: 'http://localhost:44360/api',
+    viewUrlTemplate: 'http://localhost:5174/artifacts/{artifactId}',
+    embedUploadUrlTemplate: null,
+    isBuiltIn: true,
+    enabled: true,
+    isMock: true,
+  });
 
   // 목업 문서만 지운다 (isMock:true). 실제 DB에 붙은 상태로도 안전하게 재실행할 수 있어야
   // 하므로 deleteMany({})는 절대 쓰지 않는다 - 사용자가 만든 데이터를 날려버린다.
@@ -501,7 +522,9 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
       workflowId: WFID[m.workflow],
       phaseId: m.phase,
       name: m.name,
-      docType: m.type,
+      // 목업은 Calypso(내장 서비스 #0)가 소유한 것으로 둔다 - Hub 설계서 §5.1의 A 티어.
+      serviceKey: 'calypso',
+      externalArtifactId: `mock-${m.id}`,
       network: m.net,
       series: m.series ? DID[m.series] : null,
       seriesIdx: m.seriesIdx ?? 1,
@@ -511,13 +534,22 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
       recvWorkflowId: m.recvWorkflow ? WFID[m.recvWorkflow] : null,
       sourceDept: m.sourceDept ?? null,
       layout,
+      // 목업 버전은 A 티어(서비스가 소유하고 SIREN은 관측만)로 만든다 - 실물 파일은
+      // SIREN에 없고 versionRef/viewUrl 참조만 들고 있는 게 새 구조다(Hub 설계서 §1.2).
       versions: m.versions.map(([major, minor, kind, by, when, note, file]) => ({
-        major, minor, kind,
-        fileName: file,
-        storageKey: m.net === 'OA' ? `mock/${file}` : null,
+        tier: 'A' as const,
+        versionLabel: `${major}.${minor}`,
+        isReleased: kind === 'major',
+        versionRef: `calypso:mock-${m.id}@${major}.${minor}`,
+        giverKnoxId: U[by],
+        giverDept: null,
+        sourceRefs: [],
+        viewUrl: m.net === 'OA' ? `https://calypso.local/artifacts/mock-${m.id}` : null,
         hpcPath: m.net === 'HPC' ? file : null,
         note,
-        createdBy: U[by],
+        assertedBy: null,
+        assertedAt: null,
+        observedAt: at(when),
         createdAt: at(when),
       })),
       createdBy: U[m.versions[0]?.[3] ?? 'u1'],

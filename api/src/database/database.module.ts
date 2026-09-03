@@ -7,6 +7,8 @@ import { DeliverableSchema } from '../deliverables/schemas/deliverable.schema';
 import { MemoSchema } from '../memos/schemas/memo.schema';
 import { EdgeSchema } from '../edges/schemas/edge.schema';
 import { HldReleaseSchema } from '../hld/schemas/hld-release.schema';
+import { ArtifactServiceSchema } from '../hub/schemas/artifact-service.schema';
+import { HubSyncCheckpointSchema } from '../hub/schemas/hub-sync-checkpoint.schema';
 import { isUsingRealDb, ModelDef, registerModels } from './model-registration';
 import { SeedRunnerService } from './seed-runner.service';
 
@@ -19,6 +21,8 @@ const ALL_MODELS: ModelDef[] = [
   { name: 'Memo', schema: MemoSchema },
   { name: 'Edge', schema: EdgeSchema },
   { name: 'HldRelease', schema: HldReleaseSchema },
+  { name: 'ArtifactService', schema: ArtifactServiceSchema },
+  { name: 'HubSyncCheckpoint', schema: HubSyncCheckpointSchema },
 ];
 
 /**

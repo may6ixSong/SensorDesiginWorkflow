@@ -84,12 +84,6 @@ export class CanvasService {
       await workflow.save();
     }
 
-    await this.audit.log(actor.knoxId, 'LAYOUT_UPDATE', 'workflow', workflow._id, {
-      deliverableCount: dto.deliverables.length,
-      memoCount: dto.memos.length,
-      edgeCount: dto.edges.length,
-    });
-
     return {
       deliverables: await this.deliverableModel.find({ workflowId: workflow._id }).exec(),
       memos: await this.memos.listForWorkflow(workflow._id.toString()),

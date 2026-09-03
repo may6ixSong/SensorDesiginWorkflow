@@ -1,20 +1,6 @@
 import {
-  IsIn, IsInt, IsOptional, IsString, Matches, Min, MinLength, MaxLength, IsArray, ArrayUnique,
+  IsBoolean, IsIn, IsOptional, IsString, MinLength, MaxLength, IsArray, ArrayUnique,
 } from 'class-validator';
-import { Type } from 'class-transformer';
-
-/** GET /deliverables/:id/download?major=1&minor=0 */
-export class DownloadVersionDto {
-  @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  major: number;
-
-  @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  minor: number;
-}
 
 export class CreateDeliverableDto {
   @IsString()
@@ -23,9 +9,6 @@ export class CreateDeliverableDto {
 
   @IsString()
   phaseId: string;
-
-  @IsString()
-  docType: string;
 
   @IsIn(['OA', 'HPC'])
   network: 'OA' | 'HPC';
@@ -36,18 +19,18 @@ export class CreateDeliverableDto {
   intent?: 'own' | 'received';
 
   /**
-   * 이 phase에 이미 같은 key를 가진 산출물이 있으면 생성을 거절한다(DeliverablesService.create
-   * 가 검증) — 산출물은 이제 phase마다 하나씩 개별로 추가하므로, 같은 phase에 같은 key가
-   * 겹치는 것은 실수(중복 생성)로 본다. 다른 phase에 같은 key를 쓰는 것은 "여러 phase에
-   * 걸쳐 release되는 같은 산출물"을 나타내는 정상적인 방법이라 허용한다.
+   * Hub 서비스 매핑 (artifactServices.key + 그 서비스 안에서의 식별자). 생성 시점에 정하지
+   * 않아도 된다 - 둘 다 비우면 "출처 미등록"인 정상 빈 상태로 만들어진다(Hub 설계서 §11).
    */
   @IsOptional()
   @IsString()
   @MaxLength(80)
-  @Matches(/^[A-Za-z0-9_.-]*$/, {
-    message: 'Artifact key may only contain letters, numbers, dot, underscore and hyphen.',
-  })
-  artifactKey?: string;
+  serviceKey?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  externalArtifactId?: string;
 }
 
 export class UpdateDeliverableDto {
@@ -57,26 +40,23 @@ export class UpdateDeliverableDto {
   name?: string;
 
   @IsOptional()
-  @IsString()
-  docType?: string;
-
-  @IsOptional()
   @IsIn(['OA', 'HPC'])
   network?: 'OA' | 'HPC';
 
   /**
-   * 표시 이름(name)과 분리된 안정적 식별자 — 향후 외부 시스템 연동 시 이름 변경에
-   * 영향받지 않는 매핑 키로 쓰기 위한 필드다(설계서 §8.1). 같은 workflow 안에서
-   * 유일해야 한다(BE 검증, DeliverablesService.update) — series 인스턴스끼리는 같은
-   * key를 공유할 수 있다(같은 실물 산출물의 회차이므로). 빈 문자열을 보내면 지운다.
+   * Hub 서비스 매핑. 언제든 나중에 걸 수 있고(Hub 설계서 §11), 걸리는 순간
+   * ARTIFACT_SERVICE_LINKED가 감사 로그에 남아 티어 전환 시점을 표시한다(§5.3).
+   * 빈 문자열을 보내면 매핑을 지운다.
    */
   @IsOptional()
   @IsString()
   @MaxLength(80)
-  @Matches(/^[A-Za-z0-9_.-]*$/, {
-    message: 'Artifact key may only contain letters, numbers, dot, underscore and hyphen.',
-  })
-  artifactKey?: string;
+  serviceKey?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  externalArtifactId?: string;
 }
 
 /**
@@ -103,17 +83,39 @@ export class UpdateScheduleDto {
   phaseIds: string[];
 }
 
-export class AddVersionDto {
+/**
+ * C/D 티어 수동 버전 기록 (Hub 설계서 §9). A/B 티어는 그 서비스가 버전을 갖고 SIREN은
+ * 관측만 하므로 이 DTO를 쓰지 않는다.
+ *
+ * versionLabel과 hpcPath 중 최소 하나는 있어야 한다 - 버전 개념이 없는 HPC 경로형
+ * 산출물은 경로가 라벨을 대신하고, versionRef는 `path@registeredAt`으로 합성된다(§5.2.1).
+ */
+export class AssertVersionDto {
   @IsOptional()
   @IsString()
-  storageKey?: string;
+  @MaxLength(200)
+  versionLabel?: string;
+
+  /** 가시성 판정의 유일한 근거 (§6.2). 생략하면 false(작업중). */
+  @IsOptional()
+  @IsBoolean()
+  isReleased?: boolean;
+
+  @IsOptional()
+  @IsIn(['A', 'B', 'C', 'D'])
+  tier?: 'A' | 'B' | 'C' | 'D';
 
   @IsOptional()
   @IsString()
   hpcPath?: string;
 
+  @IsOptional()
   @IsString()
-  fileName: string;
+  giverDept?: string;
+
+  @IsOptional()
+  @IsString()
+  viewUrl?: string;
 
   @IsOptional()
   @IsString()

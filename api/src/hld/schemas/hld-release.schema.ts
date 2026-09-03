@@ -4,10 +4,34 @@ import { Document, Types, SchemaTypes } from 'mongoose';
 // Mongoose가 Mixed 경로를 만들고, Mixed는 캐스팅을 하지 않아 문자열 id 필터가 전부 0건이 된다.
 // (필드의 TypeScript 타입으로서의 Types.ObjectId는 그대로 쓴다.)
 
+/**
+ * 스냅샷 한 줄 (Hub 설계서 §10.2). versionRef를 얼려두므로, 그 뒤로 서비스가 버전을
+ * 더 올려도 이 항목은 계속 그때 그 버전을 가리킨다.
+ *
+ * 이 개념이 생기기 전에 찍힌 과거 스냅샷에는 tier/confidence/versionRef가 없다 -
+ * 소급해서 채울 방법이 없으므로 비워둔 채로 두고, 화면에서는 배지를 그리지 않는다.
+ */
 @Schema({ _id: false })
 export class HldItem {
   @Prop({ required: true })
   version: string;
+
+  @Prop({ type: String, default: null })
+  versionLabel: string | null;
+
+  /** 그 시점 서비스가 준 불변 참조. C/D 수동 기록은 참조할 실체가 없어 null이다. */
+  @Prop({ type: String, default: null })
+  versionRef: string | null;
+
+  @Prop({ type: String, default: null })
+  tier: string | null;
+
+  /** 'verified'(A/B, 시스템이 확인) | 'asserted'(C/D, 담당자 주장). */
+  @Prop({ type: String, default: null })
+  confidence: string | null;
+
+  @Prop({ type: Date, default: null })
+  pinnedAt: Date | null;
 
   @Prop({ type: String, default: null })
   file: string | null;

@@ -132,9 +132,6 @@ export class ProjectsService {
     }) as Milestone[];
 
     await project.save();
-    await this.audit.log(actor.knoxId, 'PROJECT_MILESTONES_UPDATE', 'project', project._id, {
-      milestoneCount: project.milestones.length,
-    });
     return this.findDetailOrThrow(id, actor.knoxId);
   }
 
@@ -163,9 +160,6 @@ export class ProjectsService {
     project.departments = next;
     project.departmentsSeeded = true;
     await project.save();
-    await this.audit.log(actor.knoxId, 'PROJECT_DEPARTMENTS_UPDATE', 'project', project._id, {
-      departments: next,
-    });
     return this.findDetailOrThrow(id, actor.knoxId);
   }
 
@@ -253,7 +247,6 @@ export class ProjectsService {
     if (dto.status !== undefined) project.status = dto.status;
 
     await project.save();
-    await this.audit.log(actor.knoxId, 'PROJECT_UPDATE', 'project', project._id, dto);
     return this.findDetailOrThrow(id, actor.knoxId);
   }
 
@@ -280,9 +273,6 @@ export class ProjectsService {
       if (!existing.departments.some((d) => d.trim().toUpperCase() === dept.toUpperCase())) {
         existing.departments.push(dept);
         await project.save();
-        await this.audit.log(actor.knoxId, 'PROJECT_MEMBER_DEPARTMENT_ADD', 'project', project._id, {
-          knoxId, department: dept,
-        });
       }
     } else {
       project.members.push({ knoxId, departments: [dept], addedAt: new Date() });

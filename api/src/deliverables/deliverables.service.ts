@@ -9,7 +9,7 @@ import { AuditService } from '../audit/audit.service';
 import { EdgesService } from '../edges/edges.service';
 import { RECEIVABLE_DEPARTMENT_IDS } from '../common/constants/departments';
 import {
-  AddVersionDto,
+  AssertVersionDto,
   CreateDeliverableDto,
   ReleaseDto,
   UpdateDeliverableDto,
@@ -55,38 +55,15 @@ export class DeliverablesService {
     return d;
   }
 
-  /** 다음 업로드가 받을 버전 문자열(스토리지 키 경로용) - 업로드는 minor +1이다 (설계서 3.5). */
-  nextVersionLabel(d: DeliverableDocument): string {
-    const latest = d.versions[0];
-    return latest ? `${latest.major}.${latest.minor + 1}` : '0.1';
-  }
-
-  /**
-   * 다운로드 대상 버전을 찾는다. Edit 권한이 없으면 Release(major) 버전만 볼 수 있으므로
-   * 작업중(minor) 버전은 존재조차 하지 않는 것으로 취급한다 (설계서 6.1).
-   */
-  findVersionOrThrow(d: DeliverableDocument, major: number, minor: number, isEditor: boolean) {
-    const visible = isEditor ? d.versions : d.versions.filter((v) => v.kind === 'major');
-    const version = visible.find((v) => v.major === major && v.minor === minor);
-    if (!version) throw new NotFoundException('Version not found.');
-    return version;
-  }
-
   async create(workflow: WorkflowDocument, dto: CreateDeliverableDto, actor: Actor) {
-    const key = dto.artifactKey?.trim() || null;
-    if (key) {
-      const clash = await this.model.findOne({ workflowId: workflow._id, phaseId: dto.phaseId, artifactKey: key }).exec();
-      if (clash) {
-        throw new BadRequestException(`Artifact key "${key}" is already used in this phase by "${clash.name}".`);
-      }
-    }
     const d = await this.model.create({
       projectId: workflow.projectId,
       workflowId: workflow._id,
       phaseId: dto.phaseId,
       name: dto.name,
-      artifactKey: key,
-      docType: dto.docType,
+      // 출처는 나중에 지정해도 된다 - serviceKey가 null인 "정상 빈 상태"로 시작한다 (Hub 설계서 §11).
+      serviceKey: dto.serviceKey?.trim() || null,
+      externalArtifactId: dto.externalArtifactId?.trim() || null,
       network: dto.network,
       series: null,
       seriesIdx: 1,
@@ -101,32 +78,44 @@ export class DeliverablesService {
       // 목업 workflow 아래 산출물은 목업으로 남긴다 - 플래그를 끌 때 workflow와 함께 정리된다.
       isMock: workflow.isMock,
     });
-    await this.audit.log(actor.knoxId, 'DELIVERABLE_CREATE', 'deliverable', d._id, { name: dto.name });
+    if (d.serviceKey) {
+      await this.audit.log(actor.knoxId, 'ARTIFACT_SERVICE_LINKED', 'deliverable', d._id, {
+        serviceKey: d.serviceKey,
+        externalArtifactId: d.externalArtifactId,
+      });
+    }
     return d;
   }
 
-  async update(id: string, dto: UpdateDeliverableDto) {
+  /**
+   * 이름·망 변경, 그리고 Hub 서비스 매핑.
+   *
+   * 매핑(serviceKey + externalArtifactId)은 생성 시점이 아니라 **언제든 나중에** 걸 수 있다
+   * (Hub 설계서 §11). 그 전환 시점이 ARTIFACT_SERVICE_LINKED로 남아서, 나중에 이력을 보면
+   * "여기서부터 실연동이 시작됐다"를 알 수 있다(§5.3).
+   */
+  async update(id: string, dto: UpdateDeliverableDto, actor: Actor) {
     const d = await this.findOrThrow(id);
     if (dto.name !== undefined) d.name = dto.name;
-    if (dto.docType !== undefined) d.docType = dto.docType;
     if (dto.network !== undefined) d.network = dto.network;
-    if (dto.artifactKey !== undefined) {
-      const key = dto.artifactKey.trim() || null;
-      if (key) {
-        // series 인스턴스끼리는 같은 실물 산출물의 회차이므로 같은 key를 공유해도 된다 -
-        // "원본(series가 가리키는 id, 없으면 자기 자신)"이 같은지로 그 관계를 판정한다.
-        const sid = (d.series ?? d._id).toString();
-        const clash = await this.model.findOne({ workflowId: d.workflowId, artifactKey: key, _id: { $ne: d._id } }).exec();
-        if (clash) {
-          const clashSid = (clash.series ?? clash._id).toString();
-          if (clashSid !== sid) {
-            throw new BadRequestException(`Artifact key "${key}" is already used by "${clash.name}" in this workflow.`);
-          }
-        }
-      }
-      d.artifactKey = key;
+
+    const linking =
+      (dto.serviceKey !== undefined && (dto.serviceKey?.trim() || null) !== d.serviceKey) ||
+      (dto.externalArtifactId !== undefined &&
+        (dto.externalArtifactId?.trim() || null) !== d.externalArtifactId);
+
+    if (dto.serviceKey !== undefined) d.serviceKey = dto.serviceKey?.trim() || null;
+    if (dto.externalArtifactId !== undefined) {
+      d.externalArtifactId = dto.externalArtifactId?.trim() || null;
     }
+
     await d.save();
+    if (linking && d.serviceKey) {
+      await this.audit.log(actor.knoxId, 'ARTIFACT_SERVICE_LINKED', 'deliverable', d._id, {
+        serviceKey: d.serviceKey,
+        externalArtifactId: d.externalArtifactId,
+      });
+    }
     return d;
   }
 
@@ -163,74 +152,119 @@ export class DeliverablesService {
     d.recvDept = dto.recvDept ?? null;
     d.recvContact = dto.recvContact ?? null;
     await d.save();
-    await this.audit.log(actor.knoxId, 'RECV_UPDATE', 'deliverable', d._id, {
-      recvDept: d.recvDept,
-      recvContact: d.recvContact,
+    return d;
+  }
+
+  /**
+   * 연동된 서비스가 소유한 산출물인지. 이런 산출물의 버전은 그 서비스가 올리고 SIREN은
+   * 관측만 하므로(Hub 설계서 §1.2), SIREN에서 직접 버전을 쓰는 것을 막는다.
+   */
+  private assertManualArtifact(d: DeliverableDocument): void {
+    if (d.serviceKey) {
+      throw new BadRequestException(
+        `This artifact is owned by "${d.serviceKey}" — record versions there, not in SIREN.`,
+      );
+    }
+  }
+
+  /**
+   * C/D 티어 수동 버전 기록 (Hub 설계서 §9).
+   *
+   * A/B 티어는 그 서비스가 버전을 갖고 SIREN은 관측만 하므로 이 경로를 타지 않는다.
+   * 여기 남는 기록은 "검증된 사실"이 아니라 **담당자의 주장**이라, 누가 언제 무엇을
+   * 주장했는지를 append-only로 남기고(§9.2) MANUAL_VERSION_ASSERT로 감사 로그를 찍는다.
+   *
+   * 덮어쓰기가 없다 - 정정도 새 엔트리로 쌓인다. 실제 산출물의 진짜 이력은 검증하지
+   * 못해도, 주장의 이력만큼은 추적 가능해야 하기 때문이다.
+   */
+  async assertVersion(id: string, dto: AssertVersionDto, actor: Actor) {
+    const d = await this.findOrThrow(id);
+    this.assertManualArtifact(d);
+    if (d.intent === 'received') {
+      throw new BadRequestException(
+        'This artifact is a placeholder for something you are waiting to receive — it cannot be recorded here directly.',
+      );
+    }
+
+    const label = dto.versionLabel?.trim();
+    const path = dto.hpcPath?.trim() || null;
+    if (!label && !path) {
+      throw new BadRequestException('A version label (or an HPC path to stand in for one) is required.');
+    }
+
+    const now = new Date();
+    // 버전 개념이 없는 HPC 경로형 산출물은 path@registeredAt을 버전 대체값으로 쓴다 (§5.2.1).
+    const resolvedLabel = label || (path as string);
+    const versionRef = !label && path ? `${path}@${now.toISOString()}` : null;
+
+    d.versions.unshift({
+      tier: dto.tier ?? 'C',
+      versionLabel: resolvedLabel,
+      isReleased: dto.isReleased === true,
+      versionRef,
+      giverKnoxId: actor.knoxId,
+      giverDept: dto.giverDept ?? null,
+      sourceRefs: [],
+      viewUrl: dto.viewUrl?.trim() || null,
+      hpcPath: path,
+      note: dto.note ?? '',
+      assertedBy: actor.realKnoxId,
+      assertedAt: now,
+      observedAt: null,
+      createdAt: now,
+    } as any);
+    await d.save();
+
+    await this.audit.log(actor.realKnoxId, 'MANUAL_VERSION_ASSERT', 'deliverable', d._id, {
+      versionLabel: resolvedLabel,
+      isReleased: dto.isReleased === true,
+      tier: dto.tier ?? 'C',
+      actingAs: actor.isImpersonating ? actor.knoxId : undefined,
     });
     return d;
   }
 
   /**
-   * 업로드 = minor +1 (최초는 v0.1) (설계서 3.5).
-   * intent==='received'인 산출물은 이 workflow가 직접 만드는 게 아니라 연동된 서비스가
-   * 채워줄 자리표시자라 여기로 직접 업로드하는 것을 막는다(사용자 요청) — FE가 그 UI
-   * 자체를 숨기지만, API를 직접 두드리는 경우까지 막기 위해 여기서도 거절한다.
+   * 산출물 단위 Release - 가장 최근 기록을 릴리스로 승격한다.
+   *
+   * 연동된 서비스(A/B)는 릴리스도 그쪽에서 일어나므로 여기로 오지 않는다. 수동 기록
+   * (C/D)만 이 경로를 탄다. 새 엔트리를 쌓아 올리는 append-only 규칙은 여기서도 같다 -
+   * 기존 엔트리의 isReleased를 뒤집지 않는다.
    */
-  async addVersion(id: string, dto: AddVersionDto, actor: Actor) {
-    const d = await this.findOrThrow(id);
-    if (d.intent === 'received') {
-      throw new BadRequestException('This artifact is a placeholder for something you are waiting to receive — it cannot be uploaded here directly.');
-    }
-    if (d.network === 'OA' && !dto.storageKey) {
-      throw new BadRequestException('OA-network deliverables require a storageKey.');
-    }
-    if (d.network === 'HPC' && !dto.hpcPath) {
-      throw new BadRequestException('HPC-network deliverables require an hpcPath.');
-    }
-
-    const latest = d.versions[0];
-    const major = latest ? latest.major : 0;
-    const minor = latest ? latest.minor + 1 : 1;
-
-    const version = {
-      major,
-      minor,
-      kind: 'minor' as const,
-      fileName: dto.fileName,
-      storageKey: dto.storageKey ?? null,
-      hpcPath: dto.hpcPath ?? null,
-      note: dto.note ?? '',
-      createdBy: actor.knoxId,
-      createdAt: new Date(),
-    };
-    d.versions.unshift(version as any);
-    await d.save();
-    await this.audit.log(actor.knoxId, 'VERSION_UPLOAD', 'deliverable', d._id, { major, minor });
-    return d;
-  }
-
-  /** Release = major +1 · minor 0, 최신 업로드분을 그대로 릴리스로 승격 (설계서 3.5, 5.4). */
   async release(id: string, dto: ReleaseDto, actor: Actor) {
     const d = await this.findOrThrow(id);
+    this.assertManualArtifact(d);
     const latest = d.versions[0];
     if (!latest) {
-      throw new BadRequestException('There is no uploaded version to release.');
+      throw new BadRequestException('There is no recorded version to release.');
     }
-    const major = latest.major + 1;
-    const version = {
-      major,
-      minor: 0,
-      kind: 'major' as const,
-      fileName: latest.fileName,
-      storageKey: latest.storageKey,
+    if (latest.isReleased) {
+      throw new BadRequestException('The latest version is already released.');
+    }
+
+    const now = new Date();
+    d.versions.unshift({
+      tier: latest.tier,
+      versionLabel: latest.versionLabel,
+      isReleased: true,
+      versionRef: latest.versionRef,
+      giverKnoxId: latest.giverKnoxId ?? actor.knoxId,
+      giverDept: latest.giverDept,
+      sourceRefs: latest.sourceRefs ?? [],
+      viewUrl: latest.viewUrl,
       hpcPath: latest.hpcPath,
       note: dto.note ?? '',
-      createdBy: actor.knoxId,
-      createdAt: new Date(),
-    };
-    d.versions.unshift(version as any);
+      assertedBy: actor.realKnoxId,
+      assertedAt: now,
+      observedAt: null,
+      createdAt: now,
+    } as any);
     await d.save();
-    await this.audit.log(actor.knoxId, 'RELEASE', 'deliverable', d._id, { major });
+
+    await this.audit.log(actor.realKnoxId, 'RELEASE', 'deliverable', d._id, {
+      versionLabel: latest.versionLabel,
+      actingAs: actor.isImpersonating ? actor.knoxId : undefined,
+    });
     return d;
   }
 
@@ -300,8 +334,8 @@ export class DeliverablesService {
           workflowId: origin.workflowId,
           phaseId,
           name: origin.name,
-          artifactKey: origin.artifactKey,
-          docType: origin.docType,
+          serviceKey: origin.serviceKey,
+          externalArtifactId: origin.externalArtifactId,
           network: origin.network,
           series: origin._id,
           seriesIdx: 0, // 아래에서 회차 순서대로 재계산

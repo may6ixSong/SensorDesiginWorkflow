@@ -92,9 +92,6 @@ export class WorkflowsService {
       viewGrants: [],
       isMock: false,
     });
-    await this.audit.log(actor.knoxId, 'WORKFLOW_CREATE', 'workflow', workflow._id, {
-      name, domain: workflow.domain, phaseCount: workflow.phases.length,
-    });
     return workflow;
   }
 
@@ -120,7 +117,6 @@ export class WorkflowsService {
     if (dto.description !== undefined) workflow.description = dto.description.trim();
     if (dto.color !== undefined) workflow.color = dto.color;
     await workflow.save();
-    await this.audit.log(actor.knoxId, 'WORKFLOW_UPDATE', 'workflow', workflow._id, dto as any);
     return this.findOrThrow(workflowId);
   }
 
@@ -145,10 +141,6 @@ export class WorkflowsService {
 
     workflow.phases = next as WorkflowPhase[];
     await workflow.save();
-    await this.audit.log(actor.knoxId, 'WORKFLOW_PHASES_UPDATE', 'workflow', workflow._id, {
-      phaseCount: next.length,
-      removedPhaseIds: removed,
-    });
     return this.findOrThrow(workflowId);
   }
 
@@ -166,7 +158,6 @@ export class WorkflowsService {
     if (before !== domain) {
       workflow.domain = domain;
       await workflow.save();
-      await this.audit.log(actor.knoxId, 'WORKFLOW_DOMAIN_SET', 'workflow', workflow._id, { before, after: domain });
     }
     return this.findOrThrow(workflowId);
   }
@@ -205,7 +196,6 @@ export class WorkflowsService {
     if (!workflow.viewGrants.some((g) => g.knoxId === knoxId)) {
       workflow.viewGrants.push({ knoxId, department, grantedAt: new Date() });
       await workflow.save();
-      await this.audit.log(actor.knoxId, 'WORKFLOW_VIEW_GRANT_ADD', 'workflow', workflow._id, { knoxId, department });
     }
     return this.findOrThrow(workflowId);
   }
@@ -214,7 +204,6 @@ export class WorkflowsService {
     const workflow = await this.findOrThrow(workflowId);
     workflow.viewGrants = workflow.viewGrants.filter((g) => g.knoxId !== knoxId);
     await workflow.save();
-    await this.audit.log(actor.knoxId, 'WORKFLOW_VIEW_GRANT_REMOVE', 'workflow', workflow._id, { knoxId });
     return this.findOrThrow(workflowId);
   }
 }
