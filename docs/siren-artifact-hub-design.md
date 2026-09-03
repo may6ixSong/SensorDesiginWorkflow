@@ -453,6 +453,12 @@ working/released 구분 자체가 SIREN 눈에 안 보이므로 숨길 것도 �
 
 **제거되는 것** — `storageKey`, `fileName`(실물 파일이 서비스로 이관), `major`/`minor`/`kind`(→ `versionLabel` + `isReleased`). `hpcPath`는 §5.2에 따라 유지한다.
 
+**`docType`와 `artifactKey`도 폐기한다.** `docType`(자유 문자열로 "이게 뭔 산출물이냐"를 표시하던 필드)은
+`serviceKey`가 더 정확하게 그 역할을 하므로 남겨둘 이유가 없다. `artifactKey`(v2 §8.1 로드맵에서
+"언젠가 외부 시스템이 이 값으로 매핑해줄 것"을 전제로 만든 안정적 식별자)도 `serviceKey` +
+`externalArtifactId`가 정확히 그 역할을 대신하므로 같은 이유로 폐기한다. 두 필드 모두 새로 설계된
+타입에는 자리가 없다 — 이전 필드를 신경 쓸 필요 없이 §10.1의 새 구조를 그대로 따른다.
+
 **`Deliverable`은 그 workflow 캔버스에서의 placement이지, 산출물 그 자체가 아니다.** `serviceKey` +
 `externalArtifactId`가 같은 Deliverable 문서가 서로 다른 `workflowId` 아래 여러 개 존재할 수 있다
 (§11.4) — 같은 Hub 산출물이 같은 department의 여러 workflow에 동시에 걸리는 경우가 그렇다. 이
@@ -477,6 +483,46 @@ working/released 구분 자체가 SIREN 눈에 안 보이므로 숨길 것도 �
 
 - `artifactServices` — §3.2
 - `hubSyncCheckpoints` — §8.4의 커서 보관 (`{ tableName, lastCheckpoint, lastRunAt, lastError }`)
+
+### 10.4 기존 `deliverables` 데이터 변환 규칙
+
+실물 파일은 아직 S3에 하나도 올라가 있지 않다 — 옮길 바이트가 없다. 바꿔야 하는 건 문서 구조뿐이다.
+`Deliverable` 문서마다, 그리고 `versions[]`의 각 항목마다 다음을 적용한다.
+
+**Deliverable 레벨**
+
+| 필드 | 처리 |
+|---|---|
+| `docType` | 삭제 |
+| `artifactKey` | 삭제 |
+| `serviceKey` | `null`로 신규 추가 (아직 어떤 Hub 서비스에도 안 묶여 있다는 뜻 — File Vault가 만들어지면 그때 `ARTIFACT_SERVICE_LINKED`와 함께 채운다) |
+| `externalArtifactId` | `null`로 신규 추가 |
+| 그 외(`projectId`, `workflowId`, `phaseId`, `name`, `network`, `intent`, `series`/`seriesIdx`/`seriesTotal`, `recvDept`/`recvContact`, `recvWorkflowId`, `sourceDept`/`sourceContact`, `layout`, `createdBy`, `isMock`) | 그대로 유지 |
+
+**`versions[]` 각 항목 레벨** (변환 전 `major`/`minor`/`kind` 값을 먼저 읽어둔 뒤 진행)
+
+| 필드 | 처리 |
+|---|---|
+| `major`, `minor`, `kind` | 삭제 |
+| `versionLabel` | 신규 추가. `"${major}.${minor}"` |
+| `isReleased` | 신규 추가. `kind === 'major'` |
+| `versionRef` | 신규 추가. `"legacy:${deliverableId}:${major}.${minor}"` — 나중에 실제 서비스가 붙기 전까지 임시로 추적 가능한 값을 준다 |
+| `storageKey`, `fileName` | 삭제 |
+| `tier` | 신규 추가. `"A"` 고정 |
+| `giverKnoxId` | 신규 추가. 기존 `createdBy` 값을 그대로 복사 |
+| `giverDept` | 신규 추가. `null` (역산할 근거가 없다) |
+| `sourceRefs` | 신규 추가. `[]` |
+| `viewUrl` | 신규 추가. `null` |
+| `assertedBy`, `assertedAt` | 신규 추가. 둘 다 `null` (A 티어 취급이라 해당 없음) |
+| `observedAt` | 신규 추가. 기존 `createdAt` 값을 그대로 복사 |
+| `hpcPath`, `note`, `createdBy`, `createdAt` | 그대로 유지 |
+
+**건드리지 않는 컬렉션** — `hldReleases`(오래된 스냅샷은 `tier`/`confidence` 없이 남는 게 맞다, §10.2),
+`auditLogs`(과거 action 값은 그대로 읽힌다), `projects`, `workflows`, `memos`, `edges`.
+
+**주의** — 이 변환 이후에는 `deliverables` 컬렉션의 실제 문서 모양이 지금 배포된 앱 코드(Mongoose
+스키마)가 기대하는 모양과 달라진다. 이건 의도된 상태다 — 데이터 먼저, 코드는 별도 작업에서
+따라온다(§18). 그 사이 기간에 앱이 이 컬렉션을 정상적으로 못 읽을 수 있다.
 
 ---
 
@@ -695,3 +741,35 @@ SIREN의 역할이 "워크플로우 대시보드"에서 "산출물 서비스 오
 ### 17.2 남은 것
 
 지금은 없음. 새로 열리는 대로 이 절에 추가한다.
+
+---
+
+## 18. 기존 데이터 마이그레이션 — CLI 세션 실행 지시문
+
+이 절은 **이 설계서가 최종 확정된 뒤에만** 실행한다. 아래 블록은 그때 Claude Code CLI 세션에
+**그대로 붙여넣을 지시문**이다 — 지금 실행하는 게 아니라 나중에 쓸 명령을 여기 박아두는 것뿐이다.
+
+> **작업 범위: `deliverables` 컬렉션의 기존 문서를 `docs/siren-artifact-hub-design.md` §10.4의
+> 변환 규칙에 맞게 데이터만 고친다.**
+>
+> **절대 규칙 — 하나라도 어기면 작업을 멈추고 보고할 것:**
+>
+> 1. **애플리케이션 코드는 단 한 줄도 건드리지 않는다.** `api/src/**`, `web/src/**`의 어떤 파일도
+>    수정·생성·삭제하지 않는다. Mongoose 스키마 파일(`deliverable.schema.ts` 등)도 포함이다 —
+>    코드는 이번 작업 범위가 아니고, 별도의 후속 작업에서 다룬다.
+> 2. **DB 접속은 앱의 Mongoose 모델을 거치지 않는다.** 지금 앱 스키마는 여전히 옛 필드
+>    (`major`/`minor`/`kind`/`storageKey`/`fileName`/`docType`/`artifactKey`)를 기대하므로,
+>    앱 모델로 저장하면 검증에 걸리거나 의도와 다르게 동작할 수 있다. 원시 MongoDB 드라이버(또는
+>    `mongosh`)로 직접 접속해서 처리한다.
+> 3. **변환에 스크립트가 필요하면 임시 파일로 작성해서 실행한 뒤, 작업이 끝나면 그 스크립트
+>    파일을 반드시 삭제한다.** 리포지터리에 마이그레이션 스크립트를 남기지 않는다.
+> 4. **`git add`, `git commit`, `git push`를 포함해 어떤 git 쓰기 명령도 실행하지 않는다.**
+>    이건 특히 중요하다 — **절대 커밋하지 않는다.** 이 작업은 데이터베이스 안의 문서만 바꾸는
+>    것이지, 리포지터리에 남는 변경사항이 아니어야 한다(스크립트 자체도 규칙 3에 따라 지워지므로
+>    커밋할 대상이 애초에 남지 않는다).
+> 5. 작업 전후로 대상 문서 수와 변환된 필드 요약을 보고한다(예: "총 N개 Deliverable, M개 버전
+>    엔트리 변환 완료"). 실패한 문서가 있으면 어떤 문서인지, 왜 실패했는지 구체적으로 보고하고
+>    나머지는 계속 진행한다.
+>
+> **참고** — 인메모리 모드(`.env`의 `MONGODB_URI`/`DB_CONNECTION`이 비어있는 상태)로 떠 있다면
+> 옮길 데이터가 없다(재시작하면 초기화되는 목업뿐). 실제 영속 DB에 연결된 상태에서만 의미가 있다.
