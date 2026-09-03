@@ -5,8 +5,10 @@ import { ArtifactService, ArtifactServiceSchema } from './schemas/artifact-servi
 import { HubSyncCheckpoint, HubSyncCheckpointSchema } from './schemas/hub-sync-checkpoint.schema';
 import { Project, ProjectSchema } from '../projects/schemas/project.schema';
 import { Workflow, WorkflowSchema } from '../workflows/schemas/workflow.schema';
+import { Deliverable, DeliverableSchema } from '../deliverables/schemas/deliverable.schema';
 import { HubService } from './hub.service';
 import { HubCommonService } from './hub-common.service';
+import { HubShowcaseService } from './hub-showcase.service';
 import { HubController } from './hub.controller';
 
 /**
@@ -22,10 +24,11 @@ import { HubController } from './hub.controller';
       { name: HubSyncCheckpoint.name, schema: HubSyncCheckpointSchema },
       { name: Project.name, schema: ProjectSchema },
       { name: Workflow.name, schema: WorkflowSchema },
+      { name: Deliverable.name, schema: DeliverableSchema },
     ]),
     AuditModule,
   ],
-  providers: [HubService, HubCommonService],
+  providers: [HubService, HubCommonService, HubShowcaseService],
   controllers: [HubController],
   exports: [HubService, HubCommonService],
 })

@@ -3,6 +3,7 @@ import { CurrentActor } from '../common/decorators/current-actor.decorator';
 import { Actor } from '../common/actor';
 import { HubService } from './hub.service';
 import { HubCommonService } from './hub-common.service';
+import { HubShowcaseService } from './hub-showcase.service';
 import {
   RegisterServiceDto,
   UpdateServiceDto,
@@ -14,6 +15,7 @@ export class HubController {
   constructor(
     private readonly hub: HubService,
     private readonly common: HubCommonService,
+    private readonly showcase: HubShowcaseService,
   ) {}
 
   /** 산출물의 출처를 고를 때 쓰는 목록. Admin은 꺼진 것까지 본다. */
@@ -47,5 +49,15 @@ export class HubController {
   @Get('common')
   async getCommon(@Query('projectId') projectId: string) {
     return { data: await this.common.build(projectId) };
+  }
+
+  /**
+   * 대문(§15.4)의 슬랩에 얹을 대표 산출물 몇 개. 순수 표시용이라 giver 마스킹 없이
+   * 항상 공개해도 되는 released 버전만 준다 — 워크플로우 맥락이 없어 giver 판정(§6.2)
+   * 자체가 불가능하다.
+   */
+  @Get('services/:key/showcase')
+  async getShowcase(@Param('key') key: string) {
+    return { data: await this.showcase.list(key) };
   }
 }

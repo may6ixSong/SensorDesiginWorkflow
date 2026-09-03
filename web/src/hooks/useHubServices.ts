@@ -35,3 +35,28 @@ export function useHubServices() {
 
   return { services: data ?? [], isLoading };
 }
+
+export interface ShowcaseItem {
+  name: string;
+  versionLabel: string;
+  isReleased: boolean;
+}
+
+/**
+ * 대문 슬랩에 얹을 대표 산출물 몇 개 (설계서 §15.4) — 서비스 메타데이터만으로는
+ * 바둑판 위에 빈 판넬만 떠 있는 것처럼 보이므로, 원본 3D 맵처럼 실제 버전 카드를
+ * 보여주기 위한 조회. giver 맥락이 없는 자리라 released 버전만 온다.
+ */
+export function useHubShowcase(serviceKey: string) {
+  const { data } = useQuery({
+    queryKey: ['hub', 'showcase', serviceKey],
+    queryFn: async (): Promise<ShowcaseItem[]> => {
+      const { data } = await apiClient.get(`/hub/services/${serviceKey}/showcase`);
+      return data.data;
+    },
+    enabled: !!serviceKey,
+    staleTime: 60_000,
+    retry: false,
+  });
+  return data ?? [];
+}

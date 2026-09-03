@@ -434,23 +434,70 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
     Edge: EdgeModel, HldRelease: HldReleaseModel,
   } = models;
 
-  /* ── Hub 레지스트리: Calypso(내장 서비스 #0) ──
-   * 레지스트리의 첫 항목이자 Observer 계약의 레퍼런스 구현이다(Hub 설계서 §2, §16 2단계).
-   * 실서비스 등록은 Admin 관리 화면(§13.4)에서 하고, 여기서는 내장 서비스 하나만 심는다. */
+  /* ── Hub 레지스트리 ──
+   * Calypso는 레지스트리의 첫 항목이자 Observer 계약의 레퍼런스 구현이다(Hub 설계서 §2,
+   * §16 2단계) - 유일하게 실제로 API가 뜨는 항목이다. 나머지 셋(SSM/SimHub/LayoutDB)은
+   * siren-orchestration-map.html에서 구조를 설명할 때 쓴 예시와 같은 메타데이터로,
+   * 대문이 실제 레지스트리를 반영한다는 걸(§15.4) 슬랩 하나짜리가 아니라 원래 그림과
+   * 같은 구성으로 보여주기 위해 함께 심는다 - 아직 어댑터가 없어 baseUrl은 비워둔다.
+   * 실서비스 등록은 Admin 관리 화면(§13.4)에서 한다. */
+  // insertMany를 쓴다 - 인메모리 페이크 모델(in-memory-driver.ts)의 create()는 단건만
+  // 받는다. 실제 Mongoose에도 있는 메서드라 양쪽 모드에서 동일하게 동작한다.
   await ArtifactServiceModel.deleteMany({ isMock: true });
-  await ArtifactServiceModel.create({
-    key: 'calypso',
-    name: 'Calypso',
-    contractVersion: '1.0',
-    defaultTier: 'A',
-    transport: 'http',
-    baseUrl: 'http://localhost:44360/api',
-    viewUrlTemplate: 'http://localhost:5174/artifacts/{artifactId}',
-    embedUploadUrlTemplate: null,
-    isBuiltIn: true,
-    enabled: true,
-    isMock: true,
-  });
+  await ArtifactServiceModel.insertMany([
+    {
+      key: 'calypso',
+      name: 'Calypso',
+      contractVersion: '1.0',
+      defaultTier: 'A',
+      transport: 'http',
+      baseUrl: 'http://localhost:44360/api',
+      viewUrlTemplate: 'http://localhost:5174/artifacts/{artifactId}',
+      embedUploadUrlTemplate: null,
+      isBuiltIn: true,
+      enabled: true,
+      isMock: true,
+    },
+    {
+      key: 'ssm',
+      name: 'SSM',
+      contractVersion: '1.0',
+      defaultTier: 'B',
+      transport: 'shared-db',
+      baseUrl: null,
+      viewUrlTemplate: 'https://ssm.local/spec/{artifactId}',
+      embedUploadUrlTemplate: null,
+      isBuiltIn: false,
+      enabled: true,
+      isMock: true,
+    },
+    {
+      key: 'simhub',
+      name: 'SimHub',
+      contractVersion: '1.0',
+      defaultTier: 'A',
+      transport: 'http',
+      baseUrl: null,
+      viewUrlTemplate: 'https://simhub.local/run/{artifactId}',
+      embedUploadUrlTemplate: null,
+      isBuiltIn: false,
+      enabled: true,
+      isMock: true,
+    },
+    {
+      key: 'layoutdb',
+      name: 'LayoutDB',
+      contractVersion: '1.0',
+      defaultTier: 'B',
+      transport: 'shared-db',
+      baseUrl: null,
+      viewUrlTemplate: 'https://layoutdb.local/cell/{artifactId}',
+      embedUploadUrlTemplate: null,
+      isBuiltIn: false,
+      enabled: true,
+      isMock: true,
+    },
+  ]);
 
   // 목업 문서만 지운다 (isMock:true). 실제 DB에 붙은 상태로도 안전하게 재실행할 수 있어야
   // 하므로 deleteMany({})는 절대 쓰지 않는다 - 사용자가 만든 데이터를 날려버린다.
@@ -514,16 +561,43 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
   const DID: Record<string, Types.ObjectId> = {};
   MOCK_ITEMS.forEach((m) => (DID[m.id] = new Types.ObjectId()));
 
+  /**
+   * 목업을 전부 Calypso 하나에 몰아넣지 않고 이름으로 4개 서비스에 나눈다 - 대문(§15.4)이
+   * 실제 레지스트리를 반영할 때, 슬랩 하나만 떠 있는 게 아니라 siren-orchestration-map.html
+   * 원본처럼 여러 서비스가 각자의 버전 이력을 갖고 보이게 하기 위해서다. 위 레지스트리 시드의
+   * 4개 키와 정확히 대응한다.
+   */
+  function inferServiceKey(name: string): 'calypso' | 'ssm' | 'simhub' | 'layoutdb' {
+    const n = name.toLowerCase();
+    if (n.includes('simulation')) return 'simhub';
+    if (n.includes('layout') || n.includes('netlist') || n.includes('pex')) return 'layoutdb';
+    if (
+      n.includes('review') || n.includes('requirement') || n.includes('architecture') ||
+      n.includes('checklist') || n.includes('sign-off') || n.includes('characterization')
+    ) {
+      return 'ssm';
+    }
+    return 'calypso';
+  }
+  /** 각 서비스의 viewUrlTemplate과 같은 경로 세그먼트 - 레지스트리 시드와 짝을 맞춘다. */
+  const SERVICE_PATH: Record<string, string> = {
+    calypso: 'artifacts', ssm: 'spec', simhub: 'run', layoutdb: 'cell',
+  };
+  const SERVICE_TIER: Record<string, 'A' | 'B'> = {
+    calypso: 'A', ssm: 'B', simhub: 'A', layoutdb: 'B',
+  };
+
   for (const m of MOCK_ITEMS) {
     const layout = seedXY(LANE_INDEX[m.phase] ?? 0, m.row, NW, NH);
+    const serviceKey = inferServiceKey(m.name);
+    const tier = SERVICE_TIER[serviceKey];
     await DeliverableModel.create({
       _id: DID[m.id],
       projectId: p1._id,
       workflowId: WFID[m.workflow],
       phaseId: m.phase,
       name: m.name,
-      // 목업은 Calypso(내장 서비스 #0)가 소유한 것으로 둔다 - Hub 설계서 §5.1의 A 티어.
-      serviceKey: 'calypso',
+      serviceKey,
       externalArtifactId: `mock-${m.id}`,
       network: m.net,
       series: m.series ? DID[m.series] : null,
@@ -534,17 +608,17 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
       recvWorkflowId: m.recvWorkflow ? WFID[m.recvWorkflow] : null,
       sourceDept: m.sourceDept ?? null,
       layout,
-      // 목업 버전은 A 티어(서비스가 소유하고 SIREN은 관측만)로 만든다 - 실물 파일은
+      // 목업 버전은 그 산출물이 배정된 서비스가 소유한 것으로 만든다 - 실물 파일은
       // SIREN에 없고 versionRef/viewUrl 참조만 들고 있는 게 새 구조다(Hub 설계서 §1.2).
       versions: m.versions.map(([major, minor, kind, by, when, note, file]) => ({
-        tier: 'A' as const,
+        tier,
         versionLabel: `${major}.${minor}`,
         isReleased: kind === 'major',
-        versionRef: `calypso:mock-${m.id}@${major}.${minor}`,
+        versionRef: `${serviceKey}:mock-${m.id}@${major}.${minor}`,
         giverKnoxId: U[by],
         giverDept: null,
         sourceRefs: [],
-        viewUrl: m.net === 'OA' ? `https://calypso.local/artifacts/mock-${m.id}` : null,
+        viewUrl: m.net === 'OA' ? `https://${serviceKey}.local/${SERVICE_PATH[serviceKey]}/mock-${m.id}` : null,
         hpcPath: m.net === 'HPC' ? file : null,
         note,
         assertedBy: null,

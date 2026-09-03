@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { AppShell } from '@/components/layout/AppShell';
 import { useThemeMode } from '@/theme/ThemeModeContext';
 import { FONT_DISPLAY, FONT_MONO } from '@/theme/tokens';
-import { useHubServices } from '@/hooks/useHubServices';
+import { HubService, useHubServices, useHubShowcase } from '@/hooks/useHubServices';
 
 /**
  * 대문 — 산출물 서비스들이 바닥에 솔리드 슬랩으로 놓이고, 그 위에 반투명한 SIREN 판이
@@ -26,7 +26,7 @@ const Z_PLANE = 292;
 const BEAM_H = Z_PLANE;
 
 /** 슬랩 간격. 노드(172)·슬랩(206) 폭보다 넉넉해야 빔이 카드에 가리지 않는다. */
-const SLOT_W = 231;
+const SLOT_W = 258;
 const MAX_SLABS = 4;
 
 /** 개수와 무관하게 항상 가운데로 모은다 - 한 개만 등록돼 있어도 한쪽으로 쏠리지 않는다. */
@@ -61,6 +61,7 @@ interface Palette {
   ctaText: string;
   ctaShadow: string;
   ctaShadowHover: string;
+  rowBg: string;
 }
 
 const PALETTE: Record<'light' | 'dark', Palette> = {
@@ -96,6 +97,7 @@ const PALETTE: Record<'light' | 'dark', Palette> = {
     ctaText: '#ffffff',
     ctaShadow: '0 4px 12px rgba(0,0,0,.35)',
     ctaShadowHover: '0 7px 16px rgba(0,0,0,.42)',
+    rowBg: 'rgba(255,255,255,.04)',
   },
   light: {
     stageBg: '#eef1f5',
@@ -129,6 +131,7 @@ const PALETTE: Record<'light' | 'dark', Palette> = {
     ctaText: '#ffffff',
     ctaShadow: '0 4px 10px rgba(12,122,104,.2)',
     ctaShadowHover: '0 7px 14px rgba(12,122,104,.26)',
+    rowBg: 'rgba(20,30,45,.035)',
   },
 };
 
@@ -303,39 +306,7 @@ export function HomePage() {
               SIREN
             </Box>
             {slabs.map((s, i) => (
-              <Box
-                key={s.key}
-                sx={{
-                  position: 'absolute',
-                  left: planeW / 2 + slotX(i, n) - 86,
-                  top: 64,
-                  width: 172,
-                  p: '9px 11px',
-                  borderRadius: '8px',
-                  border: `1px solid ${pal.nodeBorder}`,
-                  background: pal.nodeBg,
-                  transformStyle: 'preserve-3d',
-                }}
-              >
-                <Box sx={{ fontSize: 12.5, fontWeight: 600, color: pal.text, lineHeight: 1.25 }}>
-                  {s.name}
-                </Box>
-                <Box
-                  sx={{
-                    mt: '6px',
-                    pt: '5px',
-                    borderTop: `1px dashed ${pal.chipBorder}`,
-                    fontFamily: FONT_MONO,
-                    fontSize: 9,
-                    color: pal.dim2,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {s.key}
-                </Box>
-              </Box>
+              <PlaneNode key={s.key} service={s} left={planeW / 2 + slotX(i, n) - 86} pal={pal} />
             ))}
           </Box>
 
@@ -357,79 +328,9 @@ export function HomePage() {
             }}
           />
 
-          {/* 서비스 슬랩 — 불투명 솔리드. 실물 데이터가 여기 있다. */}
+          {/* 서비스 슬랩 — 불투명 솔리드. 실물 데이터가 여기 있다(버전 스택까지). */}
           {slabs.map((s, i) => (
-            <Box
-              key={s.key}
-              sx={{
-                position: 'absolute',
-                left: slotX(i, n) - 103,
-                top: -96,
-                width: 206,
-                p: '12px 13px 14px',
-                borderRadius: '9px',
-                background: pal.slabBg,
-                border: `1px solid ${pal.slabBorder}`,
-                borderBottom: 'none',
-                boxShadow: pal.slabShadow,
-                transformStyle: 'preserve-3d',
-                '&::after': {
-                  content: '""',
-                  position: 'absolute',
-                  left: -1,
-                  right: -1,
-                  top: '100%',
-                  height: 22,
-                  background: pal.slabRim,
-                  border: `1px solid ${pal.slabBorder}`,
-                  borderTop: 'none',
-                  borderRadius: '0 0 9px 9px',
-                  transformOrigin: '50% 0',
-                  transform: 'rotateX(-90deg)',
-                },
-              }}
-            >
-              <Box
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '7px',
-                  pb: '9px',
-                  borderBottom: `1px solid ${pal.chipBorder}`,
-                }}
-              >
-                <Box
-                  sx={{
-                    width: 7,
-                    height: 7,
-                    borderRadius: '50%',
-                    flex: 'none',
-                    background: s.enabled ? pal.ctaBg : pal.dim2,
-                    boxShadow: s.enabled ? `0 0 8px ${pal.ctaBg}` : 'none',
-                  }}
-                />
-                <Box sx={{ fontSize: 13.5, fontWeight: 700, color: pal.text }}>{s.name}</Box>
-                <Box
-                  sx={{
-                    ml: 'auto',
-                    fontFamily: FONT_MONO,
-                    fontSize: 9,
-                    color: pal.dim2,
-                    border: `1px solid ${pal.chipBorder}`,
-                    borderRadius: '3px',
-                    p: '1px 5px',
-                  }}
-                >
-                  {s.contractVersion}
-                </Box>
-              </Box>
-              <Box sx={{ fontFamily: FONT_MONO, fontSize: 9.5, color: pal.dim, mt: '9px' }}>
-                {s.transport}
-              </Box>
-              <Box sx={{ fontSize: 12.5, fontWeight: 600, color: pal.text, mt: '4px', lineHeight: 1.3 }}>
-                {s.key}
-              </Box>
-            </Box>
+            <ServiceSlab key={s.key} service={s} left={slotX(i, n) - 103} pal={pal} />
           ))}
 
           {/* 빔 — 위로 흐르는 관측, 아래로 흐르는 공용 데이터.
@@ -574,4 +475,176 @@ export function HomePage() {
 function hexA(hex: string, alpha: number): string {
   const n = parseInt(hex.slice(1), 16);
   return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+}
+
+/**
+ * SIREN 판 위의 노드. 원본 맵과 같은 구조로 — 산출물 이름 + 버전 ref만 담는다. 실물
+ * 목록(버전 스택)은 아래 슬랩에 있고, 여기는 그중 하나를 "참조"로만 가리킨다(§1.2).
+ * 슬랩과 같은 showcase 쿼리를 쓰므로 React Query가 요청을 중복 없이 공유한다.
+ */
+function PlaneNode({ service: s, left, pal }: { service: HubService; left: number; pal: Palette }) {
+  const items = useHubShowcase(s.key);
+  const top = items[0] ?? null;
+
+  return (
+    <Box
+      sx={{
+        position: 'absolute',
+        left,
+        top: 64,
+        width: 172,
+        p: '9px 11px',
+        borderRadius: '8px',
+        border: `1px solid ${pal.nodeBorder}`,
+        background: pal.nodeBg,
+        transformStyle: 'preserve-3d',
+      }}
+    >
+      <Box sx={{ fontSize: 12.5, fontWeight: 600, color: pal.text, lineHeight: 1.25 }}>
+        {top?.name ?? s.name}
+      </Box>
+      <Box
+        sx={{
+          mt: '6px',
+          pt: '5px',
+          borderTop: `1px dashed ${pal.chipBorder}`,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          fontFamily: FONT_MONO,
+          fontSize: 9,
+          color: pal.dim2,
+        }}
+      >
+        <Box
+          sx={{
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            flex: 1,
+          }}
+        >
+          {s.key}
+        </Box>
+        {top && (
+          <Box sx={{ flex: 'none', color: pal.observe }}>{top.versionLabel}</Box>
+        )}
+      </Box>
+    </Box>
+  );
+}
+
+/**
+ * 서비스 하나의 슬랩. 메타데이터 아래에 대표 산출물 버전 스택을 얹는다 — 이게 없으면
+ * 바둑판 위에 빈 판넬만 떠 있는 것처럼 보인다. 목업이지만 실제 seed된 산출물의
+ * released 버전으로 채운다(showcase API, §15.4) — 화면에 박아넣은 가짜 문자열이 아니다.
+ */
+function ServiceSlab({ service: s, left, pal }: { service: HubService; left: number; pal: Palette }) {
+  const items = useHubShowcase(s.key);
+
+  return (
+    <Box
+      sx={{
+        position: 'absolute',
+        left,
+        top: -96,
+        width: 206,
+        p: '12px 13px 14px',
+        borderRadius: '9px',
+        background: pal.slabBg,
+        border: `1px solid ${pal.slabBorder}`,
+        borderBottom: 'none',
+        boxShadow: pal.slabShadow,
+        transformStyle: 'preserve-3d',
+        '&::after': {
+          content: '""',
+          position: 'absolute',
+          left: -1,
+          right: -1,
+          top: '100%',
+          height: 22,
+          background: pal.slabRim,
+          border: `1px solid ${pal.slabBorder}`,
+          borderTop: 'none',
+          borderRadius: '0 0 9px 9px',
+          transformOrigin: '50% 0',
+          transform: 'rotateX(-90deg)',
+        },
+      }}
+    >
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '7px',
+          pb: '9px',
+          borderBottom: `1px solid ${pal.chipBorder}`,
+        }}
+      >
+        <Box
+          sx={{
+            width: 7,
+            height: 7,
+            borderRadius: '50%',
+            flex: 'none',
+            background: s.enabled ? pal.ctaBg : pal.dim2,
+            boxShadow: s.enabled ? `0 0 8px ${pal.ctaBg}` : 'none',
+          }}
+        />
+        <Box sx={{ fontSize: 13.5, fontWeight: 700, color: pal.text }}>{s.name}</Box>
+        <Box
+          sx={{
+            ml: 'auto',
+            fontFamily: FONT_MONO,
+            fontSize: 9,
+            color: pal.dim2,
+            border: `1px solid ${pal.chipBorder}`,
+            borderRadius: '3px',
+            p: '1px 5px',
+          }}
+        >
+          {s.contractVersion}
+        </Box>
+      </Box>
+      <Box sx={{ fontFamily: FONT_MONO, fontSize: 9.5, color: pal.dim, mt: '9px' }}>{s.transport}</Box>
+
+      {items.length > 0 ? (
+        <Box sx={{ mt: '9px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+          {items.map((it) => (
+            <Box
+              key={it.name}
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '7px',
+                fontFamily: FONT_MONO,
+                fontSize: 10,
+                p: '3px 7px',
+                borderRadius: '4px',
+                background: pal.rowBg,
+                color: pal.dim,
+              }}
+            >
+              <Box
+                sx={{
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  color: pal.text,
+                  fontFamily: 'inherit',
+                }}
+              >
+                {it.name}
+              </Box>
+              <Box sx={{ ml: 'auto', flex: 'none', color: pal.ctaBg }}>{it.versionLabel}</Box>
+            </Box>
+          ))}
+        </Box>
+      ) : (
+        <Box sx={{ fontSize: 12.5, fontWeight: 600, color: pal.text, mt: '9px', lineHeight: 1.3 }}>
+          {s.key}
+        </Box>
+      )}
+    </Box>
+  );
 }
