@@ -486,39 +486,22 @@ working/released 구분 자체가 SIREN 눈에 안 보이므로 숨길 것도 �
 
 ### 10.4 기존 `deliverables` 데이터 변환 규칙
 
-실물 파일은 아직 S3에 하나도 올라가 있지 않다 — 옮길 바이트가 없다. 바꿔야 하는 건 문서 구조뿐이다.
-`Deliverable` 문서마다, 그리고 `versions[]`의 각 항목마다 다음을 적용한다.
+실제로 등록된 산출물이 아직 하나도 없다 — 지금 `deliverables`에 있는 문서들은 실질적으로
+**유휴 상태**다. 그러니 기존 `versions[]` 안의 값을 정교하게 보존·변환할 이유가 없다. §11의
+"정상 빈 상태"(노드는 있되 출처 미등록) 그대로 리셋하면 된다.
 
-**Deliverable 레벨**
+**Deliverable 문서마다:**
 
 | 필드 | 처리 |
 |---|---|
 | `docType` | 삭제 |
 | `artifactKey` | 삭제 |
-| `serviceKey` | `null`로 신규 추가 (아직 어떤 Hub 서비스에도 안 묶여 있다는 뜻 — File Vault가 만들어지면 그때 `ARTIFACT_SERVICE_LINKED`와 함께 채운다) |
+| `serviceKey` | `null`로 신규 추가 |
 | `externalArtifactId` | `null`로 신규 추가 |
-| 그 외(`projectId`, `workflowId`, `phaseId`, `name`, `network`, `intent`, `series`/`seriesIdx`/`seriesTotal`, `recvDept`/`recvContact`, `recvWorkflowId`, `sourceDept`/`sourceContact`, `layout`, `createdBy`, `isMock`) | 그대로 유지 |
+| `versions` | **`[]`로 초기화** — 기존 항목의 `major`/`minor`/`kind`/`storageKey`/`fileName` 등은 변환하지 않고 그대로 버린다 |
+| 그 외(`projectId`, `workflowId`, `phaseId`, `name`, `network`, `intent`, `series`/`seriesIdx`/`seriesTotal`, `recvDept`/`recvContact`, `recvWorkflowId`, `sourceDept`/`sourceContact`, `layout`, `createdBy`, `isMock`) | 그대로 유지 — 캔버스 위 노드로서의 정체성(이름·위치·flow 연결 대상)은 살아있는 데이터이므로 건드리지 않는다 |
 
-**`versions[]` 각 항목 레벨** (변환 전 `major`/`minor`/`kind` 값을 먼저 읽어둔 뒤 진행)
-
-| 필드 | 처리 |
-|---|---|
-| `major`, `minor`, `kind` | 삭제 |
-| `versionLabel` | 신규 추가. `"${major}.${minor}"` |
-| `isReleased` | 신규 추가. `kind === 'major'` |
-| `versionRef` | 신규 추가. `"legacy:${deliverableId}:${major}.${minor}"` — 나중에 실제 서비스가 붙기 전까지 임시로 추적 가능한 값을 준다 |
-| `storageKey`, `fileName` | 삭제 |
-| `tier` | 신규 추가. `"A"` 고정 |
-| `giverKnoxId` | 신규 추가. 기존 `createdBy` 값을 그대로 복사 |
-| `giverDept` | 신규 추가. `null` (역산할 근거가 없다) |
-| `sourceRefs` | 신규 추가. `[]` |
-| `viewUrl` | 신규 추가. `null` |
-| `assertedBy`, `assertedAt` | 신규 추가. 둘 다 `null` (A 티어 취급이라 해당 없음) |
-| `observedAt` | 신규 추가. 기존 `createdAt` 값을 그대로 복사 |
-| `hpcPath`, `note`, `createdBy`, `createdAt` | 그대로 유지 |
-
-**건드리지 않는 컬렉션** — `hldReleases`(오래된 스냅샷은 `tier`/`confidence` 없이 남는 게 맞다, §10.2),
-`auditLogs`(과거 action 값은 그대로 읽힌다), `projects`, `workflows`, `memos`, `edges`.
+**건드리지 않는 컬렉션** — `hldReleases`, `auditLogs`, `projects`, `workflows`, `memos`, `edges`.
 
 **주의** — 이 변환 이후에는 `deliverables` 컬렉션의 실제 문서 모양이 지금 배포된 앱 코드(Mongoose
 스키마)가 기대하는 모양과 달라진다. 이건 의도된 상태다 — 데이터 먼저, 코드는 별도 작업에서
@@ -750,7 +733,8 @@ SIREN의 역할이 "워크플로우 대시보드"에서 "산출물 서비스 오
 **그대로 붙여넣을 지시문**이다 — 지금 실행하는 게 아니라 나중에 쓸 명령을 여기 박아두는 것뿐이다.
 
 > **작업 범위: `deliverables` 컬렉션의 기존 문서를 `docs/siren-artifact-hub-design.md` §10.4의
-> 변환 규칙에 맞게 데이터만 고친다.**
+> 규칙에 맞게 데이터만 고친다.** 실제 등록된 산출물이 없는 유휴 상태이므로, 기존 `versions[]`를
+> 정교하게 변환하는 게 아니라 §11의 "정상 빈 상태"로 리셋하는 작업이다.
 >
 > **절대 규칙 — 하나라도 어기면 작업을 멈추고 보고할 것:**
 >
