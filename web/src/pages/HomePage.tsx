@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { AppShell } from '@/components/layout/AppShell';
 import { useThemeMode } from '@/theme/ThemeModeContext';
 import { FONT_DISPLAY, FONT_MONO } from '@/theme/tokens';
-import { HubService, useHubServices, useHubShowcase } from '@/hooks/useHubServices';
+import { HUB_SHOWCASE_SLABS, HubShowcaseSlab } from '@/config/hubShowcase';
 
 /**
  * 대문 — 산출물 서비스들이 바닥에 솔리드 슬랩으로 놓이고, 그 위에 반투명한 SIREN 판이
@@ -141,9 +141,9 @@ export function HomePage() {
   const stageRef = useRef<HTMLDivElement>(null);
   const cameraRef = useRef<HTMLDivElement>(null);
 
-  /** 레지스트리에 실제로 등록된 서비스가 슬랩이 된다 (설계서 §15.4). */
-  const { services } = useHubServices();
-  const slabs = services.slice(0, MAX_SLABS);
+  /** 고정 목업 (web/src/config/hubShowcase.ts) — API를 부르지 않는다. 대문일 뿐이라
+   * 데이터에 의미가 없어도 된다. */
+  const slabs = HUB_SHOWCASE_SLABS.slice(0, MAX_SLABS);
   const n = Math.max(slabs.length, 1);
   const planeW = Math.max(460, n * SLOT_W + 70);
 
@@ -480,11 +480,9 @@ function hexA(hex: string, alpha: number): string {
 /**
  * SIREN 판 위의 노드. 원본 맵과 같은 구조로 — 산출물 이름 + 버전 ref만 담는다. 실물
  * 목록(버전 스택)은 아래 슬랩에 있고, 여기는 그중 하나를 "참조"로만 가리킨다(§1.2).
- * 슬랩과 같은 showcase 쿼리를 쓰므로 React Query가 요청을 중복 없이 공유한다.
  */
-function PlaneNode({ service: s, left, pal }: { service: HubService; left: number; pal: Palette }) {
-  const items = useHubShowcase(s.key);
-  const top = items[0] ?? null;
+function PlaneNode({ service: s, left, pal }: { service: HubShowcaseSlab; left: number; pal: Palette }) {
+  const top = s.items[0] ?? null;
 
   return (
     <Box
@@ -536,11 +534,11 @@ function PlaneNode({ service: s, left, pal }: { service: HubService; left: numbe
 
 /**
  * 서비스 하나의 슬랩. 메타데이터 아래에 대표 산출물 버전 스택을 얹는다 — 이게 없으면
- * 바둑판 위에 빈 판넬만 떠 있는 것처럼 보인다. 목업이지만 실제 seed된 산출물의
- * released 버전으로 채운다(showcase API, §15.4) — 화면에 박아넣은 가짜 문자열이 아니다.
+ * 바둑판 위에 빈 판넬만 떠 있는 것처럼 보인다. web/src/config/hubShowcase.ts의 고정
+ * 목업이라 API 호출이 전혀 없다 — 대문일 뿐이라 데이터에 의미가 없어도 된다.
  */
-function ServiceSlab({ service: s, left, pal }: { service: HubService; left: number; pal: Palette }) {
-  const items = useHubShowcase(s.key);
+function ServiceSlab({ service: s, left, pal }: { service: HubShowcaseSlab; left: number; pal: Palette }) {
+  const items = s.items;
 
   return (
     <Box
