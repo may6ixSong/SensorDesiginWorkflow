@@ -70,6 +70,12 @@ export function AppShell({
           background: T.sf,
           zIndex: 50,
           boxShadow: T.ss,
+          // 좁은 화면에서 아이템이 잘리는 대신 가로 스크롤되게 — 뷰포트보다 넓어져도
+          // 테마 토글·프로필처럼 뒤쪽 컨트롤이 완전히 사라지지 않는다.
+          overflowX: 'auto',
+          overflowY: 'hidden',
+          scrollbarWidth: 'none',
+          '&::-webkit-scrollbar': { display: 'none' },
         }}
       >
         <Box
@@ -77,11 +83,11 @@ export function AppShell({
           to="/"
           sx={{
             display: 'flex', alignItems: 'center', gap: '12px',
-            textDecoration: 'none', color: 'inherit',
+            textDecoration: 'none', color: 'inherit', flex: '0 0 auto',
           }}
         >
           <SirenMark />
-          <Box sx={{ fontSize: 20, fontWeight: 800, fontFamily: FONT_DISPLAY, lineHeight: 1.05 }}>
+          <Box sx={{ fontSize: 20, fontWeight: 800, fontFamily: FONT_DISPLAY, lineHeight: 1.05, whiteSpace: 'nowrap' }}>
             <Box component="span" sx={{ color: T.tx, letterSpacing: '.02em' }}>
               SIREN
             </Box>
@@ -102,9 +108,9 @@ export function AppShell({
           </Box>
         </Box>
 
-        <Box sx={{ width: '1px', height: 22, background: T.ln }} />
+        <Box sx={{ width: '1px', height: 22, background: T.ln, flex: '0 0 auto' }} />
 
-        <Box sx={{ display: 'flex', gap: '2px' }}>
+        <Box sx={{ display: 'flex', gap: '2px', flex: '0 0 auto' }}>
           <Box
             component={Link}
             to="/projects"
@@ -141,46 +147,54 @@ export function AppShell({
 
         {showSelects && (
           <>
-            <Box sx={{ width: '1px', height: 22, background: T.ln }} />
-            <SelectBox
-              label="Project"
-              value={projectId ?? ''}
-              onChange={onChangeProject!}
-              options={(projects ?? []).map((p) => ({ value: p._id, label: `${p.code} · ${p.name}` }))}
-            />
-            <SelectBox
-              label="workflow"
-              value={workflowId ?? ''}
-              onChange={onChangeIp!}
-              minWidth={110}
-              disabled={!workflows?.length}
-              options={
-                workflows?.length
-                  ? workflows.map((i) => ({ value: i.id, label: i.name }))
-                  : [{ value: '', label: 'No access' }]
-              }
-            />
+            <Box sx={{ width: '1px', height: 22, background: T.ln, flex: '0 0 auto' }} />
+            <Box sx={{ flex: '0 0 auto' }}>
+              <SelectBox
+                label="Project"
+                value={projectId ?? ''}
+                onChange={onChangeProject!}
+                options={(projects ?? []).map((p) => ({ value: p._id, label: `${p.code} · ${p.name}` }))}
+              />
+            </Box>
+            <Box sx={{ flex: '0 0 auto' }}>
+              <SelectBox
+                label="workflow"
+                value={workflowId ?? ''}
+                onChange={onChangeIp!}
+                minWidth={110}
+                disabled={!workflows?.length}
+                options={
+                  workflows?.length
+                    ? workflows.map((i) => ({ value: i.id, label: i.name }))
+                    : [{ value: '', label: 'No access' }]
+                }
+              />
+            </Box>
             {projectId && <HeaderIconButton icon="info" label="Project Info" to={`/projects/${projectId}`} />}
           </>
         )}
 
-        <Box sx={{ flex: 1 }} />
+        <Box sx={{ flex: 1, minWidth: '12px' }} />
 
         {canToggleRecv && (
-          <SirenButton variant={recv ? 'on' : 'default'} onClick={() => setRecv(!recv)}>
-            <Icon name="eye" /> Recipient-dept view
-          </SirenButton>
+          <Box sx={{ flex: '0 0 auto' }}>
+            <SirenButton variant={recv ? 'on' : 'default'} onClick={() => setRecv(!recv)}>
+              <Icon name="eye" /> Recipient-dept view
+            </SirenButton>
+          </Box>
         )}
 
-        <HeaderIconButton
-          iconElement={<MenuBookRoundedIcon sx={{ fontSize: 20 }} />}
-          label="User Guide"
-          to="/guide"
-        />
-        <NoticeBell clientId={user?.KnoxID ?? ''} />
-        <LanguagePopover />
-        <ThemeTogglePlatform />
-        <ProfileButton />
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: '12px', flex: '0 0 auto' }}>
+          <HeaderIconButton
+            iconElement={<MenuBookRoundedIcon sx={{ fontSize: 20 }} />}
+            label="User Guide"
+            to="/guide"
+          />
+          <NoticeBell clientId={user?.KnoxID ?? ''} />
+          <LanguagePopover />
+          <ThemeTogglePlatform />
+          <ProfileButton />
+        </Box>
       </Box>
 
       <Box component="main" sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
