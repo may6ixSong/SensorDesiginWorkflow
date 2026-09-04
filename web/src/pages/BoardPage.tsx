@@ -61,7 +61,6 @@ export function BoardPage() {
 
   const st = useCanvasStore;
   const edit = useCanvasStore((s) => s.edit);
-  const recv = useCanvasStore((s) => s.recv);
   const nodes = useCanvasStore((s) => s.nodes);
   const canvasMemos = useCanvasStore((s) => s.memos);
   const openId = useCanvasStore((s) => s.openId);
@@ -147,8 +146,6 @@ export function BoardPage() {
   }, [workflowId]);
 
   const isOwner = canEditWorkflow(workflow, isAdmin); // Admin(Group==='Admin')은 owner가 아니어도 편집 가능
-  const canEdit = !!isOwner && !recv; // 목업 canEd()
-  const own = !!isOwner && !recv; // 목업 own = isOwn(workflow) && !S.recv
 
   const openNode = useMemo(() => nodes.find((n) => n.id === openId) ?? null, [nodes, openId]);
   const incomingNode = useMemo(() => incoming.find((d) => d.id === incomingId) ?? null, [incoming, incomingId]);
@@ -276,7 +273,6 @@ export function BoardPage() {
       workflows={workflows ?? []}
       workflowId={workflowId}
       onChangeIp={(id) => navigate(`/details/${projectId}/${id}`)}
-      canToggleRecv={!!isOwner}
     >
       {!workflow ? (
         <Box sx={{ flex: 1, display: 'grid', placeItems: 'center', padding: '40px' }}>
@@ -293,21 +289,18 @@ export function BoardPage() {
         <>
           <WorkflowHeader
             workflow={workflow}
-            recv={recv}
             orphanCount={orphanCount}
+            canEdit={isOwner}
             onOpenHld={() => st.getState().setHldDlg(true, null)}
             onOpenSettings={() => {
               setDetailsErr(null); setPhasesErr(null);
-              // WorkflowSettingsDialog의 Details/Schedule 탭 노출 기준(own prop)과 맞춘다 —
-              // 그쪽은 recv 미리보기 토글과 무관하게 isOwner만 본다(권한 관리 다이얼로그의
-              // 기존 동작을 그대로 이어받음).
               st.getState().setWorkflowSettingsTab(isOwner ? 'details' : 'permissions');
             }}
           />
           <Canvas
             workflow={workflow}
             phases={phaseList}
-            canEdit={canEdit}
+            canEdit={isOwner}
             onOpenIncoming={(id) => st.getState().setIncomingId(id)}
             workflowDirectory={workflowDirectory ?? []}
             onSaveLayout={saveLayout}
@@ -318,7 +311,8 @@ export function BoardPage() {
             <DeliverableDialog
               node={openNode}
               phases={phaseList}
-              own={own}
+              own={isOwner}
+              project={project}
               onClose={closeDeliverable}
               onSaveInfo={({ name, artifactKey, serviceKey, externalArtifactId }) => {
                 updateDeliverable.mutate(

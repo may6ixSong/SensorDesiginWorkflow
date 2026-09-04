@@ -4,7 +4,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Box } from '@mui/material';
 import { AppShell } from '@/components/layout/AppShell';
 import { useAuth } from '@/app/providers/AuthProvider';
-import { useActingAsStore } from '@/store/actingAsStore';
 import { apiClient } from '@/api/client';
 import { HubService } from '@/hooks/useHubServices';
 import { ModalShell } from '@/components/common/ModalShell';
@@ -31,19 +30,20 @@ const TRANSPORT_OPTIONS = [
 /**
  * Service Manage — Hub 레지스트리 관리 화면 (설계서 §13.4). 예전 AdminPage의 admin
  * 전용 두 기능(사용자 시뮬레이터 + 레지스트리 관리) 중 레지스트리 관리만 여기 남는다 —
- * 사용자 시뮬레이터는 헤더의 Admin 메뉴에서 다이얼로그로 연다(AdminMenuButton).
+ * 사용자 시뮬레이터는 헤더의 user badge(ProfileButton)에서 연다.
  *
  * FE도 자기 몫을 한다(§13.3 규칙 6): non-admin에게는 진입 자체가 안 보이고, 여기서
- * 라우트 진입도 막아 URL 직접 접근을 차단한다. 사용자 시뮬레이션 중에도 접근을 막는다 —
- * 시뮬레이션 대상의 권한으로 레지스트리를 고칠 수 없어야 하기 때문(§13.3 규칙 2). 다만
- * 이건 BE 검증을 대신하지 않는다 — api를 직접 두드리면 여전히 서버의 isAdmin 재검증이
- * 최종 방어선이다.
+ * 라우트 진입도 막아 URL 직접 접근을 차단한다. 판정은 반드시 **isRealAdmin**(실제
+ * 호출자 기준)으로 한다 — 시뮬레이션 중 화면에 보이는 isAdmin은 대상 사용자 기준으로
+ * 바뀌므로, 그걸로 게이팅하면 안 된다. 사용자 시뮬레이션 중에는 (실제로는 Admin이어도)
+ * 접근을 막는다 — 시뮬레이션 대상의 권한으로 레지스트리를 고칠 수 없어야 하기
+ * 때문(§13.3 규칙 2). 다만 이건 BE 검증을 대신하지 않는다 — api를 직접 두드리면
+ * 여전히 서버의 isAdmin 재검증이 최종 방어선이다.
  */
 export function ServiceManagePage() {
-  const { isAdmin } = useAuth();
-  const actingAs = useActingAsStore((s) => s.actingAs);
-  if (!isAdmin) return <Navigate to="/no-access" replace />;
-  if (actingAs) return <Navigate to="/" replace />;
+  const { isRealAdmin, isSimulating } = useAuth();
+  if (!isRealAdmin) return <Navigate to="/no-access" replace />;
+  if (isSimulating) return <Navigate to="/" replace />;
 
   return (
     <AppShell>

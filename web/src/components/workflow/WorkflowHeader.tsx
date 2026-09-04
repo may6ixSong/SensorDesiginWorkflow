@@ -7,10 +7,10 @@ import { T } from '@/theme/tokens';
 
 interface WorkflowHeaderProps {
   workflow: WorkflowDto;
-  /** 수신 부서 시점 토글 상태 (목업 S.recv) */
-  recv: boolean;
   /** 이 workflow에서 일정을 잃은 산출물 수 — 0보다 크면 헤더에 경고 chip이 붙는다. */
   orphanCount: number;
+  /** Edit 권한(canEditWorkflow) — 있어야 설정(연필)·HLD Release 버튼이 보인다(사용자 요청). */
+  canEdit: boolean;
   onOpenHld: () => void;
   /** Workflow settings(Details/Schedule/Permissions 탭) 열기. */
   onOpenSettings: () => void;
@@ -28,7 +28,7 @@ const ICON_BUTTON_SIZE = 19.5;
  * 과제 화면이 아니라 이 workflow의 보드가 제자리다.
  */
 export function WorkflowHeader({
-  workflow, recv, orphanCount, onOpenHld, onOpenSettings,
+  workflow, orphanCount, canEdit, onOpenHld, onOpenSettings,
 }: WorkflowHeaderProps) {
   const { t } = useTranslation();
 
@@ -51,17 +51,14 @@ export function WorkflowHeader({
           </Typography>
         </Box>
 
-        <Tooltip title={t('workflow.settings')}>
-          <SirenButton variant="ghost" onClick={onOpenSettings} sx={{ padding: '6px 8px' }} aria-label={t('workflow.settings')}>
-            <Icon name="edit" size={ICON_BUTTON_SIZE} />
-          </SirenButton>
-        </Tooltip>
+        {canEdit && (
+          <Tooltip title={t('workflow.settings')}>
+            <SirenButton variant="ghost" onClick={onOpenSettings} sx={{ padding: '6px 8px' }} aria-label={t('workflow.settings')}>
+              <Icon name="edit" size={ICON_BUTTON_SIZE} />
+            </SirenButton>
+          </Tooltip>
+        )}
       </Stack>
-
-      {recv && (
-        <Chip label="Recipient-dept view" size="small" variant="outlined"
-          sx={{ color: T.vi, borderColor: T.vi3, background: T.vi2 }} />
-      )}
 
       {orphanCount > 0 && (
         <Chip
@@ -74,9 +71,11 @@ export function WorkflowHeader({
         />
       )}
 
-      <SirenButton onClick={onOpenHld}>
-        <Icon name="grid" /> HLD Release
-      </SirenButton>
+      {canEdit && (
+        <SirenButton onClick={onOpenHld}>
+          <Icon name="grid" /> HLD Release
+        </SirenButton>
+      )}
     </Stack>
   );
 }

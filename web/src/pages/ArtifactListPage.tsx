@@ -12,7 +12,9 @@ import { useAuth } from '@/app/providers/AuthProvider';
 import { useDirectory } from '@/app/providers/DirectoryProvider';
 import { UserAvatar } from '@/components/common/Avatar';
 import { queryKeys } from '@/api/queryKeys';
-import { CalypsoArtifact, createCalypsoArtifact, listCalypsoArtifacts } from '@/api/calypsoClient';
+import {
+  CalypsoArtifact, createCalypsoArtifact, listCalypsoArtifacts, setCalypsoUserDepartments,
+} from '@/api/calypsoClient';
 import { toast } from '@/store/toastStore';
 import { CURSOR_POINTER, FONT_MONO, T } from '@/theme/tokens';
 
@@ -29,27 +31,23 @@ function ArtifactList({ project }: { project: ProjectDetailDto }) {
   const navigate = useNavigate();
   const [registerOpen, setRegisterOpen] = useState(false);
 
-  const { data = [], isLoading, isError } = useQuery({
-    queryKey: queryKeys.calypsoArtifacts(project._id),
-    queryFn: () => listCalypsoArtifacts({ projectId: project._id }),
-  });
-
   /**
-   * 이 project에서 내가 속한 부서 — "내가 올려야 하거나 받아야 하는" 산출물의 대리
-   * 신호로 쓴다(사용자 요청 §3). Calypso는 아직 수신자 개념이 없어서(project+department만
-   * 안다), 부서 소속이 그 부서가 주고받는 산출물에 대한 이해관계를 나타내는 가장 가까운
-   * 값이다 — 내가 만든 것(createdBy)도 항상 포함한다.
+   * 이 project에서 내가 속한 부서 — Artifact ACL의 "부서 단위 부여" 판정에 쓰인다
+   * (사용자 요청 — Workflow 권한과 무관한 Calypso 자체 ACL, §3). Calypso는 SIREN의
+   * project membership을 모르므로 매 요청 헤더로 실어 보낸다(calypsoClient.ts).
    */
   const myDepartments = useMemo(
     () => project.members.find((m) => m.knoxId === user?.KnoxID)?.departments ?? [],
     [project.members, user?.KnoxID],
   );
 
-  const visible = useMemo(() => {
-    if (isAdmin) return data;
-    const myDeptSet = new Set(myDepartments);
-    return data.filter((a) => myDeptSet.has(a.department) || a.createdBy === user?.KnoxID);
-  }, [data, isAdmin, myDepartments, user?.KnoxID]);
+  const { data = [], isLoading, isError } = useQuery({
+    queryKey: queryKeys.calypsoArtifacts(project._id),
+    queryFn: () => {
+      setCalypsoUserDepartments(myDepartments);
+      return listCalypsoArtifacts({ projectId: project._id });
+    },
+  });
 
   return (
     <>
@@ -70,23 +68,21 @@ function ArtifactList({ project }: { project: ProjectDetailDto }) {
 
       {isError ? (
         <Box sx={{ fontSize: 12.5, color: T.dm }}>Could not reach Calypso. Check CALYPSO_API and its CORS_ORIGIN.</Box>
-      ) : isLoading ? null : visible.length === 0 ? (
+      ) : isLoading ? null : data.length === 0 ? (
         <Box
           sx={{
             border: `1px dashed ${T.ln2}`, borderRadius: '12px', background: T.sf,
             padding: '40px 20px', textAlign: 'center',
           }}
         >
-          <Box sx={{ fontSize: 13.5, fontWeight: 600, mb: '5px' }}>
-            {data.length === 0 ? 'No artifacts registered in this project yet' : 'No artifacts for your departments yet'}
-          </Box>
+          <Box sx={{ fontSize: 13.5, fontWeight: 600, mb: '5px' }}>No artifacts you can access yet</Box>
           <Box sx={{ fontSize: 12, color: T.dm }}>
-            {data.length === 0 ? 'Register the first one above.' : `${data.length} registered under other departments.`}
+            {isAdmin ? 'Register the first one above.' : 'Register one, or ask an editor to grant you access.'}
           </Box>
         </Box>
       ) : (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
-          {visible.map((a) => (
+          {data.map((a) => (
             <ArtifactRow key={a.id} artifact={a} onOpen={() => navigate(`/artifacts/${a.id}`)} />
           ))}
         </Box>

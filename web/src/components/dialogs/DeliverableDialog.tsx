@@ -3,7 +3,8 @@ import { Box, CircularProgress } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { WorkflowPhase } from '@/types/domain';
+import { ProjectDetailDto, WorkflowPhase } from '@/types/domain';
+import { useAuth } from '@/app/providers/AuthProvider';
 import { shortDate } from '@/lib/schedule';
 import {
   CanvasNode, VersionView, fmtAt, hasW, isOrphanPhase, latA, latR, stOf, vstr,
@@ -19,14 +20,16 @@ import { VersionTree } from '@/components/deliverable/VersionTree';
 import { VersionContents } from '@/components/deliverable/VersionContents';
 import { ArtifactVersionTree } from '@/components/artifact/ArtifactVersionTree';
 import { ArtifactVersionContents } from '@/components/artifact/ArtifactVersionContents';
+import { ArtifactAccessPanel } from '@/components/artifact/ArtifactAccessPanel';
 import { SirenButton, Badge } from '@/components/common/SirenButton';
 import { Card, Ey, Field, Row, SelectInput, TextInput } from '@/components/common/Panel';
 import { Icon } from '@/components/common/Icon';
 import { UserAvatar } from '@/components/common/Avatar';
 import { queryKeys } from '@/api/queryKeys';
 import {
-  CalypsoArtifact, CalypsoVersionView, downloadCalypsoVersion, getCalypsoArtifact,
-  releaseCalypsoArtifact, uploadCalypsoVersion,
+  CalypsoArtifact, CalypsoGrantInput, CalypsoVersionView, addCalypsoEditor, addCalypsoViewGrant,
+  downloadCalypsoVersion, getCalypsoArtifact, releaseCalypsoArtifact,
+  removeCalypsoEditor, removeCalypsoViewGrant, setCalypsoUserDepartments, uploadCalypsoVersion,
 } from '@/api/calypsoClient';
 import { toast } from '@/store/toastStore';
 import { CURSOR_POINTER, FONT_MONO, T } from '@/theme/tokens';
@@ -46,8 +49,10 @@ export interface AssertVersionInput {
 interface Props {
   node: CanvasNode | null;
   phases: WorkflowPhase[];
-  /** 목업 own = isOwn(workflow) && !S.recv */
+  /** 이 workflow의 Edit 권한 (canEditWorkflow) */
   own: boolean;
+  /** Calypso 연동 산출물의 ACL(부서 단위 부여) 후보를 계산하는 데 쓴다 — 없으면(로딩 중) 후보가 비어 보인다. */
+  project?: ProjectDetailDto;
   onClose: () => void;
   onSaveInfo: (p: {
     name: string; artifactKey: string | null;
@@ -77,10 +82,11 @@ interface Props {
  * 잇는 것으로만 하고, 이 화면에는 "무엇과 이어져 있는지" 읽기 전용 목록만 남긴다.
  */
 export function DeliverableDialog({
-  node: d, phases, own, onClose,
+  node: d, phases, own, project, onClose,
   onSaveInfo, onAssertVersion, onRelease, onSaveRecv, onDelete,
 }: Props) {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
@@ -106,14 +112,49 @@ export function DeliverableDialog({
    */
   const calypsoLinked = d?.serviceKey === 'calypso' && !!d?.externalArtifactId;
   const externalArtifactId = d?.externalArtifactId ?? '';
+  /** Artifact ACL의 부서 단위 부여 후보 — 이 workflow의 project 안에서 내가 속한 부서. */
+  const myDepartments = useMemo(
+    () => project?.members.find((m) => m.knoxId === user?.KnoxID)?.departments ?? [],
+    [project?.members, user?.KnoxID],
+  );
   const {
-    data: calypsoArtifact, isLoading: calypsoLoading, isError: calypsoError,
+    data: calypsoArtifact, isLoading: calypsoLoading, isError: calypsoError, error: calypsoErrorObj,
   } = useQuery({
     queryKey: queryKeys.calypsoArtifact(externalArtifactId),
-    queryFn: () => getCalypsoArtifact(externalArtifactId),
+    queryFn: () => {
+      setCalypsoUserDepartments(myDepartments);
+      return getCalypsoArtifact(externalArtifactId);
+    },
     enabled: calypsoLinked,
     retry: false,
   });
+  const calypsoForbidden = (calypsoErrorObj as any)?.response?.status === 403;
+
+  // Details를 열었는데 연동된 산출물에 view 권한이 없는 경우(사용자 요청) — toast로
+  // 알리고 패널 자체를 닫는다. 빈 패널이 계속 떠 있으면 안 된다("slide는 그대로
+  // 노출되면 안 된다"는 지적) — 콘텐츠가 없는 패널을 열어둔 채로 두지 않는다.
+  useEffect(() => {
+    if (calypsoForbidden) {
+      toast('You do not have view access to this artifact.');
+      onClose();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calypsoForbidden]);
+
+  /**
+   * Calypso에 연동 안 된(mapping 안 된) 산출물은 확인할 외부 ACL이 없다 — 그런 산출물의
+   * "권한"은 이 workflow 자체의 Edit 권한(own)으로 대신한다(사용자 요청: "권한 없으면
+   * 무조건 차단" — 컨텐츠가 비어 있어도 패널 구조 자체가 열리는 것도 안 된다). own이
+   * 아니면 calypso-forbidden과 똑같이 toast + 자동 닫힘.
+   */
+  const unmappedForbidden = !calypsoLinked && !own;
+  useEffect(() => {
+    if (d && unmappedForbidden) {
+      toast('You do not have access to this artifact.');
+      onClose();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [d?.id, unmappedForbidden]);
 
   const invalidateCalypso = () => {
     qc.invalidateQueries({ queryKey: queryKeys.calypsoArtifact(externalArtifactId) });
@@ -128,6 +169,26 @@ export function DeliverableDialog({
     mutationFn: (note: string) => releaseCalypsoArtifact(externalArtifactId, note),
     onSuccess: () => { invalidateCalypso(); toast('Released'); },
     onError: (e: any) => toast(e?.response?.data?.message ?? 'Release failed'),
+  });
+  const addEditor = useMutation({
+    mutationFn: (g: CalypsoGrantInput) => addCalypsoEditor(externalArtifactId, g),
+    onSuccess: invalidateCalypso,
+    onError: (e: any) => toast(e?.response?.data?.message ?? 'Could not grant edit access'),
+  });
+  const removeEditor = useMutation({
+    mutationFn: (g: CalypsoGrantInput) => removeCalypsoEditor(externalArtifactId, g),
+    onSuccess: invalidateCalypso,
+    onError: (e: any) => toast(e?.response?.data?.message ?? 'Could not remove editor'),
+  });
+  const addViewGrant = useMutation({
+    mutationFn: (g: CalypsoGrantInput) => addCalypsoViewGrant(externalArtifactId, g),
+    onSuccess: invalidateCalypso,
+    onError: (e: any) => toast(e?.response?.data?.message ?? 'Could not grant view access'),
+  });
+  const removeViewGrant = useMutation({
+    mutationFn: (g: CalypsoGrantInput) => removeCalypsoViewGrant(externalArtifactId, g),
+    onSuccess: invalidateCalypso,
+    onError: (e: any) => toast(e?.response?.data?.message ?? 'Could not remove viewer'),
   });
   const handleCalypsoDownload = async (v: CalypsoVersionView) => {
     try {
@@ -216,7 +277,7 @@ export function DeliverableDialog({
             <ArtifactVersionContents
               a={calypsoArtifact}
               version={calypsoShown}
-              canEdit={calypsoArtifact.canEdit}
+              canEdit={calypsoArtifact.myAccess === 'edit'}
               onDownload={handleCalypsoDownload}
               onUpload={(file, note) => uploadCalypso.mutate({ file, note })}
               onRelease={(note) => releaseCalypso.mutate(note)}
@@ -229,8 +290,14 @@ export function DeliverableDialog({
             </Box>
           ) : calypsoLinked && calypsoError ? (
             <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '22px' }}>
-              <Box sx={{ fontSize: 13.5, fontWeight: 600 }}>Could not load the linked Calypso artifact</Box>
-              <Box sx={{ fontSize: 12, color: T.dm2 }}>It may not exist in Calypso, or the link is stale.</Box>
+              <Box sx={{ fontSize: 13.5, fontWeight: 600 }}>
+                {calypsoForbidden ? 'You do not have view access to this artifact' : 'Could not load the linked Calypso artifact'}
+              </Box>
+              <Box sx={{ fontSize: 12, color: T.dm2 }}>
+                {calypsoForbidden
+                  ? 'Ask its registrant or an editor to grant you access.'
+                  : 'It may not exist in Calypso, or the link is stale.'}
+              </Box>
             </Box>
           ) : (
             <Box sx={{ flex: 1, minWidth: 0, overflowY: 'auto', background: T.sf3, padding: '22px' }}>
@@ -296,6 +363,18 @@ export function DeliverableDialog({
                 <VersionTree versions={d.versions} selected={shown} onSelect={setPicked} />
               )}
             </Card>
+
+            {calypsoLinked && calypsoArtifact && calypsoArtifact.myAccess === 'edit' && (
+              <ArtifactAccessPanel
+                artifact={calypsoArtifact}
+                myDepartments={myDepartments}
+                allDepartments={project?.departments ?? []}
+                onAddEditor={(g) => addEditor.mutate(g)}
+                onRemoveEditor={(g) => removeEditor.mutate(g)}
+                onAddViewGrant={(g) => addViewGrant.mutate(g)}
+                onRemoveViewGrant={(g) => removeViewGrant.mutate(g)}
+              />
+            )}
 
             {own && (
               <BasicInfoCard

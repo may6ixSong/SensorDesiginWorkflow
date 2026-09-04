@@ -3,12 +3,9 @@ import { Box } from '@mui/material';
 import { Link, useLocation } from 'react-router-dom';
 import MenuBookRoundedIcon from '@mui/icons-material/MenuBookRounded';
 import { WorkflowDto, ProjectDto } from '@/types/domain';
-import { useCanvasStore } from '@/store/canvasStore';
 import { useAuth } from '@/app/providers/AuthProvider';
-import { SirenMark, Icon } from '@/components/common/Icon';
-import { SirenButton } from '@/components/common/SirenButton';
+import { SirenMark } from '@/components/common/Icon';
 import { HeaderIconButton } from '@/components/common/HeaderIconButton';
-import { AdminMenuButton } from './AdminMenuButton';
 import { NoticeBell } from './NoticeBell';
 import { LanguagePopover } from './LanguagePopover';
 import { ThemeTogglePlatform } from './ThemeTogglePlatform';
@@ -24,7 +21,6 @@ interface AppShellProps {
   workflows?: WorkflowDto[];
   workflowId?: string;
   onChangeIp?: (id: string) => void;
-  canToggleRecv?: boolean;
   children: ReactNode;
 }
 
@@ -35,7 +31,7 @@ const NAV_LABEL = 'Project List';
 
 /**
  * 목업 .tb 상단바 — 로고 + SIREN 워드마크 + 페이지 네비 + (보드에서만) 과제/workflow select
- * + 수신부서 시점 + 사용자 배지. (설계서 7.1 컴포넌트 트리의 AppShell)
+ * + 사용자 배지. (설계서 7.1 컴포넌트 트리의 AppShell)
  *
  * Right-side chrome (language/theme/notices/profile) mirrors SSM_WEB's
  * TopAppBar, wired to the platform AuthProvider (ADSSO / dev fixed admin) and
@@ -46,11 +42,9 @@ const NAV_LABEL = 'Project List';
 export function AppShell({
   projects, projectId, onChangeProject,
   workflows, workflowId, onChangeIp,
-  canToggleRecv = false, children,
+  children,
 }: AppShellProps) {
   const { user } = useAuth();
-  const recv = useCanvasStore((s) => s.recv);
-  const setRecv = useCanvasStore((s) => s.setRecv);
   const { pathname } = useLocation();
 
   const showSelects = !!onChangeProject;
@@ -70,6 +64,12 @@ export function AppShell({
           background: T.sf,
           zIndex: 50,
           boxShadow: T.ss,
+          // 좁은 화면에서 아이템이 잘리는 대신 가로 스크롤되게 — 뷰포트보다 넓어져도
+          // 테마 토글·프로필처럼 뒤쪽 컨트롤이 완전히 사라지지 않는다.
+          overflowX: 'auto',
+          overflowY: 'hidden',
+          scrollbarWidth: 'none',
+          '&::-webkit-scrollbar': { display: 'none' },
         }}
       >
         <Box
@@ -77,11 +77,11 @@ export function AppShell({
           to="/"
           sx={{
             display: 'flex', alignItems: 'center', gap: '12px',
-            textDecoration: 'none', color: 'inherit',
+            textDecoration: 'none', color: 'inherit', flex: '0 0 auto',
           }}
         >
           <SirenMark />
-          <Box sx={{ fontSize: 20, fontWeight: 800, fontFamily: FONT_DISPLAY, lineHeight: 1.05 }}>
+          <Box sx={{ fontSize: 20, fontWeight: 800, fontFamily: FONT_DISPLAY, lineHeight: 1.05, whiteSpace: 'nowrap' }}>
             <Box component="span" sx={{ color: T.tx, letterSpacing: '.02em' }}>
               SIREN
             </Box>
@@ -102,9 +102,9 @@ export function AppShell({
           </Box>
         </Box>
 
-        <Box sx={{ width: '1px', height: 22, background: T.ln }} />
+        <Box sx={{ width: '1px', height: 22, background: T.ln, flex: '0 0 auto' }} />
 
-        <Box sx={{ display: 'flex', gap: '2px' }}>
+        <Box sx={{ display: 'flex', gap: '2px', flex: '0 0 auto' }}>
           <Box
             component={Link}
             to="/projects"
@@ -122,47 +122,46 @@ export function AppShell({
 
         {showSelects && (
           <>
-            <Box sx={{ width: '1px', height: 22, background: T.ln }} />
-            <SelectBox
-              label="Project"
-              value={projectId ?? ''}
-              onChange={onChangeProject!}
-              options={(projects ?? []).map((p) => ({ value: p._id, label: `${p.code} · ${p.name}` }))}
-            />
-            <SelectBox
-              label="workflow"
-              value={workflowId ?? ''}
-              onChange={onChangeIp!}
-              minWidth={110}
-              disabled={!workflows?.length}
-              options={
-                workflows?.length
-                  ? workflows.map((i) => ({ value: i.id, label: i.name }))
-                  : [{ value: '', label: 'No access' }]
-              }
-            />
+            <Box sx={{ width: '1px', height: 22, background: T.ln, flex: '0 0 auto' }} />
+            <Box sx={{ flex: '0 0 auto' }}>
+              <SelectBox
+                label="Project"
+                value={projectId ?? ''}
+                onChange={onChangeProject!}
+                options={(projects ?? []).map((p) => ({ value: p._id, label: `${p.code} · ${p.name}` }))}
+              />
+            </Box>
+            <Box sx={{ flex: '0 0 auto' }}>
+              <SelectBox
+                label="workflow"
+                value={workflowId ?? ''}
+                onChange={onChangeIp!}
+                minWidth={110}
+                disabled={!workflows?.length}
+                options={
+                  workflows?.length
+                    ? workflows.map((i) => ({ value: i.id, label: i.name }))
+                    : [{ value: '', label: 'No access' }]
+                }
+              />
+            </Box>
             {projectId && <HeaderIconButton icon="info" label="Project Info" to={`/projects/${projectId}`} />}
           </>
         )}
 
-        <Box sx={{ flex: 1 }} />
+        <Box sx={{ flex: 1, minWidth: '12px' }} />
 
-        {canToggleRecv && (
-          <SirenButton variant={recv ? 'on' : 'default'} onClick={() => setRecv(!recv)}>
-            <Icon name="eye" /> Recipient-dept view
-          </SirenButton>
-        )}
-
-        <HeaderIconButton
-          iconElement={<MenuBookRoundedIcon sx={{ fontSize: 20 }} />}
-          label="User Guide"
-          to="/guide"
-        />
-        <NoticeBell clientId={user?.KnoxID ?? ''} />
-        <LanguagePopover />
-        <ThemeTogglePlatform />
-        <AdminMenuButton />
-        <ProfileButton />
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: '12px', flex: '0 0 auto' }}>
+          <HeaderIconButton
+            iconElement={<MenuBookRoundedIcon sx={{ fontSize: 20 }} />}
+            label="User Guide"
+            to="/guide"
+          />
+          <NoticeBell clientId={user?.KnoxID ?? ''} />
+          <LanguagePopover />
+          <ThemeTogglePlatform />
+          <ProfileButton />
+        </Box>
       </Box>
 
       <Box component="main" sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>

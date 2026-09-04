@@ -1,4 +1,6 @@
-import { Box } from '@mui/material';
+import { useEffect } from 'react';
+import { Box, CircularProgress } from '@mui/material';
+import { useQuery } from '@tanstack/react-query';
 import { DeliverableDto } from '@/types/domain';
 import { shortDate } from '@/lib/schedule';
 import { fmtAt } from '@/lib/canvasModel';
@@ -9,6 +11,8 @@ import { Card, Ey } from '@/components/common/Panel';
 import { Icon } from '@/components/common/Icon';
 import { UserAvatar } from '@/components/common/Avatar';
 import { toast } from '@/store/toastStore';
+import { queryKeys } from '@/api/queryKeys';
+import { getCalypsoArtifact } from '@/api/calypsoClient';
 import { FONT_MONO, T } from '@/theme/tokens';
 
 interface Props {
@@ -21,10 +25,58 @@ interface Props {
  * 편집/업로드/Release 버튼도 없다. 항상 released 버전만 보여준다(전달받은 DeliverableDto
  * 자체가 BE에서 그렇게 필터링돼 온다) — 이 규칙은 조회자가 우연히 sourceWorkflow의
  * owner여도 예외 없이 적용된다(BE toIncomingDeliverableDto 참고).
+ *
+ * Calypso에 연동된 산출물이면(serviceKey==='calypso') 여기 뜨는 내용도 결국 그 산출물의
+ * 데이터라, DeliverableDialog와 똑같이 Calypso 자체 ACL(view/edit, 개인·부서 단위)로
+ * 열람 여부를 한 번 더 확인한다(사용자 요청 — "기본은 다 차단, 권한 있는 경우에만
+ * 열리게"). SIREN이 보내주는 releasedVersion을 그냥 믿고 보여주면, 그 산출물에 대한
+ * Calypso 쪽 view 권한이 없는 사람도(예: 그 부서 소속이 아님) 이 팝업으로는 볼 수
+ * 있게 되는 구멍이 생긴다.
  */
 export function IncomingDeliverableDialog({ d, onClose }: Props) {
   const { resolveUser } = useDirectory();
+  const calypsoLinked = d?.serviceKey === 'calypso' && !!d?.externalArtifactId;
+  const externalArtifactId = d?.externalArtifactId ?? '';
+  const { isLoading: calypsoLoading, isError: calypsoError, error: calypsoErrorObj } = useQuery({
+    queryKey: queryKeys.calypsoArtifact(externalArtifactId),
+    queryFn: () => getCalypsoArtifact(externalArtifactId),
+    enabled: calypsoLinked,
+    retry: false,
+  });
+  const calypsoForbidden = (calypsoErrorObj as any)?.response?.status === 403;
+
+  useEffect(() => {
+    if (calypsoForbidden) {
+      toast('You do not have view access to this artifact.');
+      onClose();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calypsoForbidden]);
+
   if (!d) return null;
+
+  if (calypsoLinked && calypsoLoading) {
+    return (
+      <ModalShell open onClose={onClose} width={520} header={<Ey>Loading…</Ey>}>
+        <Box sx={{ display: 'flex', justifyContent: 'center', padding: '30px' }}>
+          <CircularProgress size={24} />
+        </Box>
+      </ModalShell>
+    );
+  }
+  // calypsoForbidden은 위 effect가 곧 onClose()로 닫는다 — 그 사이 빈 화면 대신 아무것도
+  // 안 그린다. 그 외 에러(예: 링크가 stale)는 기존처럼 SIREN이 보낸 값으로 계속 보여준다.
+  if (calypsoLinked && calypsoForbidden) return null;
+  if (calypsoLinked && calypsoError) {
+    return (
+      <ModalShell open onClose={onClose} width={520} header={<Ey>Could not load</Ey>}>
+        <Box sx={{ fontSize: 12.5, color: T.dm, padding: '10px 0' }}>
+          Could not load the linked Calypso artifact. It may not exist, or the link is stale.
+        </Box>
+      </ModalShell>
+    );
+  }
+
   // 여기 뜨는 일정은 "주는 쪽 workflow"의 phase다 — 내 캔버스의 칸 이름이 아니다.
   const ph = d.sourcePhase;
   const rel = d.releasedVersion;

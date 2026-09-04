@@ -1,5 +1,8 @@
-import { IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
-import { ArtifactDocument, ArtifactVersion } from '../schemas/artifact.schema';
+import {
+  IsIn, IsOptional, IsString, MaxLength, MinLength, ValidateIf,
+} from 'class-validator';
+import { ArtifactDocument, ArtifactGrant, ArtifactVersion } from '../schemas/artifact.schema';
+import { AccessLevel } from '../artifacts.service';
 
 /**
  * 등록 시 **project + department만** 받는다 - workflow는 받지 않는다.
@@ -59,10 +62,43 @@ export class ReleaseDto {
   note?: string;
 }
 
-/** 화면용 - Observer 계약(VersionRecord)과는 별개다. 이쪽은 파일명·스토리지 키까지 보여준다. */
-export function toArtifactDto(a: ArtifactDocument, actor: { knoxId: string }) {
-  const latest = a.versions[0] ?? null;
-  const released = a.versions.find((v) => v.isReleased) ?? null;
+/** editors/viewGrants에 한 건 추가·삭제할 때 쓰는 몸체 — user 또는 department 중 하나. */
+export class GrantDto {
+  @IsIn(['user', 'department'])
+  type: 'user' | 'department';
+
+  @ValidateIf((o: GrantDto) => o.type === 'user')
+  @IsString()
+  @MinLength(1)
+  knoxId?: string;
+
+  @ValidateIf((o: GrantDto) => o.type === 'department')
+  @IsString()
+  @MinLength(1)
+  department?: string;
+}
+
+function toGrantView(g: ArtifactGrant) {
+  return {
+    type: g.type,
+    knoxId: g.knoxId,
+    department: g.department,
+    grantedBy: g.grantedBy,
+    grantedAt: g.grantedAt instanceof Date ? g.grantedAt.toISOString() : String(g.grantedAt),
+  };
+}
+
+/**
+ * 화면용 - Observer 계약(VersionRecord)과는 별개다. 이쪽은 파일명·스토리지 키까지 보여준다.
+ *
+ * access==='view'면 released 버전만 보인다 — working(unreleased)은 마스킹한다(사용자
+ * 요청: "권한에 따라 version과 data노출이 달라지게"). access는 호출부(controller)가
+ * computeAccess()로 미리 계산해 넘긴다 — 여기서 다시 actor를 몰라도 되게.
+ */
+export function toArtifactDto(a: ArtifactDocument, access: Exclude<AccessLevel, 'none'>) {
+  const visible = access === 'edit' ? a.versions : a.versions.filter((v) => v.isReleased);
+  const latest = visible[0] ?? null;
+  const released = visible.find((v) => v.isReleased) ?? null;
   return {
     id: a._id.toString(),
     projectId: a.projectId,
@@ -70,10 +106,12 @@ export function toArtifactDto(a: ArtifactDocument, actor: { knoxId: string }) {
     name: a.name,
     description: a.description ?? '',
     createdBy: a.createdBy,
-    canEdit: a.createdBy === actor.knoxId,
-    versionCount: a.versions.length,
+    myAccess: access,
+    versionCount: visible.length,
     latestVersion: latest ? toVersionView(latest) : null,
     releasedVersion: released ? toVersionView(released) : null,
+    editors: a.editors.map(toGrantView),
+    viewGrants: a.viewGrants.map(toGrantView),
   };
 }
 

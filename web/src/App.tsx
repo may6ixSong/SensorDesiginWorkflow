@@ -11,15 +11,20 @@ import { ArtifactListPage } from '@/pages/ArtifactListPage';
 import { ArtifactDetailPage } from '@/pages/ArtifactDetailPage';
 import { BoardPage } from '@/pages/BoardPage';
 import { NoAccessPage } from '@/pages/NoAccessPage';
+import { AccessDeniedPage } from '@/pages/AccessDeniedPage';
 import { GuidePage } from '@/pages/GuidePage';
 
 /**
  * 인증은 전부 프론트엔드(ADSSO)에서 끝난다 — app/providers/AuthProvider.tsx.
  * api/는 X-Knox-Id 헤더로만 호출자를 식별하므로, AuthProvider가 사용자를 확정하고
  * setApiKnoxId()로 헤더를 채운 뒤(loginSuccess)에야 조회 쿼리를 시작한다.
+ *
+ * ADSSO는 통과했지만 사내 플랫폼(USER_GROUP_API)에 등록되지 않은 계정이면
+ * accountDenied가 선다(사용자 요청) — Home을 포함해 어떤 라우트도 못 보게 여기서
+ * 통째로 막는다. 개별 페이지 라우트가 각자 막을 일이 아니다.
  */
 function LoginGate({ children }: { children: React.ReactNode }) {
-  const { loginSuccess } = useAuth();
+  const { loginSuccess, accountDenied } = useAuth();
 
   if (!loginSuccess) {
     return (
@@ -28,6 +33,8 @@ function LoginGate({ children }: { children: React.ReactNode }) {
       </Stack>
     );
   }
+
+  if (accountDenied) return <AccessDeniedPage />;
 
   return <>{children}</>;
 }

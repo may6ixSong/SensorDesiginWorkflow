@@ -62,6 +62,13 @@ interface Palette {
   ctaShadow: string;
   ctaShadowHover: string;
   rowBg: string;
+  /** 주변부(빈 공간)를 채우는 장식 링/모트 — observe/identity와 같은 축의 보조색. */
+  ringA: string;
+  ringB: string;
+  moteA: string;
+  moteB: string;
+  floorGlow: string;
+  contactShadow: string;
 }
 
 const PALETTE: Record<'light' | 'dark', Palette> = {
@@ -98,6 +105,12 @@ const PALETTE: Record<'light' | 'dark', Palette> = {
     ctaShadow: '0 4px 12px rgba(0,0,0,.35)',
     ctaShadowHover: '0 7px 16px rgba(0,0,0,.42)',
     rowBg: 'rgba(255,255,255,.04)',
+    ringA: 'rgba(12,154,131,.4)',
+    ringB: 'rgba(123,126,232,.36)',
+    moteA: '#7fe8d3',
+    moteB: '#aaadfa',
+    floorGlow: 'radial-gradient(50% 50% at 50% 50%, rgba(12,154,131,.16), transparent 72%)',
+    contactShadow: 'radial-gradient(50% 50% at 50% 50%, rgba(0,0,0,.5), transparent 72%)',
   },
   light: {
     stageBg: '#eef1f5',
@@ -132,6 +145,12 @@ const PALETTE: Record<'light' | 'dark', Palette> = {
     ctaShadow: '0 4px 10px rgba(12,122,104,.2)',
     ctaShadowHover: '0 7px 14px rgba(12,122,104,.26)',
     rowBg: 'rgba(20,30,45,.035)',
+    ringA: 'rgba(12,120,103,.32)',
+    ringB: 'rgba(94,97,196,.28)',
+    moteA: '#0c9a83',
+    moteB: '#7376d6',
+    floorGlow: 'radial-gradient(50% 50% at 50% 50%, rgba(12,154,131,.14), transparent 72%)',
+    contactShadow: 'radial-gradient(50% 50% at 50% 50%, rgba(20,30,45,.28), transparent 72%)',
   },
 };
 
@@ -149,6 +168,8 @@ export function HomePage() {
 
   const angles = useRef({ rx: RX.initial, rz: RZ.initial });
   const drag = useRef<{ on: boolean; x: number; y: number }>({ on: false, x: 0, y: 0 });
+  /** 좁은 화면(휴대폰)에서는 장식 밀도를 줄이고 씬을 조금 더 위로 당긴다. */
+  const [compact, setCompact] = useState(false);
 
   const apply = useCallback(() => {
     const el = cameraRef.current;
@@ -161,11 +182,20 @@ export function HomePage() {
     const stage = stageRef.current;
     const el = cameraRef.current;
     if (!stage || !el) return;
+    const w = stage.clientWidth;
+    const h = stage.clientHeight;
     // 워드마크가 위쪽을 차지하므로 씬이 쓸 수 있는 높이는 스테이지보다 작다.
-    const byWidth = (stage.clientWidth - 48) / 1060;
-    const byHeight = (stage.clientHeight - 220) / 520;
-    const s = Math.max(0.34, Math.min(0.92, Math.min(byWidth, byHeight)));
+    // 분모를 실제 평면 폭(1102)보다 넉넉히 잡는 건 rotateZ로 기운 상태에서 화면상
+    // 가로 폭이 평평했을 때보다 더 벌어지기 때문 — 아주 좁은 화면(휴대폰)에서
+    // 슬랩 라벨이 스테이지 밖으로 잘리지 않게 하는 여유분이다.
+    const byWidth = (w - 32) / 1180;
+    const byHeight = (h - 200) / 560;
+    const s = Math.max(0.26, Math.min(0.92, Math.min(byWidth, byHeight)));
     el.style.setProperty('--s', s.toFixed(3));
+    // 세로로 짧은 화면(모바일 가로/작은 창)에서는 씬을 워드마크 쪽으로 덜 밀어낸다.
+    const ty = Math.max(96, Math.min(168, h * 0.22));
+    el.style.setProperty('--ty', `${ty.toFixed(0)}px`);
+    setCompact(w < 720);
   }, []);
 
   useEffect(() => {
@@ -237,6 +267,12 @@ export function HomePage() {
             from: { opacity: 0, transform: 'translateY(14px)' },
             to: { opacity: 1, transform: 'translateY(0)' },
           },
+          '@keyframes moteFloat': {
+            '0%, 100%': { transform: 'translateY(0)', opacity: 0.55 },
+            '50%': { transform: 'translateY(-14px)', opacity: 1 },
+          },
+          '@keyframes ringSpin': { to: { transform: 'rotate(360deg)' } },
+          '@keyframes ringSpinRev': { to: { transform: 'rotate(-360deg)' } },
         }}
       >
         {/*
@@ -274,6 +310,40 @@ export function HomePage() {
               opacity: 0.62,
             }}
           />
+
+          {/* 바닥 앰비언트 광 — 그리드만 있던 자리에 은은한 발광을 깔아 깊이를 준다. */}
+          <Box
+            sx={{
+              position: 'absolute',
+              width: 1100,
+              height: 640,
+              ml: '-550px',
+              mt: '-300px',
+              transform: 'translateZ(-33px)',
+              background: pal.floorGlow,
+              pointerEvents: 'none',
+            }}
+          />
+
+          {/* 씬 바깥 여백(빈 공간)을 채우는 장식 링 + 부유 모트 — §15.2 3D 모델링 확장. */}
+          <AmbientField pal={pal} planeW={planeW} compact={compact} />
+
+          {/* 슬랩 아래 접지 그림자 — 슬랩이 바닥에 실제로 놓여 있다는 느낌을 준다. */}
+          {slabs.map((s, i) => (
+            <Box
+              key={s.key}
+              sx={{
+                position: 'absolute',
+                width: 190,
+                height: 90,
+                left: slotX(i, n) - 95,
+                top: -45,
+                transform: 'translateZ(-32px)',
+                background: pal.contactShadow,
+                pointerEvents: 'none',
+              }}
+            />
+          ))}
 
           {/* SIREN 판 — 반투명 유리. 참조만 놓인다. */}
           <Box
@@ -397,18 +467,27 @@ export function HomePage() {
             pointerEvents: 'none',
           }}
         >
-          <Box
-            sx={{
-              fontFamily: FONT_DISPLAY,
-              fontWeight: 800,
-              fontSize: 'clamp(44px, 6.5vw, 88px)',
-              lineHeight: 0.95,
-              letterSpacing: '-.01em',
-              color: pal.text,
-              animation: 'sirenRise .8s cubic-bezier(.2,.8,.3,1) both',
-            }}
-          >
-            SIREN
+          {/* 타이틀 줄만큼의 높이를 가진 래퍼 — 양옆 장식이 부제·버튼이 아니라 정확히
+              "SIREN" 글자 높이에 맞춰 걸리게 한다. */}
+          <Box sx={{ position: 'relative' }}>
+            {/* 타이틀 양옆의 빈 공간을 채우는 장식 — 제목 자체는 3D 밖이지만, 옆에 살짝
+                기울어진 유리판을 두어 씬의 3D 재질감이 위쪽까지 이어지게 한다. */}
+            {!compact && <TitleFlank side="left" pal={pal} />}
+            {!compact && <TitleFlank side="right" pal={pal} />}
+
+            <Box
+              sx={{
+                fontFamily: FONT_DISPLAY,
+                fontWeight: 800,
+                fontSize: 'clamp(44px, 6.5vw, 88px)',
+                lineHeight: 0.95,
+                letterSpacing: '-.01em',
+                color: pal.text,
+                animation: 'sirenRise .8s cubic-bezier(.2,.8,.3,1) both',
+              }}
+            >
+              SIREN
+            </Box>
           </Box>
           <Box
             sx={{
@@ -644,5 +723,221 @@ function ServiceSlab({ service: s, left, pal }: { service: HubShowcaseSlab; left
         </Box>
       )}
     </Box>
+  );
+}
+
+/** 타이틀 좌우 여백에 얹는 살짝 기울어진 유리 마커. 문구는 없다 — 순수 장식(§14.1). */
+const TITLE_FLANK_OFFSET = 'clamp(170px, 21vw, 360px)';
+
+function TitleFlank({ side, pal }: { side: 'left' | 'right'; pal: Palette }) {
+  const lineColor = side === 'left' ? pal.ringA : pal.ringB;
+  const dotColor = side === 'left' ? pal.moteA : pal.moteB;
+  const tiltY = side === 'left' ? 20 : -20;
+
+  return (
+    <Box
+      aria-hidden
+      sx={{
+        position: 'absolute',
+        [side]: `calc(50% - ${TITLE_FLANK_OFFSET})`,
+        top: '50%',
+        width: 0,
+        height: 0,
+        perspective: '700px',
+        transform: 'translateY(-50%)',
+      }}
+    >
+      <Box
+        sx={{
+          position: 'absolute',
+          width: 60,
+          height: 156,
+          ml: '-30px',
+          mt: '-78px',
+          transformStyle: 'preserve-3d',
+          transform: `rotateY(${tiltY}deg) rotateX(7deg)`,
+        }}
+      >
+        <Box
+          sx={{
+            position: 'absolute',
+            left: '50%',
+            top: 0,
+            width: '2px',
+            height: '100%',
+            ml: '-1px',
+            background: `linear-gradient(180deg, transparent, ${lineColor} 42%, ${lineColor} 58%, transparent)`,
+            opacity: 0.85,
+          }}
+        />
+        <Box
+          sx={{
+            position: 'absolute',
+            left: '50%',
+            top: '50%',
+            width: 22,
+            height: 22,
+            ml: '-11px',
+            mt: '-11px',
+            border: `1.5px solid ${lineColor}`,
+            borderRadius: '4px',
+            boxShadow: `0 0 16px -2px ${lineColor}`,
+            animation: `${side === 'left' ? 'ringSpin' : 'ringSpinRev'} 17s linear infinite`,
+            '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
+          }}
+        />
+        {[10, 146].map((top, i) => (
+          <Box
+            key={i}
+            sx={{
+              position: 'absolute',
+              left: '50%',
+              top,
+              width: 5,
+              height: 5,
+              ml: '-2.5px',
+              mt: '-2.5px',
+              borderRadius: '50%',
+              background: dotColor,
+              boxShadow: `0 0 10px ${dotColor}`,
+              animation: `moteFloat ${5 + i}s ease-in-out ${i * 0.6}s infinite`,
+              '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
+            }}
+          />
+        ))}
+      </Box>
+    </Box>
+  );
+}
+
+interface RingSpec {
+  /** planeW/2 대비 배율 — 슬랩 개수가 바뀌어도 씬 폭에 비례해 자리를 잡는다. */
+  xf: number;
+  y: number;
+  z: number;
+  size: number;
+  tilt: number;
+  dur: number;
+  rev?: boolean;
+  color: 'a' | 'b';
+}
+
+/** 씬 네 귀퉁이(빈 공간)에 놓는 궤도 링. planeW에 비례해 자리를 잡아 슬랩 개수가
+ * 바뀌어도 항상 SIREN 판 바깥쪽에 머문다. */
+const RINGS: RingSpec[] = [
+  { xf: -1.28, y: -128, z: 30, size: 132, tilt: 62, dur: 26, color: 'a' },
+  { xf: 1.22, y: -76, z: 210, size: 96, tilt: 68, dur: 32, rev: true, color: 'b' },
+  { xf: -1.18, y: 96, z: 250, size: 150, tilt: 58, dur: 38, color: 'b' },
+  { xf: 1.3, y: 118, z: 70, size: 88, tilt: 66, dur: 21, rev: true, color: 'a' },
+];
+
+interface MoteSpec {
+  xf: number;
+  y: number;
+  z: number;
+  size: number;
+  dur: number;
+  delay: number;
+  color: 'a' | 'b';
+}
+
+/** 부유하는 작은 발광 모트 — 링 사이 빈 공간을 채워 씬에 미세한 생동감을 준다. */
+const MOTES: MoteSpec[] = [
+  { xf: -0.62, y: -172, z: 120, size: 5, dur: 5.2, delay: 0, color: 'a' },
+  { xf: 0.7, y: -150, z: 60, size: 4, dur: 6.1, delay: 0.4, color: 'b' },
+  { xf: -1.05, y: -40, z: 300, size: 6, dur: 4.6, delay: 1.1, color: 'b' },
+  { xf: 1.08, y: -20, z: 320, size: 5, dur: 5.6, delay: 0.2, color: 'a' },
+  { xf: -0.4, y: 150, z: 20, size: 4, dur: 6.4, delay: 0.8, color: 'a' },
+  { xf: 0.46, y: 168, z: 100, size: 5, dur: 5.0, delay: 1.5, color: 'b' },
+  { xf: -1.35, y: 10, z: 160, size: 4, dur: 7.2, delay: 0.6, color: 'a' },
+  { xf: 1.4, y: 30, z: 190, size: 5, dur: 4.9, delay: 1.9, color: 'b' },
+  { xf: -0.85, y: -220, z: 220, size: 4, dur: 6.8, delay: 0.3, color: 'b' },
+  { xf: 0.92, y: 210, z: 250, size: 4, dur: 5.8, delay: 1.2, color: 'a' },
+  { xf: -0.2, y: -200, z: 340, size: 5, dur: 6.0, delay: 2.1, color: 'a' },
+  { xf: 0.15, y: 205, z: 330, size: 4, dur: 5.4, delay: 0.9, color: 'b' },
+  { xf: -1.5, y: -100, z: 60, size: 4, dur: 7.5, delay: 1.6, color: 'b' },
+  { xf: 1.55, y: 90, z: 30, size: 5, dur: 6.6, delay: 0.5, color: 'a' },
+];
+
+/**
+ * 씬의 빈 여백(그리드 마스크 바깥, 슬랩·판 사이 공간)을 채우는 장식 레이어.
+ * 카메라 그룹 안에 있어 드래그 회전에 함께 반응하지만, 링/모트 자체의 회전·부유는
+ * 카메라 회전과 무관한 독립 애니메이션이라 정지해 있어도 씬이 살아있다는 인상을 준다.
+ * MAX_SLABS만큼의 고정 목업이라 위치도 손으로 배치한 고정값이다(§15.2 확장).
+ */
+function AmbientField({ pal, planeW, compact }: { pal: Palette; planeW: number; compact: boolean }) {
+  const off = Math.max(planeW / 2, 300);
+  const rings = compact ? RINGS.slice(0, 2) : RINGS;
+  const motes = compact ? MOTES.slice(0, 8) : MOTES;
+
+  return (
+    <>
+      {rings.map((r, i) => {
+        const color = r.color === 'a' ? pal.ringA : pal.ringB;
+        return (
+          <Box
+            key={`ring-${i}`}
+            aria-hidden
+            sx={{
+              position: 'absolute',
+              width: 0,
+              height: 0,
+              left: r.xf * off,
+              top: r.y,
+              transform: `translateZ(${r.z}px) rotateX(${r.tilt}deg)`,
+              transformStyle: 'preserve-3d',
+              pointerEvents: 'none',
+            }}
+          >
+            <Box
+              sx={{
+                width: r.size,
+                height: r.size,
+                ml: `${-r.size / 2}px`,
+                mt: `${-r.size / 2}px`,
+                borderRadius: '50%',
+                border: `1.5px dashed ${color}`,
+                boxShadow: `0 0 24px -4px ${color}`,
+                animation: `${r.rev ? 'ringSpinRev' : 'ringSpin'} ${r.dur}s linear infinite`,
+                '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
+              }}
+            />
+          </Box>
+        );
+      })}
+
+      {motes.map((m, i) => {
+        const color = m.color === 'a' ? pal.moteA : pal.moteB;
+        return (
+          <Box
+            key={`mote-${i}`}
+            aria-hidden
+            sx={{
+              position: 'absolute',
+              width: 0,
+              height: 0,
+              left: m.xf * off,
+              top: m.y,
+              transform: `translateZ(${m.z}px)`,
+              pointerEvents: 'none',
+            }}
+          >
+            <Box
+              sx={{
+                width: m.size,
+                height: m.size,
+                ml: `${-m.size / 2}px`,
+                mt: `${-m.size / 2}px`,
+                borderRadius: '50%',
+                background: color,
+                boxShadow: `0 0 ${m.size * 2.4}px ${color}`,
+                animation: `moteFloat ${m.dur}s ease-in-out ${m.delay}s infinite`,
+                '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
+              }}
+            />
+          </Box>
+        );
+      })}
+    </>
   );
 }

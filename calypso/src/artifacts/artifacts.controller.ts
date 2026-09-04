@@ -2,6 +2,8 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
+  ForbiddenException,
   Get,
   Header,
   NotFoundException,
@@ -21,12 +23,18 @@ import { StorageService } from '../storage/storage.service';
 import {
   AddVersionDto,
   CreateArtifactDto,
+  GrantDto,
   ListArtifactsQuery,
   ReleaseDto,
   toArtifactDto,
   toVersionView,
 } from './dto/artifact-crud.dto';
 import { CONTRACT_VERSION, toArtifactSummary, toVersionRecord } from './observer.dto';
+
+function toGrantInput(dto: GrantDto): { type: 'user'; knoxId: string } | { type: 'department'; department: string } {
+  if (dto.type === 'user') return { type: 'user', knoxId: dto.knoxId as string };
+  return { type: 'department', department: dto.department as string };
+}
 
 /**
  * Calypso - 파일형 산출물 등록 창구이자 Observer 계약의 레퍼런스 구현.
@@ -50,28 +58,62 @@ export class ArtifactsController {
 
   // ── 사람이 쓰는 화면용 ─────────────────────────────────────────────
 
-  /** `mine=true`면 내가 등록한 것만 - My Task 필터 (Hub 설계서 §14.3). */
+  /**
+   * `mine=true`면 내가 등록한 것만 - My Task 필터 (Hub 설계서 §14.3). 접근 등급이
+   * none인 산출물은 이미 service.list()에서 걸러졌으므로 여기 남은 건 전부 edit
+   * 아니면 view다.
+   */
   @Get()
   async list(@Query() query: ListArtifactsQuery, @CurrentActor() me: Actor) {
     const list = await this.artifacts.list(query, me);
-    return { data: list.map((a) => toArtifactDto(a, me)) };
+    return {
+      data: list.map((a) => toArtifactDto(a, this.artifacts.computeAccess(a, me) as 'edit' | 'view')),
+    };
   }
 
   @Post()
   async create(@Body() dto: CreateArtifactDto, @CurrentActor() me: Actor) {
     const a = await this.artifacts.create(dto, me);
-    return { data: toArtifactDto(a, me) };
+    return { data: toArtifactDto(a, 'edit') };
   }
 
+  /** none이면 존재 자체를 흘리지 않고 404 — findVisibleOrThrow가 막는다. */
   @Get(':id')
   async detail(@Param('id') id: string, @CurrentActor() me: Actor) {
-    const a = await this.artifacts.findOrThrow(id);
+    const a = await this.artifacts.findVisibleOrThrow(id, me);
+    const access = this.artifacts.computeAccess(a, me) as 'edit' | 'view';
+    const versions = access === 'edit' ? a.versions : a.versions.filter((v) => v.isReleased);
     return {
       data: {
-        ...toArtifactDto(a, me),
-        versions: a.versions.map(toVersionView),
+        ...toArtifactDto(a, access),
+        versions: versions.map(toVersionView),
       },
     };
+  }
+
+  /** editors/viewGrants에 부여 추가 — 부여자 본인이 edit 권한을 갖고 있어야 한다. */
+  @Post(':id/editors')
+  async addEditor(@Param('id') id: string, @Body() dto: GrantDto, @CurrentActor() me: Actor) {
+    const a = await this.artifacts.addGrant(id, 'editors', toGrantInput(dto), me);
+    return { data: toArtifactDto(a, 'edit') };
+  }
+
+  @Delete(':id/editors')
+  async removeEditor(@Param('id') id: string, @Body() dto: GrantDto, @CurrentActor() me: Actor) {
+    const a = await this.artifacts.removeGrant(id, 'editors', toGrantInput(dto), me);
+    return { data: toArtifactDto(a, 'edit') };
+  }
+
+  @Post(':id/view-grants')
+  async addViewGrant(@Param('id') id: string, @Body() dto: GrantDto, @CurrentActor() me: Actor) {
+    const a = await this.artifacts.addGrant(id, 'viewGrants', toGrantInput(dto), me);
+    return { data: toArtifactDto(a, 'edit') };
+  }
+
+  @Delete(':id/view-grants')
+  async removeViewGrant(@Param('id') id: string, @Body() dto: GrantDto, @CurrentActor() me: Actor) {
+    const a = await this.artifacts.removeGrant(id, 'viewGrants', toGrantInput(dto), me);
+    return { data: toArtifactDto(a, 'edit') };
   }
 
   /**
@@ -88,6 +130,10 @@ export class ArtifactsController {
   ) {
     if (!file) throw new BadRequestException('A file is required (multipart form field "file").');
     const a = await this.artifacts.findOrThrow(id);
+    // 스토리지에 올리기 전에 권한부터 본다 — 권한 없는 업로드가 먼저 파일을 써버리는 걸 막는다.
+    if (this.artifacts.computeAccess(a, me) !== 'edit') {
+      throw new ForbiddenException('You do not have edit access to this artifact.');
+    }
     const storageKey = this.storage.buildStorageKey(
       a.projectId,
       a._id.toString(),
@@ -103,25 +149,33 @@ export class ArtifactsController {
       { fileName: file.originalname, storageKey, note: dto.note, dept: dto.dept ?? null },
       me,
     );
-    return { data: toArtifactDto(saved, me) };
+    return { data: toArtifactDto(saved, 'edit') };
   }
 
   @Post(':id/release')
   async release(@Param('id') id: string, @Body() dto: ReleaseDto, @CurrentActor() me: Actor) {
     const a = await this.artifacts.release(id, dto.note, me);
-    return { data: toArtifactDto(a, me) };
+    return { data: toArtifactDto(a, 'edit') };
   }
 
   /**
    * 다운로드. **실물 파일에 대한 접근 판정은 여기서 한다** - SIREN이 아니라 이 서비스가
-   * 자기 데이터의 문지기다(Hub 설계서 §7.1). 지금은 등록 프로젝트 멤버면 받을 수 있는
-   * 정도이고, 더 세분화되면 이 메서드만 고치면 된다.
+   * 자기 데이터의 문지기다(Hub 설계서 §7.1). view 등급은 released 버전만 받을 수 있다 —
+   * 목록/상세와 같은 마스킹 규칙(사용자 요청).
    */
   @Get(':id/download/:versionRef')
-  async download(@Param('id') id: string, @Param('versionRef') versionRef: string): Promise<StreamableFile> {
-    const a = await this.artifacts.findOrThrow(id);
+  async download(
+    @Param('id') id: string,
+    @Param('versionRef') versionRef: string,
+    @CurrentActor() me: Actor,
+  ): Promise<StreamableFile> {
+    const a = await this.artifacts.findVisibleOrThrow(id, me);
+    const access = this.artifacts.computeAccess(a, me);
     const version = a.versions.find((v) => v.versionRef === decodeURIComponent(versionRef));
     if (!version) throw new NotFoundException('Version not found.');
+    if (access !== 'edit' && !version.isReleased) {
+      throw new ForbiddenException('Only released versions are available at your access level.');
+    }
     if (!version.storageKey) throw new BadRequestException('This version has no stored file.');
 
     const body = await this.storage.download(version.storageKey);
