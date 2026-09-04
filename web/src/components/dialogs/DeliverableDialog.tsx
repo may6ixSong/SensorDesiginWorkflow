@@ -118,7 +118,7 @@ export function DeliverableDialog({
     [project?.members, user?.KnoxID],
   );
   const {
-    data: calypsoArtifact, isLoading: calypsoLoading, isError: calypsoError,
+    data: calypsoArtifact, isLoading: calypsoLoading, isError: calypsoError, error: calypsoErrorObj,
   } = useQuery({
     queryKey: queryKeys.calypsoArtifact(externalArtifactId),
     queryFn: () => {
@@ -128,6 +128,13 @@ export function DeliverableDialog({
     enabled: calypsoLinked,
     retry: false,
   });
+  const calypsoForbidden = (calypsoErrorObj as any)?.response?.status === 403;
+
+  // Details를 열었는데 연동된 산출물에 view 권한이 없는 경우(사용자 요청) — 패널 안
+  // 문구와 별개로 toast로도 바로 알려준다.
+  useEffect(() => {
+    if (calypsoForbidden) toast('You do not have view access to this artifact.');
+  }, [calypsoForbidden]);
 
   const invalidateCalypso = () => {
     qc.invalidateQueries({ queryKey: queryKeys.calypsoArtifact(externalArtifactId) });
@@ -263,8 +270,14 @@ export function DeliverableDialog({
             </Box>
           ) : calypsoLinked && calypsoError ? (
             <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '22px' }}>
-              <Box sx={{ fontSize: 13.5, fontWeight: 600 }}>Could not load the linked Calypso artifact</Box>
-              <Box sx={{ fontSize: 12, color: T.dm2 }}>It may not exist in Calypso, or the link is stale.</Box>
+              <Box sx={{ fontSize: 13.5, fontWeight: 600 }}>
+                {calypsoForbidden ? 'You do not have view access to this artifact' : 'Could not load the linked Calypso artifact'}
+              </Box>
+              <Box sx={{ fontSize: 12, color: T.dm2 }}>
+                {calypsoForbidden
+                  ? 'Ask its registrant or an editor to grant you access.'
+                  : 'It may not exist in Calypso, or the link is stale.'}
+              </Box>
             </Box>
           ) : (
             <Box sx={{ flex: 1, minWidth: 0, overflowY: 'auto', background: T.sf3, padding: '22px' }}>

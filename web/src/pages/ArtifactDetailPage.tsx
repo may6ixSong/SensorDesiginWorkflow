@@ -25,12 +25,19 @@ export function ArtifactDetailPage() {
   const qc = useQueryClient();
   const [picked, setPicked] = useState<CalypsoVersionView | null>(null);
 
-  const { data: a, isLoading, isError } = useQuery({
+  const { data: a, isLoading, isError, error } = useQuery({
     queryKey: queryKeys.calypsoArtifact(id),
     queryFn: () => getCalypsoArtifact(id),
     enabled: Boolean(id),
     retry: false,
   });
+  const forbidden = (error as any)?.response?.status === 403;
+
+  // "Details 클릭 시 view 권한 없다고 알림"(사용자 요청) — 403은 존재는 하지만 접근이
+  // 없는 경우(findVisibleOrThrow)라 카드 문구와 별개로 toast로도 바로 알려준다.
+  useEffect(() => {
+    if (forbidden) toast('You do not have view access to this artifact.');
+  }, [forbidden]);
 
   // Artifact ACL의 부서 단위 부여는 "이 project 안에서의 내 부서"를 알아야 판정된다 —
   // artifact를 먼저 읽어야 projectId를 알 수 있으므로 project 조회는 그 뒤에 붙는다.
@@ -101,9 +108,13 @@ export function ArtifactDetailPage() {
     return (
       <AppShell>
         <Stack alignItems="center" justifyContent="center" sx={{ flex: 1, gap: '10px' }}>
-          <Box sx={{ fontSize: 14, fontWeight: 600 }}>Could not load this artifact</Box>
+          <Box sx={{ fontSize: 14, fontWeight: 600 }}>
+            {forbidden ? 'You do not have view access to this artifact' : 'Could not load this artifact'}
+          </Box>
           <Box sx={{ fontSize: 12.5, color: T.dm }}>
-            It may not exist in Calypso, or the link is stale.
+            {forbidden
+              ? 'Ask its registrant or an editor to grant you access.'
+              : 'It may not exist in Calypso, or the link is stale.'}
           </Box>
         </Stack>
       </AppShell>

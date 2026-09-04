@@ -56,11 +56,16 @@ export class ArtifactsService {
     return a;
   }
 
-  /** detail() 진입점 — none 등급이면 존재 자체를 흘리지 않고 404로 막는다. */
+  /**
+   * detail()/download() 진입점 — 존재하지 않으면 404, 존재하지만 none 등급이면 403.
+   * 사내 도구라 "이 id는 실재한다"는 사실을 굳이 숨길 필요는 없다고 판단했고(사용자
+   * 요청), FE가 403을 "view 권한이 없다"는 구체적인 안내로 바로 보여줄 수 있어야 한다 —
+   * 404로 뭉뚱그리면 "없는 건지 권한이 없는 건지" 구분이 안 된다.
+   */
   async findVisibleOrThrow(id: string, actor: Actor) {
     const a = await this.findOrThrow(id);
     if (this.computeAccess(a, actor) === 'none') {
-      throw new NotFoundException('Artifact not found.');
+      throw new ForbiddenException('You do not have view access to this artifact.');
     }
     return a;
   }

@@ -295,6 +295,7 @@ export function BoardPage() {
             workflow={workflow}
             recv={recv}
             orphanCount={orphanCount}
+            canEdit={isOwner}
             onOpenHld={() => st.getState().setHldDlg(true, null)}
             onOpenSettings={() => {
               setDetailsErr(null); setPhasesErr(null);
