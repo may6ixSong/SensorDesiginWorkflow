@@ -67,10 +67,14 @@ type AuthContextType = {
   updateUserPrefs: <K extends keyof User>(field: K, value: User[K]) => void,
   loginSuccess: boolean;
   /**
-   * ADSSO는 통과했지만 USER_GROUP_API에 이 KnoxID가 없는 계정 — 플랫폼에 등록되지
-   * 않은 사람은 권한이 아예 없어야 하므로(사용자 요청) Home을 포함해 앱 전체를 막는다
-   * (App.tsx의 LoginGate). 예전처럼 자동으로 플랫폼 사용자를 만들어 기본값으로 들여보내지
-   * 않는다.
+   * 지금 화면에 보이는 신원 기준 — 시뮬레이션 중이면 대상이 USER_GROUP_API에 없는
+   * 경우, 아니면 실제 로그인 사용자가 없는 경우. 어느 쪽이든 Home을 포함해 앱 전체를
+   * 막는다(App.tsx의 LoginGate) — 플랫폼에 없는 사람은 권한이 아예 없어야 한다(사용자
+   * 요청). 실제 로그인 실패는 예전처럼 자동으로 플랫폼 사용자를 만들어 기본값으로
+   * 들여보내지 않는다. 시뮬레이션은 반대로 **막지 않고 그대로 켜준다** — Admin이
+   * "등록 안 된 사람은 실제로 뭘 보게 되는지"(예: 나중에 만들 접근 신청 페이지)를
+   * 확인하려면 그 신원으로 들어가 볼 수 있어야 하고, 들어간 다음 이 값이 true가 되어
+   * AccessDeniedPage로 리다이렉트되는 것 자체가 검증하려는 동작이다.
    */
   accountDenied: boolean;
   /**
@@ -121,8 +125,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [realUser, setRealUser] = useState<User>({} as User);
   const [simulatedUser, setSimulatedUser] = useState<User | null>(null);
   const [loginSuccess, openGate] = useState<boolean>(false);
-  const [accountDenied, setAccountDenied] = useState<boolean>(false);
+  /** 실제 로그인 사용자가 플랫폼에 없는 경우 — 시뮬레이션과 무관하게 항상 이 값 그대로. */
+  const [realAccountDenied, setRealAccountDenied] = useState<boolean>(false);
+  /** 지금 시뮬레이션 중인 대상이 플랫폼에 없는 경우 — 시뮬레이션이 꺼지면 의미 없어진다. */
+  const [simulatedAccountDenied, setSimulatedAccountDenied] = useState<boolean>(false);
   const user = simulatedUser ?? realUser;
+  const accountDenied = simulatedUser ? simulatedAccountDenied : realAccountDenied;
   const isAdmin = useMemo(() => user.Group === "Admin", [user]);
   const isRealAdmin = useMemo(() => realUser.Group === "Admin", [realUser]);
 
@@ -186,7 +194,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       // 요청으로 대신 통째로 막는다. Language/Theme은 User 클래스 기본값을 쓴다 —
       // AccessDeniedPage 자체는 그 값을 안 쓰지만, realUser는 항상 뭔가 채워져 있어야
       // 하는 다른 코드(useAuth 소비처)가 있으니 빈 객체 대신 정상적인 User를 둔다.
-      setAccountDenied(true);
+      setRealAccountDenied(true);
     } finally {
       setRealUser(user);
       openGate(true);
@@ -207,9 +215,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
    * 특정 사용자 화면 재현(§13). Admin 전용 — FE도 자기 몫을 하지만(§13.3 규칙 6) 최종
    * 방어선은 항상 api의 isAdmin 재검증이다(X-Acting-As는 그쪽에서도 다시 본다).
    * 이름/부서는 SDP_COMMON_API 직원 조회로, Group/Authority/Language/Theme는 로그인 때와
-   * 같은 USER_GROUP_API로 채운다 — 후자가 실패하면(플랫폼에 등록 안 된 사용자) 그 사람은
-   * 실제 로그인 시도였어도 AccessDeniedPage로 막혔을 사람이니, 시뮬레이션도 거부한다
-   * (기본값으로 대충 흉내내지 않는다 — 그 사람은 권한이 아예 없어야 하므로).
+   * 같은 USER_GROUP_API로 채운다 — 후자가 실패해도(플랫폼에 등록 안 된 사용자) 시뮬레이션
+   * 자체는 거부하지 않는다(사용자 요청: 나중에 만들 접근 신청 페이지 등을 확인하려면
+   * Admin이 "등록 안 된 사람" 신원으로 들어가 볼 수 있어야 한다) — 대신
+   * simulatedAccountDenied를 세워서, 이 신원으로 있는 동안은 실제 로그인 실패와 똑같이
+   * AccessDeniedPage로 막힌다(Home으로 리다이렉트됐다가 다시 거기로 리다이렉트되는 것도
+   * 정상 — 그게 검증하려는 동작이다).
    */
   const startSimulation = async (knoxId: string) => {
     // 판정은 항상 realUser 기준 — 이미 다른 사람을 시뮬레이션 중이어도(지금 isAdmin은
@@ -226,6 +237,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     target.Department = emp.departmentName ?? '';
     target.EnDepartment = emp.enDepartmentName ?? '';
 
+    let denied = false;
     try {
       const url = `${import.meta.env.USER_GROUP_API}/user/Information/${knoxId}`;
       const response = await axios.get<Record<string, unknown>>(url);
@@ -234,7 +246,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       target.Language = (response.data.Language as Language) ?? target.Language;
       target.Theme = (response.data.Theme as Theme) ?? target.Theme;
     } catch {
-      throw new Error(`${knoxId} is not registered on the platform — they would be denied access if they logged in themselves.`);
+      denied = true;
     }
 
     setApiActingAs(knoxId);
@@ -243,6 +255,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     // 실제 호출자(Admin) 것으로 그대로 두고(시뮬레이션 자체를 켤 수 있는 자격 검증용),
     // 대상의 Group은 별도 헤더(X-Acting-As-Group)로 전달한다.
     setCalypsoActingAsGroup(target.Group);
+    setSimulatedAccountDenied(denied);
     setSimulatedUser(target);
     i18n.changeLanguage(target.Language);
     setThemeMode(target.Theme);
@@ -252,6 +265,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setApiActingAs(null);
     setCalypsoActingAsGroup(null);
     setSimulatedUser(null);
+    setSimulatedAccountDenied(false);
     i18n.changeLanguage(realUser.Language);
     setThemeMode(realUser.Theme);
   };
