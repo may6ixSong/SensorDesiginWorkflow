@@ -320,6 +320,7 @@ export function BoardPage() {
               node={openNode}
               phases={phaseList}
               own={own}
+              isOwner={isOwner}
               project={project}
               onClose={closeDeliverable}
               onSaveInfo={({ name, artifactKey, serviceKey, externalArtifactId }) => {
