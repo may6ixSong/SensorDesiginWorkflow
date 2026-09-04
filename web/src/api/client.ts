@@ -29,6 +29,9 @@ export const setApiUserGroup = (group: string | null) => {
   currentUserGroup = group;
 };
 
+/** calypsoClient.ts처럼 다른 api 클라이언트가 Admin 신호를 같이 실어야 할 때 쓴다. */
+export const getApiUserGroup = () => currentUserGroup;
+
 /**
  * 사용자 시뮬레이터 (§13). Admin이 특정 사용자의 화면을 그대로 재현할 때만 채워진다.
  * api는 **검증된 실제 호출자가 Admin일 때만** 이 값을 반영한다 — FE에서 이 값을
