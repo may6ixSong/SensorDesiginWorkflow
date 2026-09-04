@@ -101,6 +101,37 @@ function ServiceRegistry() {
   );
 }
 
+/**
+ * Service Manage 카드/폼에서 공유하는 favicon 렌더러. 비어 있거나 로드에 실패하면
+ * 이니셜 배지로 대체한다 — 값을 사용자가 입력한 URL이 실제 이미지를 가리키는지는
+ * 등록 시점엔 검증하지 않으므로, 깨진 URL이 화면을 망치지 않게 여기서 흡수한다.
+ */
+function ServiceIcon({ name, url, size = 40 }: { name: string; url: string; size?: number }) {
+  const [failed, setFailed] = useState(false);
+  const showImg = !!url && !failed;
+  return (
+    <Box
+      sx={{
+        width: size, height: size, borderRadius: '9px', flex: '0 0 auto',
+        display: 'grid', placeItems: 'center', overflow: 'hidden',
+        fontSize: size * 0.33, fontWeight: 700, color: '#fff', background: T.tl,
+      }}
+    >
+      {showImg ? (
+        <Box
+          component="img"
+          src={url}
+          alt=""
+          onError={() => setFailed(true)}
+          sx={{ width: '100%', height: '100%', objectFit: 'contain', background: '#fff' }}
+        />
+      ) : (
+        initials(name)
+      )}
+    </Box>
+  );
+}
+
 function ServiceCard({ service: s, onToggle }: { service: HubService; onToggle: () => void }) {
   return (
     <Box
@@ -111,15 +142,7 @@ function ServiceCard({ service: s, onToggle }: { service: HubService; onToggle: 
       }}
     >
       <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-        <Box
-          sx={{
-            width: 40, height: 40, borderRadius: '9px', flex: '0 0 auto',
-            display: 'grid', placeItems: 'center',
-            fontSize: s.icon ? 19 : 13, fontWeight: 700, color: '#fff', background: T.tl,
-          }}
-        >
-          {s.icon || initials(s.name)}
-        </Box>
+        <ServiceIcon name={s.name} url={s.icon} />
         <Box sx={{ minWidth: 0, flex: 1 }}>
           <Box sx={{ fontSize: 13.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {s.name}
@@ -206,8 +229,13 @@ function AddServiceDialog({ onClose }: { onClose: () => void }) {
       width={460}
       header={<Box sx={{ fontSize: 16, fontWeight: 700 }}>Add service</Box>}
     >
-      <Field label="Icon — an emoji, shown on the card">
-        <TextInput value={icon} onChange={setIcon} placeholder="e.g. 🛰" />
+      <Field label="Favicon URL — shown on the card">
+        <Box sx={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <ServiceIcon name={name || '?'} url={icon} size={34} />
+          <Box sx={{ flex: 1 }}>
+            <TextInput value={icon} onChange={setIcon} placeholder="https://…/favicon.ico" />
+          </Box>
+        </Box>
       </Field>
       <Field label="Name">
         <TextInput

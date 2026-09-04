@@ -36,7 +36,7 @@ export class ArtifactService {
   @Prop({ default: '', trim: true })
   description: string;
 
-  /** Service Manage 카드 아이콘 — 이모지 한두 글자. 비어 있으면 카드가 이니셜로 대체한다. */
+  /** Service Manage 카드에 그릴 favicon 이미지 URL. 비어 있으면 카드가 이니셜로 대체한다. */
   @Prop({ default: '', trim: true })
   icon: string;
 

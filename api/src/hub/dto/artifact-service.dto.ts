@@ -21,9 +21,10 @@ export class RegisterServiceDto {
   @MaxLength(240)
   description?: string;
 
+  /** favicon 이미지 URL. Service Manage 카드에 <img>로 그린다 (비어 있으면 이니셜로 대체). */
   @IsOptional()
   @IsString()
-  @MaxLength(8)
+  @MaxLength(2000)
   icon?: string;
 
   @IsOptional()
@@ -68,9 +69,10 @@ export class UpdateServiceDto {
   @MaxLength(240)
   description?: string;
 
+  /** favicon 이미지 URL. Service Manage 카드에 <img>로 그린다 (비어 있으면 이니셜로 대체). */
   @IsOptional()
   @IsString()
-  @MaxLength(8)
+  @MaxLength(2000)
   icon?: string;
 
   @IsOptional()
