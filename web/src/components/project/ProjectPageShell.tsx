@@ -10,14 +10,8 @@ import { SirenButton } from '@/components/common/SirenButton';
 import { DesignWorkflowDialog } from '@/components/workflow/DesignWorkflowDialog';
 import { progressOf } from '@/lib/projectProgress';
 import { FONT_DISPLAY, FONT_MONO, T } from '@/theme/tokens';
-import { canManageProject } from '@/lib/access';
+import { canEditMilestones, canManageProject } from '@/lib/access';
 import { useAuth } from '@/app/providers/AuthProvider';
-
-const TABS = [
-  { to: '', label: 'Information', icon: 'info' as const },
-  { to: '/members', label: 'Members', icon: 'users' as const },
-  { to: '/artifacts', label: 'Artifacts', icon: 'list' as const },
-];
 
 interface Props {
   children: (ctx: { project: ProjectDetailDto; workflows: WorkflowDto[]; own: boolean }) => ReactNode;
@@ -33,10 +27,18 @@ export function ProjectPageShell({ children }: Props) {
   const { pathname } = useLocation();
   const { data: project, isLoading: projectLoading, isError } = useProject(projectId);
   const { data: workflows, isLoading: ipsLoading } = useProjectWorkflows(projectId);
-  const { isAdmin } = useAuth();
+  const { user, isAdmin } = useAuth();
   const [workflowOpen, setWorkflowOpen] = useState(false);
 
   const own = useMemo(() => canManageProject(workflows, isAdmin), [workflows, isAdmin]);
+  // Members tab 자체가 Project Manager 전용이다(사용자 요청) — 탭 링크가 안 보이는 것도
+  // 권한의 일부지, 안에 들어가서 편집 버튼만 숨기는 걸로는 부족하다.
+  const canManageMembers = canEditMilestones(project, isAdmin, user?.KnoxID);
+  const TABS = useMemo(() => [
+    { to: '', label: 'Information', icon: 'info' as const },
+    ...(canManageMembers ? [{ to: '/members', label: 'Members', icon: 'users' as const }] : []),
+    { to: '/artifacts', label: 'Artifacts', icon: 'list' as const },
+  ], [canManageMembers]);
   const { pct, current, done, total } = useMemo(
     () => progressOf(project?.milestones ?? []),
     [project?.milestones],

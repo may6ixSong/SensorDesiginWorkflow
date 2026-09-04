@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Box } from '@mui/material';
 import { useTranslation } from 'react-i18next';
+import { Navigate } from 'react-router-dom';
 import { ProjectMemberDto } from '@/types/domain';
 import {
   useAddProjectMember, useAddProjectManager, useRemoveProjectMember, useRemoveProjectManager,
@@ -28,7 +29,10 @@ export function ProjectMembersPage() {
         // Members tab 전체(부서 관리 + 멤버 추가/삭제)는 Project Manager 전용이다(사용자
         // 요청) — workflow 하나의 Edit 권한(own)만으로는 못 고친다. Manager role 자체는
         // canEditMilestones가 이미 이 기준으로 판정하고 있었으니 그대로 재사용한다.
+        // ProjectPageShell이 탭 자체를 이미 숨기지만, URL로 직접 들어오는 경우까지
+        // 막아야 하니 여기서도 다시 막는다(FE 방어의 2차선).
         const canManageManagers = canEditMilestones(project, isAdmin, me?.KnoxID);
+        if (!canManageManagers) return <Navigate to={`/projects/${project._id}`} replace />;
         return (
           <>
             <ProjectManagersCard
