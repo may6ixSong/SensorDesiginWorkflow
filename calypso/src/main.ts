@@ -16,14 +16,29 @@ async function bootstrap() {
   /**
    * CORS_ORIGIN이 비어 있거나 '*'이면 요청 오리진을 그대로 반사한다(전면 허용) -
    * SFM_API가 `origin: true`로 열어둔 것과 동일한 사내망 전제다. prod가 이 경로다.
-   * dev는 http://localhost:5173만 허용한다. 쉼표로 여러 오리진도 지정할 수 있다.
+   * dev는 CORS_ORIGIN에 나열된 오리진들을 허용한다. 쉼표로 여러 오리진도 지정할 수 있다.
+   *
+   * dev 전용 예비 포트 대역: 이 모노레포에는 vite dev server가 여러 개 뜬다(SIREN web,
+   * Calypso web 등) - vite는 5173부터 시작해 이미 점유돼 있으면 +1씩 밀리므로, 로컬마다
+   * 그리고 띄울 때마다 실제 포트가 달라진다. 그때마다 CORS_ORIGIN을 손으로 늘리지 않도록,
+   * dev에서는 CORS_ORIGIN에 명시된 오리진에 더해 localhost/127.0.0.1의 5170~5199 대역을
+   * 통째로 허용해 넉넉한 예비 포트를 미리 열어둔다. prod는 이 예비 대역을 타지 않고
+   * CORS_ORIGIN 설정을 그대로 따른다.
    *
    * allowedHeaders는 '*' 대신 명시한다 - credentials와 와일드카드를 함께 쓰면
    * 브라우저가 preflight를 거부하므로, 실제로 쓰는 헤더만 나열한다(X-Knox-Id 포함).
    */
   const corsOrigin = config.get<string>('corsOrigin')?.trim() ?? '';
+  const isDev = ENV_FILE === '.env.development';
+  const DEV_RESERVED_PORTS = /^https?:\/\/(localhost|127\.0\.0\.1):51[7-9]\d$/;
+  const explicitOrigins = corsOrigin.split(',').map((o) => o.trim()).filter(Boolean);
   app.enableCors({
-    origin: !corsOrigin || corsOrigin === '*' ? true : corsOrigin.split(',').map((o) => o.trim()),
+    origin: !corsOrigin || corsOrigin === '*'
+      ? true
+      : isDev
+        ? (origin: string | undefined, cb: (err: Error | null, allow?: boolean) => void) =>
+            cb(null, !origin || explicitOrigins.includes(origin) || DEV_RESERVED_PORTS.test(origin))
+        : explicitOrigins,
     credentials: true,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     allowedHeaders: 'Content-Type, Accept, X-Knox-Id',
@@ -49,7 +64,8 @@ async function bootstrap() {
   console.log(
     `Calypso API (${ENV_FILE} <- ${ENV_PATH ?? 'NOT FOUND, 기본값 사용'}) ` +
       `listening on http://0.0.0.0:${port}/${config.get<string>('apiPrefix')} ` +
-      `| CORS_ORIGIN=${corsOrigin || '(전면 허용)'}`,
+      `| CORS_ORIGIN=${corsOrigin || '(전면 허용)'}` +
+      (isDev && corsOrigin && corsOrigin !== '*' ? ' +dev reserved ports 5170-5199' : ''),
   );
 }
 bootstrap();
