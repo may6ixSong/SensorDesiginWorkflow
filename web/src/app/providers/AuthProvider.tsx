@@ -67,6 +67,13 @@ type AuthContextType = {
   updateUserPrefs: <K extends keyof User>(field: K, value: User[K]) => void,
   loginSuccess: boolean;
   /**
+   * ADSSO는 통과했지만 USER_GROUP_API에 이 KnoxID가 없는 계정 — 플랫폼에 등록되지
+   * 않은 사람은 권한이 아예 없어야 하므로(사용자 요청) Home을 포함해 앱 전체를 막는다
+   * (App.tsx의 LoginGate). 예전처럼 자동으로 플랫폼 사용자를 만들어 기본값으로 들여보내지
+   * 않는다.
+   */
+  accountDenied: boolean;
+  /**
    * 지금 화면에 보이는 신원(user) 기준 — 시뮬레이션 중이면 대상 사용자 본인이 Admin일
    * 때만 true다("그 사람 입장에서 정확히 그 사람 권한으로" 보여야 한다는 사용자 요청).
    * Workflow/Project 편집 등 앱 전역의 페이지 권한 체크가 전부 이 값을 본다.
@@ -100,6 +107,7 @@ const AuthContext = createContext<AuthContextType>({
   realUser: null,
   updateUserPrefs: (_field, _value) => {},
   loginSuccess: false,
+  accountDenied: false,
   isAdmin: false,
   isRealAdmin: false,
   isSimulating: false,
@@ -113,6 +121,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [realUser, setRealUser] = useState<User>({} as User);
   const [simulatedUser, setSimulatedUser] = useState<User | null>(null);
   const [loginSuccess, openGate] = useState<boolean>(false);
+  const [accountDenied, setAccountDenied] = useState<boolean>(false);
   const user = simulatedUser ?? realUser;
   const isAdmin = useMemo(() => user.Group === "Admin", [user]);
   const isRealAdmin = useMemo(() => realUser.Group === "Admin", [realUser]);
@@ -172,33 +181,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         Cookies.set('loginSIREN', new Date().toISOString());
       }
     } catch {
-      await createPlatformUser(user);
+      // 플랫폼에 등록 안 된 계정 — 예전엔 여기서 자동으로 플랫폼 사용자를 만들어 기본값
+      // (Developer/en/light)으로 들여보냈지만, 그런 사람은 권한이 아예 없어야 한다는
+      // 요청으로 대신 통째로 막는다. Language/Theme은 User 클래스 기본값을 쓴다 —
+      // AccessDeniedPage 자체는 그 값을 안 쓰지만, realUser는 항상 뭔가 채워져 있어야
+      // 하는 다른 코드(useAuth 소비처)가 있으니 빈 객체 대신 정상적인 User를 둔다.
+      setAccountDenied(true);
     } finally {
       setRealUser(user);
       openGate(true);
     }
-  }
-
-  const createPlatformUser = async (user: User) => {
-    const platformRegister = {
-      Name: user.Name,
-      KnoxID: user.KnoxID,
-      Department: user.Department,
-      Group: user.Group,
-      Authority: user.Authority,
-      EnName: user.EnName,
-      EnDepartment: user.EnDepartment,
-      Language: user.Language,
-			Theme: user.Theme
-    }
-    const options = {
-      headers: {
-        'Content-Type': 'application/json; charset=utf-8',
-        'client-id': 'sdp.op',
-      }
-    }
-
-    return await axios.post(`${import.meta.env.USER_GROUP_API}/user`, platformRegister, options);
   }
 
   /** 지금 화면에 보이는 신원(시뮬레이션 중이면 대상, 아니면 실제 사용자)의 prefs만 바꾼다. */
@@ -215,8 +207,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
    * 특정 사용자 화면 재현(§13). Admin 전용 — FE도 자기 몫을 하지만(§13.3 규칙 6) 최종
    * 방어선은 항상 api의 isAdmin 재검증이다(X-Acting-As는 그쪽에서도 다시 본다).
    * 이름/부서는 SDP_COMMON_API 직원 조회로, Group/Authority/Language/Theme는 로그인 때와
-   * 같은 USER_GROUP_API로 채운다 — 후자가 실패해도(아직 플랫폼에 등록 안 된 사용자)
-   * User 클래스 기본값으로 대체하고 시뮬레이션은 그대로 진행한다.
+   * 같은 USER_GROUP_API로 채운다 — 후자가 실패하면(플랫폼에 등록 안 된 사용자) 그 사람은
+   * 실제 로그인 시도였어도 AccessDeniedPage로 막혔을 사람이니, 시뮬레이션도 거부한다
+   * (기본값으로 대충 흉내내지 않는다 — 그 사람은 권한이 아예 없어야 하므로).
    */
   const startSimulation = async (knoxId: string) => {
     // 판정은 항상 realUser 기준 — 이미 다른 사람을 시뮬레이션 중이어도(지금 isAdmin은
@@ -241,7 +234,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       target.Language = (response.data.Language as Language) ?? target.Language;
       target.Theme = (response.data.Theme as Theme) ?? target.Theme;
     } catch {
-      // 플랫폼 사용자 테이블에 아직 없을 수 있다 — User 기본값(en/light/Developer)으로 대체.
+      throw new Error(`${knoxId} is not registered on the platform — they would be denied access if they logged in themselves.`);
     }
 
     setApiActingAs(knoxId);
@@ -266,7 +259,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   return (
     <AuthContext.Provider
       value={{
-        user, realUser, updateUserPrefs, loginSuccess, isAdmin, isRealAdmin,
+        user, realUser, updateUserPrefs, loginSuccess, accountDenied, isAdmin, isRealAdmin,
         isSimulating: simulatedUser !== null, startSimulation, stopSimulation,
       }}
     >

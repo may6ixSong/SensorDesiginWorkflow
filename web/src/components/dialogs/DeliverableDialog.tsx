@@ -130,10 +130,15 @@ export function DeliverableDialog({
   });
   const calypsoForbidden = (calypsoErrorObj as any)?.response?.status === 403;
 
-  // Details를 열었는데 연동된 산출물에 view 권한이 없는 경우(사용자 요청) — 패널 안
-  // 문구와 별개로 toast로도 바로 알려준다.
+  // Details를 열었는데 연동된 산출물에 view 권한이 없는 경우(사용자 요청) — toast로
+  // 알리고 패널 자체를 닫는다. 빈 패널이 계속 떠 있으면 안 된다("slide는 그대로
+  // 노출되면 안 된다"는 지적) — 콘텐츠가 없는 패널을 열어둔 채로 두지 않는다.
   useEffect(() => {
-    if (calypsoForbidden) toast('You do not have view access to this artifact.');
+    if (calypsoForbidden) {
+      toast('You do not have view access to this artifact.');
+      onClose();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [calypsoForbidden]);
 
   const invalidateCalypso = () => {
