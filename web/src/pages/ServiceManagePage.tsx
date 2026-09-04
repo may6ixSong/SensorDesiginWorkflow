@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Box } from '@mui/material';
@@ -26,6 +26,9 @@ const TRANSPORT_OPTIONS = [
   { value: 'shared-db', label: 'shared-db' },
   { value: 'none', label: 'none' },
 ];
+
+/** 원본 파일 상한 - 300KB. base64로 인코딩되면 문서에는 약 400KB(≈400,000자)로 들어간다. */
+const MAX_ICON_BYTES = 300 * 1024;
 
 /**
  * Service Manage — Hub 레지스트리 관리 화면 (설계서 §13.4). 예전 AdminPage의 admin
@@ -56,9 +59,11 @@ export function ServiceManagePage() {
   );
 }
 
+/** 'add'는 신규 등록 다이얼로그, HubService면 그 서비스를 편집하는 다이얼로그. */
+type FormTarget = 'add' | HubService | null;
+
 function ServiceRegistry() {
-  const qc = useQueryClient();
-  const [addOpen, setAddOpen] = useState(false);
+  const [formTarget, setFormTarget] = useState<FormTarget>(null);
   const { data: services = [] } = useQuery({
     queryKey: ['hub', 'services', 'all'],
     queryFn: async (): Promise<HubService[]> => {
@@ -67,19 +72,12 @@ function ServiceRegistry() {
     },
   });
 
-  const toggle = useMutation({
-    mutationFn: async (s: HubService) => {
-      await apiClient.patch(`/hub/services/${s.key}`, { enabled: !s.enabled });
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['hub'] }),
-  });
-
   return (
     <Box>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: '10px', mb: '16px' }}>
         <Box sx={{ fontSize: 15, fontWeight: 700, letterSpacing: '-.01em' }}>Service Manage</Box>
         <Box sx={{ flex: 1 }} />
-        <SirenButton variant="primary" onClick={() => setAddOpen(true)}>
+        <SirenButton variant="primary" onClick={() => setFormTarget('add')}>
           <Icon name="plus" /> Add service
         </SirenButton>
       </Box>
@@ -92,19 +90,24 @@ function ServiceRegistry() {
         }}
       >
         {services.map((s) => (
-          <ServiceCard key={s.key} service={s} onToggle={() => toggle.mutate(s)} />
+          <ServiceCard key={s.key} service={s} onEdit={() => setFormTarget(s)} />
         ))}
       </Box>
 
-      {addOpen && <AddServiceDialog onClose={() => setAddOpen(false)} />}
+      {formTarget && (
+        <ServiceFormDialog
+          service={formTarget === 'add' ? undefined : formTarget}
+          onClose={() => setFormTarget(null)}
+        />
+      )}
     </Box>
   );
 }
 
 /**
  * Service Manage 카드/폼에서 공유하는 favicon 렌더러. 비어 있거나 로드에 실패하면
- * 이니셜 배지로 대체한다 — 값을 사용자가 입력한 URL이 실제 이미지를 가리키는지는
- * 등록 시점엔 검증하지 않으므로, 깨진 URL이 화면을 망치지 않게 여기서 흡수한다.
+ * user badge(ProfileButton)와 똑같이 이니셜 배지로 대체한다 — favicon을 등록 안 한
+ * 서비스도 항상 뭔가 뜨게 하기 위해서다.
  */
 function ServiceIcon({ name, url, size = 40 }: { name: string; url: string; size?: number }) {
   const [failed, setFailed] = useState(false);
@@ -132,7 +135,7 @@ function ServiceIcon({ name, url, size = 40 }: { name: string; url: string; size
   );
 }
 
-function ServiceCard({ service: s, onToggle }: { service: HubService; onToggle: () => void }) {
+function ServiceCard({ service: s, onEdit }: { service: HubService; onEdit: () => void }) {
   return (
     <Box
       sx={{
@@ -170,55 +173,118 @@ function ServiceCard({ service: s, onToggle }: { service: HubService; onToggle: 
 
       <Box sx={{ flex: 1 }} />
 
-      <SirenButton onClick={onToggle} sx={{ alignSelf: 'flex-start' }}>
-        {s.enabled ? 'Disable' : 'Enable'}
+      {/*
+        Disable 버튼은 없다(사용자 요청) — 꺼도 이미 이 서비스로 등록된 산출물의
+        연동 자체는 끊기지 않아서, 실제로 뭘 하는지 오해를 살 뿐이었다. 값을 바꾸고
+        싶으면 Edit으로 들어간다.
+      */}
+      <SirenButton onClick={onEdit} sx={{ alignSelf: 'flex-start' }}>
+        <Icon name="edit" /> Edit
       </SirenButton>
     </Box>
   );
 }
 
-function AddServiceDialog({ onClose }: { onClose: () => void }) {
+/** 파일을 골라 base64 data URI로 인코딩한다. 별도 스토리지 없이 문서 필드에 바로 저장한다. */
+function FaviconField({
+  name, icon, onChange,
+}: { name: string; icon: string; onChange: (dataUri: string) => void }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleFile = (file: File | undefined) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast('Pick an image file.');
+      return;
+    }
+    if (file.size > MAX_ICON_BYTES) {
+      toast('Image is too large — pick one under 300KB.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => onChange(String(reader.result));
+    reader.readAsDataURL(file);
+  };
+
+  return (
+    <Field label="Favicon — shown on the card">
+      <Box sx={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+        <ServiceIcon name={name || '?'} url={icon} size={40} />
+        <SirenButton onClick={() => inputRef.current?.click()}>
+          <Icon name="plus" /> {icon ? 'Replace' : 'Upload'}
+        </SirenButton>
+        {icon && <SirenButton onClick={() => onChange('')}>Remove</SirenButton>}
+        <Box
+          component="input"
+          type="file"
+          accept="image/*"
+          ref={inputRef}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+            handleFile(e.target.files?.[0]);
+            e.target.value = '';
+          }}
+          sx={{ display: 'none' }}
+        />
+      </Box>
+    </Field>
+  );
+}
+
+function ServiceFormDialog({ service, onClose }: { service?: HubService; onClose: () => void }) {
   const qc = useQueryClient();
-  const [icon, setIcon] = useState('');
-  const [name, setName] = useState('');
-  const [key, setKey] = useState('');
-  const [description, setDescription] = useState('');
-  const [defaultTier, setDefaultTier] = useState('C');
-  const [transport, setTransport] = useState('none');
-  const [baseUrl, setBaseUrl] = useState('');
-  const [viewUrlTemplate, setViewUrlTemplate] = useState('');
+  const isEdit = !!service;
+  const [icon, setIcon] = useState(service?.icon ?? '');
+  const [name, setName] = useState(service?.name ?? '');
+  const [description, setDescription] = useState(service?.description ?? '');
+  const [tier, setTier] = useState(service?.defaultTier ?? 'C');
+  const [transport, setTransport] = useState(service?.transport ?? 'none');
+  const [baseUrl, setBaseUrl] = useState(service?.baseUrl ?? '');
+  const [viewUrlTemplate, setViewUrlTemplate] = useState(service?.viewUrlTemplate ?? '');
   const [nameErr, setNameErr] = useState(false);
-  const [keyErr, setKeyErr] = useState('');
+
+  /**
+   * A(Live)가 아니면 실연동이 없다는 뜻이라 transport는 무조건 none이고 잠긴다
+   * (사용자 요청) — Base URL/View URL도 A일 때만 의미가 있으므로 같이 비운다.
+   * A로 되돌아오면 transport가 비어 있던 경우에만 http로 다시 채워준다.
+   */
+  const changeTier = (next: string) => {
+    setTier(next as HubService['defaultTier']);
+    if (next !== 'A') {
+      setTransport('none');
+      setBaseUrl('');
+      setViewUrlTemplate('');
+    } else if (transport === 'none') {
+      setTransport('http');
+    }
+  };
 
   const mutation = useMutation({
     mutationFn: async () => {
-      await apiClient.post('/hub/services', {
-        key: key.trim(),
+      const body = {
         name: name.trim(),
-        icon: icon.trim(),
+        icon,
         description: description.trim(),
-        defaultTier,
-        transport,
-        baseUrl: transport === 'http' ? baseUrl.trim() || undefined : undefined,
-        viewUrlTemplate: viewUrlTemplate.trim() || undefined,
-        enabled: false,
-      });
+        defaultTier: tier,
+        transport: tier === 'A' ? transport : 'none',
+        baseUrl: tier === 'A' ? (baseUrl.trim() || undefined) : undefined,
+        viewUrlTemplate: tier === 'A' ? (viewUrlTemplate.trim() || undefined) : undefined,
+      };
+      if (isEdit) {
+        await apiClient.patch(`/hub/services/${service!.key}`, body);
+      } else {
+        await apiClient.post('/hub/services', body);
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['hub'] });
-      toast('Service registered');
+      toast(isEdit ? 'Service updated' : 'Service registered');
       onClose();
     },
-    onError: (e: any) => toast(e?.response?.data?.message ?? 'Failed to register'),
+    onError: (e: any) => toast(e?.response?.data?.message ?? 'Failed to save'),
   });
 
   const submit = () => {
     if (!name.trim()) { setNameErr(true); return; }
-    if (!/^[a-z0-9-]+$/.test(key.trim())) {
-      setKeyErr('Lowercase letters, numbers and hyphens only.');
-      return;
-    }
-    setKeyErr('');
     mutation.mutate();
   };
 
@@ -227,16 +293,14 @@ function AddServiceDialog({ onClose }: { onClose: () => void }) {
       open
       onClose={onClose}
       width={460}
-      header={<Box sx={{ fontSize: 16, fontWeight: 700 }}>Add service</Box>}
+      header={<Box sx={{ fontSize: 16, fontWeight: 700 }}>{isEdit ? 'Edit service' : 'Add service'}</Box>}
     >
-      <Field label="Favicon URL — shown on the card">
-        <Box sx={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <ServiceIcon name={name || '?'} url={icon} size={34} />
-          <Box sx={{ flex: 1 }}>
-            <TextInput value={icon} onChange={setIcon} placeholder="https://…/favicon.ico" />
-          </Box>
-        </Box>
-      </Field>
+      {/* key는 이름을 바탕으로 서버가 자동 생성하고, 생성 후엔 바꿀 수 없다 — 편집
+          화면에서도 참고용 읽기 전용으로만 보여준다 (§3.2). */}
+      {isEdit && (
+        <Box sx={{ fontFamily: FONT_MONO, fontSize: 11, color: T.dm2, mb: '14px' }}>{service!.key}</Box>
+      )}
+      <FaviconField name={name} icon={icon} onChange={setIcon} />
       <Field label="Name">
         <TextInput
           value={name}
@@ -245,39 +309,37 @@ function AddServiceDialog({ onClose }: { onClose: () => void }) {
           placeholder="e.g. SimHub"
         />
       </Field>
-      <Field label="Key — immutable once created">
-        <TextInput
-          value={key}
-          onChange={(v) => { setKey(v); setKeyErr(''); }}
-          error={!!keyErr}
-          placeholder="e.g. simhub"
-        />
-        {keyErr && <Box sx={{ fontSize: 11, color: T.rd, mt: '5px' }}>{keyErr}</Box>}
-      </Field>
       <Field label="Description">
         <TextArea value={description} onChange={setDescription} rows={2} />
       </Field>
-      <Field label="Default tier">
-        <SelectInput value={defaultTier} onChange={setDefaultTier} options={TIER_OPTIONS} />
+      <Field label="Tier">
+        <SelectInput value={tier} onChange={changeTier} options={TIER_OPTIONS} />
       </Field>
       <Field label="Transport">
-        <SelectInput value={transport} onChange={setTransport} options={TRANSPORT_OPTIONS} />
+        <SelectInput
+          value={transport}
+          onChange={(v) => setTransport(v as HubService['transport'])}
+          options={TRANSPORT_OPTIONS}
+          disabled={tier !== 'A'}
+        />
       </Field>
       {transport === 'http' && (
         <Field label="Base URL">
           <TextInput value={baseUrl} onChange={setBaseUrl} placeholder="https://…" />
         </Field>
       )}
-      <Field label="View URL template — optional, {artifactId} is substituted">
-        <TextInput value={viewUrlTemplate} onChange={setViewUrlTemplate} placeholder="https://…/{artifactId}" />
-      </Field>
+      {tier === 'A' && (
+        <Field label="View URL template — optional, {artifactId} is substituted">
+          <TextInput value={viewUrlTemplate} onChange={setViewUrlTemplate} placeholder="https://…/{artifactId}" />
+        </Field>
+      )}
       <SirenButton
         variant="primary"
-        disabled={!name.trim() || !key.trim() || mutation.isPending}
+        disabled={!name.trim() || mutation.isPending}
         onClick={submit}
         sx={{ mt: '4px' }}
       >
-        <Icon name="check" /> Register
+        <Icon name="check" /> {isEdit ? 'Save' : 'Register'}
       </SirenButton>
     </ModalShell>
   );

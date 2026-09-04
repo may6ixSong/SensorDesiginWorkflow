@@ -1,15 +1,9 @@
-import { IsBoolean, IsIn, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { IsBoolean, IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import { ArtifactServiceDocument, Tier, Transport } from '../schemas/artifact-service.schema';
 
 export class RegisterServiceDto {
-  /** 불변 식별자 - 등록 후에는 바꿀 수 없다 (Hub 설계서 §3.2). */
-  @IsString()
-  @MinLength(1)
-  @MaxLength(40)
-  @Matches(/^[a-z0-9-]+$/, {
-    message: 'Service key may only contain lowercase letters, numbers and hyphens.',
-  })
-  key: string;
+  // key는 클라이언트가 안 보낸다 - HubService#register가 name을 바탕으로
+  // `{8자리 랜덤}_{name 슬러그}` 형태로 직접 만든다 (사용자 요청).
 
   @IsString()
   @MinLength(1)
@@ -21,10 +15,15 @@ export class RegisterServiceDto {
   @MaxLength(240)
   description?: string;
 
-  /** favicon 이미지 URL. Service Manage 카드에 <img>로 그린다 (비어 있으면 이니셜로 대체). */
+  /**
+   * favicon 이미지 - 업로드한 파일을 브라우저에서 base64 data URI로 인코딩해 보낸다
+   * (별도 스토리지 없이 문서에 바로 저장). Service Manage 카드에 <img>로 그리고,
+   * 비어 있으면 이니셜로 대체한다. 400,000자 ≈ 원본 파일 약 290KB - FE가 그보다
+   * 큰 파일은 인코딩 전에 거절한다(ServiceManagePage.tsx).
+   */
   @IsOptional()
   @IsString()
-  @MaxLength(2000)
+  @MaxLength(400000)
   icon?: string;
 
   @IsOptional()
@@ -69,10 +68,15 @@ export class UpdateServiceDto {
   @MaxLength(240)
   description?: string;
 
-  /** favicon 이미지 URL. Service Manage 카드에 <img>로 그린다 (비어 있으면 이니셜로 대체). */
+  /**
+   * favicon 이미지 - 업로드한 파일을 브라우저에서 base64 data URI로 인코딩해 보낸다
+   * (별도 스토리지 없이 문서에 바로 저장). Service Manage 카드에 <img>로 그리고,
+   * 비어 있으면 이니셜로 대체한다. 400,000자 ≈ 원본 파일 약 290KB - FE가 그보다
+   * 큰 파일은 인코딩 전에 거절한다(ServiceManagePage.tsx).
+   */
   @IsOptional()
   @IsString()
-  @MaxLength(2000)
+  @MaxLength(400000)
   icon?: string;
 
   @IsOptional()

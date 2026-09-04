@@ -1,7 +1,8 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { ArtifactService, ArtifactServiceDocument } from './schemas/artifact-service.schema';
+import { randomUUID } from 'crypto';
+import { ArtifactService, ArtifactServiceDocument, Tier, Transport } from './schemas/artifact-service.schema';
 import { Actor, assertAdmin } from '../common/actor';
 import { AuditService } from '../audit/audit.service';
 import { RegisterServiceDto, UpdateServiceDto } from './dto/artifact-service.dto';
@@ -32,25 +33,65 @@ export class HubService {
     return svc;
   }
 
+  private slugify(name: string): string {
+    return name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'service';
+  }
+
+  /**
+   * `{8자리 랜덤}_{name 슬러그}` 형태로 key를 직접 만든다 (사용자 요청) - Admin이
+   * key를 신경 쓸 필요가 없게 한다. 랜덤 8자리(32bit)면 충돌 가능성은 무시할
+   * 수준이지만, 그래도 몇 번 재시도해 확실히 유일한 값을 보장한다.
+   */
+  private async generateKey(name: string): Promise<string> {
+    const slug = this.slugify(name);
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const unique = randomUUID().replace(/-/g, '').slice(0, 8);
+      const key = `${unique}_${slug}`;
+      // eslint-disable-next-line no-await-in-loop
+      if (!(await this.model.findOne({ key }).exec())) return key;
+    }
+    throw new BadRequestException('Could not generate a unique service key. Try again.');
+  }
+
+  /**
+   * A(Live) 티어가 아니면 실연동이 없다는 뜻이므로, transport/baseUrl/viewUrlTemplate을
+   * 서버가 무조건 비운다 - FE가 이미 폼에서 이 규칙대로 잠가두지만(ServiceManagePage.tsx),
+   * API를 직접 두드리는 경로에도 같은 불변식을 강제한다.
+   */
+  private applyTierInvariant(
+    tier: Tier,
+    input: { transport?: Transport; baseUrl?: string | null; viewUrlTemplate?: string | null },
+  ): { transport: Transport; baseUrl: string | null; viewUrlTemplate: string | null } {
+    if (tier !== 'A') {
+      return { transport: 'none', baseUrl: null, viewUrlTemplate: null };
+    }
+    return {
+      transport: input.transport ?? 'http',
+      baseUrl: input.baseUrl?.trim() || null,
+      viewUrlTemplate: input.viewUrlTemplate?.trim() || null,
+    };
+  }
+
   async register(dto: RegisterServiceDto, actor: Actor) {
     assertAdmin(actor);
-    const key = dto.key.trim();
-    if (await this.model.findOne({ key }).exec()) {
-      throw new BadRequestException(`Service key "${key}" is already registered.`);
-    }
+    const key = await this.generateKey(dto.name);
+    const tier: Tier = dto.defaultTier ?? 'C';
+    const { transport, baseUrl, viewUrlTemplate } = this.applyTierInvariant(tier, dto);
     const svc = await this.model.create({
       key,
       name: dto.name.trim(),
       description: dto.description?.trim() || '',
       icon: dto.icon?.trim() || '',
       contractVersion: dto.contractVersion?.trim() || '1.0',
-      defaultTier: dto.defaultTier ?? 'C',
-      transport: dto.transport ?? 'none',
-      baseUrl: dto.baseUrl?.trim() || null,
-      viewUrlTemplate: dto.viewUrlTemplate?.trim() || null,
+      defaultTier: tier,
+      transport,
+      baseUrl,
+      viewUrlTemplate,
       embedUploadUrlTemplate: dto.embedUploadUrlTemplate?.trim() || null,
       isBuiltIn: false,
-      enabled: dto.enabled ?? true,
+      // 등록만 하고 못 쓰게 잠가두는 별도 활성화 단계는 두지 않는다(사용자 요청) -
+      // 등록 즉시 워크플로우의 출처 선택지에 뜬다.
+      enabled: true,
       isMock: false,
     });
     await this.audit.log(actor.realKnoxId, 'ARTIFACT_SERVICE_REGISTER', 'artifactService', svc._id, {
@@ -72,9 +113,16 @@ export class HubService {
     if (dto.icon !== undefined) svc.icon = dto.icon.trim();
     if (dto.contractVersion !== undefined) svc.contractVersion = dto.contractVersion.trim();
     if (dto.defaultTier !== undefined) svc.defaultTier = dto.defaultTier;
-    if (dto.transport !== undefined) svc.transport = dto.transport;
-    if (dto.baseUrl !== undefined) svc.baseUrl = dto.baseUrl.trim() || null;
-    if (dto.viewUrlTemplate !== undefined) svc.viewUrlTemplate = dto.viewUrlTemplate.trim() || null;
+
+    const { transport, baseUrl, viewUrlTemplate } = this.applyTierInvariant(svc.defaultTier, {
+      transport: dto.transport ?? svc.transport,
+      baseUrl: dto.baseUrl !== undefined ? dto.baseUrl : svc.baseUrl,
+      viewUrlTemplate: dto.viewUrlTemplate !== undefined ? dto.viewUrlTemplate : svc.viewUrlTemplate,
+    });
+    svc.transport = transport;
+    svc.baseUrl = baseUrl;
+    svc.viewUrlTemplate = viewUrlTemplate;
+
     if (dto.embedUploadUrlTemplate !== undefined) {
       svc.embedUploadUrlTemplate = dto.embedUploadUrlTemplate.trim() || null;
     }
