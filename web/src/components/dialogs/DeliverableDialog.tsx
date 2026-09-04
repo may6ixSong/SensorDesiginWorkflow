@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Box } from '@mui/material';
+import { Box, CircularProgress } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { WorkflowPhase } from '@/types/domain';
 import { shortDate } from '@/lib/schedule';
 import {
@@ -16,10 +17,18 @@ import { ConfirmDialog } from '@/components/dialogs/ConfirmDialog';
 import { SlidePanel } from '@/components/common/SlidePanel';
 import { VersionTree } from '@/components/deliverable/VersionTree';
 import { VersionContents } from '@/components/deliverable/VersionContents';
+import { ArtifactVersionTree } from '@/components/artifact/ArtifactVersionTree';
+import { ArtifactVersionContents } from '@/components/artifact/ArtifactVersionContents';
 import { SirenButton, Badge } from '@/components/common/SirenButton';
 import { Card, Ey, Field, Row, SelectInput, TextInput } from '@/components/common/Panel';
 import { Icon } from '@/components/common/Icon';
 import { UserAvatar } from '@/components/common/Avatar';
+import { queryKeys } from '@/api/queryKeys';
+import {
+  CalypsoArtifact, CalypsoVersionView, downloadCalypsoVersion, getCalypsoArtifact,
+  releaseCalypsoArtifact, uploadCalypsoVersion,
+} from '@/api/calypsoClient';
+import { toast } from '@/store/toastStore';
 import { FONT_MONO, T } from '@/theme/tokens';
 
 /**
@@ -78,8 +87,60 @@ export function DeliverableDialog({
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   /** 내용 면에 띄울 버전 — 트리에서 고른 것. 산출물이 바뀌면 최신으로 되돌린다. */
   const [picked, setPicked] = useState<VersionView | null>(null);
+  /** Calypso에 연동된 산출물이면 이쪽에서 고른 버전을 쓴다 — 아래 calypsoLinked 참고. */
+  const [calypsoPicked, setCalypsoPicked] = useState<CalypsoVersionView | null>(null);
 
   useEffect(() => setPicked(null), [d?.id]);
+  useEffect(() => setCalypsoPicked(null), [d?.id]);
+
+  const qc = useQueryClient();
+  /**
+   * serviceKey==='calypso'로 연동된 산출물은 SIREN 자체 versions(수동 assert 기록,
+   * C/D 티어용)가 아니라 Calypso에 실제로 등록된 버전을 보여준다 — "연동만 해두면
+   * 실제 데이터가 그대로 보여야 한다"(사용자 요청). Artifacts page와 같은
+   * calypsoClient로 브라우저에서 직접 물어본다 — SIREN api를 거치는 별도 동기화는
+   * 아직 없다.
+   */
+  const calypsoLinked = d?.serviceKey === 'calypso' && !!d?.externalArtifactId;
+  const externalArtifactId = d?.externalArtifactId ?? '';
+  const {
+    data: calypsoArtifact, isLoading: calypsoLoading, isError: calypsoError,
+  } = useQuery({
+    queryKey: queryKeys.calypsoArtifact(externalArtifactId),
+    queryFn: () => getCalypsoArtifact(externalArtifactId),
+    enabled: calypsoLinked,
+    retry: false,
+  });
+
+  const invalidateCalypso = () => {
+    qc.invalidateQueries({ queryKey: queryKeys.calypsoArtifact(externalArtifactId) });
+    qc.invalidateQueries({ queryKey: ['calypso', 'artifacts'] });
+  };
+  const uploadCalypso = useMutation({
+    mutationFn: ({ file, note }: { file: File; note: string }) => uploadCalypsoVersion(externalArtifactId, file, note),
+    onSuccess: () => { invalidateCalypso(); toast('Working copy uploaded'); },
+    onError: (e: any) => toast(e?.response?.data?.message ?? 'Upload failed'),
+  });
+  const releaseCalypso = useMutation({
+    mutationFn: (note: string) => releaseCalypsoArtifact(externalArtifactId, note),
+    onSuccess: () => { invalidateCalypso(); toast('Released'); },
+    onError: (e: any) => toast(e?.response?.data?.message ?? 'Release failed'),
+  });
+  const handleCalypsoDownload = async (v: CalypsoVersionView) => {
+    try {
+      const blob = await downloadCalypsoVersion(externalArtifactId, v.versionRef);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = v.fileName || `${externalArtifactId}-v${v.versionLabel}`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast('Download failed');
+    }
+  };
 
   if (!d) return null;
   const ph = phases.find((p) => p.id === d.phase);
@@ -87,6 +148,7 @@ export function DeliverableDialog({
   const st = stOf(d);
   const received = d.intent === 'received';
   const shown = picked ?? (own ? latA(d) : latR(d));
+  const calypsoShown = calypsoPicked ?? calypsoArtifact?.latestVersion ?? null;
   /** 실물을 소유한 서비스가 붙어 있으면 버전은 그쪽에서 올라온다 — SIREN에서 못 쓴다(§1.2). */
   const canRecord = own && !received && !d.serviceKey;
   /**
@@ -131,29 +193,50 @@ export function DeliverableDialog({
         </Box>
       )}
     >
-      {/* A — 내용 + (편집 가능하면) 버전 기록 */}
-      <Box
-        sx={{
-          flex: 3, minWidth: 0, overflowY: 'auto', background: T.sf3, padding: '22px',
-          borderRight: `1px solid ${T.ln}`, display: 'flex',
-        }}
-      >
-        <Box sx={{ width: '100%', maxWidth: 660, mx: 'auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <VersionContents d={d} version={shown} />
-          {canRecord && (
-            <RecordVersionCard
-              latest={hasW(d) ? latA(d) : null}
-              onAssertVersion={onAssertVersion}
-              onRelease={onRelease}
-            />
-          )}
-        </Box>
+      {/* A — 내용 + (편집 가능하면) 버전 기록. Calypso 연동이면 SIREN 자체 기록이 아니라
+          Calypso의 실제 버전/업로드를 그대로 보여준다(ArtifactVersionContents는 이미
+          자기 몫의 스크롤/패딩/가운데정렬을 갖고 있어 그대로 flex 컬럼에 낀다). */}
+      <Box sx={{ flex: 3, minWidth: 0, display: 'flex', borderRight: `1px solid ${T.ln}` }}>
+        {calypsoLinked && calypsoArtifact ? (
+          <ArtifactVersionContents
+            a={calypsoArtifact}
+            version={calypsoShown}
+            canEdit={calypsoArtifact.canEdit}
+            onDownload={handleCalypsoDownload}
+            onUpload={(file, note) => uploadCalypso.mutate({ file, note })}
+            onRelease={(note) => releaseCalypso.mutate(note)}
+            uploading={uploadCalypso.isPending}
+            releasing={releaseCalypso.isPending}
+          />
+        ) : calypsoLinked && calypsoLoading ? (
+          <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <CircularProgress size={24} />
+          </Box>
+        ) : calypsoLinked && calypsoError ? (
+          <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '22px' }}>
+            <Box sx={{ fontSize: 13.5, fontWeight: 600 }}>Could not load the linked Calypso artifact</Box>
+            <Box sx={{ fontSize: 12, color: T.dm2 }}>It may not exist in Calypso, or the link is stale.</Box>
+          </Box>
+        ) : (
+          <Box sx={{ flex: 1, minWidth: 0, overflowY: 'auto', background: T.sf3, padding: '22px' }}>
+            <Box sx={{ width: '100%', maxWidth: 660, mx: 'auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <VersionContents d={d} version={shown} />
+              {canRecord && (
+                <RecordVersionCard
+                  latest={hasW(d) ? latA(d) : null}
+                  onAssertVersion={onAssertVersion}
+                  onRelease={onRelease}
+                />
+              )}
+            </Box>
+          </Box>
+        )}
       </Box>
 
       {/* B — 요약 / 버전 트리 / 기본 정보 / 연결 / 전달, 탭 없이 한 레일 */}
       <Box sx={{ flex: 1, minWidth: 320, display: 'flex', flexDirection: 'column', background: T.sf2 }}>
         <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '14px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <VersionSummary d={d} own={own} />
+          <VersionSummary d={d} own={own} calypso={calypsoLinked ? calypsoArtifact ?? null : undefined} />
 
           {canOpenArtifactPage && (
             <SirenButton
@@ -166,7 +249,15 @@ export function DeliverableDialog({
 
           <Card>
             <Ey sx={{ mb: '9px' }}>Version history</Ey>
-            <VersionTree versions={d.versions} selected={shown} onSelect={setPicked} />
+            {calypsoLinked ? (
+              <ArtifactVersionTree
+                versions={calypsoArtifact?.versions ?? []}
+                selected={calypsoShown}
+                onSelect={setCalypsoPicked}
+              />
+            ) : (
+              <VersionTree versions={d.versions} selected={shown} onSelect={setPicked} />
+            )}
           </Card>
 
           {own && (
@@ -255,26 +346,47 @@ function RecordVersionCard({
   );
 }
 
-/* ── B: 버전 요약 배지 ── */
-function VersionSummary({ d, own }: { d: CanvasNode; own: boolean }) {
-  const rel = latR(d);
-  const work = hasW(d) ? latA(d) : null;
+/**
+ * B: 버전 요약 배지. calypso가 undefined면 연동 안 된 산출물 — SIREN 자체 기록(d.versions)을
+ * 쓴다. calypso가 CalypsoArtifact(또는 아직 로딩/에러라 null)면 연동된 산출물 — 그쪽의
+ * releasedVersion/latestVersion을 쓴다(사용자 요청: 연동만 해두면 실제 데이터가 보여야 함).
+ */
+function VersionSummary({
+  d, own, calypso,
+}: { d: CanvasNode; own: boolean; calypso?: CalypsoArtifact | null }) {
+  const linked = calypso !== undefined;
+  const relLabel = linked
+    ? (calypso?.releasedVersion ? `v${calypso.releasedVersion.versionLabel}` : null)
+    : (latR(d) ? vstr(latR(d) as VersionView) : null);
+  const relAt = linked
+    ? (calypso?.releasedVersion ? fmtAt(calypso.releasedVersion.createdAt) : null)
+    : (latR(d) ? fmtAt((latR(d) as VersionView).at) : null);
+  const workSrc = linked
+    ? (calypso?.latestVersion && !calypso.latestVersion.isReleased ? calypso.latestVersion : null)
+    : (hasW(d) ? latA(d) : null);
+  const workLabel = linked
+    ? (workSrc ? `v${(workSrc as CalypsoVersionView).versionLabel}` : null)
+    : (workSrc ? vstr(workSrc as VersionView) : null);
+  const workAt = linked
+    ? (workSrc ? fmtAt((workSrc as CalypsoVersionView).createdAt) : null)
+    : (workSrc ? fmtAt((workSrc as VersionView).at) : null);
+
   return (
     <Row>
       <Card sx={{ flex: 1, minWidth: 0 }}>
         <Ey>Recipient sees</Ey>
         <Box sx={{ fontFamily: FONT_MONO, fontSize: 17, fontWeight: 600, color: T.tl, mt: '5px' }}>
-          {rel ? vstr(rel) : '—'}
+          {relLabel ?? '—'}
         </Box>
-        <Box sx={{ fontSize: 10, color: T.dm2, mt: '3px' }}>{rel ? fmtAt(rel.at) : 'No release yet'}</Box>
+        <Box sx={{ fontSize: 10, color: T.dm2, mt: '3px' }}>{relAt ?? 'No release yet'}</Box>
       </Card>
       <Card sx={{ flex: 1, minWidth: 0, opacity: own ? 1 : 0.5 }}>
         <Ey>Working copy</Ey>
         <Box sx={{ fontFamily: FONT_MONO, fontSize: 17, fontWeight: 600, color: T.am, mt: '5px', display: 'flex', alignItems: 'center' }}>
-          {own ? (work ? vstr(work) : 'None') : <Icon name="lock" />}
+          {own ? (workLabel ?? 'None') : <Icon name="lock" />}
         </Box>
         <Box sx={{ fontSize: 10, color: T.dm2, mt: '3px' }}>
-          {own ? (work ? fmtAt(work.at) : 'No changes since release') : 'owners only'}
+          {own ? (workAt ?? 'No changes since release') : 'owners only'}
         </Box>
       </Card>
     </Row>
