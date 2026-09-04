@@ -1,15 +1,19 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Box, CircularProgress, Stack } from '@mui/material';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AppShell } from '@/components/layout/AppShell';
 import { ArtifactVersionTree } from '@/components/artifact/ArtifactVersionTree';
 import { ArtifactVersionContents } from '@/components/artifact/ArtifactVersionContents';
+import { ArtifactAccessPanel } from '@/components/artifact/ArtifactAccessPanel';
 import { Badge } from '@/components/common/SirenButton';
+import { useAuth } from '@/app/providers/AuthProvider';
+import { useProject } from '@/api/hooks/useProjects';
 import { queryKeys } from '@/api/queryKeys';
 import {
-  CalypsoVersionView, downloadCalypsoVersion, getCalypsoArtifact,
-  releaseCalypsoArtifact, uploadCalypsoVersion,
+  CalypsoGrantInput, CalypsoVersionView, addCalypsoEditor, addCalypsoViewGrant,
+  downloadCalypsoVersion, getCalypsoArtifact, releaseCalypsoArtifact,
+  removeCalypsoEditor, removeCalypsoViewGrant, setCalypsoUserDepartments, uploadCalypsoVersion,
 } from '@/api/calypsoClient';
 import { toast } from '@/store/toastStore';
 import { T } from '@/theme/tokens';
@@ -17,6 +21,7 @@ import { T } from '@/theme/tokens';
 /** A(내용+업로드):B(버전 트리) = 3:1 — workflow 쪽 상세 패널과 같은 비율(사용자 요청). */
 export function ArtifactDetailPage() {
   const { id = '' } = useParams();
+  const { user } = useAuth();
   const qc = useQueryClient();
   const [picked, setPicked] = useState<CalypsoVersionView | null>(null);
 
@@ -26,6 +31,17 @@ export function ArtifactDetailPage() {
     enabled: Boolean(id),
     retry: false,
   });
+
+  // Artifact ACL의 부서 단위 부여는 "이 project 안에서의 내 부서"를 알아야 판정된다 —
+  // artifact를 먼저 읽어야 projectId를 알 수 있으므로 project 조회는 그 뒤에 붙는다.
+  const { data: project } = useProject(a?.projectId);
+  const myDepartments = useMemo(
+    () => project?.members.find((m) => m.knoxId === user?.KnoxID)?.departments ?? [],
+    [project?.members, user?.KnoxID],
+  );
+  useEffect(() => {
+    if (project) setCalypsoUserDepartments(myDepartments);
+  }, [project, myDepartments]);
 
   useEffect(() => setPicked(null), [id]);
 
@@ -43,6 +59,26 @@ export function ArtifactDetailPage() {
     mutationFn: (note: string) => releaseCalypsoArtifact(id, note),
     onSuccess: () => { invalidate(); toast('Released'); },
     onError: (e: any) => toast(e?.response?.data?.message ?? 'Release failed'),
+  });
+  const addEditor = useMutation({
+    mutationFn: (g: CalypsoGrantInput) => addCalypsoEditor(id, g),
+    onSuccess: invalidate,
+    onError: (e: any) => toast(e?.response?.data?.message ?? 'Could not grant edit access'),
+  });
+  const removeEditor = useMutation({
+    mutationFn: (g: CalypsoGrantInput) => removeCalypsoEditor(id, g),
+    onSuccess: invalidate,
+    onError: (e: any) => toast(e?.response?.data?.message ?? 'Could not remove editor'),
+  });
+  const addViewGrant = useMutation({
+    mutationFn: (g: CalypsoGrantInput) => addCalypsoViewGrant(id, g),
+    onSuccess: invalidate,
+    onError: (e: any) => toast(e?.response?.data?.message ?? 'Could not grant view access'),
+  });
+  const removeViewGrant = useMutation({
+    mutationFn: (g: CalypsoGrantInput) => removeCalypsoViewGrant(id, g),
+    onSuccess: invalidate,
+    onError: (e: any) => toast(e?.response?.data?.message ?? 'Could not remove viewer'),
   });
 
   const handleDownload = async (v: CalypsoVersionView) => {
@@ -101,7 +137,10 @@ export function ArtifactDetailPage() {
           <Box sx={{ display: 'flex', alignItems: 'center', gap: '10px', mt: '4px' }}>
             <Box sx={{ fontSize: 18, fontWeight: 700, letterSpacing: '-.01em' }}>{a.name}</Box>
             <Badge color={T.dm} bg={T.sf2} borderColor={T.ln}>{a.department}</Badge>
-            {a.canEdit && <Badge color={T.tl} bg={T.tl2} borderColor={T.tl3}>You registered this</Badge>}
+            {a.createdBy === user?.KnoxID && (
+              <Badge color={T.tl} bg={T.tl2} borderColor={T.tl3}>You registered this</Badge>
+            )}
+            {a.myAccess === 'view' && <Badge color={T.dm} bg={T.sf2} borderColor={T.ln}>View only</Badge>}
           </Box>
         </Box>
 
@@ -110,7 +149,7 @@ export function ArtifactDetailPage() {
             <ArtifactVersionContents
               a={a}
               version={shown}
-              canEdit={a.canEdit}
+              canEdit={a.myAccess === 'edit'}
               onDownload={handleDownload}
               onUpload={(file, note) => upload.mutate({ file, note })}
               onRelease={(note) => release.mutate(note)}
@@ -118,9 +157,22 @@ export function ArtifactDetailPage() {
               releasing={release.isPending}
             />
           </Box>
-          <Box sx={{ flex: 1, minWidth: 320, background: T.sf2, overflowY: 'auto', padding: '16px' }}>
-            <Box sx={{ fontSize: 12.5, fontWeight: 700, mb: '10px' }}>Version history</Box>
-            <ArtifactVersionTree versions={versions} selected={shown} onSelect={setPicked} />
+          <Box sx={{ flex: 1, minWidth: 320, background: T.sf2, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <Box>
+              <Box sx={{ fontSize: 12.5, fontWeight: 700, mb: '10px' }}>Version history</Box>
+              <ArtifactVersionTree versions={versions} selected={shown} onSelect={setPicked} />
+            </Box>
+            {a.myAccess === 'edit' && (
+              <ArtifactAccessPanel
+                artifact={a}
+                myDepartments={myDepartments}
+                allDepartments={project?.departments ?? []}
+                onAddEditor={(g) => addEditor.mutate(g)}
+                onRemoveEditor={(g) => removeEditor.mutate(g)}
+                onAddViewGrant={(g) => addViewGrant.mutate(g)}
+                onRemoveViewGrant={(g) => removeViewGrant.mutate(g)}
+              />
+            )}
           </Box>
         </Box>
       </Box>

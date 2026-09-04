@@ -319,6 +319,7 @@ export function BoardPage() {
               node={openNode}
               phases={phaseList}
               own={own}
+              project={project}
               onClose={closeDeliverable}
               onSaveInfo={({ name, artifactKey, serviceKey, externalArtifactId }) => {
                 updateDeliverable.mutate(

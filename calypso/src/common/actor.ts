@@ -30,6 +30,15 @@ export const USER_GROUP_HEADER = 'x-user-group';
  */
 export const ACTING_AS_HEADER = 'x-acting-as';
 
+/**
+ * 호출자가 **이 요청이 걸린 SIREN project 안에서** 속한 department 목록(project
+ * membership 기준 — Hub 설계서 §11.4처럼 Calypso는 SIREN의 Project/members를 직접
+ * 조회하지 않으므로, SIREN web이 자기가 이미 아는 값을 매 요청마다 실어 보낸다).
+ * Artifact 권한 부여 시 "부서 단위 edit은 본인 소속 부서로만" 규칙을 서버에서
+ * 검증하는 데 쓴다(§9.2 원칙의 연장) — 콤마로 여러 개.
+ */
+export const USER_DEPARTMENTS_HEADER = 'x-user-departments';
+
 const ADMIN_GROUP = 'Admin';
 
 export interface Actor {
@@ -40,6 +49,8 @@ export interface Actor {
   isImpersonating: boolean;
   /** realKnoxId 기준. 시뮬레이션 대상의 권한이 아니라 진짜 호출자의 권한이다. */
   isAdmin: boolean;
+  /** 지금 요청의 project 안에서 knoxId가 속한 department들. 모르면 빈 배열. */
+  departments: string[];
 }
 
 function header(req: { headers?: Record<string, unknown> }, name: string): string | null {
@@ -56,10 +67,14 @@ export function resolveActor(req: { headers?: Record<string, unknown> }): Actor 
 
   // 토큰 전환 시 이 줄이 "검증된 토큰의 User.Group 클레임"으로 바뀐다.
   const isAdmin = header(req, USER_GROUP_HEADER) === ADMIN_GROUP;
+  const departments = (header(req, USER_DEPARTMENTS_HEADER) ?? '')
+    .split(',').map((d) => d.trim()).filter(Boolean);
 
   const actingAs = header(req, ACTING_AS_HEADER);
   if (!actingAs || actingAs === realKnoxId) {
-    return { knoxId: realKnoxId, realKnoxId, isImpersonating: false, isAdmin };
+    return {
+      knoxId: realKnoxId, realKnoxId, isImpersonating: false, isAdmin, departments,
+    };
   }
 
   // override는 검증된 실제 호출자가 Admin일 때만 반영한다 (§13.3 규칙 2).
@@ -67,7 +82,9 @@ export function resolveActor(req: { headers?: Record<string, unknown> }): Actor 
     throw new ForbiddenException('User simulation is available to Admin users only.');
   }
 
-  return { knoxId: actingAs, realKnoxId, isImpersonating: true, isAdmin };
+  return {
+    knoxId: actingAs, realKnoxId, isImpersonating: true, isAdmin, departments,
+  };
 }
 
 /** Admin 전용 라우트에서 쓴다. 판정 기준은 항상 realKnoxId다. */

@@ -49,6 +49,35 @@ export const ArtifactVersionSchema = SchemaFactory.createForClass(ArtifactVersio
 export type ArtifactDocument = Artifact & Document;
 
 /**
+ * 권한 부여 한 건 — 개인(knoxId) 또는 부서(department) 단위. 등록자·Admin은 이 목록에
+ * 없어도 항상 edit이므로 여기 담기지 않는다 — 이 배열은 그 외에 "추가로" 부여된 것만.
+ *
+ * edit 부여는 부서 단위일 때 **부여자 본인 소속 부서로만** 제한한다 — 서비스 컨트롤러에서
+ * 검증한다(department가 analog 단위라 타 부서에 통째로 주면 그 안의 관련 없는 IP까지
+ * 편집권이 퍼지기 때문 — 사용자 요청). view 부여는 부서 제한이 없다.
+ */
+@Schema({ _id: false, timestamps: false })
+export class ArtifactGrant {
+  @Prop({ required: true, enum: ['user', 'department'] })
+  type: 'user' | 'department';
+
+  /** type==='user'일 때만. */
+  @Prop({ type: String, default: null, trim: true })
+  knoxId: string | null;
+
+  /** type==='department'일 때만. */
+  @Prop({ type: String, default: null, trim: true })
+  department: string | null;
+
+  @Prop({ required: true, trim: true })
+  grantedBy: string;
+
+  @Prop({ default: () => new Date() })
+  grantedAt: Date;
+}
+export const ArtifactGrantSchema = SchemaFactory.createForClass(ArtifactGrant);
+
+/**
  * Calypso의 산출물. **project + department로만 스코프된다 - workflow 개념을 모른다**
  * (Hub 설계서 §11.4). 어느 workflow가 이걸 가져다 쓰는지는 SIREN 쪽 관심사이며,
  * 같은 산출물이 여러 workflow에 동시에 걸릴 수 있다.
@@ -78,6 +107,14 @@ export class Artifact {
 
   @Prop({ default: false, index: true })
   isMock: boolean;
+
+  /** 등록자·Admin 외에 추가로 edit 권한을 받은 사람/부서(본인 부서만). */
+  @Prop({ type: [ArtifactGrantSchema], default: [] })
+  editors: ArtifactGrant[];
+
+  /** view 권한을 받은 사람/부서 — 어느 부서든 가능(수신 부서 handoff 등). */
+  @Prop({ type: [ArtifactGrantSchema], default: [] })
+  viewGrants: ArtifactGrant[];
 
   _id: Types.ObjectId;
 }
