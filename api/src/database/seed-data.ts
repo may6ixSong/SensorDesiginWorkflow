@@ -435,29 +435,17 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
   } = models;
 
   /* ── Hub 레지스트리 ──
-   * Calypso는 레지스트리의 첫 항목이자 Observer 계약의 레퍼런스 구현이다(Hub 설계서 §2,
-   * §16 2단계) - 유일하게 실제로 API가 뜨는 항목이다. 나머지 셋(SSM/SimHub/LayoutDB)은
-   * siren-orchestration-map.html에서 구조를 설명할 때 쓴 예시와 같은 메타데이터로,
-   * 대문이 실제 레지스트리를 반영한다는 걸(§15.4) 슬랩 하나짜리가 아니라 원래 그림과
-   * 같은 구성으로 보여주기 위해 함께 심는다 - 아직 어댑터가 없어 baseUrl은 비워둔다.
-   * 실서비스 등록은 Admin 관리 화면(§13.4)에서 한다. */
+   * Calypso는 여기 없다 - Hub가 "연동하는 외부 서비스"가 아니라 SIREN이 직접 만든
+   * 산출물 관리 기능이다(ArtifactListPage/ArtifactDetailPage, calypsoClient.ts로
+   * 직접 호출). Service Manage(§13.4)는 실제로 연동을 맺는 서비스 목록이라 여기 끼워
+   * 넣지 않는다. 나머지 셋(SSM/SimHub/LayoutDB)은 siren-orchestration-map.html에서
+   * 구조를 설명할 때 쓴 예시와 같은 메타데이터로, 대문이 실제 레지스트리를 반영한다는
+   * 걸(§15.4) 원래 그림과 같은 구성으로 보여주기 위해 심는다 - 아직 어댑터가 없어
+   * baseUrl은 비워둔다. 실서비스 등록은 Service Manage 화면(§13.4)에서 한다. */
   // insertMany를 쓴다 - 인메모리 페이크 모델(in-memory-driver.ts)의 create()는 단건만
   // 받는다. 실제 Mongoose에도 있는 메서드라 양쪽 모드에서 동일하게 동작한다.
   await ArtifactServiceModel.deleteMany({ isMock: true });
   await ArtifactServiceModel.insertMany([
-    {
-      key: 'calypso',
-      name: 'Calypso',
-      contractVersion: '1.0',
-      defaultTier: 'A',
-      transport: 'http',
-      baseUrl: 'http://localhost:44360/api',
-      viewUrlTemplate: 'http://localhost:5174/artifacts/{artifactId}',
-      embedUploadUrlTemplate: null,
-      isBuiltIn: true,
-      enabled: true,
-      isMock: true,
-    },
     {
       key: 'ssm',
       name: 'SSM',
@@ -562,29 +550,23 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
   MOCK_ITEMS.forEach((m) => (DID[m.id] = new Types.ObjectId()));
 
   /**
-   * 목업을 전부 Calypso 하나에 몰아넣지 않고 이름으로 4개 서비스에 나눈다 - 대문(§15.4)이
-   * 실제 레지스트리를 반영할 때, 슬랩 하나만 떠 있는 게 아니라 siren-orchestration-map.html
-   * 원본처럼 여러 서비스가 각자의 버전 이력을 갖고 보이게 하기 위해서다. 위 레지스트리 시드의
-   * 4개 키와 정확히 대응한다.
+   * 목업을 이름으로 3개 서비스에 나눈다 - 대문(§15.4)이 실제 레지스트리를 반영할 때,
+   * 슬랩 하나만 떠 있는 게 아니라 여러 서비스가 각자의 버전 이력을 갖고 보이게 하기
+   * 위해서다. 위 레지스트리 시드의 3개 키와 정확히 대응한다. Calypso는 대상이 아니다 -
+   * Hub가 연동하는 서비스가 아니므로 목업 산출물의 serviceKey로도 배정하지 않는다.
    */
-  function inferServiceKey(name: string): 'calypso' | 'ssm' | 'simhub' | 'layoutdb' {
+  function inferServiceKey(name: string): 'ssm' | 'simhub' | 'layoutdb' {
     const n = name.toLowerCase();
     if (n.includes('simulation')) return 'simhub';
     if (n.includes('layout') || n.includes('netlist') || n.includes('pex')) return 'layoutdb';
-    if (
-      n.includes('review') || n.includes('requirement') || n.includes('architecture') ||
-      n.includes('checklist') || n.includes('sign-off') || n.includes('characterization')
-    ) {
-      return 'ssm';
-    }
-    return 'calypso';
+    return 'ssm';
   }
   /** 각 서비스의 viewUrlTemplate과 같은 경로 세그먼트 - 레지스트리 시드와 짝을 맞춘다. */
   const SERVICE_PATH: Record<string, string> = {
-    calypso: 'artifacts', ssm: 'spec', simhub: 'run', layoutdb: 'cell',
+    ssm: 'spec', simhub: 'run', layoutdb: 'cell',
   };
   const SERVICE_TIER: Record<string, 'A' | 'B'> = {
-    calypso: 'A', ssm: 'B', simhub: 'A', layoutdb: 'B',
+    ssm: 'B', simhub: 'A', layoutdb: 'B',
   };
 
   for (const m of MOCK_ITEMS) {

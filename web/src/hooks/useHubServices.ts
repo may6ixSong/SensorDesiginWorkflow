@@ -2,6 +2,8 @@
 export interface HubService {
   key: string;
   name: string;
+  description: string;
+  icon: string;
   contractVersion: string;
   defaultTier: 'A' | 'B' | 'C' | 'D';
   transport: 'http' | 'shared-db' | 'none';

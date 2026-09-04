@@ -18,6 +18,16 @@ export class RegisterServiceDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(240)
+  description?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(8)
+  icon?: string;
+
+  @IsOptional()
+  @IsString()
   contractVersion?: string;
 
   @IsOptional()
@@ -55,6 +65,16 @@ export class UpdateServiceDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(240)
+  description?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(8)
+  icon?: string;
+
+  @IsOptional()
+  @IsString()
   contractVersion?: string;
 
   @IsOptional()
@@ -86,6 +106,8 @@ export function toArtifactServiceDto(s: ArtifactServiceDocument) {
   return {
     key: s.key,
     name: s.name,
+    description: s.description ?? '',
+    icon: s.icon ?? '',
     contractVersion: s.contractVersion,
     defaultTier: s.defaultTier,
     transport: s.transport,

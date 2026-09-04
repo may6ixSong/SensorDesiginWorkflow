@@ -3,7 +3,7 @@ import { CircularProgress, Stack } from '@mui/material';
 import { useAuth } from '@/app/providers/AuthProvider';
 import { DetailsRedirect } from '@/pages/DetailsRedirect';
 import { HomePage } from '@/pages/HomePage';
-import { AdminPage } from '@/pages/AdminPage';
+import { ServiceManagePage } from '@/pages/ServiceManagePage';
 import { ProjectListPage } from '@/pages/ProjectListPage';
 import { ProjectInfoPage } from '@/pages/ProjectInfoPage';
 import { ProjectMembersPage } from '@/pages/ProjectMembersPage';
@@ -45,7 +45,7 @@ export default function App() {
         <Route path="/details" element={<DetailsRedirect />} />
         <Route path="/details/:projectId" element={<DetailsRedirect />} />
         <Route path="/details/:projectId/:workflowId" element={<BoardPage />} />
-        <Route path="/admin" element={<AdminPage />} />
+        <Route path="/service-manage" element={<ServiceManagePage />} />
         <Route path="/guide" element={<GuidePage />} />
         <Route path="/no-access" element={<NoAccessPage />} />
       </Routes>

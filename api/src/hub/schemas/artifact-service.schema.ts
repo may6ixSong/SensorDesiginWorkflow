@@ -32,6 +32,14 @@ export class ArtifactService {
   @Prop({ required: true, trim: true })
   name: string;
 
+  /** Service Manage 카드에 쓰는 짧은 설명. 순수 표시용, 계약에는 관여하지 않는다. */
+  @Prop({ default: '', trim: true })
+  description: string;
+
+  /** Service Manage 카드 아이콘 — 이모지 한두 글자. 비어 있으면 카드가 이니셜로 대체한다. */
+  @Prop({ default: '', trim: true })
+  icon: string;
+
   /** 이 서비스가 구현한 Observer 계약 버전. 응답 헤더와 다르면 경고만 남긴다(§4.5). */
   @Prop({ default: '1.0', trim: true })
   contractVersion: string;

@@ -41,6 +41,8 @@ export class HubService {
     const svc = await this.model.create({
       key,
       name: dto.name.trim(),
+      description: dto.description?.trim() || '',
+      icon: dto.icon?.trim() || '',
       contractVersion: dto.contractVersion?.trim() || '1.0',
       defaultTier: dto.defaultTier ?? 'C',
       transport: dto.transport ?? 'none',
@@ -66,6 +68,8 @@ export class HubService {
     assertAdmin(actor);
     const svc = await this.findByKeyOrThrow(key);
     if (dto.name !== undefined) svc.name = dto.name.trim();
+    if (dto.description !== undefined) svc.description = dto.description.trim();
+    if (dto.icon !== undefined) svc.icon = dto.icon.trim();
     if (dto.contractVersion !== undefined) svc.contractVersion = dto.contractVersion.trim();
     if (dto.defaultTier !== undefined) svc.defaultTier = dto.defaultTier;
     if (dto.transport !== undefined) svc.transport = dto.transport;
