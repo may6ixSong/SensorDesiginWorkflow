@@ -4,7 +4,9 @@ import axios from 'axios';
 import { addEventLog } from '../../service/event-log-service';
 import { useTranslation } from 'react-i18next';
 import { setApiActingAs, setApiKnoxId, setApiUserGroup } from '../../api/client';
+import { setCalypsoActingAsGroup } from '../../api/calypsoClient';
 import { getEmployeesByIDs } from '../../service/user-service';
+import { useThemeMode } from '../../theme/ThemeModeContext';
 
 // Ported from SSM_WEB's AuthProvider.tsx (service name swapped to SIREN only
 // where it names the service itself — cookie name, event name).
@@ -64,8 +66,15 @@ type AuthContextType = {
   realUser: User | null;
   updateUserPrefs: <K extends keyof User>(field: K, value: User[K]) => void,
   loginSuccess: boolean;
-  /** realUser.Group === 'Admin' — 시뮬레이션 대상이 아니라 항상 실제 호출자 기준(§13.3 규칙 3). */
+  /**
+   * 지금 화면에 보이는 신원(user) 기준 — 시뮬레이션 중이면 대상 사용자 본인이 Admin일
+   * 때만 true다("그 사람 입장에서 정확히 그 사람 권한으로" 보여야 한다는 사용자 요청).
+   * Workflow/Project 편집 등 앱 전역의 페이지 권한 체크가 전부 이 값을 본다.
+   */
   isAdmin: boolean;
+  /** realUser.Group === 'Admin' — 시뮬레이션 중에도 절대 안 바뀐다. 시뮬레이터를 켜고 끄는
+   * 주체(ProfileButton)만 이 값을 본다 — 그래야 Admin이 자기가 만든 시뮬레이션에 갇히지 않는다. */
+  isRealAdmin: boolean;
   isSimulating: boolean;
   /**
    * 특정 사용자 화면을 그대로 재현한다(§13) — Admin 전용. 대상의 실제 프로필을 가져와
@@ -92,6 +101,7 @@ const AuthContext = createContext<AuthContextType>({
   updateUserPrefs: (_field, _value) => {},
   loginSuccess: false,
   isAdmin: false,
+  isRealAdmin: false,
   isSimulating: false,
   startSimulation: async () => {},
   stopSimulation: () => {},
@@ -99,11 +109,13 @@ const AuthContext = createContext<AuthContextType>({
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const { i18n } = useTranslation();
+  const { setMode: setThemeMode } = useThemeMode();
   const [realUser, setRealUser] = useState<User>({} as User);
   const [simulatedUser, setSimulatedUser] = useState<User | null>(null);
   const [loginSuccess, openGate] = useState<boolean>(false);
-  const isAdmin = useMemo(() => realUser.Group === "Admin", [realUser]);
   const user = simulatedUser ?? realUser;
+  const isAdmin = useMemo(() => user.Group === "Admin", [user]);
+  const isRealAdmin = useMemo(() => realUser.Group === "Admin", [realUser]);
 
   useEffect(() => {
     if (isDev) {
@@ -207,7 +219,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
    * User 클래스 기본값으로 대체하고 시뮬레이션은 그대로 진행한다.
    */
   const startSimulation = async (knoxId: string) => {
-    if (!isAdmin) throw new Error('Only Admin can simulate another user.');
+    // 판정은 항상 realUser 기준 — 이미 다른 사람을 시뮬레이션 중이어도(지금 isAdmin은
+    // 그 대상 기준이라 틀릴 수 있다) Admin 본인의 권한으로 켤 수 있어야 한다.
+    if (!isRealAdmin) throw new Error('Only Admin can simulate another user.');
     const empRes = await getEmployeesByIDs(knoxId);
     const emp = empRes.employees?.[0];
     if (!emp) throw new Error(`No such user: ${knoxId}`);
@@ -231,20 +245,28 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
 
     setApiActingAs(knoxId);
+    // Calypso의 admin bypass는 그 사람 자신의 Group으로 판정해야 한다(사용자 요청: 시뮬레이션
+    // 중엔 Admin의 super 권한이 아니라 그 사람 실제 권한으로 보여야 함) — X-User-Group은
+    // 실제 호출자(Admin) 것으로 그대로 두고(시뮬레이션 자체를 켤 수 있는 자격 검증용),
+    // 대상의 Group은 별도 헤더(X-Acting-As-Group)로 전달한다.
+    setCalypsoActingAsGroup(target.Group);
     setSimulatedUser(target);
     i18n.changeLanguage(target.Language);
+    setThemeMode(target.Theme);
   };
 
   const stopSimulation = () => {
     setApiActingAs(null);
+    setCalypsoActingAsGroup(null);
     setSimulatedUser(null);
     i18n.changeLanguage(realUser.Language);
+    setThemeMode(realUser.Theme);
   };
 
   return (
     <AuthContext.Provider
       value={{
-        user, realUser, updateUserPrefs, loginSuccess, isAdmin,
+        user, realUser, updateUserPrefs, loginSuccess, isAdmin, isRealAdmin,
         isSimulating: simulatedUser !== null, startSimulation, stopSimulation,
       }}
     >

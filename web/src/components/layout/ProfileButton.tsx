@@ -1,11 +1,14 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Stack, Typography } from '@mui/material';
 import { useAuth } from '@/app/providers/AuthProvider';
+import { UserSearchDialog } from '@/components/dialogs/UserSearchDialog';
 import { initials } from '@/components/common/Avatar';
 import { useThemeMode } from '@/theme/ThemeModeContext';
 import { SirenButton } from '@/components/common/SirenButton';
+import { Icon } from '@/components/common/Icon';
 import { toast } from '@/store/toastStore';
 import { CURSOR_POINTER, FONT_MONO, T } from '@/theme/tokens';
 
@@ -23,19 +26,26 @@ function ProfileRow({ label, value }: { label: string; value: string }) {
  *
  * Admin-only from here on (사용자 요청): non-admin의 클릭은 아예 아무 것도 하지 않는다 —
  * 예전엔 누구나 열어 읽기 전용 프로필을 봤지만, 이 자리가 이제 사용자 시뮬레이터(§13)의
- * 입구를 겸하게 되면서 Admin 전용 진입점으로 좁혔다. 시뮬레이션 중엔 이름/부서 자체가
- * 대상 사용자 것으로 바뀌므로(AuthProvider.startSimulation), 뱃지 텍스트 색을 amber로
- * 바꿔 "지금 보고 있는 게 내 화면이 아니다"를 착각하지 않게 표시한다(§13.3 규칙 5).
+ * 입구를 겸하게 되면서 Admin 전용 진입점으로 좁혔다. 이 게이팅과 시뮬레이터 컨트롤은
+ * 반드시 **isRealAdmin**(실제 호출자 기준)으로 한다 — 지금 화면에 보이는 isAdmin은
+ * 시뮬레이션 중이면 대상 사용자 기준으로 바뀌므로, 그걸로 게이팅하면 Admin이 non-admin을
+ * 시뮬레이션하는 순간 자기 Stop 버튼을 잃어버린다.
+ *
+ * 시뮬레이션을 걸거나 끌 때마다 Home으로 리다이렉트한다(사용자 요청) — 지금 열려 있던
+ * 페이지의 로컬 상태(캔버스 store 등)가 이전 신원 기준으로 남아있을 수 있어서, React
+ * Query 캐시를 비우는 것만으로는 화면이 완전히 새 신원 기준으로 다시 시작한다는 보장이
+ * 없다. 페이지 전체를 새로 마운트시켜야 확실하다.
  */
 export function ProfileButton() {
   const { i18n } = useTranslation();
   const {
-    user, isAdmin, isSimulating, startSimulation, stopSimulation,
+    user, isRealAdmin, isSimulating, startSimulation, stopSimulation,
   } = useAuth();
   const { mode } = useThemeMode();
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
-  const [target, setTarget] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
   const [applying, setApplying] = useState(false);
   const isKo = i18n.language?.startsWith('ko');
 
@@ -43,15 +53,15 @@ export function ProfileButton() {
   const dept = (isKo ? user?.Department : user?.EnDepartment) || '';
   const badgeColor = isSimulating ? T.am : T.tx;
 
-  const apply = async () => {
-    if (!target.trim()) return;
+  const apply = async (knoxId: string) => {
+    setSearchOpen(false);
     setApplying(true);
     try {
-      await startSimulation(target.trim());
+      await startSimulation(knoxId);
       // 시점이 바뀌면 캐시된 응답은 전부 다른 사람 기준이라 버린다.
       qc.clear();
-      setTarget('');
       setOpen(false);
+      navigate('/');
     } catch (e: any) {
       toast(e?.message ?? 'Could not simulate that user');
     } finally {
@@ -62,18 +72,20 @@ export function ProfileButton() {
   const stop = () => {
     stopSimulation();
     qc.clear();
+    setOpen(false);
+    navigate('/');
   };
 
   return (
     <>
       <Box
         component="button"
-        onClick={() => isAdmin && setOpen(true)}
+        onClick={() => isRealAdmin && setOpen(true)}
         sx={{
           ml: 0.5, px: 1, height: 34, borderRadius: '999px', display: 'flex', alignItems: 'center', gap: 1,
           color: badgeColor, background: 'transparent', border: '1px solid transparent',
-          cursor: isAdmin ? CURSOR_POINTER : 'default',
-          ...(isAdmin ? { '&:hover': { background: T.sf3, borderColor: T.ln } } : {}),
+          cursor: isRealAdmin ? CURSOR_POINTER : 'default',
+          ...(isRealAdmin ? { '&:hover': { background: T.sf3, borderColor: T.ln } } : {}),
         }}
       >
         <Box
@@ -90,7 +102,7 @@ export function ProfileButton() {
         </Box>
       </Box>
 
-      {isAdmin && (
+      {isRealAdmin && (
         <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="xs">
           <DialogTitle sx={{ fontWeight: 700 }}>Profile</DialogTitle>
           <DialogContent dividers>
@@ -104,23 +116,9 @@ export function ProfileButton() {
 
             <Box sx={{ mt: '18px', pt: '16px', borderTop: `1px solid ${T.ln}` }}>
               <Typography sx={{ fontSize: 12.5, fontWeight: 700, mb: '9px' }}>User simulation</Typography>
-              <Box sx={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <Box
-                  component="input"
-                  value={target}
-                  placeholder="KnoxID"
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTarget(e.target.value)}
-                  sx={{
-                    flex: 1, height: 34, px: '10px',
-                    border: `1px solid ${T.ln}`, borderRadius: '7px',
-                    background: T.sf, color: T.tx, fontSize: 13, outline: 'none',
-                    '&:focus': { borderColor: T.tl },
-                  }}
-                />
-                <SirenButton variant="primary" disabled={applying || !target.trim()} onClick={apply}>
-                  View as
-                </SirenButton>
-              </Box>
+              <SirenButton variant="primary" disabled={applying} onClick={() => setSearchOpen(true)}>
+                <Icon name="search" /> View as…
+              </SirenButton>
               {isSimulating && (
                 <Box
                   sx={{
@@ -142,6 +140,14 @@ export function ProfileButton() {
             </Button>
           </DialogActions>
         </Dialog>
+      )}
+
+      {searchOpen && (
+        <UserSearchDialog
+          title="View as — pick a user"
+          onClose={() => setSearchOpen(false)}
+          onConfirm={(knoxId) => apply(knoxId)}
+        />
       )}
     </>
   );

@@ -30,6 +30,18 @@ export const setCalypsoUserDepartments = (departments: string[]) => {
   currentDepartments = departments;
 };
 
+/**
+ * 시뮬레이션 대상 **본인**의 Group — Calypso의 admin bypass(computeAccess)는 이 값으로
+ * 판정한다(사용자 요청: 시뮬레이션 중엔 Admin의 super 권한이 아니라 그 사람 실제 권한대로
+ * 보여야 함). x-user-group(실제 호출자, 위 getApiUserGroup)은 "시뮬레이션 자체를 켤 수
+ * 있는 자격"을 검증하는 별개 값이라 시뮬레이션 중에도 절대 안 바뀐다 — 둘을 섞으면 안 된다.
+ */
+let currentActingAsGroup: string | null = null;
+
+export const setCalypsoActingAsGroup = (group: string | null) => {
+  currentActingAsGroup = group;
+};
+
 calypsoApi.interceptors.request.use((config) => {
   const knoxId = getApiKnoxId();
   if (knoxId) config.headers['x-knox-id'] = knoxId;
@@ -37,6 +49,7 @@ calypsoApi.interceptors.request.use((config) => {
   if (userGroup) config.headers['x-user-group'] = userGroup;
   const actingAs = getApiActingAs();
   if (actingAs) config.headers['x-acting-as'] = actingAs;
+  if (currentActingAsGroup) config.headers['x-acting-as-group'] = currentActingAsGroup;
   if (currentDepartments.length) config.headers['x-user-departments'] = currentDepartments.join(',');
   return config;
 });

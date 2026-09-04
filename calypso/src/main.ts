@@ -44,7 +44,7 @@ async function bootstrap() {
         : explicitOrigins,
     credentials: true,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-    allowedHeaders: 'Content-Type, Accept, X-Knox-Id, X-User-Group, X-Acting-As, X-User-Departments',
+    allowedHeaders: 'Content-Type, Accept, X-Knox-Id, X-User-Group, X-Acting-As, X-Acting-As-Group, X-User-Departments',
   });
 
   // TLS는 앞단(IIS/nginx)에서 종료한다 - api는 평문 HTTP로만 리스닝한다.
