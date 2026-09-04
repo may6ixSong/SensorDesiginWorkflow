@@ -170,7 +170,6 @@ export function HomePage() {
   const drag = useRef<{ on: boolean; x: number; y: number }>({ on: false, x: 0, y: 0 });
   /** 좁은 화면(휴대폰)에서는 장식 밀도를 줄이고 씬을 조금 더 위로 당긴다. */
   const [compact, setCompact] = useState(false);
-  const [interacted, setInteracted] = useState(false);
 
   const apply = useCallback(() => {
     const el = cameraRef.current;
@@ -210,7 +209,6 @@ export function HomePage() {
     if ((e.target as HTMLElement).closest('a')) return;
     drag.current = { on: true, x: e.clientX, y: e.clientY };
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    setInteracted(true);
   };
   const onPointerMove = (e: React.PointerEvent) => {
     if (!drag.current.on) return;
@@ -275,10 +273,6 @@ export function HomePage() {
           },
           '@keyframes ringSpin': { to: { transform: 'rotate(360deg)' } },
           '@keyframes ringSpinRev': { to: { transform: 'rotate(-360deg)' } },
-          '@keyframes hintFade': {
-            '0%, 100%': { opacity: 0.55 },
-            '50%': { opacity: 1 },
-          },
         }}
       >
         {/*
@@ -473,18 +467,27 @@ export function HomePage() {
             pointerEvents: 'none',
           }}
         >
-          <Box
-            sx={{
-              fontFamily: FONT_DISPLAY,
-              fontWeight: 800,
-              fontSize: 'clamp(44px, 6.5vw, 88px)',
-              lineHeight: 0.95,
-              letterSpacing: '-.01em',
-              color: pal.text,
-              animation: 'sirenRise .8s cubic-bezier(.2,.8,.3,1) both',
-            }}
-          >
-            SIREN
+          {/* 타이틀 줄만큼의 높이를 가진 래퍼 — 양옆 장식이 부제·버튼이 아니라 정확히
+              "SIREN" 글자 높이에 맞춰 걸리게 한다. */}
+          <Box sx={{ position: 'relative' }}>
+            {/* 타이틀 양옆의 빈 공간을 채우는 장식 — 제목 자체는 3D 밖이지만, 옆에 살짝
+                기울어진 유리판을 두어 씬의 3D 재질감이 위쪽까지 이어지게 한다. */}
+            {!compact && <TitleFlank side="left" pal={pal} />}
+            {!compact && <TitleFlank side="right" pal={pal} />}
+
+            <Box
+              sx={{
+                fontFamily: FONT_DISPLAY,
+                fontWeight: 800,
+                fontSize: 'clamp(44px, 6.5vw, 88px)',
+                lineHeight: 0.95,
+                letterSpacing: '-.01em',
+                color: pal.text,
+                animation: 'sirenRise .8s cubic-bezier(.2,.8,.3,1) both',
+              }}
+            >
+              SIREN
+            </Box>
           </Box>
           <Box
             sx={{
@@ -541,28 +544,6 @@ export function HomePage() {
               View Projects
             </Box>
           </Box>
-        </Box>
-
-        {/* 조작 힌트 — 처음 상호작용 전까지만, 은은하게 깜빡이며 존재를 알린다. */}
-        <Box
-          aria-hidden
-          sx={{
-            position: 'absolute',
-            left: 0,
-            right: 0,
-            bottom: 'clamp(14px, 4%, 28px)',
-            textAlign: 'center',
-            fontFamily: FONT_MONO,
-            fontSize: 10,
-            letterSpacing: '.14em',
-            color: pal.dim2,
-            pointerEvents: 'none',
-            opacity: interacted ? 0 : 1,
-            transition: 'opacity .5s ease',
-            animation: interacted ? 'none' : 'hintFade 2.4s ease-in-out infinite',
-          }}
-        >
-          DRAG TO ROTATE · ARROW KEYS
         </Box>
       </Box>
     </AppShell>
@@ -741,6 +722,90 @@ function ServiceSlab({ service: s, left, pal }: { service: HubShowcaseSlab; left
           {s.key}
         </Box>
       )}
+    </Box>
+  );
+}
+
+/** 타이틀 좌우 여백에 얹는 살짝 기울어진 유리 마커. 문구는 없다 — 순수 장식(§14.1). */
+const TITLE_FLANK_OFFSET = 'clamp(170px, 21vw, 360px)';
+
+function TitleFlank({ side, pal }: { side: 'left' | 'right'; pal: Palette }) {
+  const lineColor = side === 'left' ? pal.ringA : pal.ringB;
+  const dotColor = side === 'left' ? pal.moteA : pal.moteB;
+  const tiltY = side === 'left' ? 20 : -20;
+
+  return (
+    <Box
+      aria-hidden
+      sx={{
+        position: 'absolute',
+        [side]: `calc(50% - ${TITLE_FLANK_OFFSET})`,
+        top: '50%',
+        width: 0,
+        height: 0,
+        perspective: '700px',
+        transform: 'translateY(-50%)',
+      }}
+    >
+      <Box
+        sx={{
+          position: 'absolute',
+          width: 60,
+          height: 156,
+          ml: '-30px',
+          mt: '-78px',
+          transformStyle: 'preserve-3d',
+          transform: `rotateY(${tiltY}deg) rotateX(7deg)`,
+        }}
+      >
+        <Box
+          sx={{
+            position: 'absolute',
+            left: '50%',
+            top: 0,
+            width: '2px',
+            height: '100%',
+            ml: '-1px',
+            background: `linear-gradient(180deg, transparent, ${lineColor} 42%, ${lineColor} 58%, transparent)`,
+            opacity: 0.85,
+          }}
+        />
+        <Box
+          sx={{
+            position: 'absolute',
+            left: '50%',
+            top: '50%',
+            width: 22,
+            height: 22,
+            ml: '-11px',
+            mt: '-11px',
+            border: `1.5px solid ${lineColor}`,
+            borderRadius: '4px',
+            boxShadow: `0 0 16px -2px ${lineColor}`,
+            animation: `${side === 'left' ? 'ringSpin' : 'ringSpinRev'} 17s linear infinite`,
+            '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
+          }}
+        />
+        {[10, 146].map((top, i) => (
+          <Box
+            key={i}
+            sx={{
+              position: 'absolute',
+              left: '50%',
+              top,
+              width: 5,
+              height: 5,
+              ml: '-2.5px',
+              mt: '-2.5px',
+              borderRadius: '50%',
+              background: dotColor,
+              boxShadow: `0 0 10px ${dotColor}`,
+              animation: `moteFloat ${5 + i}s ease-in-out ${i * 0.6}s infinite`,
+              '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
+            }}
+          />
+        ))}
+      </Box>
     </Box>
   );
 }
