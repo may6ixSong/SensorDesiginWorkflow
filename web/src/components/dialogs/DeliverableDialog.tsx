@@ -29,7 +29,7 @@ import {
   releaseCalypsoArtifact, uploadCalypsoVersion,
 } from '@/api/calypsoClient';
 import { toast } from '@/store/toastStore';
-import { FONT_MONO, T } from '@/theme/tokens';
+import { CURSOR_POINTER, FONT_MONO, T } from '@/theme/tokens';
 
 /**
  * 삭제는 이 phase에 걸린 산출물 사본 하나만 지운다(다른 phase의 사본에는 영향 없음) —
@@ -89,9 +89,12 @@ export function DeliverableDialog({
   const [picked, setPicked] = useState<VersionView | null>(null);
   /** Calypso에 연동된 산출물이면 이쪽에서 고른 버전을 쓴다 — 아래 calypsoLinked 참고. */
   const [calypsoPicked, setCalypsoPicked] = useState<CalypsoVersionView | null>(null);
+  /** B영역 탭 — 전달(Handoff)만 다시 탭으로 분리한다(사용자 요청), 나머지는 한 레일. */
+  const [bTab, setBTab] = useState<'overview' | 'handoff'>('overview');
 
   useEffect(() => setPicked(null), [d?.id]);
   useEffect(() => setCalypsoPicked(null), [d?.id]);
+  useEffect(() => setBTab('overview'), [d?.id]);
 
   const qc = useQueryClient();
   /**
@@ -195,81 +198,114 @@ export function DeliverableDialog({
     >
       {/* A — 내용 + (편집 가능하면) 버전 기록. Calypso 연동이면 SIREN 자체 기록이 아니라
           Calypso의 실제 버전/업로드를 그대로 보여준다(ArtifactVersionContents는 이미
-          자기 몫의 스크롤/패딩/가운데정렬을 갖고 있어 그대로 flex 컬럼에 낀다). */}
-      <Box sx={{ flex: 3, minWidth: 0, display: 'flex', borderRight: `1px solid ${T.ln}` }}>
-        {calypsoLinked && calypsoArtifact ? (
-          <ArtifactVersionContents
-            a={calypsoArtifact}
-            version={calypsoShown}
-            canEdit={calypsoArtifact.canEdit}
-            onDownload={handleCalypsoDownload}
-            onUpload={(file, note) => uploadCalypso.mutate({ file, note })}
-            onRelease={(note) => releaseCalypso.mutate(note)}
-            uploading={uploadCalypso.isPending}
-            releasing={releaseCalypso.isPending}
-          />
-        ) : calypsoLinked && calypsoLoading ? (
-          <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <CircularProgress size={24} />
-          </Box>
-        ) : calypsoLinked && calypsoError ? (
-          <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '22px' }}>
-            <Box sx={{ fontSize: 13.5, fontWeight: 600 }}>Could not load the linked Calypso artifact</Box>
-            <Box sx={{ fontSize: 12, color: T.dm2 }}>It may not exist in Calypso, or the link is stale.</Box>
-          </Box>
-        ) : (
-          <Box sx={{ flex: 1, minWidth: 0, overflowY: 'auto', background: T.sf3, padding: '22px' }}>
-            <Box sx={{ width: '100%', maxWidth: 660, mx: 'auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <VersionContents d={d} version={shown} />
-              {canRecord && (
-                <RecordVersionCard
-                  latest={hasW(d) ? latA(d) : null}
-                  onAssertVersion={onAssertVersion}
-                  onRelease={onRelease}
-                />
-              )}
-            </Box>
-          </Box>
-        )}
-      </Box>
-
-      {/* B — 요약 / 버전 트리 / 기본 정보 / 연결 / 전달, 탭 없이 한 레일 */}
-      <Box sx={{ flex: 1, minWidth: 320, display: 'flex', flexDirection: 'column', background: T.sf2 }}>
-        <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '14px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <VersionSummary d={d} own={own} calypso={calypsoLinked ? calypsoArtifact ?? null : undefined} />
-
-          {canOpenArtifactPage && (
+          자기 몫의 스크롤/패딩/가운데정렬을 갖고 있어 그대로 flex 컬럼에 낀다). "Open in
+          Artifact page"는 내용 바로 위, 이 컬럼에 둔다(사용자 요청 — B에서 이동). */}
+      <Box sx={{ flex: 3, minWidth: 0, display: 'flex', flexDirection: 'column', borderRight: `1px solid ${T.ln}` }}>
+        {canOpenArtifactPage && (
+          <Box sx={{ flex: '0 0 auto', padding: '11px 22px', borderBottom: `1px solid ${T.ln}`, background: T.sf2 }}>
             <SirenButton
               variant="primary"
               onClick={() => navigate(`/artifacts/${d.externalArtifactId}`)}
             >
               <Icon name="expand" /> Open in Artifact page
             </SirenButton>
-          )}
-
-          <Card>
-            <Ey sx={{ mb: '9px' }}>Version history</Ey>
-            {calypsoLinked ? (
-              <ArtifactVersionTree
-                versions={calypsoArtifact?.versions ?? []}
-                selected={calypsoShown}
-                onSelect={setCalypsoPicked}
-              />
-            ) : (
-              <VersionTree versions={d.versions} selected={shown} onSelect={setPicked} />
-            )}
-          </Card>
-
-          {own && (
-            <BasicInfoCard
-              d={d} phases={phases} nodes={nodes} onSaveInfo={onSaveInfo}
+          </Box>
+        )}
+        <Box sx={{ flex: 1, minHeight: 0, display: 'flex' }}>
+          {calypsoLinked && calypsoArtifact ? (
+            <ArtifactVersionContents
+              a={calypsoArtifact}
+              version={calypsoShown}
+              canEdit={calypsoArtifact.canEdit}
+              onDownload={handleCalypsoDownload}
+              onUpload={(file, note) => uploadCalypso.mutate({ file, note })}
+              onRelease={(note) => releaseCalypso.mutate(note)}
+              uploading={uploadCalypso.isPending}
+              releasing={releaseCalypso.isPending}
             />
+          ) : calypsoLinked && calypsoLoading ? (
+            <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <CircularProgress size={24} />
+            </Box>
+          ) : calypsoLinked && calypsoError ? (
+            <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '22px' }}>
+              <Box sx={{ fontSize: 13.5, fontWeight: 600 }}>Could not load the linked Calypso artifact</Box>
+              <Box sx={{ fontSize: 12, color: T.dm2 }}>It may not exist in Calypso, or the link is stale.</Box>
+            </Box>
+          ) : (
+            <Box sx={{ flex: 1, minWidth: 0, overflowY: 'auto', background: T.sf3, padding: '22px' }}>
+              <Box sx={{ width: '100%', maxWidth: 660, mx: 'auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <VersionContents d={d} version={shown} />
+                {canRecord && (
+                  <RecordVersionCard
+                    latest={hasW(d) ? latA(d) : null}
+                    onAssertVersion={onAssertVersion}
+                    onRelease={onRelease}
+                  />
+                )}
+              </Box>
+            </Box>
           )}
-
-          <FlowLinksCard d={d} phases={phases} nodes={nodes} edges={edges} />
-
-          {!received && <HandoffSection d={d} own={own} onSave={onSaveRecv} />}
         </Box>
+      </Box>
+
+      {/* B — 요약 / 버전 트리 / 기본 정보 / 연결은 한 레일, 전달(Handoff)만 다시 별도
+          탭으로 분리한다(사용자 요청 — 예전처럼). 받는 산출물(received)이면 애초에
+          전달 섹션 자체가 없으므로 탭 바를 안 띄운다. */}
+      <Box sx={{ flex: 1, minWidth: 320, display: 'flex', flexDirection: 'column', background: T.sf2 }}>
+        {!received && (
+          <Box sx={{ flex: '0 0 auto', display: 'flex', gap: '2px', padding: '10px 14px 0', borderBottom: `1px solid ${T.ln}` }}>
+            {([
+              { key: 'overview' as const, label: 'Overview' },
+              { key: 'handoff' as const, label: t('deliverable.recipientDeptTitle') },
+            ]).map(({ key, label }) => (
+              <Box
+                key={key}
+                component="button"
+                onClick={() => setBTab(key)}
+                sx={{
+                  padding: '8px 12px', fontSize: 12.5, fontWeight: 500, fontFamily: 'inherit',
+                  color: bTab === key ? T.tl : T.dm, background: 'none', border: 'none',
+                  borderBottom: `2px solid ${bTab === key ? T.tl : 'transparent'}`,
+                  mb: '-1px', cursor: CURSOR_POINTER,
+                }}
+              >
+                {label}
+              </Box>
+            ))}
+          </Box>
+        )}
+
+        {bTab === 'handoff' && !received ? (
+          <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '14px' }}>
+            <HandoffSection d={d} own={own} onSave={onSaveRecv} />
+          </Box>
+        ) : (
+          <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '14px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <VersionSummary d={d} own={own} calypso={calypsoLinked ? calypsoArtifact ?? null : undefined} />
+
+            <Card>
+              <Ey sx={{ mb: '9px' }}>Version history</Ey>
+              {calypsoLinked ? (
+                <ArtifactVersionTree
+                  versions={calypsoArtifact?.versions ?? []}
+                  selected={calypsoShown}
+                  onSelect={setCalypsoPicked}
+                />
+              ) : (
+                <VersionTree versions={d.versions} selected={shown} onSelect={setPicked} />
+              )}
+            </Card>
+
+            {own && (
+              <BasicInfoCard
+                d={d} phases={phases} nodes={nodes} onSaveInfo={onSaveInfo}
+              />
+            )}
+
+            <FlowLinksCard d={d} phases={phases} nodes={nodes} edges={edges} />
+          </Box>
+        )}
       </Box>
 
       {confirmDeleteOpen && (
@@ -393,7 +429,12 @@ function VersionSummary({
   );
 }
 
-/* ── B: 기본 정보 편집 (Artifact key는 더 이상 보여주지 않는다 — 사용자 요청) ── */
+/**
+ * B: 기본 정보 편집. Artifact key와 마찬가지로 External artifact ID도 이 화면에 노출하지
+ * 않는다(사용자 요청) — 그 값은 내부 연결용 id일 뿐이라 사람이 직접 타이핑할 자리가
+ * 아니고, Source를 실제로 어떻게 고를지(예: Artifact list에서 등록한 산출물을 고르는 식)는
+ * 나중에 다시 설계한다. 지금은 있던 값을 그대로 들고 저장만 한다.
+ */
 function BasicInfoCard({
   d, phases, nodes, onSaveInfo,
 }: {
@@ -415,20 +456,19 @@ function BasicInfoCard({
 
   const [name, setName] = useState(d.name);
   const [serviceKey, setServiceKey] = useState(d.serviceKey ?? '');
-  const [externalArtifactId, setExternalArtifactId] = useState(d.externalArtifactId ?? '');
   const [nameErr, setNameErr] = useState(false);
   const orphan = isOrphanPhase(phases, d.phase);
 
   useEffect(() => {
-    setName(d.name); setServiceKey(d.serviceKey ?? ''); setExternalArtifactId(d.externalArtifactId ?? '');
+    setName(d.name); setServiceKey(d.serviceKey ?? '');
   }, [d.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const submit = () => {
     if (!name.trim()) { setNameErr(true); return; }
-    // artifactKey는 더 이상 이 화면에서 편집하지 않는다 — 있던 값을 그대로 들고 저장한다.
+    // artifactKey, externalArtifactId 둘 다 이 화면에서 편집하지 않는다 — 있던 값을 그대로 들고 저장한다.
     onSaveInfo({
       name: name.trim(), artifactKey: d.artifactKey,
-      serviceKey: serviceKey || null, externalArtifactId: externalArtifactId.trim() || null,
+      serviceKey: serviceKey || null, externalArtifactId: d.externalArtifactId,
     });
   };
 
@@ -438,7 +478,7 @@ function BasicInfoCard({
       <Field label="Name">
         <TextInput value={name} onChange={(v) => { setName(v); setNameErr(false); }} error={nameErr} />
       </Field>
-      <Field label="Source — the registered system this artifact lives in">
+      <Field label="Source — the registered system this artifact lives in" sx={{ mb: '12px' }}>
         <SelectInput
           value={serviceKey}
           onChange={setServiceKey}
@@ -446,13 +486,6 @@ function BasicInfoCard({
             { value: '', label: 'Not linked — record versions here' },
             ...(services ?? []).map((s) => ({ value: s.key, label: s.name })),
           ]}
-        />
-      </Field>
-      <Field label="External artifact ID — optional" sx={{ mb: '12px' }}>
-        <TextInput
-          value={externalArtifactId}
-          onChange={setExternalArtifactId}
-          placeholder="its id in that system"
         />
       </Field>
       <SirenButton variant="primary" onClick={submit}>
