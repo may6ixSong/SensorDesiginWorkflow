@@ -1,16 +1,18 @@
-import { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Box } from '@mui/material';
 import { AppShell } from '@/components/layout/AppShell';
 import { useAuth } from '@/app/providers/AuthProvider';
-import { apiClient, getApiActingAs, setApiActingAs } from '@/api/client';
+import { apiClient } from '@/api/client';
 import { HubService } from '@/hooks/useHubServices';
 import { T, FONT_MONO } from '@/theme/tokens';
 import { SirenButton } from '@/components/common/SirenButton';
 
 /**
- * Admin 전용 화면 — 사용자 시뮬레이터(§13)와 Hub 레지스트리 관리(§13.4).
+ * Admin 전용 화면 — Hub 레지스트리 관리(§13.4). 사용자 시뮬레이터(§13)는 여기 없다 —
+ * app bar의 user badge(ProfileButton)로 옮겼다(사용자 요청): Admin이 자기 화면 어디서든
+ * 바로 시뮬레이션을 걸고 끌 수 있어야 하는 기능이라, 별도 페이지로 이동해야만 켤 수
+ * 있는 게 오히려 어색하다는 판단.
  *
  * FE도 자기 몫을 한다(§13.3 규칙 6): 네비게이션 항목은 non-admin에게 렌더하지 않고,
  * 여기서 라우트 진입도 막아 URL 직접 접근을 차단한다. 다만 이건 BE 검증을 대신하지
@@ -24,68 +26,10 @@ export function AdminPage() {
     <AppShell>
       <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto', p: '28px 32px' }}>
         <Box sx={{ maxWidth: 980, mx: 'auto', display: 'flex', flexDirection: 'column', gap: '28px' }}>
-          <UserSimulator />
           <ServiceRegistry />
         </Box>
       </Box>
     </AppShell>
-  );
-}
-
-/**
- * 권한이 워크플로우별·산출물별로 갈리므로 같은 부서 안에서도 사용자마다 화면이 다르다.
- * 버그 진단 시 그 사람의 화면 상태를 그대로 재현하기 위한 도구다 (§13.1).
- */
-function UserSimulator() {
-  const qc = useQueryClient();
-  const [target, setTarget] = useState('');
-  const [active, setActive] = useState<string | null>(getApiActingAs());
-
-  useEffect(() => setActive(getApiActingAs()), []);
-
-  const apply = (knoxId: string | null) => {
-    setApiActingAs(knoxId);
-    setActive(knoxId);
-    // 시점이 바뀌면 캐시된 응답은 전부 다른 사람 기준이라 버린다.
-    qc.clear();
-  };
-
-  return (
-    <Section title="User simulation">
-      <Box sx={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-        <Box
-          component="input"
-          value={target}
-          placeholder="KnoxID"
-          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTarget(e.target.value)}
-          sx={{
-            flex: '0 0 260px', height: 34, px: '10px',
-            border: `1px solid ${T.ln}`, borderRadius: '7px',
-            background: T.sf, color: T.tx, fontSize: 13, outline: 'none',
-            '&:focus': { borderColor: T.tl },
-          }}
-        />
-        <SirenButton variant="primary" onClick={() => target.trim() && apply(target.trim())}>
-          View as
-        </SirenButton>
-        {active && <SirenButton onClick={() => apply(null)}>Stop</SirenButton>}
-      </Box>
-      {/*
-        시뮬레이션 중임을 항상 보이게 둔다 (§13.3 규칙 5) — Admin이 자기 권한과
-        착각하지 않도록. 이건 시스템 설명이 아니라 현재 상태 표시라 §14.1의 예외다.
-      */}
-      {active && (
-        <Box
-          sx={{
-            mt: '12px', p: '9px 12px', borderRadius: '7px',
-            border: `1px solid ${T.am2}`, background: T.am3,
-            fontFamily: FONT_MONO, fontSize: 12, color: T.am,
-          }}
-        >
-          Viewing as {active}
-        </Box>
-      )}
-    </Section>
   );
 }
 
