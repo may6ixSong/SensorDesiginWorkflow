@@ -26,7 +26,10 @@ async function bootstrap() {
    * CORS_ORIGIN 설정을 그대로 따른다.
    *
    * allowedHeaders는 '*' 대신 명시한다 - credentials와 와일드카드를 함께 쓰면
-   * 브라우저가 preflight를 거부하므로, 실제로 쓰는 헤더만 나열한다(X-Knox-Id 포함).
+   * 브라우저가 preflight를 거부하므로, 실제로 쓰는 헤더만 나열한다. Artifact 권한
+   * 모델(actor.ts)이 쓰는 X-User-Group/X-Acting-As/X-User-Departments도 여기 없으면
+   * 프리플라이트에서 막힌다 — 헤더를 보내는 쪽(calypsoClient.ts)만 고치고 여기를
+   * 빠뜨리면 CORS 에러로만 보여서 원인을 찾기 어렵다.
    */
   const corsOrigin = config.get<string>('corsOrigin')?.trim() ?? '';
   const isDev = ENV_FILE === '.env.development';
@@ -41,7 +44,7 @@ async function bootstrap() {
         : explicitOrigins,
     credentials: true,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-    allowedHeaders: 'Content-Type, Accept, X-Knox-Id',
+    allowedHeaders: 'Content-Type, Accept, X-Knox-Id, X-User-Group, X-Acting-As, X-User-Departments',
   });
 
   // TLS는 앞단(IIS/nginx)에서 종료한다 - api는 평문 HTTP로만 리스닝한다.
