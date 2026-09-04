@@ -1,8 +1,11 @@
-import { ReactNode, useEffect } from 'react';
+import { ReactNode, useEffect, useRef, useState } from 'react';
 import { Box } from '@mui/material';
 import { T } from '@/theme/tokens';
 import { SirenButton } from './SirenButton';
 import { Icon } from './Icon';
+
+/** 열림 애니메이션 길이 — 너무 길지 않게(사용자 요청) 짧고 또렷하게. */
+const SLIDE_MS = 220;
 
 interface Props {
   open: boolean;
@@ -24,6 +27,25 @@ interface Props {
  * 붙는 이 패널을 쓴다 (설계서 7.1의 모달 계열 컴포넌트에 추가).
  */
 export function SlidePanel({ open, onClose, width = '62vw', header, children, footer }: Props) {
+  /**
+   * open은 mount 시점부터 이미 true로 들어온다(호출부가 `{node && <Dialog/>}`로
+   * 조건부 렌더하기 때문) — 그래서 open을 그대로 transform에 쓰면 첫 프레임부터
+   * translateX(0)로 그려져 트랜지션이 일어날 시간이 없다(실측 확인된 버그). entered를
+   * 따로 두고 mount 다음 프레임에 true로 올려서, 그 사이에 CSS 트랜지션이 걸리게 한다.
+   */
+  const [entered, setEntered] = useState(false);
+  const raf2Ref = useRef<number>();
+  useEffect(() => {
+    if (!open) { setEntered(false); return undefined; }
+    const raf1 = requestAnimationFrame(() => {
+      raf2Ref.current = requestAnimationFrame(() => setEntered(true));
+    });
+    return () => {
+      cancelAnimationFrame(raf1);
+      if (raf2Ref.current) cancelAnimationFrame(raf2Ref.current);
+    };
+  }, [open]);
+
   useEffect(() => {
     if (!open) return undefined;
     const onKey = (e: KeyboardEvent) => {
@@ -37,14 +59,14 @@ export function SlidePanel({ open, onClose, width = '62vw', header, children, fo
     <Box
       sx={{
         position: 'fixed', inset: 0, zIndex: 1300,
-        pointerEvents: open ? 'auto' : 'none',
+        pointerEvents: entered ? 'auto' : 'none',
       }}
     >
       <Box
         onClick={onClose}
         sx={{
           position: 'absolute', inset: 0, background: T.backdrop,
-          opacity: open ? 1 : 0, transition: 'opacity .28s ease',
+          opacity: entered ? 1 : 0, transition: `opacity ${SLIDE_MS}ms ease`,
         }}
       />
       <Box
@@ -55,8 +77,8 @@ export function SlidePanel({ open, onClose, width = '62vw', header, children, fo
           borderLeft: `1px solid ${T.ln}`,
           boxShadow: T.shadowDialog,
           display: 'flex', flexDirection: 'column',
-          transform: open ? 'translateX(0)' : 'translateX(100%)',
-          transition: 'transform .3s cubic-bezier(.22,.9,.3,1)',
+          transform: entered ? 'translateX(0)' : 'translateX(100%)',
+          transition: `transform ${SLIDE_MS}ms cubic-bezier(.22,.9,.3,1)`,
         }}
       >
         <Box

@@ -7,6 +7,8 @@ import { AdminPage } from '@/pages/AdminPage';
 import { ProjectListPage } from '@/pages/ProjectListPage';
 import { ProjectInfoPage } from '@/pages/ProjectInfoPage';
 import { ProjectMembersPage } from '@/pages/ProjectMembersPage';
+import { ArtifactListPage } from '@/pages/ArtifactListPage';
+import { ArtifactDetailPage } from '@/pages/ArtifactDetailPage';
 import { BoardPage } from '@/pages/BoardPage';
 import { NoAccessPage } from '@/pages/NoAccessPage';
 import { GuidePage } from '@/pages/GuidePage';
@@ -38,6 +40,8 @@ export default function App() {
         <Route path="/projects" element={<ProjectListPage />} />
         <Route path="/projects/:projectId" element={<ProjectInfoPage />} />
         <Route path="/projects/:projectId/members" element={<ProjectMembersPage />} />
+        <Route path="/projects/:projectId/artifacts" element={<ArtifactListPage />} />
+        <Route path="/artifacts/:id" element={<ArtifactDetailPage />} />
         <Route path="/details" element={<DetailsRedirect />} />
         <Route path="/details/:projectId" element={<DetailsRedirect />} />
         <Route path="/details/:projectId/:workflowId" element={<BoardPage />} />

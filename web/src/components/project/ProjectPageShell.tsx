@@ -16,6 +16,7 @@ import { useAuth } from '@/app/providers/AuthProvider';
 const TABS = [
   { to: '', label: 'Information', icon: 'info' as const },
   { to: '/members', label: 'Members', icon: 'users' as const },
+  { to: '/artifacts', label: 'Artifacts', icon: 'list' as const },
 ];
 
 interface Props {

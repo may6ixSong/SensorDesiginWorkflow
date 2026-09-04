@@ -77,7 +77,7 @@ function MilestonesSection({
           variant={mineOnly ? 'primary' : undefined}
           onClick={() => setMineOnly((v) => !v)}
         >
-          My Task
+          My Workflow
         </SirenButton>
         {canEditSchedule && (
           <SirenButton onClick={() => { setEditErr(null); setEditOpen(true); }}>

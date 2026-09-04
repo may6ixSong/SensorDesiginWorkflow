@@ -27,7 +27,9 @@ function resolvePort(): string | number {
 export default () => ({
   port: resolvePort(),
   apiPrefix: process.env.API_PREFIX ?? 'api/v1',
-  corsOrigin: process.env.CORS_ORIGIN ?? 'http://localhost:5174',
+  // 기본값에 SIREN web(5173)을 포함한다 - 산출물 등록/관리 화면이 당분간 Calypso 자체
+  // web이 아니라 SIREN web 안에 있고(§11.5), 거기서 이 api를 브라우저에서 직접 호출한다.
+  corsOrigin: process.env.CORS_ORIGIN ?? 'http://localhost:5173,http://localhost:5174',
   /** 사람이 여는 Calypso 화면의 베이스 URL - Observer 계약의 viewUrl이 이걸로 만들어진다. */
   publicBaseUrl: process.env.PUBLIC_BASE_URL ?? 'http://localhost:5174',
   mongodbUri: resolveMongodbUri(),

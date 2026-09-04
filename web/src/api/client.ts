@@ -15,6 +15,9 @@ export const setApiKnoxId = (knoxId: string | null) => {
   currentKnoxId = knoxId;
 };
 
+/** calypsoClient.ts처럼 SIREN api 밖의 다른 api 클라이언트도 같은 신원을 실어야 할 때 쓴다. */
+export const getApiKnoxId = () => currentKnoxId;
+
 /**
  * ADSSO의 User.Group. api는 Admin 판정을 별도 목록이 아니라 이 값으로 한다
  * (Hub 설계서 §13.3 규칙 3). 토큰 전환 전까지의 임시 배선이며, 그 시점에 api는

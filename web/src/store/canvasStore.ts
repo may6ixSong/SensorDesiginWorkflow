@@ -38,7 +38,6 @@ interface CanvasState {
   snapshot: CanvasSnapshot | null;
   /* dialog */
   openId: string | null;
-  tab: 'overview' | 'versions' | 'recv';
   noteDlg: string | null;
   addDlg: boolean;
   /**
@@ -101,8 +100,7 @@ interface CanvasState {
   setLinkPos: (p: { x: number; y: number } | null) => void;
   flash: (bnd: number | null) => void;
 
-  openDeliverable: (id: string | null, tab?: CanvasState['tab']) => void;
-  setTab: (t: CanvasState['tab']) => void;
+  openDeliverable: (id: string | null) => void;
   setNoteDlg: (id: string | null) => void;
   setAddDlg: (v: boolean, intent?: CanvasState['addDlgIntent']) => void;
   setHldDlg: (v: boolean, sel?: string | null) => void;
@@ -137,7 +135,6 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   flashBnd: null,
   snapshot: null,
   openId: null,
-  tab: 'overview',
   noteDlg: null,
   addDlg: false,
   addDlgIntent: 'own',
@@ -217,8 +214,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   setLinkPos: (p) => set({ linkPos: p }),
   flash: (bnd) => set({ flashBnd: bnd }),
 
-  openDeliverable: (id, tab) => set({ openId: id, tab: tab ?? 'overview' }),
-  setTab: (t) => set({ tab: t }),
+  openDeliverable: (id) => set({ openId: id }),
   setNoteDlg: (id) => set({ noteDlg: id }),
   setAddDlg: (v, intent) => set({ addDlg: v, addDlgIntent: intent ?? 'own' }),
   setHldDlg: (v, sel) => set({ hldDlg: v, hldSel: sel === undefined ? null : sel }),
