@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Stack, Typography } from '@mui/material';
+import {
+  Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Menu, MenuItem, Stack, Tooltip, Typography,
+} from '@mui/material';
 import { useAuth } from '@/app/providers/AuthProvider';
 import { UserSearchDialog } from '@/components/dialogs/UserSearchDialog';
 import { initials } from '@/components/common/Avatar';
@@ -22,19 +24,18 @@ function ProfileRow({ label, value }: { label: string; value: string }) {
 }
 
 /**
- * Platform-identity avatar + name/dept, opens a profile dialog. Right-most in the top bar.
+ * Platform-identity avatar + name/dept. Right-most in the top bar.
  *
  * Admin-only from here on (사용자 요청): non-admin의 클릭은 아예 아무 것도 하지 않는다 —
- * 예전엔 누구나 열어 읽기 전용 프로필을 봤지만, 이 자리가 이제 사용자 시뮬레이터(§13)의
- * 입구를 겸하게 되면서 Admin 전용 진입점으로 좁혔다. 이 게이팅과 시뮬레이터 컨트롤은
- * 반드시 **isRealAdmin**(실제 호출자 기준)으로 한다 — 지금 화면에 보이는 isAdmin은
- * 시뮬레이션 중이면 대상 사용자 기준으로 바뀌므로, 그걸로 게이팅하면 Admin이 non-admin을
- * 시뮬레이션하는 순간 자기 Stop 버튼을 잃어버린다.
+ * 예전엔 누구나 열어 읽기 전용 프로필을 봤지만, 이 자리가 이제 사용자 시뮬레이터(§13)와
+ * Service Manage(§13.4)의 입구를 겸하게 되면서 Admin 전용 진입점으로 좁혔다. 이 게이팅과
+ * 시뮬레이터 컨트롤은 반드시 **isRealAdmin**(실제 호출자 기준)으로 한다 — 지금 화면에
+ * 보이는 isAdmin은 시뮬레이션 중이면 대상 사용자 기준으로 바뀌므로, 그걸로 게이팅하면
+ * Admin이 non-admin을 시뮬레이션하는 순간 자기 Stop 버튼을 잃어버린다.
  *
- * 시뮬레이션을 걸거나 끌 때마다 Home으로 리다이렉트한다(사용자 요청) — 지금 열려 있던
- * 페이지의 로컬 상태(캔버스 store 등)가 이전 신원 기준으로 남아있을 수 있어서, React
- * Query 캐시를 비우는 것만으로는 화면이 완전히 새 신원 기준으로 다시 시작한다는 보장이
- * 없다. 페이지 전체를 새로 마운트시켜야 확실하다.
+ * 클릭하면 dialog가 바로 뜨는 대신 메뉴가 먼저 뜬다(사용자 요청) — User Simulator는
+ * 예전과 같은 popup(Profile 정보 + 시뮬레이션 컨트롤을 담은 Dialog)으로, Service
+ * Manage는 dialog를 거치지 않고 바로 그 페이지로 이동한다.
  */
 export function ProfileButton() {
   const { i18n } = useTranslation();
@@ -44,7 +45,8 @@ export function ProfileButton() {
   const { mode } = useThemeMode();
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const [open, setOpen] = useState(false);
+  const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
+  const [simulatorOpen, setSimulatorOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [applying, setApplying] = useState(false);
   const isKo = i18n.language?.startsWith('ko');
@@ -60,7 +62,7 @@ export function ProfileButton() {
       await startSimulation(knoxId);
       // 시점이 바뀌면 캐시된 응답은 전부 다른 사람 기준이라 버린다.
       qc.clear();
-      setOpen(false);
+      setSimulatorOpen(false);
       navigate('/');
     } catch (e: any) {
       toast(e?.message ?? 'Could not simulate that user');
@@ -72,7 +74,7 @@ export function ProfileButton() {
   const stop = () => {
     stopSimulation();
     qc.clear();
-    setOpen(false);
+    setSimulatorOpen(false);
     navigate('/');
   };
 
@@ -80,7 +82,7 @@ export function ProfileButton() {
     <>
       <Box
         component="button"
-        onClick={() => isRealAdmin && setOpen(true)}
+        onClick={(e) => isRealAdmin && setAnchorEl(e.currentTarget)}
         sx={{
           ml: 0.5, px: 1, height: 34, borderRadius: '999px', display: 'flex', alignItems: 'center', gap: 1,
           color: badgeColor, background: 'transparent', border: '1px solid transparent',
@@ -103,8 +105,31 @@ export function ProfileButton() {
       </Box>
 
       {isRealAdmin && (
-        <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="xs">
-          <DialogTitle sx={{ fontWeight: 700 }}>Profile</DialogTitle>
+        <Menu anchorEl={anchorEl} open={!!anchorEl} onClose={() => setAnchorEl(null)}>
+          <MenuItem onClick={() => { setAnchorEl(null); setSimulatorOpen(true); }}>
+            User Simulator
+          </MenuItem>
+          {/*
+            시뮬레이션 중에는 그 대상의 권한으로 레지스트리를 고칠 수 없어야
+            하므로 비활성화한다(§13.3 규칙 2) — 라우트 진입 자체도
+            ServiceManagePage가 한 번 더 막는다.
+          */}
+          <Tooltip title={isSimulating ? 'Stop the user simulator first' : ''} placement="right">
+            <span>
+              <MenuItem
+                disabled={isSimulating}
+                onClick={() => { setAnchorEl(null); navigate('/service-manage'); }}
+              >
+                Service Manage
+              </MenuItem>
+            </span>
+          </Tooltip>
+        </Menu>
+      )}
+
+      {isRealAdmin && (
+        <Dialog open={simulatorOpen} onClose={() => setSimulatorOpen(false)} fullWidth maxWidth="xs">
+          <DialogTitle sx={{ fontWeight: 700 }}>User Simulator</DialogTitle>
           <DialogContent dividers>
             <Stack spacing={1.25}>
               <ProfileRow label="Name" value={name} />
@@ -115,7 +140,6 @@ export function ProfileButton() {
             </Stack>
 
             <Box sx={{ mt: '18px', pt: '16px', borderTop: `1px solid ${T.ln}` }}>
-              <Typography sx={{ fontSize: 12.5, fontWeight: 700, mb: '9px' }}>User simulation</Typography>
               <SirenButton variant="primary" disabled={applying} onClick={() => setSearchOpen(true)}>
                 <Icon name="search" /> View as…
               </SirenButton>
@@ -133,25 +157,9 @@ export function ProfileButton() {
                 </Box>
               )}
             </Box>
-
-            {/*
-              Service Manage(Hub 레지스트리, §13.4)로 가는 진입점. 예전엔 상단바에 별도
-              "Admin" 링크가 있었지만 여기로 옮겼다(사용자 요청). 시뮬레이션 중에는 그
-              대상의 권한으로 레지스트리를 고칠 수 없어야 하므로 비활성화한다(§13.3 규칙 2) —
-              라우트 진입 자체도 ServiceManagePage가 한 번 더 막는다.
-            */}
-            <Box sx={{ mt: '18px', pt: '16px', borderTop: `1px solid ${T.ln}` }}>
-              <Typography sx={{ fontSize: 12.5, fontWeight: 700, mb: '9px' }}>Service Manage</Typography>
-              <SirenButton
-                disabled={isSimulating}
-                onClick={() => { setOpen(false); navigate('/service-manage'); }}
-              >
-                <Icon name="expand" /> Open
-              </SirenButton>
-            </Box>
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setOpen(false)} variant="outlined">
+            <Button onClick={() => setSimulatorOpen(false)} variant="outlined">
               Close
             </Button>
           </DialogActions>
