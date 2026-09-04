@@ -49,14 +49,8 @@ export interface AssertVersionInput {
 interface Props {
   node: CanvasNode | null;
   phases: WorkflowPhase[];
-  /** 목업 own = isOwn(workflow) && !S.recv */
+  /** 이 workflow의 Edit 권한 (canEditWorkflow) */
   own: boolean;
-  /**
-   * recv(Recipient-dept view 미리보기) 토글과 무관한 진짜 Edit 권한 — mapping 안 된
-   * 산출물의 열람 게이트(사용자 요청)에 쓴다. own을 그대로 쓰면 owner 본인이 미리보기
-   * 토글 중일 때(own=false) 자기 산출물의 Details도 못 여는 회귀가 생긴다.
-   */
-  isOwner: boolean;
   /** Calypso 연동 산출물의 ACL(부서 단위 부여) 후보를 계산하는 데 쓴다 — 없으면(로딩 중) 후보가 비어 보인다. */
   project?: ProjectDetailDto;
   onClose: () => void;
@@ -88,7 +82,7 @@ interface Props {
  * 잇는 것으로만 하고, 이 화면에는 "무엇과 이어져 있는지" 읽기 전용 목록만 남긴다.
  */
 export function DeliverableDialog({
-  node: d, phases, own, isOwner, project, onClose,
+  node: d, phases, own, project, onClose,
   onSaveInfo, onAssertVersion, onRelease, onSaveRecv, onDelete,
 }: Props) {
   const { t } = useTranslation();
@@ -149,12 +143,11 @@ export function DeliverableDialog({
 
   /**
    * Calypso에 연동 안 된(mapping 안 된) 산출물은 확인할 외부 ACL이 없다 — 그런 산출물의
-   * "권한"은 이 workflow 자체의 진짜 Edit 권한(isOwner)으로 대신한다(사용자 요청: "권한
-   * 없으면 무조건 차단" — 컨텐츠가 비어 있어도 패널 구조 자체가 열리는 것도 안 된다).
-   * own이 아니라 isOwner를 본다 — recv 미리보기 토글 중인 owner 본인까지 막으면 안 된다.
-   * isOwner가 아니면 calypso-forbidden과 똑같이 toast + 자동 닫힘.
+   * "권한"은 이 workflow 자체의 Edit 권한(own)으로 대신한다(사용자 요청: "권한 없으면
+   * 무조건 차단" — 컨텐츠가 비어 있어도 패널 구조 자체가 열리는 것도 안 된다). own이
+   * 아니면 calypso-forbidden과 똑같이 toast + 자동 닫힘.
    */
-  const unmappedForbidden = !calypsoLinked && !isOwner;
+  const unmappedForbidden = !calypsoLinked && !own;
   useEffect(() => {
     if (d && unmappedForbidden) {
       toast('You do not have access to this artifact.');

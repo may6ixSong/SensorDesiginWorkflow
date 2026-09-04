@@ -29,7 +29,6 @@ interface CanvasState {
   loadedWorkflowId: string | null;
   /* 상호작용 */
   edit: boolean;
-  recv: boolean;
   sel: string | null;
   hlSet: Set<string> | null;
   link: string | null;
@@ -94,7 +93,6 @@ interface CanvasState {
   cancelEdit: () => void;
   trackAddedDeliverable: (id: string) => void;
 
-  setRecv: (v: boolean) => void;
   select: (id: string | null, hl: Set<string> | null) => void;
   setLink: (id: string | null) => void;
   setLinkPos: (p: { x: number; y: number } | null) => void;
@@ -127,7 +125,6 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   phasePW: {},
   loadedWorkflowId: null,
   edit: false,
-  recv: false,
   sel: null,
   hlSet: null,
   link: null,
@@ -208,7 +205,6 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     }));
   },
 
-  setRecv: (v) => set({ recv: v, edit: false }),
   select: (id, hl) => set({ sel: id, hlSet: hl }),
   setLink: (id) => set({ link: id, linkPos: null }),
   setLinkPos: (p) => set({ linkPos: p }),

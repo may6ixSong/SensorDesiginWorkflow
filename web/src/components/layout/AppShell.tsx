@@ -3,10 +3,8 @@ import { Box } from '@mui/material';
 import { Link, useLocation } from 'react-router-dom';
 import MenuBookRoundedIcon from '@mui/icons-material/MenuBookRounded';
 import { WorkflowDto, ProjectDto } from '@/types/domain';
-import { useCanvasStore } from '@/store/canvasStore';
 import { useAuth } from '@/app/providers/AuthProvider';
-import { SirenMark, Icon } from '@/components/common/Icon';
-import { SirenButton } from '@/components/common/SirenButton';
+import { SirenMark } from '@/components/common/Icon';
 import { HeaderIconButton } from '@/components/common/HeaderIconButton';
 import { NoticeBell } from './NoticeBell';
 import { LanguagePopover } from './LanguagePopover';
@@ -23,7 +21,6 @@ interface AppShellProps {
   workflows?: WorkflowDto[];
   workflowId?: string;
   onChangeIp?: (id: string) => void;
-  canToggleRecv?: boolean;
   children: ReactNode;
 }
 
@@ -34,7 +31,7 @@ const NAV_LABEL = 'Project List';
 
 /**
  * 목업 .tb 상단바 — 로고 + SIREN 워드마크 + 페이지 네비 + (보드에서만) 과제/workflow select
- * + 수신부서 시점 + 사용자 배지. (설계서 7.1 컴포넌트 트리의 AppShell)
+ * + 사용자 배지. (설계서 7.1 컴포넌트 트리의 AppShell)
  *
  * Right-side chrome (language/theme/notices/profile) mirrors SSM_WEB's
  * TopAppBar, wired to the platform AuthProvider (ADSSO / dev fixed admin) and
@@ -45,11 +42,9 @@ const NAV_LABEL = 'Project List';
 export function AppShell({
   projects, projectId, onChangeProject,
   workflows, workflowId, onChangeIp,
-  canToggleRecv = false, children,
+  children,
 }: AppShellProps) {
   const { user, isAdmin } = useAuth();
-  const recv = useCanvasStore((s) => s.recv);
-  const setRecv = useCanvasStore((s) => s.setRecv);
   const { pathname } = useLocation();
 
   const showSelects = !!onChangeProject;
@@ -175,14 +170,6 @@ export function AppShell({
         )}
 
         <Box sx={{ flex: 1, minWidth: '12px' }} />
-
-        {canToggleRecv && (
-          <Box sx={{ flex: '0 0 auto' }}>
-            <SirenButton variant={recv ? 'on' : 'default'} onClick={() => setRecv(!recv)}>
-              <Icon name="eye" /> Recipient-dept view
-            </SirenButton>
-          </Box>
-        )}
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: '12px', flex: '0 0 auto' }}>
           <HeaderIconButton
