@@ -56,7 +56,7 @@ interface Props {
   onClose: () => void;
   onSaveInfo: (p: {
     name: string; artifactKey: string | null;
-    serviceKey: string | null; externalArtifactId: string | null;
+    serviceKey: string | null; externalArtifactId: string | null; artifactTypeKey: string | null;
   }) => void;
   /** C/D 티어 수동 버전 기록 — 연동된 서비스가 없는 산출물에서만 쓴다. */
   onAssertVersion: (p: AssertVersionInput) => void;
@@ -535,19 +535,27 @@ function BasicInfoCard({
 
   const [name, setName] = useState(d.name);
   const [serviceKey, setServiceKey] = useState(d.serviceKey ?? '');
+  const [artifactTypeKey, setArtifactTypeKey] = useState(d.artifactTypeKey ?? '');
   const [nameErr, setNameErr] = useState(false);
+  const [typeErr, setTypeErr] = useState(false);
   const orphan = isOrphanPhase(phases, d.phase);
 
   useEffect(() => {
-    setName(d.name); setServiceKey(d.serviceKey ?? '');
+    setName(d.name); setServiceKey(d.serviceKey ?? ''); setArtifactTypeKey(d.artifactTypeKey ?? '');
   }, [d.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const selectedService = (services ?? []).find((s) => s.key === serviceKey) ?? null;
+  const artifactTypes = selectedService?.artifactTypes ?? [];
 
   const submit = () => {
     if (!name.trim()) { setNameErr(true); return; }
+    if (serviceKey && artifactTypes.length > 0 && !artifactTypeKey) { setTypeErr(true); return; }
+    setTypeErr(false);
     // artifactKey, externalArtifactId 둘 다 이 화면에서 편집하지 않는다 — 있던 값을 그대로 들고 저장한다.
     onSaveInfo({
       name: name.trim(), artifactKey: d.artifactKey,
       serviceKey: serviceKey || null, externalArtifactId: d.externalArtifactId,
+      artifactTypeKey: artifactTypes.length > 0 ? artifactTypeKey || null : null,
     });
   };
 
@@ -557,16 +565,33 @@ function BasicInfoCard({
       <Field label="Name">
         <TextInput value={name} onChange={(v) => { setName(v); setNameErr(false); }} error={nameErr} />
       </Field>
-      <Field label="Source — the registered system this artifact lives in" sx={{ mb: '12px' }}>
+      <Field label="Source — the registered system this artifact lives in" sx={{ mb: artifactTypes.length > 0 ? '12px' : 0 }}>
         <SelectInput
           value={serviceKey}
-          onChange={setServiceKey}
+          onChange={(v) => { setServiceKey(v); setArtifactTypeKey(''); setTypeErr(false); }}
           options={[
             { value: '', label: 'Not linked — record versions here' },
             ...(services ?? []).map((s) => ({ value: s.key, label: s.name })),
           ]}
         />
       </Field>
+      {artifactTypes.length > 0 && (
+        <Field label="Artifact type — this service provides more than one kind" sx={{ mb: '12px' }}>
+          <SelectInput
+            value={artifactTypeKey}
+            onChange={(v) => { setArtifactTypeKey(v); setTypeErr(false); }}
+            options={[
+              { value: '', label: 'Choose one…' },
+              ...artifactTypes.map((t) => ({ value: t.key, label: t.name })),
+            ]}
+          />
+          {typeErr && (
+            <Box sx={{ fontSize: 11, color: T.rd, mt: '5px' }}>
+              {selectedService?.name} provides more than one artifact type — pick one.
+            </Box>
+          )}
+        </Field>
+      )}
       <SirenButton variant="primary" onClick={submit}>
         <Icon name="check" /> Save
       </SirenButton>

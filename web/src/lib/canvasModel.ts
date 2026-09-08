@@ -38,6 +38,8 @@ export interface CanvasNode {
   /** 이 산출물의 실물을 소유한 Hub 서비스(artifactServices.key) — null이면 출처 미등록. */
   serviceKey: string | null;
   externalArtifactId: string | null;
+  /** 그 서비스가 여러 산출물 종류를 낼 때 어느 종류인지(§19.1) — 단일 종류 서비스면 null. */
+  artifactTypeKey: string | null;
   /** 레거시 필드 — 더 이상 화면에서 고르지 않는다(항상 서버 기본값). */
   net: 'OA' | 'HPC';
   series: string | null;
@@ -109,6 +111,7 @@ export function toCanvasNode(d: DeliverableDto, origin: 'own' | 'incoming' = 'ow
     intent: d.intent,
     serviceKey: d.serviceKey ?? null,
     externalArtifactId: d.externalArtifactId ?? null,
+    artifactTypeKey: d.artifactTypeKey ?? null,
     net: d.network,
     series: d.series,
     seriesIdx: d.seriesIdx,

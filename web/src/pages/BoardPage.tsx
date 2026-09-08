@@ -314,11 +314,12 @@ export function BoardPage() {
               own={isOwner}
               project={project}
               onClose={closeDeliverable}
-              onSaveInfo={({ name, artifactKey, serviceKey, externalArtifactId }) => {
+              onSaveInfo={({ name, artifactKey, serviceKey, externalArtifactId, artifactTypeKey }) => {
                 updateDeliverable.mutate(
                   {
                     id: openNode.id, name, artifactKey: artifactKey ?? '',
                     serviceKey: serviceKey ?? '', externalArtifactId: externalArtifactId ?? '',
+                    artifactTypeKey: artifactTypeKey ?? '',
                   },
                   {
                     onSuccess: (updated) => {
@@ -491,11 +492,11 @@ export function BoardPage() {
               phases={phaseList}
               intent={addDlgIntent}
               onClose={() => st.getState().setAddDlg(false)}
-              onCreate={({ name, phaseId, artifactKey, serviceKey, externalArtifactId }) => {
+              onCreate={({ name, phaseId, artifactKey, serviceKey, externalArtifactId, artifactTypeKey }) => {
                 const wasReceived = addDlgIntent === 'received';
                 const intent = wasReceived ? 'received' : 'own';
                 createDeliverable.mutate(
-                  { name, phaseId, intent, artifactKey, serviceKey, externalArtifactId },
+                  { name, phaseId, intent, artifactKey, serviceKey, externalArtifactId, artifactTypeKey },
                   {
                     onSuccess: (created) => {
                       const s = st.getState();

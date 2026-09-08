@@ -58,6 +58,7 @@ export function useCreateDeliverable(workflowId: string) {
       payload: {
         name: string; phaseId: string; intent?: 'own' | 'received';
         artifactKey?: string | null; serviceKey?: string | null; externalArtifactId?: string | null;
+        artifactTypeKey?: string | null;
       },
     ) => {
       const res = await apiClient.post<ApiEnvelope<DeliverableDto>>(`/workflows/${workflowId}/deliverables`, payload);
@@ -73,7 +74,7 @@ export function useUpdateDeliverable(workflowId: string) {
     mutationFn: async (
       { id, ...patch }: {
         id: string; name?: string; artifactKey?: string;
-        serviceKey?: string | null; externalArtifactId?: string | null;
+        serviceKey?: string | null; externalArtifactId?: string | null; artifactTypeKey?: string | null;
       },
     ) => {
       const res = await apiClient.patch<ApiEnvelope<DeliverableDto>>(`/deliverables/${id}`, patch);

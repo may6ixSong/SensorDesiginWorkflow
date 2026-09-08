@@ -173,6 +173,8 @@ export interface DeliverableDto {
   serviceKey: string | null;
   /** 그 서비스 안에서의 산출물 식별자 — serviceKey와 짝을 이룬다. */
   externalArtifactId: string | null;
+  /** 그 서비스가 여러 산출물 종류를 낼 때 어느 종류인지(§19.1) — 단일 종류 서비스면 null. */
+  artifactTypeKey: string | null;
   /** 레거시 필드 — 더 이상 생성/편집 화면에서 고르지 않는다(항상 서버 기본값). */
   network: 'OA' | 'HPC';
   series: string | null;

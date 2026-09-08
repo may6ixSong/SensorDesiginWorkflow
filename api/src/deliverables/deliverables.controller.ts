@@ -126,6 +126,22 @@ export class DeliverablesController {
     return { data: toDeliverableDto(d, workflow, me) };
   }
 
+  /**
+   * 연동된(Calypso 제외) 서비스의 실시간 접근 권한/버전 이력(§19.5, §19.6) - DeliverableDialog의
+   * 3-state 접근 판정(차단/열람 전용/편집)이 이 두 라우트로 그때그때 확인한다.
+   */
+  @WorkflowAccess('view')
+  @Get('deliverables/:id/live-access')
+  async liveAccess(@Param('id') id: string, @CurrentActor() me: Actor) {
+    return { data: await this.deliverables.liveAccess(id, me) };
+  }
+
+  @WorkflowAccess('view')
+  @Get('deliverables/:id/live-versions')
+  async liveVersions(@Param('id') id: string, @CurrentActor() me: Actor) {
+    return { data: await this.deliverables.liveVersions(id, me) };
+  }
+
   @WorkflowAccess('edit')
   @Post('deliverables/:id/release')
   async release(

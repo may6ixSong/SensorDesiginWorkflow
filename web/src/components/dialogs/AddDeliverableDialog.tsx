@@ -17,7 +17,7 @@ interface Props {
   onClose: () => void;
   onCreate: (p: {
     name: string; phaseId: string; artifactKey: string | null;
-    serviceKey: string | null; externalArtifactId: string | null;
+    serviceKey: string | null; externalArtifactId: string | null; artifactTypeKey: string | null;
   }) => void;
 }
 
@@ -36,8 +36,13 @@ export function AddDeliverableDialog({ workflowName, phases, intent = 'own', onC
   const [artifactKey, setArtifactKey] = useState('');
   const [serviceKey, setServiceKey] = useState('');
   const [externalArtifactId, setExternalArtifactId] = useState('');
+  const [artifactTypeKey, setArtifactTypeKey] = useState('');
   const [err, setErr] = useState(false);
   const [keyErr, setKeyErr] = useState('');
+  const [typeErr, setTypeErr] = useState(false);
+
+  const selectedService = (services ?? []).find((s) => s.key === serviceKey) ?? null;
+  const artifactTypes = selectedService?.artifactTypes ?? [];
 
   const submit = () => {
     if (!name.trim() || !phaseId) { setErr(true); return; }
@@ -47,9 +52,17 @@ export function AddDeliverableDialog({ workflowName, phases, intent = 'own', onC
       return;
     }
     setKeyErr('');
+    // 서비스가 산출물 종류를 여러 개 낼 때는 반드시 하나를 골라야 한다(§19.1) — API도
+    // 같은 규칙을 강제하지만, 여기서 먼저 걸러 왕복 없이 바로 알려준다.
+    if (serviceKey && artifactTypes.length > 0 && !artifactTypeKey) {
+      setTypeErr(true);
+      return;
+    }
+    setTypeErr(false);
     onCreate({
       name: name.trim(), phaseId, artifactKey: key || null,
       serviceKey, externalArtifactId: externalArtifactId.trim() || null,
+      artifactTypeKey: artifactTypes.length > 0 ? artifactTypeKey || null : null,
     });
   };
 
@@ -117,7 +130,7 @@ export function AddDeliverableDialog({ workflowName, phases, intent = 'own', onC
       <Field label="Source — the registered system this artifact lives in">
         <SelectInput
           value={serviceKey}
-          onChange={setServiceKey}
+          onChange={(v) => { setServiceKey(v); setArtifactTypeKey(''); setTypeErr(false); }}
           disabled={servicesLoading}
           options={[
             { value: '', label: servicesLoading ? 'Loading…' : 'Not linked — record versions here' },
@@ -125,6 +138,23 @@ export function AddDeliverableDialog({ workflowName, phases, intent = 'own', onC
           ]}
         />
       </Field>
+      {artifactTypes.length > 0 && (
+        <Field label="Artifact type — this service provides more than one kind">
+          <SelectInput
+            value={artifactTypeKey}
+            onChange={(v) => { setArtifactTypeKey(v); setTypeErr(false); }}
+            options={[
+              { value: '', label: 'Choose one…' },
+              ...artifactTypes.map((t) => ({ value: t.key, label: t.name })),
+            ]}
+          />
+          {typeErr && (
+            <Box sx={{ fontSize: 11, color: T.rd, mt: '5px' }}>
+              {selectedService?.name} provides more than one artifact type — pick one.
+            </Box>
+          )}
+        </Field>
+      )}
       <Field label="External artifact ID — optional; fill in once it's registered there">
         <TextInput
           value={externalArtifactId}

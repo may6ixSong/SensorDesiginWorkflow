@@ -2,11 +2,14 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Deliverable, DeliverableDocument } from './schemas/deliverable.schema';
+import { ArtifactServiceDocument } from '../hub/schemas/artifact-service.schema';
 import { Workflow, WorkflowDocument } from '../workflows/schemas/workflow.schema';
 import { Actor } from '../common/actor';
 import { sortSchedule } from '../common/schedule';
 import { AuditService } from '../audit/audit.service';
 import { EdgesService } from '../edges/edges.service';
+import { HubService } from '../hub/hub.service';
+import { ObserverAccess, ObserverClientService, ObserverVersionRecord } from '../hub/observer-client.service';
 import { RECEIVABLE_DEPARTMENT_IDS } from '../common/constants/departments';
 import {
   AssertVersionDto,
@@ -23,7 +26,62 @@ export class DeliverablesService {
     @InjectModel(Workflow.name) private readonly workflowModel: Model<WorkflowDocument>,
     private readonly audit: AuditService,
     private readonly edges: EdgesService,
+    private readonly hub: HubService,
+    private readonly observer: ObserverClientService,
   ) {}
+
+  /**
+   * 연동된 서비스로부터 지금 이 순간의 접근 권한/버전 이력을 직접 물어본다(§19.5, §19.6).
+   * 백그라운드 상시 동기화가 없어졌으므로(§19.4) SIREN 로컬 versions는 이제 이 종류의
+   * 산출물에 대해선 항상 비어 있다 - 상세 화면은 이 두 메서드로 그때그때 실시간 조회한다.
+   * Calypso는 대상이 아니다(레지스트리에 없고, 브라우저가 이미 직접 부른다 - §10).
+   */
+  private async liveTarget(id: string): Promise<{ svc: ArtifactServiceDocument; externalArtifactId: string } | null> {
+    const d = await this.findOrThrow(id);
+    if (!d.serviceKey || d.serviceKey === 'calypso' || !d.externalArtifactId) return null;
+    const svc = await this.hub.findByKeyOrThrow(d.serviceKey);
+    return { svc, externalArtifactId: d.externalArtifactId };
+  }
+
+  /** fail-closed(§19.2) - 연동 대상이 아니거나 서비스가 응답하지 않으면 접근 없음으로 취급한다. */
+  async liveAccess(id: string, actor: Actor): Promise<ObserverAccess> {
+    const target = await this.liveTarget(id);
+    if (!target) return { canView: false, canEdit: false };
+    return this.observer.access(target.svc, target.externalArtifactId, actor.knoxId);
+  }
+
+  /** 그 서비스가 이미 knoxId 기준으로 필터링해 준 목록을 그대로 돌려준다 - 다시 마스킹하지 않는다. */
+  async liveVersions(id: string, actor: Actor): Promise<ObserverVersionRecord[]> {
+    const target = await this.liveTarget(id);
+    if (!target) return [];
+    return this.observer.versions(target.svc, target.externalArtifactId, actor.knoxId);
+  }
+
+  /**
+   * artifactTypeKey는 그 서비스가 여러 산출물 종류를 낼 때만 의미가 있다(§19.1) - 서비스가
+   * 단일 종류면(artifactTypes 비어 있음) 항상 null로 저장하고, 여러 종류면 반드시 그중
+   * 하나를 정확히 골라야 한다. serviceKey가 비면(출처 미등록) 검증할 것도 없이 null이다.
+   */
+  private async resolveArtifactTypeKey(
+    serviceKey: string | null,
+    artifactTypeKey: string | undefined,
+  ): Promise<string | null> {
+    if (!serviceKey) return null;
+    const svc = await this.hub.findByKeyOrThrow(serviceKey);
+    const types = svc.artifactTypes ?? [];
+    if (types.length === 0) return null;
+
+    const key = artifactTypeKey?.trim() || null;
+    if (!key) {
+      throw new BadRequestException(
+        `"${svc.name}" provides more than one artifact type — pick one.`,
+      );
+    }
+    if (!types.some((t) => t.key === key)) {
+      throw new BadRequestException(`"${svc.name}" has no artifact type "${key}".`);
+    }
+    return key;
+  }
 
   listForWorkflow(workflowId: string) {
     return this.model.find({ workflowId }).sort({ phaseId: 1, 'layout.x': 1 }).exec();
@@ -56,14 +114,17 @@ export class DeliverablesService {
   }
 
   async create(workflow: WorkflowDocument, dto: CreateDeliverableDto, actor: Actor) {
+    const serviceKey = dto.serviceKey?.trim() || null;
+    const artifactTypeKey = await this.resolveArtifactTypeKey(serviceKey, dto.artifactTypeKey);
     const d = await this.model.create({
       projectId: workflow.projectId,
       workflowId: workflow._id,
       phaseId: dto.phaseId,
       name: dto.name,
       // 출처는 나중에 지정해도 된다 - serviceKey가 null인 "정상 빈 상태"로 시작한다 (Hub 설계서 §11).
-      serviceKey: dto.serviceKey?.trim() || null,
+      serviceKey,
       externalArtifactId: dto.externalArtifactId?.trim() || null,
+      artifactTypeKey,
       network: dto.network ?? 'OA',
       series: null,
       seriesIdx: 1,
@@ -107,6 +168,11 @@ export class DeliverablesService {
     if (dto.serviceKey !== undefined) d.serviceKey = dto.serviceKey?.trim() || null;
     if (dto.externalArtifactId !== undefined) {
       d.externalArtifactId = dto.externalArtifactId?.trim() || null;
+    }
+    // serviceKey나 artifactTypeKey 둘 중 하나라도 이번 요청에 왔으면 조합을 다시 검증한다 -
+    // 서비스만 바뀌고 예전 종류 키가 그대로 남는 상태(다른 서비스의 키가 붙어 있는 상태)를 막는다.
+    if (dto.serviceKey !== undefined || dto.artifactTypeKey !== undefined) {
+      d.artifactTypeKey = await this.resolveArtifactTypeKey(d.serviceKey, dto.artifactTypeKey);
     }
 
     await d.save();
@@ -336,6 +402,7 @@ export class DeliverablesService {
           name: origin.name,
           serviceKey: origin.serviceKey,
           externalArtifactId: origin.externalArtifactId,
+          artifactTypeKey: origin.artifactTypeKey,
           network: origin.network,
           series: origin._id,
           seriesIdx: 0, // 아래에서 회차 순서대로 재계산

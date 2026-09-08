@@ -149,6 +149,14 @@ export class Deliverable {
   @Prop({ type: String, default: null, trim: true })
   externalArtifactId: string | null;
 
+  /**
+   * 그 서비스의 artifactTypes 중 어느 종류인지(§19.1) — 서비스가 산출물 종류를 여러 개
+   * 낼 때만 의미가 있다(예: SSM의 "수식" vs "spec data"). 서비스의 artifactTypes가
+   * 비어 있으면(단일 종류 서비스) 항상 null이다.
+   */
+  @Prop({ type: String, default: null, trim: true })
+  artifactTypeKey: string | null;
+
   @Prop({ type: String, required: true, enum: ['OA', 'HPC'], default: 'OA' })
   network: NetworkKind;
 

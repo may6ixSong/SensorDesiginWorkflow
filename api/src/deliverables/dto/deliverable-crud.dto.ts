@@ -37,6 +37,12 @@ export class CreateDeliverableDto {
   @IsString()
   @MaxLength(200)
   externalArtifactId?: string;
+
+  /** 그 서비스가 여러 산출물 종류를 낼 때만 필요하다(§19.1) — DeliverablesService가 검증한다. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  artifactTypeKey?: string;
 }
 
 export class UpdateDeliverableDto {
@@ -63,6 +69,12 @@ export class UpdateDeliverableDto {
   @IsString()
   @MaxLength(200)
   externalArtifactId?: string;
+
+  /** 서비스 매핑을 새로 걸거나 바꿀 때 함께 보낸다(§19.1). 빈 문자열을 보내면 지운다. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  artifactTypeKey?: string;
 }
 
 /**
