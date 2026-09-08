@@ -749,7 +749,7 @@ Hub 화면(§11.4 산출물 선택, §13.4 레지스트리 관리)은 여전히 
 | **2** | Calypso 구축 (레퍼런스 구현) | 같은 레포 `calypso/` 폴더. 필수+선택 엔드포인트 전부 구현 |
 | **3** | SIREN Hub 모듈 | 레지스트리 CRUD, 범용 Observer client, 버전 마스킹 단일 통로, 데이터 모델 마이그레이션 |
 | **4** | SimHub 연동 (A 티어 실증) | SimHub 레포 분리 + 계약 구현. **여기서 계약의 빈틈이 드러난다 — v1.1 개정을 예상한다** |
-| **5** | B 티어 sync job | `api/src/hub/sync/`, 공용 DB 수출/수입 테이블 |
+| **5** | ~~B 티어 sync job~~ → **Workflow Release 시점 일괄 동기화**로 대체 (§19.4) | Release 생성 API가 그 순간 각 산출물의 `current-version`을 호출해 스냅샷에 얼림. 상시 백그라운드 job 없음 |
 | **6** | C/D 수동 등록 UI + 가드레일 | 등록 당사자 제한, append-only, 신뢰도 표식 |
 | **7** | Admin 시뮬레이터 | `resolveActor()` 교체 |
 | **8** | Home 대문 재설계 | §15 |
@@ -773,9 +773,27 @@ Hub 화면(§11.4 산출물 선택, §13.4 레지스트리 관리)은 여전히 
 | Calypso 산출물이 workflow에 뜨는 방식 | **Hub가 먼저 등록, workflow는 거기서 선택** — Hub는 project+department 스코프만 알고 workflow 개념을 모른다. 같은 산출물이 같은 department의 여러 workflow에 동시에 걸릴 수 있다 (§11.4) |
 | Calypso 배포 인프라 | 별도 결정 사항 아님 — 이미 운영 중인 다른 서비스와 같은 배포 방식을 그대로 쓴다. 스토리지는 §3.7(할당된 S3 자원)로 이미 정함 |
 
+### 17.1.1 해결됨 (2026-09-04, §19)
+
+| 항목 | 결정 |
+|---|---|
+| `access`/`role` 엔드포인트 여부 | §4.3 결정을 번복 — 다시 둔다. 서비스마다 권한 체계가 달라 SIREN이 giver 비교만으로 흉내 낼 수 없음 (§19.2) |
+| 필수 엔드포인트 개수 | `current-version`/`versions`/`access` 3개로 확정. POST push는 폐기 (§19.2) |
+| 버전 마스킹 주체 | SIREN이 giver로 계산 → **그 서비스가 `knoxId` 기준으로 직접 필터링**해서 응답 (§19.2, §6.2 무효화) |
+| 한 서비스가 여러 산출물 종류를 낼 때 | Service Manage에 artifactType 하위 목록 추가, `viewUrlTemplate` 등을 종류별로 (§19.1) |
+| Service Manage 등록 폼 | key 자동 생성(사람이 안 정함), favicon은 파일 업로드, tier가 A 아니면 transport 잠금, Disable 토글 없음(Edit만) — 이미 코드로 구현됨, 문서에 반영 (§19.1) |
+| 캔버스에서 Edit/View 권한자가 보는 버전 | 워크플로우 진입 시 Edit은 실시간 구조 + 산출물 latest release, View는 최신 Workflow Release 스냅샷 고정. 캔버스 뱃지는 owner도 release만 (working은 상세창에서만) (§19.3) |
+| Workflow Release(HLD)의 범위 | 산출물 버전 표 → **canvas 전체(좌표·edge·phase) + 버전을 한 문서로 통째 스냅샷**. 권한은 제외, 항상 열람 시점 기준 (§19.4) |
+| 과거 Release 시점 캔버스 보기 | 오늘 구조와 섞지 않고 그 스냅샷만 100% 사용 — 삭제된 노드/edge도 스냅샷에 있으면 그대로 재현 (§19.5) |
+| `sourceRefs` 언제 요구하나 | release 이벤트에만. save마다 요구하지 않음. SIREN이 flow edge로 자동 추론하지 않음 (§19.2) |
+| 산출물 상세창 열람 3단계 | 권한없음(차단)/view만(release only)/edit(전체+editors 목록) — Calypso도 동일 규칙 (§19.6, §19.7) |
+| 연동 산출물의 편집 UI | SIREN 안에서 절대 안 만듦 — 항상 `viewUrl`로 링크아웃(또는 서비스가 제공하는 embed 위젯) (§19.6) |
+
 ### 17.2 남은 것
 
-지금은 없음. 새로 열리는 대로 이 절에 추가한다.
+| 항목 | 비고 |
+|---|---|
+| artifactType의 `sampleUrl` | 있으면 좋겠다는 수준 — 실제 제공 방식·노출 UI 미정 (§19.8) |
 
 ---
 
@@ -820,3 +838,227 @@ POC 성격이라 기존 `siren` DB를 직접 고치지 않는다 — **새 DB에
 >
 > **참고** — 인메모리 모드(`.env`의 `MONGODB_URI`/`DB_CONNECTION`이 비어있는 상태)로 떠 있다면
 > 옮길 데이터가 없다(재시작하면 초기화되는 목업뿐). 실제 영속 DB에 연결된 상태에서만 의미가 있다.
+
+---
+
+## 19. 세션 후속 개정 (2026-09-04) — 연동 계약 v2 · 캔버스 열람 모델 · Workflow Release 전체 스냅샷
+
+> 이 절은 §3.2, §4, §6, §7, §10의 관련 조항보다 **우선한다**. 본문은 레지스트리 기본 구조·티어
+> 정의·§8/§9(B/C/D 티어)의 근거로 계속 유효하다. 아래에서 바뀐 항목은 본문의 서술이 오래된 것이며,
+> 이후 구현은 이 절을 따른다.
+
+### 19.1 Service Manage 레지스트리 — 실제 구현과 맞춘다
+
+`api/src/hub/`에 이미 반영된 내용을 문서에도 반영한다(§3.2, §13.4 대체).
+
+```ts
+{
+  _id: ObjectId,
+  key: string,               // 서버가 생성. `{8자리 랜덤}_{name 슬러그}` 형태, 등록 후 불변
+  name: string,
+  description: string,       // Service Manage 카드에 쓰는 짧은 설명
+  icon: string,               // favicon — 파일 업로드를 base64 data URI로 인코딩해 저장(별도 스토리지 없음).
+                               // 원본 300KB 상한. 비어 있으면 카드가 이름 이니셜로 대체(user badge와 동일 규칙)
+  contractVersion: string,
+  defaultTier: "A" | "B" | "C" | "D",
+  transport: "http" | "shared-db" | "none",
+  baseUrl: string | null,
+  viewUrlTemplate: string | null,
+  embedUploadUrlTemplate: string | null,
+  isBuiltIn: boolean,        // Calypso만 true. Calypso는 이 레지스트리에 등록하지 않는다(§17.1의
+                             // "Calypso 산출물이 workflow에 뜨는 방식"과 별개 — Calypso는 연동
+                             // 서비스가 아니라 SIREN 내장 기능이므로 Service Manage 목록에도 없다)
+  enabled: boolean,          // 등록 즉시 true. 별도의 "검증 후 활성화" 단계는 두지 않는다
+}
+```
+
+- **`key`는 사람이 입력하지 않는다.** 등록 폼엔 Name/Description/Favicon/Tier/Transport/Base
+  URL/View URL만 있고, key는 서버가 자동 생성해 읽기 전용으로만 보여준다.
+- **`defaultTier`가 A(Live)가 아니면 `transport`는 서버가 무조건 `"none"`으로 되돌리고,
+  `baseUrl`/`viewUrlTemplate`도 함께 비운다** — 실연동이 없다는 뜻이므로 자동/링크 관련 필드가
+  같이 있으면 모순이다. `HubService#register`/`#update`가 이 불변식을 강제한다(폼에서도 tier가
+  A가 아니면 Transport select가 잠긴다). B 티어(shared-db)도 예외 없이 이 규칙을 따른다 —
+  §8(HPC↔OA 공용 DB 동기화)의 실제 데이터 흐름은 유지되지만, Service Manage 폼에서 B 티어를
+  고르면 A 전용 필드는 잠긴 채로 시작한다.
+- **Disable 토글은 없다.** 꺼도 이미 그 서비스로 등록된 산출물의 연동 자체는 끊기지 않아
+  오해를 살 뿐이었다. 대신 Edit 버튼으로 값(설명·favicon·URL 등)을 언제든 고칠 수 있다.
+- **artifact type** — 한 서비스가 여러 종류의 산출물을 낼 수 있다(예: SSM 하나가 "수식"과
+  "spec data"를 별도 종류로 냄). `viewUrlTemplate` 등 산출물 종류마다 달라지는 값은 서비스
+  레벨이 아니라 이 하위 목록에 둔다.
+
+  ```ts
+  artifactTypes: [
+    { key: "formula",   name: "Formula",   viewUrlTemplate: "…/formula/{artifactId}",   sampleUrl: null },
+    { key: "spec-data", name: "Spec Data", viewUrlTemplate: "…/spec/{artifactId}",       sampleUrl: "…/spec/sample" },
+  ]
+  ```
+
+  `sampleUrl`은 **미정 기능**이다(§19.8) — 그 산출물 종류의 예시를 보여줄 수 있으면 상세창에
+  링크로 노출하고, 없으면 그냥 생략한다.
+  artifactTypes가 1개뿐인 서비스(지금의 SimHub, LayoutDB)는 사용자에게 종류를 고르라고 묻지
+  않고 그 1개를 자동으로 쓴다 — 지금 흐름과 다르지 않다.
+
+### 19.2 Observer 계약 v2 — `access` 엔드포인트를 다시 둔다 (§4.3 결정 번복)
+
+§4.3은 "role/access 엔드포인트를 두지 않고 giver 여부로 SIREN이 내부에서 판정한다"고 했으나
+이번 세션에서 **뒤집는다.** 서비스마다 권한 체계가 근본적으로 다르다(view는 프로젝트 권한으로
+막고 edit는 공개인 곳, 반대인 곳 등) — SIREN이 giver 비교만으로 이걸 흉내 낼 수 없고, 실제
+판정은 항상 그 서비스 자신에게 맡기는 게 맞다.
+
+**필수 엔드포인트 3개로 확정:**
+
+```
+GET /artifacts/{artifactId}/current-version?knoxId={requester}
+GET /artifacts/{artifactId}/versions?knoxId={requester}
+GET /artifacts/{artifactId}/access?knoxId={requester}
+```
+
+```json
+// access 응답
+{ "canView": true, "canEdit": false }
+```
+
+- **`current-version`/`versions`도 `knoxId`를 받아, 그 서비스가 요청자 권한에 맞게 이미
+  필터링해서 응답한다.** SIREN은 받은 걸 그대로 믿고 다시 마스킹하지 않는다 — §6.2의
+  "giver 비교로 SIREN이 마스킹한다"는 문장은 **외부 연동 산출물에는 더 이상 적용하지 않는다**
+  (SIREN 자체 산출물인 Calypso도 §19.7에서 같은 access 기반 모델로 맞춘다). edit 권한자가
+  부르면 working 포함 전체, view 권한만 있으면 release만 — 이 필터링은 SIREN이 아니라
+  **그 서비스가 직접** 한다.
+- 응답에 **`editors: string[] | null`**(선택)을 둔다 — 그 산출물의 편집 권한자 KnoxID
+  목록이다. **요청자 본인이 edit 권한이 있을 때만** 그 서비스가 이 필드를 채워 보낸다(자기
+  자신도 필터링 원칙을 따름) — view 권한자에게는 항상 `null`이거나 필드 자체가 없다. 상세창의
+  "member" 표시(§19.6)가 이 값을 쓴다.
+- **응답이 비어 있는 것과 권한이 없는 것은 다른 상태다.** view 권한은 있지만 그 산출물이 아직
+  한 번도 release 안 됐으면 `versions`가 빈 배열로 올 수 있다 — 이때도 상세창(artifact
+  slide)은 정상적으로 열려야 하고, "아직 release 없음"과 "애초에 권한 없음"을 화면에서
+  명확히 구분한다(§19.6).
+- **fail-closed** — `access` 호출이 실패/타임아웃되면 `canView: false`로 취급한다.
+- **POST push 엔드포인트(§4.3의 `hub/events/version`)는 폐기한다.** 서비스 쪽 구현 부담이
+  실시간성의 이득보다 크다고 판단 — 대신 §19.4의 Workflow Release 시점 일괄 동기화로 충분하다.
+- `sourceRefs`(§4.1)는 **release 이벤트에만 의미 있게 채워지길 기대한다.** save는 워낙 잦고
+  대부분 대외적으로 의미가 없어서(그 산출물의 편집 권한자 외엔 아무도 안 봄), 매번
+  sourceRefs를 요구하면 각 서비스에 부담만 준다. release 시점엔 그 서비스가 계산 시 이미
+  내부적으로 알고 있는 입력 버전 정보를 실어 보내기만 하면 되고(사람이 새로 고를 필요 없음),
+  그런 추적을 안 하는 서비스는 그냥 빈 배열로 두면 된다 — 여전히 선택 필드다(§17.1).
+  **SIREN이 캔버스 flow edge를 보고 sourceRefs를 자동 추론하는 일은 절대 없다** — edge는
+  "이래야 한다"는 설계 의도일 뿐이고, "실제로 그 버전을 참조했다"는 그 계산을 한 서비스만
+  안다. 자동 추론은 실제로 다른 입력을 썼는데 마침 다른 시점의 최신값을 참조했다고 잘못
+  기록하는 사고로 이어진다.
+
+### 19.3 캔버스 열람 모델 — Edit 권한자와 View 권한자가 보는 게 다르다
+
+워크플로우 페이지에 처음 들어왔을 때:
+
+| 권한 | 캔버스 구조(노드 존재·좌표·flow·일정) | 각 산출물의 버전 뱃지 |
+|---|---|---|
+| **Edit 권한자** | **실시간(latest)** — 지금 편집 중인 그대로 | 그 산출물의 **최신 release** 버전만 (working/minor는 상세창에서만) |
+| **View 권한자** | **최신 Workflow Release 스냅샷** 기준 | 같은 스냅샷의 값 |
+
+- Edit 권한자도 캔버스 뱃지에서는 working 버전을 안 본다 — working까지 보려면 상세창을
+  열어야 한다(§19.6). 캔버스 레벨에서는 owner/viewer 뱃지 구분 자체가 없다.
+- 캔버스 **구조**(노드 추가·배치·flow 연결·그 workflow 자기 일정 편집)는 이 절과 무관하게
+  원래 하던 대로다(v2 §3.7 캔버스 편집 세션) — Edit 권한자가 방금 추가한 노드는 그 자리에서
+  바로 보인다. **View 권한자는 그 편집이 다음 Workflow Release로 얼려지기 전까진 못 본다** —
+  구조든 버전이든, View 권한자에게는 "최신 Release 스냅샷"이 유일한 진실이다.
+- 새로 추가된 노드가 아직 한 번도 Release에 안 잡혔으면 그 뱃지는 "미릴리스분 — 공란"이다
+  (v2 §3.10 규칙을 그대로 따름).
+
+### 19.4 Workflow Release는 이제 "산출물 버전 표"가 아니라 **전체 스냅샷**이다
+
+지금 `hldReleases.items`는 산출물별 버전만 담는다(§10.2). 이걸 **workflow 전체를 통째로 얼리는
+것으로 확장한다** — 부분적으로 "이건 얼리고 저건 살아있다"를 계속 늘려가다 보면(버전 다음엔
+flow edge, 그다음엔 phase…) 구멍이 끝없이 나온다는 게 이번 세션에서 드러났다. 통째로 얼리면
+이 문제가 구조적으로 사라진다.
+
+```ts
+hldReleases {
+  _id, workflowId, version, date, releasedBy, note,
+
+  canvas: {
+    deliverables: [{ id, name, layout, phaseId, recvDept, serviceKey, externalArtifactId, ... }],
+    edges:  [{ fromId, toId, bidirectional }],
+    memos:  [...],
+    phases: [{ id, name, start, end }],   // 그 workflow 자기 일정(v3 부록 A)도 그 시점 것
+  },
+
+  items: {
+    [deliverableId]: {
+      versionLabel, isReleased, giverKnoxId, viewUrl, sourceRefs, tier, confidence, pinnedAt,  // §10.2 그대로
+    }
+  }
+}
+```
+
+- **Release를 누르는 순간, 그 workflow의 모든 연동 산출물에 `current-version`을 한 번씩
+  물어보고(§19.2), 그 값과 지금 캔버스 상태(좌표/edge/phase/노드 목록)를 함께 이 하나의
+  문서로 얼린다.** 이후 캔버스가 바뀌거나 그 서비스에서 버전이 더 올라가도, 이 스냅샷은
+  안 바뀐다.
+- **권한(owners/viewGrants)은 스냅샷에 넣지 않는다.** "누가 볼 수 있는가"는 항상 지금
+  시점의 권한으로 판정한다(§6.3의 "마스킹은 열람 시점 기준" 원칙과 일관) — 예전에 권한
+  있었던 사람이 지금은 없는데 과거 스냅샷은 계속 보인다거나 하면 안 된다.
+- **상시 백그라운드 동기화 job은 만들지 않는다.** §16 로드맵 5단계("B 티어 sync job")는
+  이 절로 대체한다 — A/B 티어 공통으로, SIREN DB의 산출물 버전 값은 **Workflow Release를
+  생성하는 그 순간에만** 갱신된다. 평소 캔버스 렌더링은 외부 서비스를 한 번도 호출하지 않고
+  SIREN 자기 DB(마지막 Release 스냅샷)만 읽는다 — 그래서 산출물이 몇 개든, 특정 서비스가
+  느리거나 죽어 있어도 캔버스 로딩엔 영향이 없다. `hubSyncCheckpoints`(§10.3)는 이 용도로는
+  더 이상 필요 없다 — 남겨두되 다른 목적이 생기면 그때 쓴다.
+- 상세창(§19.6)만은 예외로, 열 때마다 `current-version`/`versions`/`access`를 라이브로
+  다시 부른다 — 지금 보고 있는 산출물 하나에 대한 것이라 몇 번의 호출이면 충분하고, 그
+  사람에게 지금 가장 정확한 값을 보여줄 수 있다.
+
+### 19.5 과거 Workflow Release 시점으로 보기
+
+캔버스에 "이 Release 시점으로 보기" 모드를 추가한다 — 기본은 최신 Release(§19.3)이지만,
+과거 Release 중 하나를 골라 그 시점 그대로를 볼 수 있다.
+
+- **오늘 캔버스와 절대 섞지 않는다.** 좌표·flow edge·phase·산출물 버전 전부 **그 스냅샷
+  안의 값만** 쓴다(§19.4 덕분에 한 문서 안에 다 있음).
+- 그 시점엔 없었는데 지금은 있는 노드/edge는 스냅샷에 없으니 자연히 안 보이고, 그 시점엔
+  있었는데 지금은 삭제된 노드/edge도 마찬가지로(지금 캔버스에서 삭제됐다는 사실과 무관하게)
+  **스냅샷 자체에 다 들어있으므로 그대로 재현된다** — §19.4 이전엔 "오늘 구조 + 과거 값"을
+  섞는 방식이라 삭제된 노드를 못 그렸지만, 통째로 얼리는 방식으로 바뀌면서 이 한계도 함께
+  없어진다.
+- 예: v1 Release 때는 flow 연결이 없었는데 v2 Release 전에 새로 연결한 경우 — v1 시점
+  보기에선 연결이 없는 채로, v2 시점 보기에선 연결이 있는 채로 각각 정확히 재현된다.
+
+### 19.6 산출물 상세("artifact slide") 열람 규칙
+
+캔버스에서 노드를 클릭해 상세창을 열 때:
+
+1. 그 산출물의 `access?knoxId={나}`를 부른다(§19.2).
+2. **`canView`도 `canEdit`도 false** → 상세창 자체를 열지 않는다(권한 없음 상태로 캔버스에
+   머무름).
+3. **`canEdit: true`** → `versions`를 전체(working 포함)로 받아 버전 트리 전체를 보여준다.
+   `editors` 필드도 오므로 "이 산출물을 편집할 수 있는 사람" 목록을 보여줄 수 있다.
+4. **`canView: true`, `canEdit: false`** → `versions`가 release만 필터링돼서 온다. 하나도
+   release된 게 없으면 빈 목록이 올 수 있는데, 이건 **"아직 release 없음"**으로 명확히
+   표시하지 **"권한 없음"과 절대 혼동하지 않는다** — 2번(차단)과 화면이 달라야 한다.
+5. **연동 산출물(Calypso 아닌 것)은 이 상세창에서 어떤 편집도 허용하지 않는다.** 보여주는
+   건 버전 정보와(`canEdit`일 때만) member 목록뿐이다. 실제 수정은 항상 `viewUrl`을 눌러
+   그 서비스 자신의 화면으로 나가서 한다 — SIREN이 그 서비스 대신 쓰기 폼을 만들지 않는다
+   (§7.1 원칙 유지). `embedUploadUrlTemplate`이 있는 서비스는 예외적으로 그 위젯을 SIREN
+   화면 안에 끼워 넣을 수 있지만, 그것도 SIREN 자체 폼이 아니라 그 서비스가 제공하는
+   위젯을 빌려 쓰는 것이다.
+6. artifactType에 `sampleUrl`이 있으면(§19.1, 미정 기능) 상세창에 "샘플 보기" 링크로
+   같이 노출한다.
+
+### 19.7 Calypso도 같은 access 체계를 따른다
+
+Calypso는 여전히 "우선은 지금처럼 유지" — 파일 업로드·버전·release까지 SIREN 안에서 직접
+하는 지금 흐름(§11.4, §11.5) 그대로다. 다만 **열람 3단계 규칙(§19.6)은 Calypso 산출물에도
+동일하게 적용한다:**
+
+| 그 산출물에 대한 Calypso 자체 권한 | SIREN에서 할 수 있는 것 |
+|---|---|
+| 편집 권한 있음 | 지금과 동일 — 업로드·release 등 전체 |
+| view 권한만 있음 | 파일 다운로드 또는 경로 복사만. 업로드/release 버튼은 숨김 |
+| 권한 없음 | 산출물 상세 자체를 열 수 없음 |
+
+Calypso는 §19.2의 3개 GET을 그대로 구현한 것으로 취급한다(`access`는 Calypso 자체 API가
+이미 갖고 있는 `canEdit` 판정을 그대로 노출하면 된다) — "외부 서비스는 access를 부르고
+Calypso는 예외"가 아니라, **Calypso도 그냥 하나의 연동 대상으로서 같은 규칙을 따른다.**
+
+### 19.8 미정 — 이후 열리는 대로 §17.2에 추가
+
+- **artifactType의 `sampleUrl`** — 있으면 좋겠다는 수준의 아이디어. 실제로 이 값을 어느
+  서비스가 채워줄 수 있는지, 상세창에서 어떻게 노출할지는 확정 전.
