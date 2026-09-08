@@ -53,6 +53,24 @@ export class HubService {
     throw new BadRequestException('Could not generate a unique service key. Try again.');
   }
 
+  /** artifactTypes의 key가 그 서비스 안에서 중복되면 링크 시점에 어느 걸 가리키는지 모호해진다. */
+  private normalizeArtifactTypes(input?: RegisterServiceDto['artifactTypes']) {
+    const types = (input ?? []).map((t) => ({
+      key: t.key.trim(),
+      name: t.name.trim(),
+      viewUrlTemplate: t.viewUrlTemplate?.trim() || null,
+      sampleUrl: t.sampleUrl?.trim() || null,
+    }));
+    const seen = new Set<string>();
+    for (const t of types) {
+      if (seen.has(t.key)) {
+        throw new BadRequestException(`Duplicate artifact type key within this service: "${t.key}".`);
+      }
+      seen.add(t.key);
+    }
+    return types;
+  }
+
   /**
    * A(Live) 티어가 아니면 실연동이 없다는 뜻이므로, transport/baseUrl/viewUrlTemplate을
    * 서버가 무조건 비운다 - FE가 이미 폼에서 이 규칙대로 잠가두지만(ServiceManagePage.tsx),
@@ -93,6 +111,7 @@ export class HubService {
       // 등록 즉시 워크플로우의 출처 선택지에 뜬다.
       enabled: true,
       isMock: false,
+      artifactTypes: this.normalizeArtifactTypes(dto.artifactTypes),
     });
     await this.audit.log(actor.realKnoxId, 'ARTIFACT_SERVICE_REGISTER', 'artifactService', svc._id, {
       key: svc.key,

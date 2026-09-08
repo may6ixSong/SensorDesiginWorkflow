@@ -17,6 +17,30 @@ export type Transport = (typeof TRANSPORTS)[number];
 export type ArtifactServiceDocument = ArtifactService & Document;
 
 /**
+ * 한 서비스가 여러 종류의 산출물을 낼 수 있다(설계서 §19.1) — 예: SSM 하나가 "수식"과
+ * "spec data"를 별도 종류로 냄. `viewUrlTemplate`처럼 산출물 종류마다 달라지는 값은
+ * 서비스 레벨이 아니라 여기 둔다. 서비스에 이 목록이 비어 있으면(기존 SimHub/LayoutDB
+ * 같은 단일 종류 서비스) 서비스 레벨 `viewUrlTemplate`를 그대로 쓴다 — 하위 호환.
+ */
+@Schema({ _id: false })
+export class ArtifactType {
+  /** 그 서비스 안에서만 유일하면 된다(전역 unique 아님). */
+  @Prop({ required: true, trim: true })
+  key: string;
+
+  @Prop({ required: true, trim: true })
+  name: string;
+
+  @Prop({ type: String, default: null, trim: true })
+  viewUrlTemplate: string | null;
+
+  /** 미정 기능(§19.8) — 있으면 상세창에 "샘플 보기" 링크로 노출, 없으면 생략. */
+  @Prop({ type: String, default: null, trim: true })
+  sampleUrl: string | null;
+}
+export const ArtifactTypeSchema = SchemaFactory.createForClass(ArtifactType);
+
+/**
  * Hub 레지스트리 (설계서 §3.2). 산출물을 워크플로우에 얹을 때 사용자는 이 목록에서
  * 서비스를 고른다 - 기존의 자유 입력 docType 방식은 폐기됐다.
  */
@@ -71,6 +95,10 @@ export class ArtifactService {
 
   @Prop({ default: false, index: true })
   isMock: boolean;
+
+  /** 산출물 종류 목록(§19.1). 비어 있으면 서비스 자체가 단일 종류로 취급된다. */
+  @Prop({ type: [ArtifactTypeSchema], default: [] })
+  artifactTypes: ArtifactType[];
 
   _id: Types.ObjectId;
 }

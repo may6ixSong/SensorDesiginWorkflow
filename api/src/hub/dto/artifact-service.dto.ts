@@ -1,5 +1,29 @@
-import { IsBoolean, IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  IsArray, IsBoolean, IsIn, IsOptional, IsString, MaxLength, MinLength, ValidateNested,
+} from 'class-validator';
 import { ArtifactServiceDocument, Tier, Transport } from '../schemas/artifact-service.schema';
+
+/** §19.1 — 한 서비스가 낼 수 있는 산출물 종류 하나. */
+export class ArtifactTypeInput {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(40)
+  key: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(80)
+  name: string;
+
+  @IsOptional()
+  @IsString()
+  viewUrlTemplate?: string;
+
+  @IsOptional()
+  @IsString()
+  sampleUrl?: string;
+}
 
 export class RegisterServiceDto {
   // key는 클라이언트가 안 보낸다 - HubService#register가 name을 바탕으로
@@ -53,6 +77,12 @@ export class RegisterServiceDto {
   @IsOptional()
   @IsBoolean()
   enabled?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ArtifactTypeInput)
+  artifactTypes?: ArtifactTypeInput[];
 }
 
 /** key는 없다 - 불변이라 수정 대상이 아니다. */
@@ -106,6 +136,12 @@ export class UpdateServiceDto {
   @IsOptional()
   @IsBoolean()
   enabled?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ArtifactTypeInput)
+  artifactTypes?: ArtifactTypeInput[];
 }
 
 export function toArtifactServiceDto(s: ArtifactServiceDocument) {
@@ -122,5 +158,11 @@ export function toArtifactServiceDto(s: ArtifactServiceDocument) {
     embedUploadUrlTemplate: s.embedUploadUrlTemplate ?? null,
     isBuiltIn: s.isBuiltIn === true,
     enabled: s.enabled !== false,
+    artifactTypes: (s.artifactTypes ?? []).map((t) => ({
+      key: t.key,
+      name: t.name,
+      viewUrlTemplate: t.viewUrlTemplate ?? null,
+      sampleUrl: t.sampleUrl ?? null,
+    })),
   };
 }

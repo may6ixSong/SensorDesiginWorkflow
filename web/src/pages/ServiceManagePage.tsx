@@ -5,7 +5,7 @@ import { Box } from '@mui/material';
 import { AppShell } from '@/components/layout/AppShell';
 import { useAuth } from '@/app/providers/AuthProvider';
 import { apiClient } from '@/api/client';
-import { HubService } from '@/hooks/useHubServices';
+import { HubArtifactType, HubService } from '@/hooks/useHubServices';
 import { ModalShell } from '@/components/common/ModalShell';
 import { Field, SelectInput, TextArea, TextInput } from '@/components/common/Panel';
 import { Badge } from '@/components/common/SirenButton';
@@ -169,6 +169,11 @@ function ServiceCard({ service: s, onEdit }: { service: HubService; onEdit: () =
         <Badge color={T.dm} bg={T.sf2} borderColor={T.ln}>{s.transport}</Badge>
         <Badge color={T.dm} bg={T.sf2} borderColor={T.ln}>tier {s.defaultTier}</Badge>
         <Badge color={T.dm} bg={T.sf2} borderColor={T.ln}>v{s.contractVersion}</Badge>
+        {s.artifactTypes.length > 0 && (
+          <Badge color={T.dm} bg={T.sf2} borderColor={T.ln}>
+            {s.artifactTypes.length} artifact type{s.artifactTypes.length > 1 ? 's' : ''}
+          </Badge>
+        )}
       </Box>
 
       <Box sx={{ flex: 1 }} />
@@ -230,6 +235,64 @@ function FaviconField({
   );
 }
 
+/** id는 이 폼 안에서만 쓰는 임시 키 — 서버로는 key/name/viewUrlTemplate/sampleUrl만 나간다. */
+interface ArtifactTypeRow extends HubArtifactType { id: string; }
+
+let rowSeq = 0;
+const newRow = (): ArtifactTypeRow => ({
+  id: `row-${(rowSeq += 1)}`, key: '', name: '', viewUrlTemplate: null, sampleUrl: null,
+});
+
+/**
+ * 한 서비스가 여러 종류의 산출물을 낼 때(설계서 §19.1, 예: SSM의 Formula/Spec Data)
+ * 종류마다 key/name/View URL/샘플 URL을 따로 등록한다. 비워두면(빈 목록) 그 서비스는
+ * 지금처럼 단일 종류로 취급되고 서비스 레벨 View URL을 그대로 쓴다 — 기존 SimHub/
+ * LayoutDB 등은 손댈 필요가 없다.
+ */
+function ArtifactTypesField({
+  rows, onChange,
+}: { rows: ArtifactTypeRow[]; onChange: (rows: ArtifactTypeRow[]) => void }) {
+  const update = (id: string, patch: Partial<ArtifactTypeRow>) => {
+    onChange(rows.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+  };
+  const remove = (id: string) => onChange(rows.filter((r) => r.id !== id));
+
+  return (
+    <Field label="Artifact types — optional, only if this service produces more than one kind">
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {rows.map((r) => (
+          <Box
+            key={r.id}
+            sx={{
+              display: 'flex', flexDirection: 'column', gap: '6px',
+              p: '10px', border: `1px solid ${T.ln}`, borderRadius: '8px', background: T.sf2,
+            }}
+          >
+            <Box sx={{ display: 'flex', gap: '6px' }}>
+              <TextInput value={r.key} onChange={(v) => update(r.id, { key: v })} placeholder="key, e.g. spec-data" />
+              <TextInput value={r.name} onChange={(v) => update(r.id, { name: v })} placeholder="Name, e.g. Spec Data" />
+              <SirenButton onClick={() => remove(r.id)} aria-label="Remove"><Icon name="x" /></SirenButton>
+            </Box>
+            <TextInput
+              value={r.viewUrlTemplate ?? ''}
+              onChange={(v) => update(r.id, { viewUrlTemplate: v || null })}
+              placeholder="View URL template — https://…/{artifactId}"
+            />
+            <TextInput
+              value={r.sampleUrl ?? ''}
+              onChange={(v) => update(r.id, { sampleUrl: v || null })}
+              placeholder="Sample URL — optional"
+            />
+          </Box>
+        ))}
+        <SirenButton onClick={() => onChange([...rows, newRow()])} sx={{ alignSelf: 'flex-start' }}>
+          <Icon name="plus" /> Add artifact type
+        </SirenButton>
+      </Box>
+    </Field>
+  );
+}
+
 function ServiceFormDialog({ service, onClose }: { service?: HubService; onClose: () => void }) {
   const qc = useQueryClient();
   const isEdit = !!service;
@@ -240,7 +303,11 @@ function ServiceFormDialog({ service, onClose }: { service?: HubService; onClose
   const [transport, setTransport] = useState(service?.transport ?? 'none');
   const [baseUrl, setBaseUrl] = useState(service?.baseUrl ?? '');
   const [viewUrlTemplate, setViewUrlTemplate] = useState(service?.viewUrlTemplate ?? '');
+  const [artifactTypeRows, setArtifactTypeRows] = useState<ArtifactTypeRow[]>(
+    () => (service?.artifactTypes ?? []).map((t) => ({ ...t, id: `row-${(rowSeq += 1)}` })),
+  );
   const [nameErr, setNameErr] = useState(false);
+  const [typeErr, setTypeErr] = useState('');
 
   /**
    * A(Live)가 아니면 실연동이 없다는 뜻이라 transport는 무조건 none이고 잠긴다
@@ -268,6 +335,14 @@ function ServiceFormDialog({ service, onClose }: { service?: HubService; onClose
         transport: tier === 'A' ? transport : 'none',
         baseUrl: tier === 'A' ? (baseUrl.trim() || undefined) : undefined,
         viewUrlTemplate: tier === 'A' ? (viewUrlTemplate.trim() || undefined) : undefined,
+        artifactTypes: artifactTypeRows
+          .filter((r) => r.key.trim() && r.name.trim())
+          .map((r) => ({
+            key: r.key.trim(),
+            name: r.name.trim(),
+            viewUrlTemplate: r.viewUrlTemplate?.trim() || undefined,
+            sampleUrl: r.sampleUrl?.trim() || undefined,
+          })),
       };
       if (isEdit) {
         await apiClient.patch(`/hub/services/${service!.key}`, body);
@@ -285,6 +360,12 @@ function ServiceFormDialog({ service, onClose }: { service?: HubService; onClose
 
   const submit = () => {
     if (!name.trim()) { setNameErr(true); return; }
+    const keys = artifactTypeRows.filter((r) => r.key.trim()).map((r) => r.key.trim());
+    if (new Set(keys).size !== keys.length) {
+      setTypeErr('Artifact type keys must be unique within this service.');
+      return;
+    }
+    setTypeErr('');
     mutation.mutate();
   };
 
@@ -333,6 +414,8 @@ function ServiceFormDialog({ service, onClose }: { service?: HubService; onClose
           <TextInput value={viewUrlTemplate} onChange={setViewUrlTemplate} placeholder="https://…/{artifactId}" />
         </Field>
       )}
+      <ArtifactTypesField rows={artifactTypeRows} onChange={setArtifactTypeRows} />
+      {typeErr && <Box sx={{ fontSize: 11, color: T.rd, mb: '11px' }}>{typeErr}</Box>}
       <SirenButton
         variant="primary"
         disabled={!name.trim() || mutation.isPending}
