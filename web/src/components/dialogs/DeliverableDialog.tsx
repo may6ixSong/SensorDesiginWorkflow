@@ -20,6 +20,7 @@ import { ConfirmDialog } from '@/components/dialogs/ConfirmDialog';
 import { SlidePanel } from '@/components/common/SlidePanel';
 import { VersionTree } from '@/components/deliverable/VersionTree';
 import { VersionContents } from '@/components/deliverable/VersionContents';
+import { ExternalArtifactPicker } from '@/components/deliverable/ExternalArtifactPicker';
 import { ArtifactVersionTree } from '@/components/artifact/ArtifactVersionTree';
 import { ArtifactVersionContents } from '@/components/artifact/ArtifactVersionContents';
 import { ArtifactAccessPanel } from '@/components/artifact/ArtifactAccessPanel';
@@ -427,7 +428,7 @@ export function DeliverableDialog({
 
             {own && (
               <BasicInfoCard
-                d={d} phases={phases} nodes={nodes} onSaveInfo={onSaveInfo}
+                d={d} phases={phases} nodes={nodes} project={project} onSaveInfo={onSaveInfo}
               />
             )}
 
@@ -771,9 +772,9 @@ function VersionSummary({
  * 나중에 다시 설계한다. 지금은 있던 값을 그대로 들고 저장만 한다.
  */
 function BasicInfoCard({
-  d, phases, nodes, onSaveInfo,
+  d, phases, nodes, project, onSaveInfo,
 }: {
-  d: CanvasNode; phases: WorkflowPhase[]; nodes: CanvasNode[];
+  d: CanvasNode; phases: WorkflowPhase[]; nodes: CanvasNode[]; project?: ProjectDetailDto;
   onSaveInfo: Props['onSaveInfo'];
 }) {
   const { data: services } = useArtifactServices();
@@ -792,12 +793,18 @@ function BasicInfoCard({
   const [name, setName] = useState(d.name);
   const [serviceKey, setServiceKey] = useState(d.serviceKey ?? '');
   const [artifactTypeKey, setArtifactTypeKey] = useState(d.artifactTypeKey ?? '');
+  // 예전엔 이 화면에서 아예 편집할 수 없었다 — 오타를 내면 고칠 방법이 없는 게 가장
+  // 위험한 문제였다(Hub 설계서 §19.3). 이제 자유 텍스트가 아니라 후보 선택으로만 고친다.
+  const [externalArtifactId, setExternalArtifactId] = useState(d.externalArtifactId ?? '');
   const [nameErr, setNameErr] = useState(false);
   const [typeErr, setTypeErr] = useState(false);
   const orphan = isOrphanPhase(phases, d.phase);
 
   useEffect(() => {
-    setName(d.name); setServiceKey(d.serviceKey ?? ''); setArtifactTypeKey(d.artifactTypeKey ?? '');
+    setName(d.name);
+    setServiceKey(d.serviceKey ?? '');
+    setArtifactTypeKey(d.artifactTypeKey ?? '');
+    setExternalArtifactId(d.externalArtifactId ?? '');
   }, [d.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const selectedService = (services ?? []).find((s) => s.key === serviceKey) ?? null;
@@ -805,12 +812,12 @@ function BasicInfoCard({
 
   const submit = () => {
     if (!name.trim()) { setNameErr(true); return; }
-    if (serviceKey && artifactTypes.length > 0 && !artifactTypeKey) { setTypeErr(true); return; }
+    if (serviceKey && artifactTypes.length > 1 && !artifactTypeKey) { setTypeErr(true); return; }
     setTypeErr(false);
-    // artifactKey, externalArtifactId 둘 다 이 화면에서 편집하지 않는다 — 있던 값을 그대로 들고 저장한다.
+    // artifactKey는 이 화면에서 편집하지 않는다 — 있던 값을 그대로 들고 저장한다.
     onSaveInfo({
       name: name.trim(), artifactKey: d.artifactKey,
-      serviceKey: serviceKey || null, externalArtifactId: d.externalArtifactId,
+      serviceKey: serviceKey || null, externalArtifactId: externalArtifactId.trim() || null,
       artifactTypeKey: artifactTypes.length > 0 ? artifactTypeKey || null : null,
     });
   };
@@ -821,17 +828,25 @@ function BasicInfoCard({
       <Field label="Name">
         <TextInput value={name} onChange={(v) => { setName(v); setNameErr(false); }} error={nameErr} />
       </Field>
-      <Field label="Source — the registered system this artifact lives in" sx={{ mb: artifactTypes.length > 0 ? '12px' : 0 }}>
+      <Field label="Source — the registered system this artifact lives in" sx={{ mb: artifactTypes.length > 1 ? '12px' : 0 }}>
         <SelectInput
           value={serviceKey}
-          onChange={(v) => { setServiceKey(v); setArtifactTypeKey(''); setTypeErr(false); }}
+          onChange={(v) => {
+            setServiceKey(v);
+            const svc = (services ?? []).find((s) => s.key === v);
+            const types = svc?.artifactTypes ?? [];
+            // 종류가 1개뿐이면 고르라고 묻지 않고 그 1개를 자동으로 쓴다(§19.1).
+            setArtifactTypeKey(types.length === 1 ? types[0].key : '');
+            setExternalArtifactId('');
+            setTypeErr(false);
+          }}
           options={[
             { value: '', label: 'Not linked — record versions here' },
             ...(services ?? []).map((s) => ({ value: s.key, label: s.name })),
           ]}
         />
       </Field>
-      {artifactTypes.length > 0 && (
+      {artifactTypes.length > 1 && (
         <Field label="Artifact type — this service provides more than one kind" sx={{ mb: '12px' }}>
           <SelectInput
             value={artifactTypeKey}
@@ -847,6 +862,17 @@ function BasicInfoCard({
             </Box>
           )}
         </Field>
+      )}
+      {serviceKey && (
+        <Box sx={{ mb: '12px' }}>
+          <ExternalArtifactPicker
+            service={selectedService}
+            projectCode={project?.code}
+            projectRevision={project?.revision}
+            value={externalArtifactId}
+            onChange={setExternalArtifactId}
+          />
+        </Box>
       )}
       <SirenButton variant="primary" onClick={submit}>
         <Icon name="check" /> Save

@@ -6,12 +6,16 @@ import { useArtifactServices } from '@/api/hooks/useHub';
 import { ModalShell } from '@/components/common/ModalShell';
 import { SirenButton } from '@/components/common/SirenButton';
 import { Ey, Field, SelectInput, TextInput } from '@/components/common/Panel';
+import { ExternalArtifactPicker } from '@/components/deliverable/ExternalArtifactPicker';
 import { Icon } from '@/components/common/Icon';
 import { CURSOR_POINTER, FONT_MONO, T } from '@/theme/tokens';
 
 interface Props {
   workflowName: string;
   phases: WorkflowPhase[];
+  /** external artifact 후보 검색 기준(Hub 설계서 §19.3) — 없으면 자유 입력으로만 동작한다. */
+  projectCode?: string;
+  projectRevision?: string;
   /** 'received'면 헤더 문구가 "내가 받아야 할 산출물"로 바뀐다 — 폼 필드 자체는 동일하다. */
   intent?: 'own' | 'received';
   onClose: () => void;
@@ -29,7 +33,9 @@ interface Props {
  *
  * 여기 뜨는 phase는 전부 "이 workflow가 정한 자기 일정"이다 — 과제 마일스톤이 아니다.
  */
-export function AddDeliverableDialog({ workflowName, phases, intent = 'own', onClose, onCreate }: Props) {
+export function AddDeliverableDialog({
+  workflowName, phases, projectCode, projectRevision, intent = 'own', onClose, onCreate,
+}: Props) {
   const { data: services, isLoading: servicesLoading } = useArtifactServices();
   const [name, setName] = useState('');
   const [phaseId, setPhaseId] = useState<string>(phases[0]?.id ?? '');
@@ -52,9 +58,10 @@ export function AddDeliverableDialog({ workflowName, phases, intent = 'own', onC
       return;
     }
     setKeyErr('');
-    // 서비스가 산출물 종류를 여러 개 낼 때는 반드시 하나를 골라야 한다(§19.1) — API도
-    // 같은 규칙을 강제하지만, 여기서 먼저 걸러 왕복 없이 바로 알려준다.
-    if (serviceKey && artifactTypes.length > 0 && !artifactTypeKey) {
+    // 서비스가 산출물 종류를 여러 개 낼 때만 사람이 골라야 한다(§19.1) — 1개뿐이면
+    // 아래 Source 선택 시 이미 자동으로 채워져 있다. API도 같은 규칙을 강제하지만,
+    // 여기서 먼저 걸러 왕복 없이 바로 알려준다.
+    if (serviceKey && artifactTypes.length > 1 && !artifactTypeKey) {
       setTypeErr(true);
       return;
     }
@@ -130,7 +137,15 @@ export function AddDeliverableDialog({ workflowName, phases, intent = 'own', onC
       <Field label="Source — the registered system this artifact lives in">
         <SelectInput
           value={serviceKey}
-          onChange={(v) => { setServiceKey(v); setArtifactTypeKey(''); setTypeErr(false); }}
+          onChange={(v) => {
+            setServiceKey(v);
+            const svc = (services ?? []).find((s) => s.key === v);
+            const types = svc?.artifactTypes ?? [];
+            // 종류가 1개뿐이면 고르라고 묻지 않고 그 1개를 자동으로 쓴다(§19.1).
+            setArtifactTypeKey(types.length === 1 ? types[0].key : '');
+            setExternalArtifactId('');
+            setTypeErr(false);
+          }}
           disabled={servicesLoading}
           options={[
             { value: '', label: servicesLoading ? 'Loading…' : 'Not linked — record versions here' },
@@ -138,7 +153,7 @@ export function AddDeliverableDialog({ workflowName, phases, intent = 'own', onC
           ]}
         />
       </Field>
-      {artifactTypes.length > 0 && (
+      {artifactTypes.length > 1 && (
         <Field label="Artifact type — this service provides more than one kind">
           <SelectInput
             value={artifactTypeKey}
@@ -155,13 +170,13 @@ export function AddDeliverableDialog({ workflowName, phases, intent = 'own', onC
           )}
         </Field>
       )}
-      <Field label="External artifact ID — optional; fill in once it's registered there">
-        <TextInput
-          value={externalArtifactId}
-          onChange={setExternalArtifactId}
-          placeholder="e.g. the artifact's id in that system"
-        />
-      </Field>
+      <ExternalArtifactPicker
+        service={selectedService}
+        projectCode={projectCode}
+        projectRevision={projectRevision}
+        value={externalArtifactId}
+        onChange={setExternalArtifactId}
+      />
       <Field
         label="Artifact key — optional; use the same key when adding this artifact again in another phase"
       >

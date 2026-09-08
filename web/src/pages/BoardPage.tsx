@@ -539,6 +539,8 @@ export function BoardPage() {
             <AddDeliverableDialog
               workflowName={workflow.name}
               phases={phaseList}
+              projectCode={project?.code}
+              projectRevision={project?.revision}
               intent={addDlgIntent}
               onClose={() => st.getState().setAddDlg(false)}
               onCreate={({ name, phaseId, artifactKey, serviceKey, externalArtifactId, artifactTypeKey }) => {

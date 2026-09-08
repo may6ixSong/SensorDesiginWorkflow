@@ -52,6 +52,25 @@ export function useUpdateMilestones(projectId: string) {
 }
 
 /**
+ * 과제 메타데이터(이름/code/revision) 수정 — code+revision 조합에만 유니크 제약이
+ * 걸려 있다(Hub 설계서 §19.3). status는 이 화면에서 건드리지 않는다 — 전달하지 않으면
+ * 서버가 기존 값을 그대로 둔다.
+ */
+export function useUpdateProject(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: { name?: string; code?: string; revision?: string }) => {
+      const res = await apiClient.patch<ApiEnvelope<ProjectDetailDto>>(`/projects/${projectId}`, payload);
+      return res.data.data;
+    },
+    onSuccess: (project) => {
+      qc.setQueryData(queryKeys.project(projectId), project);
+      qc.invalidateQueries({ queryKey: queryKeys.projects });
+    },
+  });
+}
+
+/**
  * 이 과제의 부서 목록 교체 — 목록 전체를 보낸다(workflow-domains와 같은 방식). 산출물
  * "Received from" 화면의 후보 목록이라 workflow-domains와 달리 사용 중이어도 자유롭게
  * 지울 수 있다(BE가 막지 않는다).

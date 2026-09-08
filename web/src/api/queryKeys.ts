@@ -15,6 +15,8 @@ export const queryKeys = {
   edges: (workflowId: string) => ['workflows', workflowId, 'edges'] as const,
   hldReleases: (workflowId: string) => ['workflows', workflowId, 'hld-releases'] as const,
   hubServices: ['hub', 'services'] as const,
+  hubProjectSearch: (serviceKey: string, code: string, revision: string) =>
+    ['hub', 'services', serviceKey, 'projects', 'search', code, revision] as const,
   /** Calypso api를 직접 호출한다(§11.5) — SIREN이 소유한 캐시가 아니라 그냥 원격 데이터 캐시다. */
   calypsoArtifacts: (projectId: string) => ['calypso', 'artifacts', projectId] as const,
   calypsoArtifact: (id: string) => ['calypso', 'artifacts', 'detail', id] as const,
