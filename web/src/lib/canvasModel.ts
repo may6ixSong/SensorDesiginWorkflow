@@ -6,7 +6,10 @@
  *
  * 설계서 1.3·5.5에 따라 이 계산은 전부 FE에서 완결되고, BE는 결과 좌표만 저장한다.
  */
-import { DeliverableDto, DeliverableVersionDto, EdgeDto, MemoDto, WorkflowPhase } from '@/types/domain';
+import {
+  DeliverableDto, DeliverableVersionDto, EdgeDto, HldItemDto, HldReleaseDto, HldSnapshotDeliverableDto,
+  HldSnapshotEdgeDto, HldSnapshotMemoDto, MemoDto, Tier, WorkflowPhase,
+} from '@/types/domain';
 import { DAY_MS, dayMs, matchPhaseByDate } from './schedule';
 import {
   DEFAULT_PW, GAP, LANE_PAD, MH, MW, NH, NW, ROW_H, TOP_PAD, WALL_FORCE, snp,
@@ -148,6 +151,93 @@ export function toCanvasMemo(m: MemoDto): CanvasMemo {
 }
 export function toCanvasEdge(e: EdgeDto): CanvasEdge {
   return { id: e._id, from: e.fromId, to: e.toId, auto: e.auto, bidirectional: e.bidirectional };
+}
+
+/* ── HLD 스냅샷 → 작업 모델 (§19.4, §19.5) ──
+ * View 권한은 라이브 캔버스가 아니라 가장 최근 Workflow(HLD) Release 스냅샷 하나로
+ * 구조와 버전을 함께 그린다 — flow 연결이 그 뒤로 바뀌었을 수 있어 라이브 구조와
+ * 과거 버전을 섞으면 그 시점에 없던 연결이 있었던 것처럼 보이기 때문이다.
+ */
+function hldItemToVersionView(item: HldItemDto): VersionView {
+  return {
+    versionLabel: item.versionLabel ?? item.version,
+    isReleased: true,
+    versionRef: item.versionRef,
+    tier: (item.tier as Tier) ?? 'A',
+    giverKnoxId: item.giverKnoxId,
+    giverDept: null,
+    viewUrl: item.viewUrl,
+    hpcPath: null,
+    note: item.comment ?? '',
+    sourceRefs: item.sourceRefs ?? [],
+    confidence: item.confidence === 'asserted' ? 'asserted' : 'verified',
+    assertedBy: null,
+    assertedAt: null,
+    observedAt: item.pinnedAt,
+    at: item.at,
+  };
+}
+
+export function toCanvasNodeFromSnapshot(
+  workflowId: string, sd: HldSnapshotDeliverableDto, item: HldItemDto | undefined,
+): CanvasNode {
+  const versions = item ? [hldItemToVersionView(item)] : [];
+  return {
+    id: sd.id,
+    workflow: workflowId,
+    phase: sd.phaseId,
+    name: sd.name,
+    artifactKey: null,
+    intent: sd.intent,
+    serviceKey: sd.serviceKey,
+    externalArtifactId: sd.externalArtifactId,
+    artifactTypeKey: sd.artifactTypeKey,
+    net: 'OA',
+    series: sd.series,
+    seriesIdx: sd.seriesIdx,
+    seriesTotal: sd.seriesTotal,
+    recvDept: sd.recvDept,
+    recvContact: null,
+    recvWorkflowId: null,
+    sourceDept: null,
+    sourceContact: null,
+    origin: 'own',
+    sourceWorkflow: null,
+    sourcePhase: null,
+    versions,
+    releasedVersion: versions[0] ?? null,
+    // View 권한은 작업중 버전을 절대 보지 않는다(§19.3) — 스냅샷 자체가 release만 담는다.
+    workingVersion: null,
+    canEdit: false,
+    x: sd.layout.x, y: sd.layout.y, w: sd.layout.w || NW, h: sd.layout.h || NH,
+  };
+}
+
+export function toCanvasEdgeFromSnapshot(se: HldSnapshotEdgeDto, i: number): CanvasEdge {
+  return { id: `snap-e${i}`, from: se.fromId, to: se.toId, auto: false, bidirectional: se.bidirectional };
+}
+
+export function toCanvasMemoFromSnapshot(workflowId: string, sm: HldSnapshotMemoDto): CanvasMemo {
+  return {
+    id: sm.id, workflow: workflowId, phase: sm.phaseId, text: sm.text,
+    x: sm.layout.x, y: sm.layout.y, w: sm.layout.w || MW, h: sm.layout.h || MH,
+  };
+}
+
+/**
+ * Edit 권한 캔버스는 라이브 구조를 그대로 쓰되, 버전 배지만은 release-only로 제한한다
+ * (§19.3) — 연동된(Calypso 포함) 산출물은 상시 동기화가 없어(§19.4) 로컬 versions가
+ * 항상 비어 있으므로, 가장 최근 HLD Release가 얼려둔 값으로 배지를 채운다. 연동 없는
+ * 수동(C/D) 산출물은 이미 로컬 versions가 진짜 값이라 건드리지 않는다.
+ */
+export function applyLatestReleaseBadges(nodes: CanvasNode[], latestHld: HldReleaseDto | null | undefined): CanvasNode[] {
+  if (!latestHld) return nodes;
+  return nodes.map((n) => {
+    if (!n.serviceKey) return n;
+    const item = latestHld.items?.[n.id];
+    if (!item) return { ...n, releasedVersion: null };
+    return { ...n, releasedVersion: hldItemToVersionView(item) };
+  });
 }
 
 /* ── 레인 지오메트리 ── */

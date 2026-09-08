@@ -266,9 +266,61 @@ export interface EdgeDto {
 
 export interface HldItemDto {
   version: string;
+  versionLabel: string | null;
+  versionRef: string | null;
+  tier: string | null;
+  confidence: string | null;
+  pinnedAt: string | null;
   file: string | null;
   at: string;
   comment: string;
+  /** §19.4 — 이 개념이 생기기 전 스냅샷에는 없다(둘 다 비어 있음). */
+  giverKnoxId: string | null;
+  viewUrl: string | null;
+  sourceRefs: SourceRefDto[];
+}
+
+/** HLD 스냅샷 안의 산출물 배치 하나(§19.4) — 그 시점의 캔버스 구조만 담는다. */
+export interface HldSnapshotDeliverableDto {
+  id: string;
+  name: string;
+  phaseId: string;
+  layout: Layout;
+  serviceKey: string | null;
+  externalArtifactId: string | null;
+  artifactTypeKey: string | null;
+  intent: 'own' | 'received';
+  recvDept: string | null;
+  series: string | null;
+  seriesIdx: number;
+  seriesTotal: number;
+}
+
+export interface HldSnapshotEdgeDto {
+  fromId: string;
+  toId: string;
+  bidirectional: boolean;
+}
+
+export interface HldSnapshotMemoDto {
+  id: string;
+  phaseId: string;
+  text: string;
+  layout: Layout;
+}
+
+export interface HldSnapshotPhaseDto {
+  id: string;
+  name: string;
+  start: string;
+  end: string;
+}
+
+export interface HldSnapshotCanvasDto {
+  deliverables: HldSnapshotDeliverableDto[];
+  edges: HldSnapshotEdgeDto[];
+  memos: HldSnapshotMemoDto[];
+  phases: HldSnapshotPhaseDto[];
 }
 
 export interface HldReleaseDto {
@@ -278,5 +330,7 @@ export interface HldReleaseDto {
   date: string;
   releasedBy: string;
   note: string;
+  /** §19.4 이전 스냅샷은 네 배열이 전부 비어 있다 — 구조 정보가 소급되지 않는다. */
+  canvas: HldSnapshotCanvasDto;
   items: Record<string, HldItemDto>;
 }

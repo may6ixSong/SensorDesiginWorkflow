@@ -31,7 +31,10 @@ import { usePutCanvas } from '@/api/hooks/useCanvas';
 import { useCanvasStore } from '@/store/canvasStore';
 import { useAuth } from '@/app/providers/AuthProvider';
 import { toast } from '@/store/toastStore';
-import { countOrphans, placeIncomingNodes, placeInLane, toCanvasEdge, toCanvasMemo, toCanvasNode } from '@/lib/canvasModel';
+import {
+  applyLatestReleaseBadges, countOrphans, placeIncomingNodes, placeInLane, toCanvasEdge,
+  toCanvasEdgeFromSnapshot, toCanvasMemo, toCanvasMemoFromSnapshot, toCanvasNode, toCanvasNodeFromSnapshot,
+} from '@/lib/canvasModel';
 import { DeliverableDto, WorkflowPhase } from '@/types/domain';
 import { T } from '@/theme/tokens';
 import { canEditWorkflow } from '@/lib/access';
@@ -104,20 +107,55 @@ export function BoardPage() {
    * 이어져 보인다. incoming은 이 workflow 소유가 아니라 위치를 저장할 곳이 없으므로,
    * hydrate 직후 placeIncomingNodes로 own 노드와 겹치지 않는 자리에 매번 다시 배치한다.
    */
+  /**
+   * View 권한은 라이브 캔버스가 아니라 가장 최근 Workflow(HLD) Release 스냅샷 하나로
+   * 구조와 버전을 함께 그린다(설계서 §19.3, §19.5) — flow 연결·배치가 그 뒤로 바뀌었을
+   * 수 있어, 라이브 구조에 과거 버전을 조인하면 그 시점에 없던 연결이 있었던 것처럼
+   * 보인다(실측 확인된 문제). Edit 권한은 계속 라이브 구조를 쓰되, 연동된(Calypso 포함)
+   * 산출물의 버전 배지만은 같은 최신 Release가 얼려둔 값으로 맞춘다 — 상시 동기화가
+   * 없어졌으므로(§19.4) 그게 SIREN이 실시간으로 아는 유일한 released 사실이기 때문이다.
+   * incoming(다른 workflow가 준 산출물)은 이 workflow 소유가 아니라 스냅샷에도 없으므로
+   * 두 경우 모두 라이브로 얹고 placeIncomingNodes로 매번 다시 배치한다.
+   */
   useEffect(() => {
-    if (!workflowId || !deliverables || !memos || !edges) return;
+    if (!workflowId || !workflow) return;
     if (st.getState().edit) return;
+
+    const viewOnly = workflow.myAccess === 'view';
+    const latestHld = hlds?.[0] ?? null;
+    const incomingNodes = incoming.map((d) => toCanvasNode(d, 'incoming'));
+
+    if (viewOnly) {
+      const hasSnapshot = (latestHld?.canvas?.deliverables?.length ?? 0) > 0;
+      st.getState().hydrate(workflowId, {
+        nodes: [
+          ...(hasSnapshot
+            ? latestHld!.canvas.deliverables.map((sd) => toCanvasNodeFromSnapshot(workflowId, sd, latestHld!.items?.[sd.id]))
+            : []),
+          ...incomingNodes,
+        ],
+        memos: hasSnapshot ? latestHld!.canvas.memos.map((sm) => toCanvasMemoFromSnapshot(workflowId, sm)) : [],
+        edges: hasSnapshot ? latestHld!.canvas.edges.map(toCanvasEdgeFromSnapshot) : [],
+        phaseWidths: workflow.phaseWidths,
+      });
+      const s = st.getState();
+      placeIncomingNodes(s.nodes, workflow.phases ?? [], s.phasePW);
+      s.bumpBlocks();
+      return;
+    }
+
+    if (!deliverables || !memos || !edges) return;
     st.getState().hydrate(workflowId, {
-      nodes: [
-        ...deliverables.map((d) => toCanvasNode(d, 'own')),
-        ...incoming.map((d) => toCanvasNode(d, 'incoming')),
-      ],
+      nodes: applyLatestReleaseBadges(
+        [...deliverables.map((d) => toCanvasNode(d, 'own')), ...incomingNodes],
+        latestHld,
+      ),
       memos: memos.map(toCanvasMemo),
       edges: edges.map(toCanvasEdge),
-      phaseWidths: workflow?.phaseWidths,
+      phaseWidths: workflow.phaseWidths,
     });
     const s = st.getState();
-    placeIncomingNodes(s.nodes, workflow?.phases ?? [], s.phasePW);
+    placeIncomingNodes(s.nodes, workflow.phases ?? [], s.phasePW);
     // 사용자가 같은 Phase 안에서 옮겨둔 incoming 노드 위치를 다시 덮어씌운다 — 그
     // Phase로 재배치된 것이 아니면(다른 IP가 스케줄을 바꿨으면) 무시한다.
     const overrides = s.incomingOverrides;
@@ -129,7 +167,7 @@ export function BoardPage() {
       }
     });
     s.bumpBlocks();
-  }, [workflowId, deliverables, incoming, memos, edges, workflow?.phases, workflow?.phaseWidths, st]);
+  }, [workflowId, workflow, deliverables, incoming, memos, edges, hlds, st]);
 
   /**
    * 편집 모드로 둔 채 이 페이지를 떠나면(다른 workflow로 이동 포함) 캔버스 편집 상태가
@@ -297,6 +335,17 @@ export function BoardPage() {
               st.getState().setWorkflowSettingsTab(isOwner ? 'details' : 'permissions');
             }}
           />
+          {workflow.myAccess === 'view' && !(hlds?.length ?? 0) && (
+            <Box
+              sx={{
+                display: 'flex', alignItems: 'center', gap: '9px', fontSize: 12.5, color: T.dm,
+                background: T.sf2, borderBottom: `1px solid ${T.ln}`, padding: '9px 22px',
+              }}
+            >
+              This workflow has no HLD Release yet — view-only access shows the latest release
+              snapshot, so there is nothing to display until its owners publish one.
+            </Box>
+          )}
           <Canvas
             workflow={workflow}
             phases={phaseList}

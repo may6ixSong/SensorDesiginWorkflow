@@ -23,10 +23,23 @@ interface Props {
   onOpenRow: (deliverableId: string) => void;
 }
 
+/** 표에 그릴 최소한의 행 모양 — 스냅샷 산출물이든 라이브 캔버스 노드든 이 모양으로 맞춘다. */
+interface Row {
+  id: string;
+  name: string;
+  phaseId: string;
+  x: number;
+  net: 'OA' | 'HPC';
+}
+
 /**
  * 목업 hldDlgH() — HLD Release 그리드.
- * 행 구성 기준은 "현재 IP에 설정된 산출물 전체"이고, 이전 HLD 대비 버전이 달라진 행만
- * 단일 하이라이트로 표시한다 (설계서 3.10). 이 조인/diff는 FE에서 계산한다.
+ *
+ * §19.4부터는 그 release 문서 자신의 canvas 스냅샷에서 행을 뽑는다 - flow 연결이나
+ * 캔버스 배치가 그 뒤로 바뀌었을 수 있어, 지금의 라이브 캔버스와 과거 버전 표를
+ * 섞어 쓰면 그 시점에 없던/이미 없어진 배치가 있었던 것처럼 보인다(실측 확인된 문제).
+ * canvas가 비어 있는(§19.4 이전) 옛 스냅샷만 예외적으로 라이브 nodes/phases로
+ * 폴백한다 — 소급해서 구조를 채울 방법이 없기 때문이다.
  */
 export function HldReleaseDialog({
   workflowName, releases, nodes, phases, selectedId, onSelect, onClose, onOpenRow,
@@ -55,11 +68,19 @@ export function HldReleaseDialog({
   const cur = sorted.find((h) => h._id === selectedId) ?? sorted[0];
   const prev = sorted[sorted.findIndex((h) => h._id === cur._id) + 1] ?? null;
 
+  // canvas가 없는(§19.4 이전) 옛 스냅샷만 라이브 nodes/phases로 폴백한다 - 소급해서
+  // 그 시점 구조를 재구성할 방법이 없기 때문이다. 그 외에는 항상 그 release 자신의 canvas를 쓴다.
+  const hasSnapshot = (cur.canvas?.deliverables?.length ?? 0) > 0;
+  const rowPhases = hasSnapshot ? cur.canvas.phases : phases;
+  const rows: Row[] = hasSnapshot
+    ? cur.canvas.deliverables.map((d) => ({ id: d.id, name: d.name, phaseId: d.phaseId, x: d.layout.x, net: 'OA' as const }))
+    : nodes.map((d) => ({ id: d.id, name: d.name, phaseId: d.phase, x: d.x, net: d.net }));
+
   const order: Record<string, number> = {};
-  phases.forEach((p, i) => (order[p.id] = i));
-  const rows = [...nodes].sort((a, b) =>
-    (order[a.phase] ?? 99) !== (order[b.phase] ?? 99)
-      ? (order[a.phase] ?? 99) - (order[b.phase] ?? 99)
+  rowPhases.forEach((p, i) => (order[p.id] = i));
+  rows.sort((a, b) =>
+    (order[a.phaseId] ?? 99) !== (order[b.phaseId] ?? 99)
+      ? (order[a.phaseId] ?? 99) - (order[b.phaseId] ?? 99)
       : a.x - b.x,
   );
 
@@ -111,6 +132,19 @@ export function HldReleaseDialog({
         </Box>
       }
     >
+      {!hasSnapshot && (
+        <Box
+          sx={{
+            display: 'flex', alignItems: 'flex-start', gap: '7px', fontSize: 11.5, color: T.am,
+            background: T.am2, border: `1px solid ${T.am3}`, borderRadius: '8px',
+            padding: '8px 10px', mb: '10px', lineHeight: 1.6,
+          }}
+        >
+          <Box component="span" sx={{ mt: '1px' }}><Icon name="warn" size={12} /></Box>
+          This release predates full canvas snapshots — rows and order below are approximated from
+          the current live canvas, not the structure as it actually stood at release time.
+        </Box>
+      )}
       <Box sx={{ border: `1px solid ${T.ln}`, borderRadius: '10px', overflow: 'hidden', background: T.sf }}>
         <Box component="table" sx={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
           <Box component="thead">
