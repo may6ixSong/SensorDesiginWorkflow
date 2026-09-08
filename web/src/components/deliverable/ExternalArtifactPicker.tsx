@@ -1,8 +1,7 @@
-import { useEffect, useState } from 'react';
 import { Box, CircularProgress } from '@mui/material';
 import { HubService } from '@/hooks/useHubServices';
 import { useProjectSearchCandidates } from '@/api/hooks/useHub';
-import { Field, TextInput } from '@/components/common/Panel';
+import { Field } from '@/components/common/Panel';
 import { Icon } from '@/components/common/Icon';
 import { CURSOR_POINTER, FONT_MONO, T } from '@/theme/tokens';
 
@@ -16,50 +15,40 @@ interface Props {
   label?: string;
 }
 
-const linkSx = {
-  display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: 11.5, color: T.tl,
-  cursor: CURSOR_POINTER, mt: '7px', '&:hover': { textDecoration: 'underline' },
-};
-
 /**
- * 산출물의 external artifact ID를 자유 입력이 아니라, 연동된 서비스가 code+revision으로
- * 찾아준 후보 중에서 사람이 직접 고르게 한다(Hub 설계서 §19.3) — 오타로 잘못된 id를
- * 저장하는 것을 막는다.
+ * 산출물의 external artifact ID는 자유 입력을 받지 않는다 — 연동된 서비스가 code+revision
+ * 으로 찾아준 후보 중에서 사람이 직접 골라야만 저장된다(Hub 설계서 §19.3). 오타로 잘못된
+ * id가 저장되는 사고를 원천적으로 막기 위한 결정이라, 직접 타이핑으로 우회하는 경로를
+ * 두지 않는다(사용자 요청 — RPM 연동 실사용 후 확정).
  *
  * 후보가 하나뿐이어도 자동으로 채우지 않는다 — code+revision이 그 서비스 안에서 항상
  * 유일하다는 보장이 없기 때문이다(RPM처럼). 서비스가 project search를 지원하지
  * 않으면(transport !== 'http' 이거나 baseUrl이 없으면) 애초에 후보를 물어볼 수 없으므로
- * 자유 입력만 보여준다. 후보를 지원하는 서비스에도 "직접 입력" 탈출구를 항상 남겨둔다 —
- * 빈 후보 목록이 "등록된 게 없다"인지 "그 서비스가 지금 응답하지 않는다"인지 SIREN은
- * 구분할 수 없기 때문이다(§19.2 fail-closed).
+ * 이 화면에서는 아예 값을 설정할 수 없다 — 그런 서비스를 등록했다면 링크는 여기가 아니라
+ * (아직 없는) 다른 수단으로 해야 한다.
  */
 export function ExternalArtifactPicker({ service, projectCode, projectRevision, value, onChange, label }: Props) {
   const supportsSearch = !!service && service.transport === 'http' && !!service.baseUrl;
-  const [manual, setManual] = useState(!supportsSearch);
-
-  useEffect(() => setManual(!supportsSearch), [service?.key, supportsSearch]);
 
   const { data: candidates, isLoading } = useProjectSearchCandidates(
-    service?.key ?? '', projectCode ?? '', projectRevision ?? '', supportsSearch && !manual,
+    service?.key ?? '', projectCode ?? '', projectRevision ?? '', supportsSearch,
   );
 
-  const fieldLabel = label ?? (service
-    ? `External artifact ID — the exact ${service.name} project this deliverable maps to`
-    : "External artifact ID — optional; fill in once it's registered there");
+  if (!service) return null;
 
-  if (!supportsSearch || manual) {
+  const fieldLabel = label ?? `External artifact ID — the exact ${service.name} project this deliverable maps to`;
+
+  if (!supportsSearch) {
     return (
       <Field label={fieldLabel}>
-        <TextInput
-          value={value}
-          onChange={onChange}
-          placeholder="e.g. the artifact's id in that system"
-        />
-        {supportsSearch && (
-          <Box component="span" sx={linkSx} onClick={() => setManual(false)}>
-            <Icon name="search" size={12} /> Pick from {service!.name} instead
-          </Box>
-        )}
+        <Box
+          sx={{
+            fontSize: 11.5, color: T.dm, background: T.sf2, border: `1px solid ${T.ln}`,
+            borderRadius: '8px', padding: '8px 10px', lineHeight: 1.6,
+          }}
+        >
+          {service.name} doesn't support picking a project by code/revision, so it can't be linked here.
+        </Box>
       </Field>
     );
   }
@@ -70,7 +59,7 @@ export function ExternalArtifactPicker({ service, projectCode, projectRevision, 
     <Field label={fieldLabel}>
       {isLoading ? (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 0', fontSize: 12, color: T.dm2 }}>
-          <CircularProgress size={13} /> Searching {service!.name}…
+          <CircularProgress size={13} /> Searching {service.name}…
         </Box>
       ) : (candidates?.length ?? 0) === 0 ? (
         <Box
@@ -79,9 +68,9 @@ export function ExternalArtifactPicker({ service, projectCode, projectRevision, 
             borderRadius: '8px', padding: '8px 10px', lineHeight: 1.6,
           }}
         >
-          No matching {service!.name} project for this project's code
+          No matching {service.name} project for this project's code
           {projectRevision ? `/revision (${projectCode}/${projectRevision})` : ` (${projectCode})`} —
-          it may not be registered there yet, or {service!.name} may not be reachable right now.
+          it may not be registered there yet, or {service.name} may not be reachable right now.
         </Box>
       ) : (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
@@ -124,14 +113,9 @@ export function ExternalArtifactPicker({ service, projectCode, projectRevision, 
         >
           <Box component="span" sx={{ mt: '1px' }}><Icon name="warn" size={12} /></Box>
           Currently set to <Box component="span" sx={{ fontFamily: FONT_MONO }}>{value}</Box>, which isn't
-          in the candidates above — it may have been entered manually, or no longer matches. Pick a
-          candidate to replace it, or keep it if you know it's still correct.
+          in the candidates above — pick one to replace it.
         </Box>
       )}
-
-      <Box component="span" sx={linkSx} onClick={() => setManual(true)}>
-        <Icon name="edit" size={12} /> Enter the ID manually instead
-      </Box>
     </Field>
   );
 }

@@ -110,7 +110,15 @@ export function useUpdateDeliverable(workflowId: string) {
       const res = await apiClient.patch<ApiEnvelope<DeliverableDto>>(`/deliverables/${id}`, patch);
       return res.data.data;
     },
-    onSuccess: () => invalidateDeliverables(qc, workflowId),
+    // serviceKey/externalArtifactId를 바꾼 저장은 이 산출물이 가리키는 실체 자체가
+    // 달라지는 것이다 — live-access/live-versions는 별도 캐시 키(deliverable id 기준)라
+    // 목록 무효화만으로는 갱신되지 않는다. 이걸 빼먹으면 상세 패널이 열려 있는 채로
+    // 저장해도 예전 서비스/버전 정보가 그대로 남아, 새로고침해야만 반영되는 것처럼 보인다.
+    onSuccess: (updated) => {
+      invalidateDeliverables(qc, workflowId);
+      qc.invalidateQueries({ queryKey: queryKeys.deliverableLiveAccess(updated.id) });
+      qc.invalidateQueries({ queryKey: queryKeys.deliverableLiveVersions(updated.id) });
+    },
   });
 }
 

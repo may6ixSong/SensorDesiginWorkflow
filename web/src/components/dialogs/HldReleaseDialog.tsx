@@ -204,7 +204,7 @@ export function HldReleaseDialog({
                   </Box>
                   <Box component="td" sx={{ padding: '9px 12px' }}>
                     <Box component="span" sx={{ fontFamily: FONT_MONO, fontWeight: 600, color: T.tl }}>
-                      {rec ? `v${rec.version}` : ''}
+                      {rec?.version ?? ''}
                     </Box>
                   </Box>
                   <Box component="td" sx={{ padding: '9px 12px' }}>

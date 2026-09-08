@@ -655,7 +655,7 @@ function ExternalVersionList({
           >
             <Box sx={{ display: 'flex', alignItems: 'center', gap: '7px', flexWrap: 'wrap' }}>
               <Box sx={{ fontFamily: FONT_MONO, fontSize: 13, fontWeight: 600, color: v.isReleased ? T.tl : T.am }}>
-                v{v.versionLabel}
+                {v.versionLabel}
               </Box>
               <Badge color={v.isReleased ? T.tl : T.am} bg={v.isReleased ? T.tl2 : T.am2} borderColor={v.isReleased ? T.tl3 : T.am3}>
                 {v.isReleased ? 'RELEASE' : 'WORKING'}
@@ -681,7 +681,7 @@ function ExternalVersionSummary({ versions, canEdit }: { versions: LiveVersionRe
       <Card sx={{ flex: 1, minWidth: 0 }}>
         <Ey>Recipient sees</Ey>
         <Box sx={{ fontFamily: FONT_MONO, fontSize: 17, fontWeight: 600, color: T.tl, mt: '5px' }}>
-          {released ? `v${released.versionLabel}` : '—'}
+          {released ? released.versionLabel : '—'}
         </Box>
         <Box sx={{ fontSize: 10, color: T.dm2, mt: '3px' }}>
           {released?.observedAt ? fmtAt(released.observedAt) : 'No release yet'}
@@ -690,7 +690,7 @@ function ExternalVersionSummary({ versions, canEdit }: { versions: LiveVersionRe
       <Card sx={{ flex: 1, minWidth: 0, opacity: canEdit ? 1 : 0.5 }}>
         <Ey>Working copy</Ey>
         <Box sx={{ fontFamily: FONT_MONO, fontSize: 17, fontWeight: 600, color: T.am, mt: '5px', display: 'flex', alignItems: 'center' }}>
-          {canEdit ? (working ? `v${working.versionLabel}` : 'None') : <Icon name="lock" />}
+          {canEdit ? (working ? working.versionLabel : 'None') : <Icon name="lock" />}
         </Box>
         <Box sx={{ fontSize: 10, color: T.dm2, mt: '3px' }}>
           {canEdit ? (working?.observedAt ? fmtAt(working.observedAt) : 'No changes since release') : 'editors only'}
