@@ -146,6 +146,9 @@ export class HubService {
       svc.embedUploadUrlTemplate = dto.embedUploadUrlTemplate.trim() || null;
     }
     if (dto.enabled !== undefined) svc.enabled = dto.enabled;
+    if (dto.artifactTypes !== undefined) {
+      svc.artifactTypes = this.normalizeArtifactTypes(dto.artifactTypes);
+    }
     await svc.save();
 
     await this.audit.log(actor.realKnoxId, 'ARTIFACT_SERVICE_UPDATE', 'artifactService', svc._id, {

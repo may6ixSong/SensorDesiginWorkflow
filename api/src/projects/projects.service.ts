@@ -230,18 +230,23 @@ export class ProjectsService {
   /** 과제 메타데이터(이름/코드/상태) 수정 — 마일스톤은 updateMilestones가 따로 다룬다. */
   async updateProject(
     id: string,
-    dto: { name?: string; code?: string; status?: string },
+    dto: { name?: string; code?: string; revision?: string; status?: string },
     actor: Actor,
   ) {
     await this.assertManageAccess(id, actor);
     const project = await this.findByIdOrThrow(id);
 
-    if (dto.code !== undefined && dto.code !== project.code) {
-      const existing = await this.model.findOne({ code: dto.code }).exec();
+    // code+revision 조합만 유일하면 된다(Hub 설계서 §19) - 같은 code라도 revision이
+    // 다르면 별개 프로젝트다. 둘 중 하나만 바뀌어도 조합이 바뀌므로 항상 같이 검사한다.
+    const nextCode = dto.code ?? project.code;
+    const nextRevision = dto.revision ?? project.revision ?? '';
+    if (nextCode !== project.code || nextRevision !== (project.revision ?? '')) {
+      const existing = await this.model.findOne({ code: nextCode, revision: nextRevision }).exec();
       if (existing && existing._id.toString() !== project._id.toString()) {
-        throw new BadRequestException('That project code is already in use.');
+        throw new BadRequestException('That project code + revision is already in use.');
       }
-      project.code = dto.code;
+      project.code = nextCode;
+      project.revision = nextRevision;
     }
     if (dto.name !== undefined) project.name = dto.name;
     if (dto.status !== undefined) project.status = dto.status;

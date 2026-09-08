@@ -27,6 +27,9 @@ export const AUDIT_ACTIONS = [
   'MANUAL_VERSION_ASSERT',
   /** 산출물이 Hub 서비스에 처음 묶인 시점 - 티어 전환의 표시 (§5.3). */
   'ARTIFACT_SERVICE_LINKED',
+  /** 과제(code+revision)와 외부 서비스 프로젝트를 잇는 확정 링크 (§19.3). */
+  'PROJECT_SERVICE_LINK_CREATE',
+  'PROJECT_SERVICE_LINK_DELETE',
 
   // 접근 권한 · 데이터 소실
   'DELIVERABLE_DELETE',
