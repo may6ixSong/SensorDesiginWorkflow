@@ -61,6 +61,11 @@ export function BoardPage() {
   const { data: memos } = useMemos(workflowId);
   const { data: edges } = useEdges(workflowId);
   const { data: hlds } = useHldReleases(workflowId);
+  // Admin(Group==='Admin')은 서버가 내려주는 workflow.myAccess와 무관하게 owner와
+  // 동등한 super 권한을 갖는다 — 캔버스를 라이브로 볼지(Edit) 최신 HLD 스냅샷으로
+  // 볼지(View) 가르는 기준도 이 값이어야 한다(§19.3). myAccess를 그대로 쓰면 Admin도
+  // "아직 Release가 없다"는 이유로 빈 캔버스를 보게 되는 버그가 생긴다(실측 확인).
+  const isOwner = canEditWorkflow(workflow, isAdmin);
 
   const st = useCanvasStore;
   const edit = useCanvasStore((s) => s.edit);
@@ -121,7 +126,9 @@ export function BoardPage() {
     if (!workflowId || !workflow) return;
     if (st.getState().edit) return;
 
-    const viewOnly = workflow.myAccess === 'view';
+    // myAccess는 서버가 owner 여부만으로 계산한 값이라 Admin의 super 권한을 모른다 —
+    // 그래서 isOwner(canEditWorkflow)로 판단해야 Admin도 항상 라이브 캔버스를 본다.
+    const viewOnly = !isOwner;
     const latestHld = hlds?.[0] ?? null;
     const incomingNodes = incoming.map((d) => toCanvasNode(d, 'incoming'));
 
@@ -167,7 +174,7 @@ export function BoardPage() {
       }
     });
     s.bumpBlocks();
-  }, [workflowId, workflow, deliverables, incoming, memos, edges, hlds, st]);
+  }, [workflowId, workflow, isOwner, deliverables, incoming, memos, edges, hlds, st]);
 
   /**
    * 편집 모드로 둔 채 이 페이지를 떠나면(다른 workflow로 이동 포함) 캔버스 편집 상태가
@@ -182,8 +189,6 @@ export function BoardPage() {
       if (useCanvasStore.getState().edit) useCanvasStore.getState().cancelEdit();
     };
   }, [workflowId]);
-
-  const isOwner = canEditWorkflow(workflow, isAdmin); // Admin(Group==='Admin')은 owner가 아니어도 편집 가능
 
   const openNode = useMemo(() => nodes.find((n) => n.id === openId) ?? null, [nodes, openId]);
   const incomingNode = useMemo(() => incoming.find((d) => d.id === incomingId) ?? null, [incoming, incomingId]);
@@ -335,7 +340,7 @@ export function BoardPage() {
               st.getState().setWorkflowSettingsTab(isOwner ? 'details' : 'permissions');
             }}
           />
-          {workflow.myAccess === 'view' && !(hlds?.length ?? 0) && (
+          {!isOwner && !(hlds?.length ?? 0) && (
             <Box
               sx={{
                 display: 'flex', alignItems: 'center', gap: '9px', fontSize: 12.5, color: T.dm,
