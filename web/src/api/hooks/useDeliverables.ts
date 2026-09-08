@@ -1,7 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient, ApiEnvelope } from '../client';
 import { queryKeys } from '../queryKeys';
-import { DeliverableDto, DeliverableVersionDto, DeliverablesListResponse } from '@/types/domain';
+import {
+  DeliverableDto, DeliverableVersionDto, DeliverablesListResponse, LiveAccessDto, LiveVersionRecordDto,
+} from '@/types/domain';
 import { useCanvasStore } from '@/store/canvasStore';
 
 /**
@@ -29,6 +31,34 @@ export function useDeliverableVersions(id: string | undefined) {
     enabled: Boolean(id),
     queryFn: async () => {
       const res = await apiClient.get<ApiEnvelope<DeliverableVersionDto[]>>(`/deliverables/${id}/versions`);
+      return res.data.data;
+    },
+  });
+}
+
+/**
+ * 연동된(Calypso 제외) 서비스의 실시간 접근 권한(§19.5) — DeliverableDialog의 3-state
+ * 판정(차단/열람 전용/편집)이 이 값 하나로 갈린다. Calypso는 대상이 아니다(브라우저가
+ * 이미 직접 부른다) — enabled를 그 경우 false로 둔다.
+ */
+export function useDeliverableLiveAccess(id: string | undefined, enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.deliverableLiveAccess(id ?? ''),
+    enabled: Boolean(id) && enabled,
+    queryFn: async () => {
+      const res = await apiClient.get<ApiEnvelope<LiveAccessDto>>(`/deliverables/${id}/live-access`);
+      return res.data.data;
+    },
+  });
+}
+
+/** view 권한이 확인된 뒤에만 부른다 — 그 서비스가 이미 필터링해 준 목록을 그대로 쓴다(§19.2). */
+export function useDeliverableLiveVersions(id: string | undefined, enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.deliverableLiveVersions(id ?? ''),
+    enabled: Boolean(id) && enabled,
+    queryFn: async () => {
+      const res = await apiClient.get<ApiEnvelope<LiveVersionRecordDto[]>>(`/deliverables/${id}/live-versions`);
       return res.data.data;
     },
   });

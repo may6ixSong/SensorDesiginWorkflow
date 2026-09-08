@@ -142,6 +142,31 @@ export interface DeliverableVersionDto {
   at: string;
 }
 
+/**
+ * 연동된(Calypso 제외) 서비스로부터 그때그때 직접 물어본 접근 권한(§19.2, §19.5) —
+ * fail-closed이므로 서비스가 응답하지 않으면 둘 다 false로 온다.
+ */
+export interface LiveAccessDto {
+  canView: boolean;
+  canEdit: boolean;
+}
+
+/**
+ * 연동된 서비스가 knoxId 기준으로 이미 필터링해 준 버전 레코드 그대로다(§19.2) —
+ * SIREN은 다시 마스킹하지 않는다. editors는 그 서비스가 edit 권한이 있는 호출자에게만
+ * 채워 보낸다 — view 권한이면 항상 null이다.
+ */
+export interface LiveVersionRecordDto {
+  versionLabel: string;
+  isReleased: boolean;
+  giverKnoxId: string | null;
+  giverDept: string | null;
+  viewUrl: string | null;
+  sourceRefs: SourceRefDto[];
+  editors: string[] | null;
+  observedAt: string | null;
+}
+
 /** 산출물 수신 workflow 셀렉트 박스 및 Incoming 카드용 최소 정보. */
 export interface WorkflowBriefDto {
   id: string;

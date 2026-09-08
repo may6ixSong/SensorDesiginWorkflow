@@ -11,6 +11,8 @@ import {
 } from '@/lib/canvasModel';
 import { useCanvasStore } from '@/store/canvasStore';
 import { useArtifactServices } from '@/api/hooks/useHub';
+import { useDeliverableLiveAccess, useDeliverableLiveVersions } from '@/api/hooks/useDeliverables';
+import { LiveVersionRecordDto } from '@/types/domain';
 import { RECEIVABLE_DEPARTMENTS, departmentName } from '@/shared/constants/departments';
 import { useDirectory } from '@/app/providers/DirectoryProvider';
 import { UserSearchDialog } from '@/components/dialogs/UserSearchDialog';
@@ -95,11 +97,14 @@ export function DeliverableDialog({
   const [picked, setPicked] = useState<VersionView | null>(null);
   /** Calypso에 연동된 산출물이면 이쪽에서 고른 버전을 쓴다 — 아래 calypsoLinked 참고. */
   const [calypsoPicked, setCalypsoPicked] = useState<CalypsoVersionView | null>(null);
+  /** Calypso 이외의 연동 서비스면 이쪽에서 고른 버전을 쓴다 — 아래 externalLinked 참고. */
+  const [externalPicked, setExternalPicked] = useState<LiveVersionRecordDto | null>(null);
   /** B영역 탭 — 전달(Handoff)만 다시 탭으로 분리한다(사용자 요청), 나머지는 한 레일. */
   const [bTab, setBTab] = useState<'overview' | 'handoff'>('overview');
 
   useEffect(() => setPicked(null), [d?.id]);
   useEffect(() => setCalypsoPicked(null), [d?.id]);
+  useEffect(() => setExternalPicked(null), [d?.id]);
   useEffect(() => setBTab('overview'), [d?.id]);
 
   const qc = useQueryClient();
@@ -142,12 +147,31 @@ export function DeliverableDialog({
   }, [calypsoForbidden]);
 
   /**
-   * Calypso에 연동 안 된(mapping 안 된) 산출물은 확인할 외부 ACL이 없다 — 그런 산출물의
-   * "권한"은 이 workflow 자체의 Edit 권한(own)으로 대신한다(사용자 요청: "권한 없으면
-   * 무조건 차단" — 컨텐츠가 비어 있어도 패널 구조 자체가 열리는 것도 안 된다). own이
-   * 아니면 calypso-forbidden과 똑같이 toast + 자동 닫힘.
+   * Calypso 이외의 연동 서비스는 그 서비스에 실시간으로 access를 물어봐 3-state(차단/
+   * 열람 전용/편집)를 가른다(설계서 §19.5, §19.6) — Calypso처럼 SIREN이 자체 판정을
+   * 대신하지 않는다. fail-closed이므로 응답이 없거나 실패해도 canView는 false다.
    */
-  const unmappedForbidden = !calypsoLinked && !own;
+  const externalLinked = !!d?.serviceKey && d.serviceKey !== 'calypso' && !!d?.externalArtifactId;
+  const { data: liveAccess, isLoading: liveAccessLoading } = useDeliverableLiveAccess(d?.id, externalLinked);
+  const liveCanView = liveAccess?.canView === true;
+  const liveCanEdit = liveAccess?.canEdit === true;
+  const { data: liveVersions } = useDeliverableLiveVersions(d?.id, externalLinked && liveCanView);
+  const externalForbidden = externalLinked && !liveAccessLoading && !liveCanView;
+  useEffect(() => {
+    if (d && externalForbidden) {
+      toast('You do not have view access to this artifact.');
+      onClose();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [d?.id, externalForbidden]);
+
+  /**
+   * Calypso도 아니고 다른 서비스에 연동되지도 않은(mapping 안 된) 산출물은 확인할 외부
+   * ACL이 없다 — 그런 산출물의 "권한"은 이 workflow 자체의 Edit 권한(own)으로 대신한다
+   * (사용자 요청: "권한 없으면 무조건 차단" — 컨텐츠가 비어 있어도 패널 구조 자체가
+   * 열리는 것도 안 된다). own이 아니면 calypso-forbidden과 똑같이 toast + 자동 닫힘.
+   */
+  const unmappedForbidden = !calypsoLinked && !externalLinked && !own;
   useEffect(() => {
     if (d && unmappedForbidden) {
       toast('You do not have access to this artifact.');
@@ -213,6 +237,7 @@ export function DeliverableDialog({
   const received = d.intent === 'received';
   const shown = picked ?? (own ? latA(d) : latR(d));
   const calypsoShown = calypsoPicked ?? calypsoArtifact?.latestVersion ?? null;
+  const externalShown = externalPicked ?? liveVersions?.[0] ?? null;
   /** 실물을 소유한 서비스가 붙어 있으면 버전은 그쪽에서 올라온다 — SIREN에서 못 쓴다(§1.2). */
   const canRecord = own && !received && !d.serviceKey;
   /**
@@ -299,6 +324,16 @@ export function DeliverableDialog({
                   : 'It may not exist in Calypso, or the link is stale.'}
               </Box>
             </Box>
+          ) : externalLinked && liveAccessLoading ? (
+            <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <CircularProgress size={24} />
+            </Box>
+          ) : externalLinked ? (
+            <Box sx={{ flex: 1, minWidth: 0, overflowY: 'auto', background: T.sf3, padding: '22px' }}>
+              <Box sx={{ width: '100%', maxWidth: 660, mx: 'auto' }}>
+                <ExternalVersionContents version={externalShown} canEdit={liveCanEdit} />
+              </Box>
+            </Box>
           ) : (
             <Box sx={{ flex: 1, minWidth: 0, overflowY: 'auto', background: T.sf3, padding: '22px' }}>
               <Box sx={{ width: '100%', maxWidth: 660, mx: 'auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -349,7 +384,11 @@ export function DeliverableDialog({
           </Box>
         ) : (
           <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '14px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <VersionSummary d={d} own={own} calypso={calypsoLinked ? calypsoArtifact ?? null : undefined} />
+            {externalLinked ? (
+              <ExternalVersionSummary versions={liveVersions ?? []} canEdit={liveCanEdit} />
+            ) : (
+              <VersionSummary d={d} own={own} calypso={calypsoLinked ? calypsoArtifact ?? null : undefined} />
+            )}
 
             <Card>
               <Ey sx={{ mb: '9px' }}>Version history</Ey>
@@ -359,10 +398,20 @@ export function DeliverableDialog({
                   selected={calypsoShown}
                   onSelect={setCalypsoPicked}
                 />
+              ) : externalLinked ? (
+                <ExternalVersionList
+                  versions={liveVersions ?? []}
+                  selected={externalShown}
+                  onSelect={setExternalPicked}
+                />
               ) : (
                 <VersionTree versions={d.versions} selected={shown} onSelect={setPicked} />
               )}
             </Card>
+
+            {externalLinked && liveCanEdit && (externalShown?.editors?.length ?? 0) > 0 && (
+              <ExternalEditorsCard editors={externalShown!.editors as string[]} />
+            )}
 
             {calypsoLinked && calypsoArtifact && calypsoArtifact.myAccess === 'edit' && (
               <ArtifactAccessPanel
@@ -457,6 +506,213 @@ function RecordVersionCard({
           </SirenButton>
         </Box>
       )}
+    </Card>
+  );
+}
+
+/**
+ * A: Calypso 이외의 연동 서비스(§19.5, §19.6) — 그 서비스가 knoxId 기준으로 이미
+ * 필터링해 준 레코드를 그대로 문서면처럼 보여준다. tier/note/hpcPath 같은 SIREN 자체
+ * 필드는 이 계약에 없으므로(ObserverVersionRecord) VersionContents보다 단순하다.
+ */
+function ExternalVersionContents({
+  version: v, canEdit,
+}: { version: LiveVersionRecordDto | null; canEdit: boolean }) {
+  const { resolveUser } = useDirectory();
+
+  if (!v) {
+    return (
+      <Box
+        sx={{
+          border: `1px dashed ${T.ln2}`, borderRadius: '12px', background: T.sf,
+          padding: '40px 20px', textAlign: 'center', color: T.dm2,
+        }}
+      >
+        <Icon name="word" size={24} />
+        <Box sx={{ fontSize: 12.5, mt: '9px' }}>No version to show yet.</Box>
+      </Box>
+    );
+  }
+
+  const by = v.giverKnoxId ? resolveUser(v.giverKnoxId) : null;
+  const accent = v.isReleased ? T.tl : T.am;
+
+  return (
+    <Box
+      sx={{
+        background: T.sf, border: `1px solid ${T.ln}`, borderRadius: '12px',
+        boxShadow: T.sl, overflow: 'hidden', display: 'flex', flexDirection: 'column',
+      }}
+    >
+      <Box sx={{ height: 4, background: accent, flex: '0 0 auto' }} />
+      <Box sx={{ padding: '24px 28px 26px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: '9px', flexWrap: 'wrap' }}>
+          <Box sx={{ fontFamily: FONT_MONO, fontSize: 26, fontWeight: 600, color: accent, lineHeight: 1 }}>
+            {v.versionLabel}
+          </Box>
+          <Badge color={accent} bg={v.isReleased ? T.tl2 : T.am2} borderColor={v.isReleased ? T.tl3 : T.am3}>
+            {v.isReleased ? 'RELEASE' : 'WORKING'}
+          </Badge>
+          {!canEdit && <Badge color={T.dm} bg={T.sf2} borderColor={T.ln}>View only</Badge>}
+        </Box>
+
+        {by && (
+          <Box
+            sx={{
+              display: 'flex', alignItems: 'center', gap: '9px', mt: '16px',
+              paddingTop: '15px', borderTop: `1px solid ${T.ln}`,
+            }}
+          >
+            <UserAvatar user={by} size={30} />
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Box sx={{ fontSize: 13, fontWeight: 600 }}>{by.name}</Box>
+              <Box sx={{ fontFamily: FONT_MONO, fontSize: 10.5, color: T.dm2, mt: '2px' }}>
+                {v.observedAt ? fmtAt(v.observedAt) : '—'}
+                {v.giverDept ? ` · ${v.giverDept}` : ''}
+              </Box>
+            </Box>
+          </Box>
+        )}
+
+        {(v.sourceRefs?.length ?? 0) > 0 && (
+          <Box sx={{ mt: '18px' }}>
+            <Box
+              sx={{
+                fontFamily: FONT_MONO, fontSize: 10, letterSpacing: '.15em',
+                textTransform: 'uppercase', color: T.dm2, mb: '8px',
+              }}
+            >
+              Built from
+            </Box>
+            {v.sourceRefs.map((s) => (
+              <Box
+                key={`${s.serviceKey}:${s.versionRef}`}
+                sx={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 0', borderTop: `1px solid ${T.ln}` }}
+              >
+                <Box component="span" sx={{ color: T.dm2 }}><Icon name="link" size={12} /></Box>
+                <Box sx={{ flex: 1, minWidth: 0, fontSize: 12.5 }}>{s.artifactKey || s.serviceKey}</Box>
+                <Box sx={{ fontFamily: FONT_MONO, fontSize: 10.5, color: T.dm2 }}>
+                  {s.serviceKey} · {s.versionLabel || s.versionRef}
+                </Box>
+              </Box>
+            ))}
+          </Box>
+        )}
+
+        <Box sx={{ mt: '18px', paddingTop: '18px', borderTop: `1px solid ${T.ln}` }}>
+          <Box
+            sx={{
+              fontFamily: FONT_MONO, fontSize: 10, letterSpacing: '.15em',
+              textTransform: 'uppercase', color: T.dm2, mb: '9px',
+            }}
+          >
+            Location
+          </Box>
+          {v.viewUrl ? (
+            <SirenButton onClick={() => window.open(v.viewUrl as string, '_blank', 'noopener')}>
+              <Icon name="link" /> Open in source
+            </SirenButton>
+          ) : (
+            <Box sx={{ fontSize: 12.5, color: T.dm2 }}>No link recorded for this version.</Box>
+          )}
+        </Box>
+      </Box>
+    </Box>
+  );
+}
+
+/** B: Calypso 이외의 연동 서비스 — 버전 이력을 그 서비스가 준 순서(최신 우선) 그대로 나열한다. */
+function ExternalVersionList({
+  versions, selected, onSelect,
+}: { versions: LiveVersionRecordDto[]; selected: LiveVersionRecordDto | null; onSelect: (v: LiveVersionRecordDto) => void }) {
+  if (!versions.length) {
+    return (
+      <Box
+        sx={{
+          border: `1px dashed ${T.ln2}`, borderRadius: '10px', background: T.sf,
+          padding: '26px 16px', textAlign: 'center', fontSize: 12.5, color: T.dm2,
+        }}
+      >
+        No versions visible to you yet.
+      </Box>
+    );
+  }
+  return (
+    <Box>
+      {versions.map((v, i) => {
+        const isSel = selected === v;
+        return (
+          <Box
+            key={`${v.versionLabel}-${i}`}
+            onClick={() => onSelect(v)}
+            sx={{
+              mb: '8px', background: isSel ? (v.isReleased ? T.tl2 : T.am2) : T.sf,
+              border: `1px solid ${isSel ? (v.isReleased ? T.tl3 : T.am3) : T.ln}`,
+              borderRadius: '9px', padding: '8px 11px 9px', cursor: CURSOR_POINTER,
+              transition: 'background .15s, border-color .15s',
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: '7px', flexWrap: 'wrap' }}>
+              <Box sx={{ fontFamily: FONT_MONO, fontSize: 13, fontWeight: 600, color: v.isReleased ? T.tl : T.am }}>
+                v{v.versionLabel}
+              </Box>
+              <Badge color={v.isReleased ? T.tl : T.am} bg={v.isReleased ? T.tl2 : T.am2} borderColor={v.isReleased ? T.tl3 : T.am3}>
+                {v.isReleased ? 'RELEASE' : 'WORKING'}
+              </Badge>
+              {i === 0 && <Badge color={T.vi} bg={T.vi2} borderColor={T.vi3}>LATEST</Badge>}
+            </Box>
+            <Box sx={{ fontFamily: FONT_MONO, fontSize: 10, color: T.dm2, mt: '5px' }}>
+              {v.giverKnoxId ?? '—'} · {v.observedAt ? fmtAt(v.observedAt) : '—'}
+            </Box>
+          </Box>
+        );
+      })}
+    </Box>
+  );
+}
+
+/** B: 요약 배지 — Calypso 이외의 연동 서비스용. canEdit가 아니면 Working copy는 항상 잠긴다. */
+function ExternalVersionSummary({ versions, canEdit }: { versions: LiveVersionRecordDto[]; canEdit: boolean }) {
+  const released = versions.find((v) => v.isReleased) ?? null;
+  const working = canEdit ? versions.find((v) => !v.isReleased) ?? null : null;
+  return (
+    <Row>
+      <Card sx={{ flex: 1, minWidth: 0 }}>
+        <Ey>Recipient sees</Ey>
+        <Box sx={{ fontFamily: FONT_MONO, fontSize: 17, fontWeight: 600, color: T.tl, mt: '5px' }}>
+          {released ? `v${released.versionLabel}` : '—'}
+        </Box>
+        <Box sx={{ fontSize: 10, color: T.dm2, mt: '3px' }}>
+          {released?.observedAt ? fmtAt(released.observedAt) : 'No release yet'}
+        </Box>
+      </Card>
+      <Card sx={{ flex: 1, minWidth: 0, opacity: canEdit ? 1 : 0.5 }}>
+        <Ey>Working copy</Ey>
+        <Box sx={{ fontFamily: FONT_MONO, fontSize: 17, fontWeight: 600, color: T.am, mt: '5px', display: 'flex', alignItems: 'center' }}>
+          {canEdit ? (working ? `v${working.versionLabel}` : 'None') : <Icon name="lock" />}
+        </Box>
+        <Box sx={{ fontSize: 10, color: T.dm2, mt: '3px' }}>
+          {canEdit ? (working?.observedAt ? fmtAt(working.observedAt) : 'No changes since release') : 'editors only'}
+        </Box>
+      </Card>
+    </Row>
+  );
+}
+
+/** B: 그 서비스가 edit 권한이 있는 호출자에게만 채워 보낸 편집자 목록(§19.2). */
+function ExternalEditorsCard({ editors }: { editors: string[] }) {
+  const { resolveUser } = useDirectory();
+  return (
+    <Card>
+      <Ey sx={{ mb: '9px' }}>Editors</Ey>
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+        {editors.map((knoxId) => (
+          <Box key={knoxId} sx={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <UserAvatar user={resolveUser(knoxId)} size={20} />
+            <Box sx={{ fontSize: 12 }}>{resolveUser(knoxId).name}</Box>
+          </Box>
+        ))}
+      </Box>
     </Card>
   );
 }
