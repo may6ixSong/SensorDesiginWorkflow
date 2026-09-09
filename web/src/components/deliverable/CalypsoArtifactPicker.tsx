@@ -41,22 +41,22 @@ export function CalypsoArtifactPicker({ projectId, myDepartments, value, onChang
   }, [data, q]);
 
   return (
-    <Field label="Calypso artifact — only ones you have view access to">
+    <Field label="File — only ones you have view access to">
       <TextInput value={q} onChange={setQ} placeholder="Search by name or department" />
       <Box sx={{ mt: '8px', maxHeight: 230, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '5px' }}>
         {isError ? (
           <Box sx={{ fontSize: 11.5, color: T.dm, background: T.sf2, border: `1px solid ${T.ln}`, borderRadius: '8px', padding: '8px 10px', lineHeight: 1.6 }}>
-            Could not reach Calypso — check that it's running.
+            Could not reach the file service — check that it's running.
           </Box>
         ) : isLoading ? (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 0', fontSize: 12, color: T.dm2 }}>
-            <CircularProgress size={13} /> Loading Calypso artifacts…
+            <CircularProgress size={13} /> Loading files…
           </Box>
         ) : filtered.length === 0 ? (
           <Box sx={{ fontSize: 11.5, color: T.dm, background: T.sf2, border: `1px solid ${T.ln}`, borderRadius: '8px', padding: '8px 10px', lineHeight: 1.6 }}>
             {data?.length
               ? 'No match for that search.'
-              : "No Calypso artifacts you can access in this project yet — register one on the project's Artifacts page first."}
+              : "No files you can access in this project yet — register one on the project's Artifacts page first."}
           </Box>
         ) : (
           filtered.map((a) => {

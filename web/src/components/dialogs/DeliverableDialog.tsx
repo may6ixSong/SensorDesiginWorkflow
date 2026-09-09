@@ -265,7 +265,9 @@ export function DeliverableDialog({
             {orphan && <Badge color={T.rd} bg={T.rd2} borderColor={T.rd3}>Schedule lost</Badge>}
             <Badge color={st.c} bg={st.bg} borderColor={st.bd}>{st.lb}</Badge>
             {d.serviceKey ? (
-              <Badge color={T.tl} bg={T.tl2} borderColor={T.tl3}>{d.serviceKey.toUpperCase()}</Badge>
+              <Badge color={T.tl} bg={T.tl2} borderColor={T.tl3}>
+                {d.serviceKey === 'calypso' ? 'FILES' : d.serviceKey.toUpperCase()}
+              </Badge>
             ) : (
               <Badge color={T.dm} bg={T.sf2} borderColor={T.ln}>Unlinked</Badge>
             )}
@@ -318,12 +320,12 @@ export function DeliverableDialog({
           ) : calypsoLinked && calypsoError ? (
             <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '22px' }}>
               <Box sx={{ fontSize: 13.5, fontWeight: 600 }}>
-                {calypsoForbidden ? 'You do not have view access to this artifact' : 'Could not load the linked Calypso artifact'}
+                {calypsoForbidden ? 'You do not have view access to this artifact' : 'Could not load the linked file'}
               </Box>
               <Box sx={{ fontSize: 12, color: T.dm2 }}>
                 {calypsoForbidden
                   ? 'Ask its registrant or an editor to grant you access.'
-                  : 'It may not exist in Calypso, or the link is stale.'}
+                  : 'It may not exist, or the link is stale.'}
               </Box>
             </Box>
           ) : externalLinked && liveAccessLoading ? (
@@ -853,7 +855,7 @@ function BasicInfoCard({
           {([
             { m: 'none' as const, label: 'Not linked' },
             { m: 'service' as const, label: 'Connected Service' },
-            { m: 'calypso' as const, label: 'Calypso' },
+            { m: 'calypso' as const, label: 'Files' },
           ]).map(({ m, label }) => (
             <Box
               key={m}

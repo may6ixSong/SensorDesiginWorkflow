@@ -158,7 +158,7 @@ export function AddDeliverableDialog({
           {([
             { m: 'none' as const, label: 'Not linked' },
             { m: 'service' as const, label: 'Connected Service' },
-            { m: 'calypso' as const, label: 'Calypso' },
+            { m: 'calypso' as const, label: 'Files' },
           ]).map(({ m, label }) => (
             <Box
               key={m}
