@@ -1,13 +1,25 @@
 import { Box } from '@mui/material';
 import { CanvasNode, latA, latR, hasW, stOf, vstr, versionBy, fmtAt } from '@/lib/canvasModel';
-import { WorkflowBriefDto, WorkflowPhase } from '@/types/domain';
+import { Tier, WorkflowBriefDto, WorkflowPhase } from '@/types/domain';
 import { departmentName } from '@/shared/constants/departments';
 import { useDirectory } from '@/app/providers/DirectoryProvider';
-import { Icon } from '@/components/common/Icon';
+import { Icon, IconName } from '@/components/common/Icon';
 import { CURSOR_POINTER, FONT_MONO, T } from '@/theme/tokens';
+
+/**
+ * tier별 블록 아이콘(사용자 요청) — B는 기존처럼 문서, A는 "그 서비스가 들고 있는
+ * 진짜 산출물"이라는 느낌의 패키지 아이콘, C/D는 경로/링크 느낌의 체인 아이콘.
+ */
+function iconForTier(tier: Tier): IconName {
+  if (tier === 'A') return 'artifact';
+  if (tier === 'B') return 'word';
+  return 'link';
+}
 
 interface Props {
   d: CanvasNode;
+  /** 아이콘/LIVE 배지를 결정하는 유효 tier(Hub 설계서 §5.1, canvasModel.effectiveTier). */
+  tier: Tier;
   /** 이 산출물이 걸린 phase. 찾을 수 없으면(=일정 유실) undefined다. */
   phase?: WorkflowPhase;
   /**
@@ -36,7 +48,7 @@ interface Props {
 
 /** 목업 nodeH() — 산출물 블록 */
 export function DeliverableNode({
-  d, phase, orphan = false, recvWorkflow, edit, canEdit, isSel, onHl, dimLink, hasHl,
+  d, tier, phase, orphan = false, recvWorkflow, edit, canEdit, isSel, onHl, dimLink, hasHl,
   onOpen, onPinClick, onGripDown, linkActive, registerRef,
   onPointerDown, onPointerMove, onPointerUp, onClick,
 }: Props) {
@@ -171,17 +183,24 @@ export function DeliverableNode({
           <Icon name="lock" size={13} />
         </Box>
       )}
-      {d.serviceKey && (
+      {/* A 티어(연동된 서비스에서 지금 라이브로 관측됨)만 표시한다 — 서비스명 자체는
+          더 이상 블록에 노출하지 않는다(사용자 요청, 상세 패널에서 확인). */}
+      {tier === 'A' && (
         <Box
           component="span"
-          title="Source service"
+          title="Live — observed from the connected service"
           sx={{
-            position: 'absolute', top: 0, right: 0, fontFamily: FONT_MONO, fontSize: 14,
-            letterSpacing: '.08em', padding: '3px 10px 4px', borderBottomLeftRadius: '12px',
-            background: T.tl2, color: T.tl,
+            position: 'absolute', bottom: 0, left: 0, padding: '4px 9px 5px',
+            borderTopRightRadius: '12px', background: T.tl2, color: T.tl,
+            display: 'inline-flex', alignItems: 'center', gap: '5px',
+            fontFamily: FONT_MONO, fontSize: 11, fontWeight: 700, letterSpacing: '.08em',
           }}
         >
-          {d.serviceKey.toUpperCase()}
+          <Box
+            component="span"
+            sx={{ width: 6, height: 6, borderRadius: '50%', background: T.tl, flex: '0 0 auto' }}
+          />
+          LIVE
         </Box>
       )}
 
@@ -229,7 +248,7 @@ export function DeliverableNode({
 
       <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: '10px', pl: '12px' }}>
         <Box component="span" sx={{ color: col, flex: '0 0 auto' }}>
-          <Icon name={d.serviceKey ? 'link' : 'word'} size={20} />
+          <Icon name={iconForTier(tier)} size={20} />
         </Box>
         <Box
           sx={{

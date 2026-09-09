@@ -526,6 +526,17 @@ export const hasW = (d: CanvasNode) => !!d.workingVersion;
 /** 버전을 만들어 준 사람 — giver가 없으면(C/D 티어 등) 수동 기록자로 대신한다. */
 export const versionBy = (v: VersionView) => v.giverKnoxId ?? v.assertedBy ?? '';
 
+/**
+ * 캔버스 블록의 아이콘/LIVE 배지를 결정하는 유효 tier(Hub 설계서 §5.1). 연동된
+ * 서비스가 있으면 그 서비스의 defaultTier가 기준이다(실제 라이브 관측은 A 티어에서만
+ * 일어나므로, 결국 이 값이 "지금 그 서비스에서 살아있는 데이터인가"를 그대로 보여준다).
+ * 연동이 없으면(수동 C/D 기록) 가장 최근 기록의 tier를 쓰고, 그마저 없으면 C로 본다.
+ */
+export function effectiveTier(d: CanvasNode, tierByServiceKey: Record<string, Tier>): Tier {
+  if (d.serviceKey) return tierByServiceKey[d.serviceKey] ?? 'C';
+  return d.versions[0]?.tier ?? 'C';
+}
+
 export interface StatusStyle { lb: string; c: string; bg: string; bd: string }
 export function stOf(d: CanvasNode): StatusStyle {
   if (!d.versions.length) return { lb: 'Not submitted', c: T.dm2, bg: T.sf2, bd: T.ln };
