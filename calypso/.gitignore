@@ -1,0 +1,11 @@
+node_modules/
+dist/
+*.log
+coverage/
+package-lock.json
+
+# 환경 파일에는 AES_KEY와 S3 시크릿이 들어간다 - 절대 커밋하지 않는다.
+# 키 이름만 담은 .env.example만 공유한다.
+.env
+.env.*
+!.env.example

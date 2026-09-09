@@ -2,21 +2,18 @@ import { ReactNode, useMemo, useState } from 'react';
 import { Box, CircularProgress, Stack, Tooltip, Typography } from '@mui/material';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { WorkflowDto, ProjectDetailDto } from '@/types/domain';
-import { useProject, useProjectWorkflows } from '@/api/hooks/useProjects';
+import { useProject, useProjectWorkflows, useUpdateProject } from '@/api/hooks/useProjects';
 import { AppShell } from '@/components/layout/AppShell';
 import { Card, Ey } from '@/components/common/Panel';
 import { Icon } from '@/components/common/Icon';
 import { SirenButton } from '@/components/common/SirenButton';
 import { DesignWorkflowDialog } from '@/components/workflow/DesignWorkflowDialog';
+import { EditProjectInfoDialog } from '@/components/dialogs/EditProjectInfoDialog';
 import { progressOf } from '@/lib/projectProgress';
+import { toast } from '@/store/toastStore';
 import { FONT_DISPLAY, FONT_MONO, T } from '@/theme/tokens';
-import { canManageProject } from '@/lib/access';
+import { canEditMilestones, canManageProject } from '@/lib/access';
 import { useAuth } from '@/app/providers/AuthProvider';
-
-const TABS = [
-  { to: '', label: 'Information', icon: 'info' as const },
-  { to: '/members', label: 'Members', icon: 'users' as const },
-];
 
 interface Props {
   children: (ctx: { project: ProjectDetailDto; workflows: WorkflowDto[]; own: boolean }) => ReactNode;
@@ -32,10 +29,21 @@ export function ProjectPageShell({ children }: Props) {
   const { pathname } = useLocation();
   const { data: project, isLoading: projectLoading, isError } = useProject(projectId);
   const { data: workflows, isLoading: ipsLoading } = useProjectWorkflows(projectId);
-  const { isAdmin } = useAuth();
+  const { user, isAdmin } = useAuth();
   const [workflowOpen, setWorkflowOpen] = useState(false);
+  const [editInfoOpen, setEditInfoOpen] = useState(false);
+  const [editInfoErr, setEditInfoErr] = useState<string | null>(null);
+  const updateProject = useUpdateProject(projectId ?? '');
 
   const own = useMemo(() => canManageProject(workflows, isAdmin), [workflows, isAdmin]);
+  // Members tab 자체가 Project Manager 전용이다(사용자 요청) — 탭 링크가 안 보이는 것도
+  // 권한의 일부지, 안에 들어가서 편집 버튼만 숨기는 걸로는 부족하다.
+  const canManageMembers = canEditMilestones(project, isAdmin, user?.KnoxID);
+  const TABS = useMemo(() => [
+    { to: '', label: 'Information', icon: 'info' as const },
+    ...(canManageMembers ? [{ to: '/members', label: 'Members', icon: 'users' as const }] : []),
+    { to: '/artifacts', label: 'Artifacts', icon: 'list' as const },
+  ], [canManageMembers]);
   const { pct, current, done, total } = useMemo(
     () => progressOf(project?.milestones ?? []),
     [project?.milestones],
@@ -83,6 +91,19 @@ export function ProjectPageShell({ children }: Props) {
                 >
                   {project.code}
                 </Box>
+                {/* revision(EVT) — 없으면 아직 지정되지 않았다는 것을 옅은 톤으로 알려준다(Hub 설계서 §19.3). */}
+                <Box
+                  component="span"
+                  title="Revision"
+                  sx={{
+                    fontFamily: FONT_MONO, fontSize: 10.5, letterSpacing: '.1em', padding: '2px 8px',
+                    borderRadius: '6px', background: project.revision ? T.sf3 : 'transparent',
+                    color: project.revision ? T.dm : T.dm2,
+                    border: `1px dashed ${project.revision ? T.ln : T.ln2}`,
+                  }}
+                >
+                  {project.revision || 'no revision'}
+                </Box>
                 <Box
                   component="span"
                   sx={{
@@ -102,6 +123,18 @@ export function ProjectPageShell({ children }: Props) {
                 >
                   {project.name}
                 </Box>
+                {own && (
+                  <Tooltip title="Edit project info">
+                    <SirenButton
+                      variant="ghost"
+                      onClick={() => { setEditInfoErr(null); setEditInfoOpen(true); }}
+                      sx={{ padding: '6px 8px' }}
+                      aria-label="Edit project info"
+                    >
+                      <Icon name="edit" size={17} />
+                    </SirenButton>
+                  </Tooltip>
+                )}
                 <Tooltip title="Design workflow">
                   <SirenButton
                     variant="ghost"
@@ -172,6 +205,22 @@ export function ProjectPageShell({ children }: Props) {
         workflows={workflows ?? []}
         departments={project.departments ?? []}
       />
+
+      {editInfoOpen && (
+        <EditProjectInfoDialog
+          project={project}
+          saving={updateProject.isPending}
+          error={editInfoErr}
+          onClose={() => setEditInfoOpen(false)}
+          onSave={(p) => {
+            setEditInfoErr(null);
+            updateProject.mutate(p, {
+              onSuccess: () => { setEditInfoOpen(false); toast('Project info updated'); },
+              onError: (e: any) => setEditInfoErr(e?.response?.data?.message ?? 'Failed to save'),
+            });
+          }}
+        />
+      )}
     </AppShell>
   );
 }

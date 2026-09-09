@@ -29,7 +29,6 @@ interface CanvasState {
   loadedWorkflowId: string | null;
   /* 상호작용 */
   edit: boolean;
-  recv: boolean;
   sel: string | null;
   hlSet: Set<string> | null;
   link: string | null;
@@ -38,7 +37,6 @@ interface CanvasState {
   snapshot: CanvasSnapshot | null;
   /* dialog */
   openId: string | null;
-  tab: 'overview' | 'versions' | 'recv';
   noteDlg: string | null;
   addDlg: boolean;
   /**
@@ -95,14 +93,12 @@ interface CanvasState {
   cancelEdit: () => void;
   trackAddedDeliverable: (id: string) => void;
 
-  setRecv: (v: boolean) => void;
   select: (id: string | null, hl: Set<string> | null) => void;
   setLink: (id: string | null) => void;
   setLinkPos: (p: { x: number; y: number } | null) => void;
   flash: (bnd: number | null) => void;
 
-  openDeliverable: (id: string | null, tab?: CanvasState['tab']) => void;
-  setTab: (t: CanvasState['tab']) => void;
+  openDeliverable: (id: string | null) => void;
   setNoteDlg: (id: string | null) => void;
   setAddDlg: (v: boolean, intent?: CanvasState['addDlgIntent']) => void;
   setHldDlg: (v: boolean, sel?: string | null) => void;
@@ -129,7 +125,6 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   phasePW: {},
   loadedWorkflowId: null,
   edit: false,
-  recv: false,
   sel: null,
   hlSet: null,
   link: null,
@@ -137,7 +132,6 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   flashBnd: null,
   snapshot: null,
   openId: null,
-  tab: 'overview',
   noteDlg: null,
   addDlg: false,
   addDlgIntent: 'own',
@@ -211,14 +205,12 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     }));
   },
 
-  setRecv: (v) => set({ recv: v, edit: false }),
   select: (id, hl) => set({ sel: id, hlSet: hl }),
   setLink: (id) => set({ link: id, linkPos: null }),
   setLinkPos: (p) => set({ linkPos: p }),
   flash: (bnd) => set({ flashBnd: bnd }),
 
-  openDeliverable: (id, tab) => set({ openId: id, tab: tab ?? 'overview' }),
-  setTab: (t) => set({ tab: t }),
+  openDeliverable: (id) => set({ openId: id }),
   setNoteDlg: (id) => set({ noteDlg: id }),
   setAddDlg: (v, intent) => set({ addDlg: v, addDlgIntent: intent ?? 'own' }),
   setHldDlg: (v, sel) => set({ hldDlg: v, hldSel: sel === undefined ? null : sel }),

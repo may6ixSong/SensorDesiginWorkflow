@@ -5,7 +5,7 @@ import { useQueries } from '@tanstack/react-query';
 import { apiClient, ApiEnvelope } from '@/api/client';
 import { queryKeys } from '@/api/queryKeys';
 import { DeliverableDto, DeliverablesListResponse, EdgeDto, Milestone, WorkflowDto } from '@/types/domain';
-import { DocIcon, Icon } from '@/components/common/Icon';
+import { Icon } from '@/components/common/Icon';
 import { CURSOR_POINTER, FONT_MONO, T } from '@/theme/tokens';
 import { buildDomainModel, withAlpha, lighten, darken, DomainWorkflowModel, UNASSIGNED_DOMAIN } from '@/lib/domainWorkflow';
 import { useThemeMode } from '@/theme/ThemeModeContext';
@@ -829,7 +829,7 @@ function DeliverableBlock({
               color: withAlpha('#ffffff', 0.92), filter: 'drop-shadow(0 1px 2px rgba(0,0,0,.5))',
             }}
           >
-            <DocIcon type={b.docType} size={Math.round(b.d * 0.42)} />
+            <Icon name={b.serviceKey ? 'link' : 'word'} size={Math.round(b.d * 0.42)} />
           </Box>
         )}
       </Box>

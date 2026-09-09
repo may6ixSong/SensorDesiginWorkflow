@@ -6,7 +6,8 @@ export type IconName =
   | 'word' | 'excel' | 'path' | 'lock' | 'eye' | 'edit' | 'check' | 'plus' | 'x'
   | 'up' | 'dn' | 'send' | 'shield' | 'users' | 'trash' | 'note' | 'copy'
   | 'pan' | 'grid' | 'undo' | 'expand' | 'fit' | 'hist' | 'link' | 'search' | 'list'
-  | 'sun' | 'moon' | 'globe' | 'book' | 'info' | 'warn' | 'flag' | 'bell' | 'calendar' | 'inbox';
+  | 'sun' | 'moon' | 'globe' | 'book' | 'info' | 'warn' | 'flag' | 'bell' | 'calendar' | 'inbox'
+  | 'artifact' | 'unlinked';
 
 const P: Record<IconName, { d: string; s: number }> = {
   word: { s: 14, d: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/>' },
@@ -47,6 +48,16 @@ const P: Record<IconName, { d: string; s: number }> = {
   inbox: { s: 14, d: '<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>' },
   flag: { s: 13, d: '<path d="M4 22V4"/><path d="M4 4h13l-2.5 4L17 12H4"/>' },
   bell: { s: 14, d: '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>' },
+  // A 티어(라이브 연동, 실제 산출물이 그쪽에 있음) 캔버스 블록용 — 패키지/박스 형태로
+  // "문서 하나"가 아니라 "그 서비스가 들고 있는 진짜 산출물"이라는 느낌을 준다.
+  artifact: {
+    s: 14,
+    d: '<path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="M3.3 7 12 12l8.7-5"/><path d="M12 22V12"/>',
+  },
+  // 출처(serviceKey)가 아예 없는 산출물용 — 점선 박스로 "아직 비어 있음/미연동"을
+  // 다른 tier 아이콘들과 확실히 구분되게 표시한다(사용자 요청: C/D의 link 아이콘과
+  // 헷갈린다는 지적).
+  unlinked: { s: 14, d: '<rect x="3" y="3" width="18" height="18" rx="3" stroke-dasharray="4 3.2"/>' },
 };
 
 export function Icon({ name, size }: { name: IconName; size?: number }) {

@@ -37,6 +37,8 @@ export type WorkflowPhase = ScheduleSpan;
 export interface ProjectDto {
   _id: string;
   code: string;
+  /** 같은 code라도 다른 프로젝트로 취급하는 리비전(RPM 등에서는 EVT). 없으면 빈 문자열. */
+  revision: string;
   name: string;
   milestones: Milestone[];
   status: string;
@@ -103,18 +105,68 @@ export interface Layout {
   h: number;
 }
 
-export type VersionKind = 'major' | 'minor';
+/** 통합 신뢰도 티어 (Hub 설계서 §5.1) — 산출물이 아니라 버전 엔트리마다 붙는다. */
+export type Tier = 'A' | 'B' | 'C' | 'D';
 
-/** BE가 목업 MV() 모양으로 내려주는 버전 (권한 필터링 완료 — 설계서 6.1) */
+export interface SourceRefDto {
+  artifactKey: string;
+  serviceKey: string;
+  versionRef: string;
+  versionLabel: string;
+  capturedAt: string | null;
+}
+
+/**
+ * 버전 엔트리 (권한 필터링 완료 — Hub 설계서 §6.2). 실물 파일은 각 산출물 서비스가
+ * 소유하고 SIREN은 참조만 갖는다 — major/minor/file 같은 파일 중심 필드는 없다.
+ */
 export interface DeliverableVersionDto {
-  major: number;
-  minor: number;
-  kind: VersionKind;
-  file: string;
+  versionLabel: string;
+  /** 가시성 판정의 유일한 근거이자, 화면의 Release/작업중 배지 기준. */
+  isReleased: boolean;
+  /** 그 서비스가 준 불변 참조. C/D 티어(수동 기록)는 null일 수 있다. */
+  versionRef: string | null;
+  tier: Tier;
+  /** 이 버전을 만들어 준 쪽 — 있으면 giver 판정(§6.2)의 근거가 된다. */
+  giverKnoxId: string | null;
+  giverDept: string | null;
+  /** 그 서비스의 산출물 상세 페이지 — SIREN은 이 링크로 내보낸다. */
+  viewUrl: string | null;
+  /** HPC망 경로형 산출물의 실물 위치. */
+  hpcPath: string | null;
   note: string;
-  /** 업로드/Release를 수행한 사용자의 knoxId. */
-  by: string;
+  sourceRefs: SourceRefDto[];
+  /** C/D 티어는 "검증된 사실"이 아니라 담당자의 주장이다(§6.3, §9.2) — 화면이 이걸로 구분한다. */
+  confidence: 'verified' | 'asserted';
+  assertedBy: string | null;
+  assertedAt: string | null;
+  observedAt: string | null;
   at: string;
+}
+
+/**
+ * 연동된(Calypso 제외) 서비스로부터 그때그때 직접 물어본 접근 권한(§19.2, §19.5) —
+ * fail-closed이므로 서비스가 응답하지 않으면 둘 다 false로 온다.
+ */
+export interface LiveAccessDto {
+  canView: boolean;
+  canEdit: boolean;
+}
+
+/**
+ * 연동된 서비스가 knoxId 기준으로 이미 필터링해 준 버전 레코드 그대로다(§19.2) —
+ * SIREN은 다시 마스킹하지 않는다. editors는 그 서비스가 edit 권한이 있는 호출자에게만
+ * 채워 보낸다 — view 권한이면 항상 null이다.
+ */
+export interface LiveVersionRecordDto {
+  versionLabel: string;
+  isReleased: boolean;
+  giverKnoxId: string | null;
+  giverDept: string | null;
+  viewUrl: string | null;
+  sourceRefs: SourceRefDto[];
+  editors: string[] | null;
+  observedAt: string | null;
 }
 
 /** 산출물 수신 workflow 셀렉트 박스 및 Incoming 카드용 최소 정보. */
@@ -140,7 +192,17 @@ export interface DeliverableDto {
    * 연동할 때는 이 값으로 매핑하도록 둔다. 지정하지 않으면 null(설계서 §8.1 로드맵).
    */
   artifactKey: string | null;
-  docType: string;
+  /**
+   * 이 산출물의 실물을 소유한 Hub 서비스 (artifactServices.key) — null이면 아직 출처가
+   * 정해지지 않은 정상 빈 상태다(Hub 설계서 §11). 생성 화면에서 Network/Format 대신
+   * 이 값을 고른다.
+   */
+  serviceKey: string | null;
+  /** 그 서비스 안에서의 산출물 식별자 — serviceKey와 짝을 이룬다. */
+  externalArtifactId: string | null;
+  /** 그 서비스가 여러 산출물 종류를 낼 때 어느 종류인지(§19.1) — 단일 종류 서비스면 null. */
+  artifactTypeKey: string | null;
+  /** 레거시 필드 — 더 이상 생성/편집 화면에서 고르지 않는다(항상 서버 기본값). */
   network: 'OA' | 'HPC';
   series: string | null;
   seriesIdx: number;
@@ -204,11 +266,71 @@ export interface EdgeDto {
   auto: boolean;
 }
 
+/** GET /hub/services/:key/projects/search 후보 하나(Hub 설계서 §19.3) — 사람이 직접 골라 확정한다. */
+export interface ProjectSearchCandidateDto {
+  externalProjectId: string;
+  displayName: string;
+  code: string;
+  revision: string | null;
+}
+
 export interface HldItemDto {
   version: string;
+  versionLabel: string | null;
+  versionRef: string | null;
+  tier: string | null;
+  confidence: string | null;
+  pinnedAt: string | null;
   file: string | null;
   at: string;
   comment: string;
+  /** §19.4 — 이 개념이 생기기 전 스냅샷에는 없다(둘 다 비어 있음). */
+  giverKnoxId: string | null;
+  viewUrl: string | null;
+  sourceRefs: SourceRefDto[];
+}
+
+/** HLD 스냅샷 안의 산출물 배치 하나(§19.4) — 그 시점의 캔버스 구조만 담는다. */
+export interface HldSnapshotDeliverableDto {
+  id: string;
+  name: string;
+  phaseId: string;
+  layout: Layout;
+  serviceKey: string | null;
+  externalArtifactId: string | null;
+  artifactTypeKey: string | null;
+  intent: 'own' | 'received';
+  recvDept: string | null;
+  series: string | null;
+  seriesIdx: number;
+  seriesTotal: number;
+}
+
+export interface HldSnapshotEdgeDto {
+  fromId: string;
+  toId: string;
+  bidirectional: boolean;
+}
+
+export interface HldSnapshotMemoDto {
+  id: string;
+  phaseId: string;
+  text: string;
+  layout: Layout;
+}
+
+export interface HldSnapshotPhaseDto {
+  id: string;
+  name: string;
+  start: string;
+  end: string;
+}
+
+export interface HldSnapshotCanvasDto {
+  deliverables: HldSnapshotDeliverableDto[];
+  edges: HldSnapshotEdgeDto[];
+  memos: HldSnapshotMemoDto[];
+  phases: HldSnapshotPhaseDto[];
 }
 
 export interface HldReleaseDto {
@@ -218,5 +340,7 @@ export interface HldReleaseDto {
   date: string;
   releasedBy: string;
   note: string;
+  /** §19.4 이전 스냅샷은 네 배열이 전부 비어 있다 — 구조 정보가 소급되지 않는다. */
+  canvas: HldSnapshotCanvasDto;
   items: Record<string, HldItemDto>;
 }

@@ -5,7 +5,7 @@ import { CanvasNode, latR, stOf } from '@/lib/canvasModel';
 import { ModalShell } from '@/components/common/ModalShell';
 import { Badge } from '@/components/common/SirenButton';
 import { Card, Ey, Row } from '@/components/common/Panel';
-import { DocIcon } from '@/components/common/Icon';
+import { Icon } from '@/components/common/Icon';
 import { CURSOR_POINTER, FONT_MONO, T } from '@/theme/tokens';
 
 interface Props {
@@ -74,14 +74,14 @@ export function PhaseInfoDialog({ workflowName, phase: p, nodes, onClose, onOpen
                   '&:hover': { background: T.sf2 },
                 }}
               >
-                <Box component="span" sx={{ color: d.net === 'HPC' ? T.hp : T.bl }}>
-                  <DocIcon type={d.type} />
+                <Box component="span" sx={{ color: d.serviceKey ? T.tl : T.bl }}>
+                  <Icon name={d.serviceKey ? 'link' : 'word'} />
                 </Box>
                 <Box sx={{ flex: 1, fontSize: 13, fontWeight: 500 }}>
                   {d.name}
                 </Box>
                 <Box component="span" sx={{ fontFamily: FONT_MONO, fontSize: 11, color: T.dm2 }}>
-                  {r ? `v${r.major}.${r.minor}` : ''}
+                  {r ? r.versionLabel : ''}
                 </Box>
                 <Badge color={s.c} bg={s.bg} borderColor={s.bd}>{s.lb}</Badge>
               </Box>

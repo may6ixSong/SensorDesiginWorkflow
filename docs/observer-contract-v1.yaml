@@ -1,0 +1,318 @@
+openapi: 3.0.3
+
+# SIREN Observer 계약 v1
+#
+# 이 문서는 설계서(docs/siren-artifact-hub-design.md) §4의 정본 스펙이다.
+# 산출물 서비스(Calypso, SimHub, SSM 어댑터 등)가 SIREN에 노출해야 하는 인터페이스와,
+# 반대로 SIREN이 그 서비스들에게 제공하는 공용 데이터 API를 함께 정의한다.
+#
+# 각 서비스/어댑터는 이 명세를 참조해 자체 구현한다 - 공유 npm 패키지는 두지 않는다(§3.4).
+
+info:
+  title: SIREN Observer Contract
+  version: '1.0'
+  description: |
+    두 방향의 계약을 담는다.
+
+    - **서비스 → SIREN (관측)**: `/artifacts/*`. 산출물 서비스가 구현하고 SIREN이 호출한다.
+      버전 ref·라벨·릴리스 여부·giver·lineage·바로가기 링크를 정규화된 형태로 돌려준다.
+    - **SIREN → 서비스 (공용 데이터)**: `/hub/common`. SIREN이 구현하고 서비스들이 호출한다.
+      프로젝트의 부서·멤버·일정을 내려준다.
+
+    `transport: "shared-db"`인 서비스(B 티어)는 `/artifacts/*` 대신 공용 DB의 테이블에
+    같은 필드를 쓴다. **의미 계약은 같고 전송 수단만 다르다** (설계서 §8).
+
+servers:
+  - url: https://{serviceHost}/api
+    description: 산출물 서비스(또는 어댑터)의 베이스 URL. 레지스트리의 baseUrl과 같다.
+    variables:
+      serviceHost:
+        default: calypso.local
+
+tags:
+  - name: artifacts
+    description: 산출물 서비스가 구현한다. SIREN이 호출한다.
+  - name: hub
+    description: SIREN이 구현한다. 산출물 서비스들이 호출한다.
+
+paths:
+  /artifacts/{artifactId}/current-version:
+    get:
+      tags: [artifacts]
+      summary: 현재 버전 하나
+      description: |
+        SIREN이 캔버스에 버전 라벨을 그리고 Workflow Release 스냅샷을 찍을 때 호출한다.
+        `versionRef`는 불변이어야 한다 - 한번 Release가 이 값을 고정하면 그 뒤로
+        같은 ref가 다른 내용을 가리켜서는 안 된다(최소 soft-delete).
+      operationId: getCurrentVersion
+      parameters:
+        - $ref: '#/components/parameters/ArtifactId'
+      responses:
+        '200':
+          description: 현재 버전
+          headers:
+            X-Observer-Contract:
+              $ref: '#/components/headers/ContractVersion'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionRecord'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /artifacts/{artifactId}/versions:
+    get:
+      tags: [artifacts]
+      summary: 버전 이력 (최신순)
+      description: |
+        SIREN은 이 응답을 그대로 보여주지 않는다 - `isReleased`와 조회자의 giver 여부로
+        마스킹한 뒤에 내려보낸다(설계서 §6.2). 서비스는 자기가 아는 전부를 주면 된다.
+      operationId: listVersions
+      parameters:
+        - $ref: '#/components/parameters/ArtifactId'
+      responses:
+        '200':
+          description: 최신이 배열 앞(index 0)
+          headers:
+            X-Observer-Contract:
+              $ref: '#/components/headers/ContractVersion'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VersionRecord'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /artifacts:
+    get:
+      tags: [artifacts]
+      summary: 이 서비스가 들고 있는 산출물 목록 (선택 구현)
+      description: |
+        SIREN의 "등록된 산출물에서 선택"(설계서 §11.4) 화면이 쓴다. project/department로
+        스코프해서 고를 수 있어야 하므로 두 쿼리 파라미터를 지원한다.
+
+        구현하지 않아도 계약 위반은 아니다 - 다만 이게 없으면 SIREN 쪽에서 그 서비스의
+        산출물을 골라 워크플로우에 얹는 흐름을 쓸 수 없고, 사용자가 externalArtifactId를
+        직접 입력해야 한다.
+      operationId: listArtifacts
+      parameters:
+        - name: projectId
+          in: query
+          required: false
+          schema: { type: string }
+        - name: department
+          in: query
+          required: false
+          schema: { type: string }
+      responses:
+        '200':
+          description: 산출물 요약 목록
+          headers:
+            X-Observer-Contract:
+              $ref: '#/components/headers/ContractVersion'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ArtifactSummary'
+
+  /hub/common:
+    get:
+      tags: [hub]
+      summary: 프로젝트 공용 데이터 (SIREN이 제공)
+      description: |
+        부서·멤버·일정. 각 서비스는 필요한 것만 골라 쓴다 - 권한 화면의 담당자 후보
+        목록에는 members를, 자체 마감 관리에는 schedule을 쓴다.
+
+        **이 API가 SIREN을 사실상 사내 신원·일정 공급자로 만든다.** SIREN 가용성이 각
+        서비스의 권한 화면에 영향을 주므로, 서비스는 이 응답을 짧게 캐시하고 SIREN이
+        응답하지 않을 때 마지막 캐시로 동작해야 한다(설계서 §4.4).
+
+        HPC망 서비스는 이 API를 직접 못 부른다 - 같은 내용을 공용 DB의 `siren_common`
+        테이블로 받는다(설계서 §8).
+      operationId: getHubCommon
+      parameters:
+        - name: projectId
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: 공용 데이터
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HubCommon'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  parameters:
+    ArtifactId:
+      name: artifactId
+      in: path
+      required: true
+      description: 그 서비스 안에서의 산출물 식별자. SIREN은 이 값을 externalArtifactId로 들고 있다.
+      schema: { type: string }
+
+  headers:
+    ContractVersion:
+      description: 이 응답이 따르는 Observer 계약 버전. SIREN은 레지스트리의 contractVersion과 다르면 경고만 남기고 거부하지 않는다(§4.5).
+      schema: { type: string, example: '1.0' }
+
+  responses:
+    NotFound:
+      description: 그런 산출물(또는 프로젝트)이 없다
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  schemas:
+    VersionRecord:
+      type: object
+      description: 모든 티어가 공유하는 정규화 형태 (설계서 §4.1).
+      required: [artifactId, versionRef, versionLabel, isReleased, createdAt, giver, sourceRefs, viewUrl]
+      properties:
+        artifactId:
+          type: string
+        versionRef:
+          type: string
+          description: |
+            불변 참조. Workflow Release 스냅샷이 이 값을 고정한다.
+            버전 개념이 없는 HPC 경로형 산출물은 `{path}@{registeredAt}` 형태를 쓴다(설계서 §5.2.1).
+          example: 'calypso:obj/9f2c@0.3'
+        versionLabel:
+          type: string
+          description: |
+            표시용 자유 문자열. major.minor 규칙은 SIREN이 직접 만드는 서비스에만 강제하고,
+            기존 시스템은 자기 넘버링 체계를 그대로 쓴다.
+          example: 'v1.2'
+        isReleased:
+          type: boolean
+          description: |
+            **가시성 판정은 오직 이 필드로만 한다.** versionLabel의 모양을 파싱해서
+            릴리스 여부를 추론하지 않는다.
+        createdAt:
+          type: string
+          format: date-time
+        giver:
+          type: object
+          description: |
+            이 버전을 만들어 제공한 쪽. SIREN은 별도 role 엔드포인트를 호출하지 않고,
+            이 값과 자기가 가진 멤버 데이터를 비교해 giver 여부를 스스로 계산한다(설계서 §4.3).
+          required: [knoxId, dept]
+          properties:
+            knoxId:
+              type: string
+              nullable: true
+              description: 개인 식별이 가능하면 채운다.
+            dept:
+              type: string
+              nullable: true
+              description: 부서 단위로만 알 수 있으면 여기만 채운다.
+        sourceRefs:
+          type: array
+          description: |
+            lineage - 이 버전이 무엇으로부터 만들어졌는가. **만든 쪽이 자기신고한다.**
+            SIREN이 캔버스 edge와 현재 버전을 조합해 추론하지 않는다.
+            추적하지 못하는 서비스는 빈 배열을 준다 - 선택 필드다(설계서 §17.1).
+          items:
+            $ref: '#/components/schemas/SourceRef'
+        viewUrl:
+          type: string
+          nullable: true
+          description: 그 서비스의 산출물 상세 페이지. SIREN은 이 링크로 내보낸다.
+
+    SourceRef:
+      type: object
+      required: [artifactKey, serviceKey, versionRef, versionLabel, capturedAt]
+      properties:
+        artifactKey: { type: string }
+        serviceKey: { type: string }
+        versionRef: { type: string }
+        versionLabel: { type: string }
+        capturedAt: { type: string, format: date-time }
+
+    ArtifactSummary:
+      type: object
+      required: [artifactId, name, projectId, department, currentVersion]
+      properties:
+        artifactId: { type: string }
+        name: { type: string }
+        projectId: { type: string }
+        department:
+          type: string
+          nullable: true
+        currentVersion:
+          allOf:
+            - $ref: '#/components/schemas/VersionRecord'
+          nullable: true
+          description: 아직 버전이 하나도 없으면 null.
+
+    HubCommon:
+      type: object
+      required: [projectId, members, departments, schedule]
+      properties:
+        projectId: { type: string }
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/Member'
+        departments:
+          type: array
+          items: { type: string }
+        schedule:
+          $ref: '#/components/schemas/Schedule'
+
+    Member:
+      type: object
+      required: [knoxId]
+      properties:
+        knoxId: { type: string }
+        name:
+          type: string
+          nullable: true
+        dept:
+          type: string
+          nullable: true
+
+    Schedule:
+      type: object
+      required: [milestones, workflowPhases]
+      properties:
+        milestones:
+          type: array
+          items:
+            $ref: '#/components/schemas/Phase'
+        workflowPhases:
+          type: array
+          items:
+            type: object
+            required: [workflowId, workflowName, phases]
+            properties:
+              workflowId: { type: string }
+              workflowName: { type: string }
+              phases:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Phase'
+
+    Phase:
+      type: object
+      description: 부록 A.2 - PhaseRef{key,label,order}는 폐기됐고 {id,name,start,end}를 쓴다.
+      required: [id, name, start, end]
+      properties:
+        id: { type: string }
+        name: { type: string, example: 'ML3' }
+        start: { type: string, format: date }
+        end: { type: string, format: date }
+
+    Error:
+      type: object
+      required: [message]
+      properties:
+        message: { type: string }

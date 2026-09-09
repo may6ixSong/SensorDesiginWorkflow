@@ -26,7 +26,10 @@ function resolvePort(): string | number {
 export default () => ({
   port: resolvePort(),
   apiPrefix: process.env.API_PREFIX ?? 'api/v1',
-  corsOrigin: process.env.CORS_ORIGIN ?? 'http://localhost:5173',
+  // 기본값에 Calypso web(5174)을 포함한다 - Calypso가 이제 SIREN의 Project List를
+  // 브라우저에서 직접 읽어오므로(Hub 설계서 §11.4), 별도 CORS_ORIGIN 설정 없이도
+  // 로컬 개발 환경에서 바로 동작해야 한다.
+  corsOrigin: process.env.CORS_ORIGIN ?? 'http://localhost:5173,http://localhost:5174',
   mongodbUri: resolveMongodbUri(),
   /**
    * 목업 데이터 노출 여부. true면 부팅 시 목업이 없을 때 한 번 시드하고(isMock:true 표시),
@@ -34,6 +37,12 @@ export default () => ({
    * 데이터는 어느 쪽에서도 건드리지 않는다. (src/database/seed-runner.service.ts)
    */
   mockupEnabled: (process.env.MOCKUP_ENABLED ?? 'false') === 'true',
+  /**
+   * Calypso api 베이스 URL — HLD Release 스냅샷(§19.4)이 Calypso 산출물의 현재 버전을
+   * 백엔드에서 직접 물어봐야 할 때 쓴다(브라우저가 매번 직접 부르는 평소 열람 경로와는
+   * 별개). web/의 CALYPSO_API와 같은 기본값을 쓴다.
+   */
+  calypsoApiUrl: process.env.CALYPSO_API || 'http://localhost:3010/api/v1',
   /** S3 호환 오브젝트 스토리지 (SFM_API files.service.ts와 동일한 키 구성). */
   storage: {
     uri: process.env.S3_URI ?? '',

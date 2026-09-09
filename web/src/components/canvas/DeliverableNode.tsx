@@ -1,13 +1,32 @@
 import { Box } from '@mui/material';
-import { CanvasNode, latA, latR, hasW, stOf, vstr, fmtAt } from '@/lib/canvasModel';
-import { WorkflowBriefDto, WorkflowPhase } from '@/types/domain';
+import { CanvasNode, latA, latR, hasW, stOf, vstr, versionBy, fmtAt } from '@/lib/canvasModel';
+import { Tier, WorkflowBriefDto, WorkflowPhase } from '@/types/domain';
 import { departmentName } from '@/shared/constants/departments';
 import { useDirectory } from '@/app/providers/DirectoryProvider';
-import { DocIcon, Icon } from '@/components/common/Icon';
+import { Icon, IconName } from '@/components/common/Icon';
 import { CURSOR_POINTER, FONT_MONO, T } from '@/theme/tokens';
+
+/**
+ * tier별 블록 아이콘(사용자 요청) — B는 기존처럼 문서, A는 "그 서비스가 들고 있는
+ * 진짜 산출물"이라는 느낌의 패키지 아이콘, C/D는 경로/링크 느낌의 체인 아이콘.
+ *
+ * C/D 티어는 Hub 서비스 연동(serviceKey) 없이 수동으로 기록된 경우가 정상이다
+ * (Hub 설계서 §9 - 수동 버전 기록). 그래서 "출처가 없다"만으로 unlinked 아이콘을
+ * 쓰면 실제로 Tier C로 기록된 산출물까지 빈 박스로 보인다(실측 확인된 문제) - 정말
+ * 아무것도 기록된 게 없을 때(버전이 하나도 없고 서비스도 안 걸린 경우)만 unlinked를
+ * 쓴다.
+ */
+function iconForNode(d: CanvasNode, tier: Tier): IconName {
+  if (!d.serviceKey && d.versions.length === 0) return 'unlinked';
+  if (tier === 'A') return 'artifact';
+  if (tier === 'B') return 'word';
+  return 'link';
+}
 
 interface Props {
   d: CanvasNode;
+  /** 아이콘/LIVE 배지를 결정하는 유효 tier(Hub 설계서 §5.1, canvasModel.effectiveTier). */
+  tier: Tier;
   /** 이 산출물이 걸린 phase. 찾을 수 없으면(=일정 유실) undefined다. */
   phase?: WorkflowPhase;
   /**
@@ -36,7 +55,7 @@ interface Props {
 
 /** 목업 nodeH() — 산출물 블록 */
 export function DeliverableNode({
-  d, phase, orphan = false, recvWorkflow, edit, canEdit, isSel, onHl, dimLink, hasHl,
+  d, tier, phase, orphan = false, recvWorkflow, edit, canEdit, isSel, onHl, dimLink, hasHl,
   onOpen, onPinClick, onGripDown, linkActive, registerRef,
   onPointerDown, onPointerMove, onPointerUp, onClick,
 }: Props) {
@@ -46,7 +65,7 @@ export function DeliverableNode({
   const work = hasW(d) ? latA(d) : null;
   const last = latA(d);
   const compact = d.h < 175;
-  const col = d.net === 'HPC' ? T.hp : d.type === 'excel' ? T.tl : T.bl;
+  const col = d.serviceKey ? T.tl : T.bl;
   // 진짜 다른 workflow 소유 — 이 캔버스에서 위치 편집 불가, edit 모드에서 흐리게 처리.
   const incoming = d.origin === 'incoming';
   // 이 시스템에 없는 외부 부서로부터 받은 것으로 표시된 own 산출물 — own이므로
@@ -171,17 +190,26 @@ export function DeliverableNode({
           <Icon name="lock" size={13} />
         </Box>
       )}
-      <Box
-        component="span"
-        sx={{
-          position: 'absolute', top: 0, right: 0, fontFamily: FONT_MONO, fontSize: 14,
-          letterSpacing: '.08em', padding: '3px 10px 4px', borderBottomLeftRadius: '12px',
-          background: d.net === 'HPC' ? T.hp2 : T.sf3,
-          color: d.net === 'HPC' ? T.hp : T.dm,
-        }}
-      >
-        {d.net}
-      </Box>
+      {/* A 티어(연동된 서비스에서 지금 라이브로 관측됨)만 표시한다 — 서비스명 자체는
+          더 이상 블록에 노출하지 않는다(사용자 요청, 상세 패널에서 확인). */}
+      {tier === 'A' && (
+        <Box
+          component="span"
+          title="Live — observed from the connected service"
+          sx={{
+            position: 'absolute', bottom: 0, left: 0, padding: '4px 9px 5px',
+            borderTopRightRadius: '12px', background: T.tl2, color: T.tl,
+            display: 'inline-flex', alignItems: 'center', gap: '5px',
+            fontFamily: FONT_MONO, fontSize: 11, fontWeight: 700, letterSpacing: '.08em',
+          }}
+        >
+          <Box
+            component="span"
+            sx={{ width: 6, height: 6, borderRadius: '50%', background: T.tl, flex: '0 0 auto' }}
+          />
+          LIVE
+        </Box>
+      )}
 
       {/* pin (좌: 입력, 우: 연결 시작) */}
       <Box
@@ -227,7 +255,7 @@ export function DeliverableNode({
 
       <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: '10px', pl: '12px' }}>
         <Box component="span" sx={{ color: col, flex: '0 0 auto' }}>
-          <DocIcon type={d.type} size={20} />
+          <Icon name={iconForNode(d, tier)} size={20} />
         </Box>
         <Box
           sx={{
@@ -247,7 +275,7 @@ export function DeliverableNode({
         }}
       >
         {orphan ? 'Release schedule lost' : phase ? phase.name : '-'} ·{' '}
-        {last ? resolveUser(last.by).name : '—'} ·{' '}
+        {last ? resolveUser(versionBy(last)).name : '—'} ·{' '}
         {last ? fmtAt(last.at).slice(5, 16) : 'No updates'}
       </Box>
 

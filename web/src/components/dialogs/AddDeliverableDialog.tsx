@@ -2,19 +2,33 @@ import { useState } from 'react';
 import { Box } from '@mui/material';
 import { WorkflowPhase } from '@/types/domain';
 import { shortDate } from '@/lib/schedule';
+import { useArtifactServices } from '@/api/hooks/useHub';
 import { ModalShell } from '@/components/common/ModalShell';
 import { SirenButton } from '@/components/common/SirenButton';
-import { Ey, Field, Row, SelectInput, TextInput } from '@/components/common/Panel';
+import { Ey, Field, SelectInput, TextInput } from '@/components/common/Panel';
+import { ExternalArtifactPicker } from '@/components/deliverable/ExternalArtifactPicker';
+import { CalypsoArtifactPicker } from '@/components/deliverable/CalypsoArtifactPicker';
 import { Icon } from '@/components/common/Icon';
 import { CURSOR_POINTER, FONT_MONO, T } from '@/theme/tokens';
+
+type SourceMode = 'none' | 'service' | 'calypso';
 
 interface Props {
   workflowName: string;
   phases: WorkflowPhase[];
+  /** external artifact 후보 검색 기준(Hub 설계서 §19.3) — 없으면 자유 입력으로만 동작한다. */
+  projectCode?: string;
+  projectRevision?: string;
+  /** Calypso artifact 목록 조회 대상 project와, ACL 부서 판정에 쓰는 내 부서 목록. */
+  projectId?: string;
+  myDepartments?: string[];
   /** 'received'면 헤더 문구가 "내가 받아야 할 산출물"로 바뀐다 — 폼 필드 자체는 동일하다. */
   intent?: 'own' | 'received';
   onClose: () => void;
-  onCreate: (p: { name: string; phaseId: string; docType: string; network: 'OA' | 'HPC'; artifactKey: string | null }) => void;
+  onCreate: (p: {
+    name: string; phaseId: string; artifactKey: string | null;
+    serviceKey: string | null; externalArtifactId: string | null; artifactTypeKey: string | null;
+  }) => void;
 }
 
 /**
@@ -25,14 +39,35 @@ interface Props {
  *
  * 여기 뜨는 phase는 전부 "이 workflow가 정한 자기 일정"이다 — 과제 마일스톤이 아니다.
  */
-export function AddDeliverableDialog({ workflowName, phases, intent = 'own', onClose, onCreate }: Props) {
+export function AddDeliverableDialog({
+  workflowName, phases, projectCode, projectRevision, projectId, myDepartments, intent = 'own',
+  onClose, onCreate,
+}: Props) {
+  const { data: services, isLoading: servicesLoading } = useArtifactServices();
   const [name, setName] = useState('');
   const [phaseId, setPhaseId] = useState<string>(phases[0]?.id ?? '');
   const [artifactKey, setArtifactKey] = useState('');
-  const [net, setNet] = useState<'OA' | 'HPC'>('OA');
-  const [type, setType] = useState('word');
+  const [sourceMode, setSourceMode] = useState<SourceMode>('none');
+  const [serviceKey, setServiceKey] = useState('');
+  const [externalArtifactId, setExternalArtifactId] = useState('');
+  const [artifactTypeKey, setArtifactTypeKey] = useState('');
   const [err, setErr] = useState(false);
   const [keyErr, setKeyErr] = useState('');
+  const [typeErr, setTypeErr] = useState(false);
+
+  const selectedService = (services ?? []).find((s) => s.key === serviceKey) ?? null;
+  const artifactTypes = selectedService?.artifactTypes ?? [];
+
+  /** Tier A(연동된 서비스)와 Calypso는 등록 방법이 완전히 다르다 — code+revision 후보
+   * 검색 vs 내가 view 권한 있는 Calypso artifact 목록. 그래서 같은 dropdown 하나에
+   * 섞지 않고 먼저 방식부터 고르게 한다(사용자 요청). */
+  const switchSourceMode = (mode: SourceMode) => {
+    setSourceMode(mode);
+    setExternalArtifactId('');
+    setArtifactTypeKey('');
+    setServiceKey(mode === 'calypso' ? 'calypso' : '');
+    setTypeErr(false);
+  };
 
   const submit = () => {
     if (!name.trim() || !phaseId) { setErr(true); return; }
@@ -42,8 +77,18 @@ export function AddDeliverableDialog({ workflowName, phases, intent = 'own', onC
       return;
     }
     setKeyErr('');
+    // 서비스가 산출물 종류를 여러 개 낼 때만 사람이 골라야 한다(§19.1) — 1개뿐이면
+    // 아래 Source 선택 시 이미 자동으로 채워져 있다. API도 같은 규칙을 강제하지만,
+    // 여기서 먼저 걸러 왕복 없이 바로 알려준다.
+    if (serviceKey && artifactTypes.length > 1 && !artifactTypeKey) {
+      setTypeErr(true);
+      return;
+    }
+    setTypeErr(false);
     onCreate({
-      name: name.trim(), phaseId, docType: net === 'HPC' ? 'path' : type, network: net, artifactKey: key || null,
+      name: name.trim(), phaseId, artifactKey: key || null,
+      serviceKey, externalArtifactId: externalArtifactId.trim() || null,
+      artifactTypeKey: artifactTypes.length > 0 ? artifactTypeKey || null : null,
     });
   };
 
@@ -108,6 +153,89 @@ export function AddDeliverableDialog({ workflowName, phases, intent = 'own', onC
           )}
         </Box>
       </Field>
+      <Field label="Source — where this deliverable's real data lives">
+        <Box sx={{ display: 'flex', gap: '5px' }}>
+          {([
+            { m: 'none' as const, label: 'Not linked' },
+            { m: 'service' as const, label: 'Connected Service' },
+            { m: 'calypso' as const, label: 'Files' },
+          ]).map(({ m, label }) => (
+            <Box
+              key={m}
+              component="button"
+              type="button"
+              onClick={() => switchSourceMode(m)}
+              sx={{
+                flex: 1, fontSize: 11.5, fontWeight: 600, padding: '7px 8px',
+                borderRadius: '7px', transition: '.14s', cursor: CURSOR_POINTER,
+                background: sourceMode === m ? T.tl2 : T.sf,
+                border: `1px solid ${sourceMode === m ? T.tl : T.ln2}`,
+                color: sourceMode === m ? T.tl : T.dm,
+                '&:hover': { background: sourceMode === m ? T.tl2 : T.sf3 },
+              }}
+            >
+              {label}
+            </Box>
+          ))}
+        </Box>
+      </Field>
+
+      {sourceMode === 'service' && (
+        <>
+          <Field label="Connected service">
+            <SelectInput
+              value={serviceKey}
+              onChange={(v) => {
+                setServiceKey(v);
+                const svc = (services ?? []).find((s) => s.key === v);
+                const types = svc?.artifactTypes ?? [];
+                // 종류가 1개뿐이면 고르라고 묻지 않고 그 1개를 자동으로 쓴다(§19.1).
+                setArtifactTypeKey(types.length === 1 ? types[0].key : '');
+                setExternalArtifactId('');
+                setTypeErr(false);
+              }}
+              disabled={servicesLoading}
+              options={[
+                { value: '', label: servicesLoading ? 'Loading…' : 'Choose a service…' },
+                ...(services ?? []).map((s) => ({ value: s.key, label: s.name })),
+              ]}
+            />
+          </Field>
+          {artifactTypes.length > 1 && (
+            <Field label="Artifact type — this service provides more than one kind">
+              <SelectInput
+                value={artifactTypeKey}
+                onChange={(v) => { setArtifactTypeKey(v); setTypeErr(false); }}
+                options={[
+                  { value: '', label: 'Choose one…' },
+                  ...artifactTypes.map((t) => ({ value: t.key, label: t.name })),
+                ]}
+              />
+              {typeErr && (
+                <Box sx={{ fontSize: 11, color: T.rd, mt: '5px' }}>
+                  {selectedService?.name} provides more than one artifact type — pick one.
+                </Box>
+              )}
+            </Field>
+          )}
+          <ExternalArtifactPicker
+            service={selectedService}
+            projectCode={projectCode}
+            projectRevision={projectRevision}
+            value={externalArtifactId}
+            onChange={setExternalArtifactId}
+          />
+        </>
+      )}
+
+      {sourceMode === 'calypso' && (
+        <CalypsoArtifactPicker
+          projectId={projectId}
+          myDepartments={myDepartments ?? []}
+          value={externalArtifactId}
+          onChange={setExternalArtifactId}
+        />
+      )}
       <Field
         label="Artifact key — optional; use the same key when adding this artifact again in another phase"
       >
@@ -119,23 +247,6 @@ export function AddDeliverableDialog({ workflowName, phases, intent = 'own', onC
         />
         {keyErr && <Box sx={{ fontSize: 11, color: T.rd, mt: '5px' }}>{keyErr}</Box>}
       </Field>
-      <Row>
-        <Field label="Network" sx={{ width: 90 }}>
-          <SelectInput
-            value={net}
-            onChange={(v) => { setNet(v as 'OA' | 'HPC'); if (v === 'HPC') setType('path'); else if (type === 'path') setType('word'); }}
-            options={[{ value: 'OA', label: 'OA' }, { value: 'HPC', label: 'HPC' }]}
-          />
-        </Field>
-        <Field label="Format" sx={{ width: 90 }}>
-          <SelectInput
-            value={type}
-            disabled={net === 'HPC'}
-            onChange={setType}
-            options={[{ value: 'word', label: 'Word' }, { value: 'excel', label: 'Excel' }, { value: 'path', label: 'Path' }]}
-          />
-        </Field>
-      </Row>
       <SirenButton variant="primary" onClick={submit}>
         <Icon name="plus" /> Create
       </SirenButton>

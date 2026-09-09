@@ -1,7 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient, ApiEnvelope } from '../client';
 import { queryKeys } from '../queryKeys';
-import { DeliverableDto, DeliverableVersionDto, DeliverablesListResponse } from '@/types/domain';
+import {
+  DeliverableDto, DeliverableVersionDto, DeliverablesListResponse, LiveAccessDto, LiveVersionRecordDto,
+} from '@/types/domain';
 import { useCanvasStore } from '@/store/canvasStore';
 
 /**
@@ -34,6 +36,34 @@ export function useDeliverableVersions(id: string | undefined) {
   });
 }
 
+/**
+ * 연동된(Calypso 제외) 서비스의 실시간 접근 권한(§19.5) — DeliverableDialog의 3-state
+ * 판정(차단/열람 전용/편집)이 이 값 하나로 갈린다. Calypso는 대상이 아니다(브라우저가
+ * 이미 직접 부른다) — enabled를 그 경우 false로 둔다.
+ */
+export function useDeliverableLiveAccess(id: string | undefined, enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.deliverableLiveAccess(id ?? ''),
+    enabled: Boolean(id) && enabled,
+    queryFn: async () => {
+      const res = await apiClient.get<ApiEnvelope<LiveAccessDto>>(`/deliverables/${id}/live-access`);
+      return res.data.data;
+    },
+  });
+}
+
+/** view 권한이 확인된 뒤에만 부른다 — 그 서비스가 이미 필터링해 준 목록을 그대로 쓴다(§19.2). */
+export function useDeliverableLiveVersions(id: string | undefined, enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.deliverableLiveVersions(id ?? ''),
+    enabled: Boolean(id) && enabled,
+    queryFn: async () => {
+      const res = await apiClient.get<ApiEnvelope<LiveVersionRecordDto[]>>(`/deliverables/${id}/live-versions`);
+      return res.data.data;
+    },
+  });
+}
+
 function invalidateDeliverables(qc: ReturnType<typeof useQueryClient>, workflowId: string) {
   qc.invalidateQueries({ queryKey: queryKeys.deliverables(workflowId) });
 }
@@ -56,8 +86,9 @@ export function useCreateDeliverable(workflowId: string) {
   return useMutation({
     mutationFn: async (
       payload: {
-        name: string; phaseId: string; docType: string; network: 'OA' | 'HPC'; intent?: 'own' | 'received';
-        artifactKey?: string | null;
+        name: string; phaseId: string; intent?: 'own' | 'received';
+        artifactKey?: string | null; serviceKey?: string | null; externalArtifactId?: string | null;
+        artifactTypeKey?: string | null;
       },
     ) => {
       const res = await apiClient.post<ApiEnvelope<DeliverableDto>>(`/workflows/${workflowId}/deliverables`, payload);
@@ -71,12 +102,23 @@ export function useUpdateDeliverable(workflowId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (
-      { id, ...patch }: { id: string; name?: string; artifactKey?: string; docType?: string; network?: 'OA' | 'HPC' },
+      { id, ...patch }: {
+        id: string; name?: string; artifactKey?: string;
+        serviceKey?: string | null; externalArtifactId?: string | null; artifactTypeKey?: string | null;
+      },
     ) => {
       const res = await apiClient.patch<ApiEnvelope<DeliverableDto>>(`/deliverables/${id}`, patch);
       return res.data.data;
     },
-    onSuccess: () => invalidateDeliverables(qc, workflowId),
+    // serviceKey/externalArtifactId를 바꾼 저장은 이 산출물이 가리키는 실체 자체가
+    // 달라지는 것이다 — live-access/live-versions는 별도 캐시 키(deliverable id 기준)라
+    // 목록 무효화만으로는 갱신되지 않는다. 이걸 빼먹으면 상세 패널이 열려 있는 채로
+    // 저장해도 예전 서비스/버전 정보가 그대로 남아, 새로고침해야만 반영되는 것처럼 보인다.
+    onSuccess: (updated) => {
+      invalidateDeliverables(qc, workflowId);
+      qc.invalidateQueries({ queryKey: queryKeys.deliverableLiveAccess(updated.id) });
+      qc.invalidateQueries({ queryKey: queryKeys.deliverableLiveVersions(updated.id) });
+    },
   });
 }
 
@@ -135,67 +177,25 @@ export function useUpdateSchedule(workflowId: string) {
 }
 
 /**
- * 파일 업로드 (S3 presigned URL 대신 api/가 바이트를 직접 중계한다).
- * POST /deliverables/:id/upload — multipart/form-data, 파일 필드명은 "file" 고정.
- * 응답의 storageKey/fileName을 그대로 useAddVersion에 넘겨 버전을 만든다(2단계 플로우).
+ * C/D 티어 수동 버전 기록 (Hub 설계서 §9) — POST /deliverables/:id/versions.
+ *
+ * 실물을 소유한 서비스가 붙어 있는 산출물(serviceKey != null)은 BE가 이 경로를
+ * 거절한다(assertManualArtifact). 아직 연동되지 않은 출처로부터 "이 버전을 받았다"를
+ * 기록하는 자리이고, 덮어쓰기 없이 append-only로 쌓인다.
  */
-export function useUploadFile() {
-  return useMutation({
-    mutationFn: async ({ id, file }: { id: string; file: File }) => {
-      const form = new FormData();
-      form.append('file', file);
-      const res = await apiClient.post<ApiEnvelope<{ storageKey: string; fileName: string }>>(
-        `/deliverables/${id}/upload`,
-        form,
-        { headers: { 'Content-Type': 'multipart/form-data' } },
-      );
-      return res.data.data;
-    },
-  });
-}
-
-/**
- * 특정 버전의 파일 바이트를 받아온다.
- * GET /deliverables/:id/download?major=&minor= — 응답은 파일 그 자체(blob).
- */
-export async function fetchDeliverableFile(id: string, major: number, minor: number): Promise<Blob> {
-  const res = await apiClient.get<Blob>(`/deliverables/${id}/download`, {
-    params: { major, minor },
-    responseType: 'blob',
-  });
-  return res.data;
-}
-
-/** 위 다운로드를 브라우저 저장까지 처리하는 헬퍼 — UI의 "Download file" 버튼용. */
-export function useDownloadVersion() {
-  return useMutation({
-    mutationFn: async ({
-      id, major, minor, fileName,
-    }: { id: string; major: number; minor: number; fileName?: string | null }) => {
-      const blob = await fetchDeliverableFile(id, major, minor);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = fileName || `${id}-v${major}.${minor}`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    },
-  });
-}
-
-export function useAddVersion(workflowId: string) {
+export function useAssertVersion(workflowId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({
-      id,
-      ...body
+      id, ...body
     }: {
       id: string;
-      storageKey?: string;
+      versionLabel?: string;
+      isReleased?: boolean;
+      tier?: 'A' | 'B' | 'C' | 'D';
       hpcPath?: string;
-      fileName: string;
+      giverDept?: string;
+      viewUrl?: string;
       note?: string;
     }) => {
       const res = await apiClient.post<ApiEnvelope<DeliverableDto>>(`/deliverables/${id}/versions`, body);

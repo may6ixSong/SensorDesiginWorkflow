@@ -8,7 +8,16 @@ export const queryKeys = {
   workflow: (workflowId: string) => ['workflows', workflowId] as const,
   deliverables: (workflowId: string) => ['workflows', workflowId, 'deliverables'] as const,
   deliverableVersions: (id: string) => ['deliverables', id, 'versions'] as const,
+  /** 연동된(Calypso 제외) 서비스로부터의 실시간 접근/버전 조회 (§19.5, §19.6). */
+  deliverableLiveAccess: (id: string) => ['deliverables', id, 'live-access'] as const,
+  deliverableLiveVersions: (id: string) => ['deliverables', id, 'live-versions'] as const,
   memos: (workflowId: string) => ['workflows', workflowId, 'memos'] as const,
   edges: (workflowId: string) => ['workflows', workflowId, 'edges'] as const,
   hldReleases: (workflowId: string) => ['workflows', workflowId, 'hld-releases'] as const,
+  hubServices: ['hub', 'services'] as const,
+  hubProjectSearch: (serviceKey: string, code: string, revision: string) =>
+    ['hub', 'services', serviceKey, 'projects', 'search', code, revision] as const,
+  /** Calypso api를 직접 호출한다(§11.5) — SIREN이 소유한 캐시가 아니라 그냥 원격 데이터 캐시다. */
+  calypsoArtifacts: (projectId: string) => ['calypso', 'artifacts', projectId] as const,
+  calypsoArtifact: (id: string) => ['calypso', 'artifacts', 'detail', id] as const,
 };

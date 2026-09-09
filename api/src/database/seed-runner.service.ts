@@ -10,6 +10,7 @@ import { DeliverableDocument } from '../deliverables/schemas/deliverable.schema'
 import { MemoDocument } from '../memos/schemas/memo.schema';
 import { EdgeDocument } from '../edges/schemas/edge.schema';
 import { HldReleaseDocument } from '../hld/schemas/hld-release.schema';
+import { ArtifactServiceDocument } from '../hub/schemas/artifact-service.schema';
 
 const MOCK_FILTER = { isMock: true };
 
@@ -39,6 +40,7 @@ export class SeedRunnerService implements OnModuleInit {
     @Inject(getModelToken('Memo')) private readonly memoModel: Model<MemoDocument>,
     @Inject(getModelToken('Edge')) private readonly edgeModel: Model<EdgeDocument>,
     @Inject(getModelToken('HldRelease')) private readonly hldReleaseModel: Model<HldReleaseDocument>,
+    @Inject(getModelToken('ArtifactService')) private readonly artifactServiceModel: Model<ArtifactServiceDocument>,
   ) {}
 
   /** 목업 시드가 문서를 만드는 컬렉션 전체. auditlogs는 시드 대상이 아니라 제외한다. */
@@ -78,6 +80,7 @@ export class SeedRunnerService implements OnModuleInit {
     this.logger.log(`MOCKUP_ENABLED=true - 목업 데이터를 시드합니다 (${mode} 모드)...`);
     try {
       await seedDatabase({
+        ArtifactService: this.artifactServiceModel,
         Project: this.projectModel,
         Workflow: this.workflowModel,
         Deliverable: this.deliverableModel,

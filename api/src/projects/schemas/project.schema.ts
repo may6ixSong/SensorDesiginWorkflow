@@ -58,8 +58,16 @@ export type ProjectDocument = Project & Document;
 
 @Schema({ timestamps: true })
 export class Project {
-  @Prop({ required: true, unique: true, trim: true })
+  @Prop({ required: true, trim: true })
   code: string;
+
+  /**
+   * 같은 code라도 revision이 다르면 완전히 다른 프로젝트로 취급한다(Hub 설계서 §19) —
+   * 리비전이 없는 기존 프로젝트는 빈 문자열이다. 유니크 제약은 (code, revision) 조합에
+   * 걸려 있다(스키마 파일 하단 index) — 단일 `code`엔 더 이상 걸지 않는다.
+   */
+  @Prop({ default: '', trim: true })
+  revision: string;
 
   @Prop({ required: true, trim: true })
   name: string;
@@ -124,3 +132,4 @@ export class Project {
 }
 
 export const ProjectSchema = SchemaFactory.createForClass(Project);
+ProjectSchema.index({ code: 1, revision: 1 }, { unique: true });

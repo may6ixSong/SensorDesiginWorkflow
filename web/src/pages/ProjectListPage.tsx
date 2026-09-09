@@ -205,6 +205,19 @@ function ProjectCard({ project, view }: { project: ProjectDto; view: View }) {
           >
             {project.code}
           </Box>
+          {project.revision && (
+            <Box
+              component="span"
+              title="Revision"
+              sx={{
+                fontFamily: FONT_MONO, fontSize: 9, letterSpacing: '.1em', padding: '2px 7px',
+                borderRadius: '6px', background: 'transparent', color: T.dm2,
+                border: `1px dashed ${T.ln2}`,
+              }}
+            >
+              {project.revision}
+            </Box>
+          )}
           <Box
             component="span"
             sx={{

@@ -12,6 +12,7 @@ import { CanvasModule } from './canvas/canvas.module';
 import { HldModule } from './hld/hld.module';
 import { StorageModule } from './storage/storage.module';
 import { AuditModule } from './audit/audit.module';
+import { HubModule } from './hub/hub.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { AuditModule } from './audit/audit.module';
     HldModule,
     StorageModule,
     AuditModule,
+    HubModule,
   ],
 })
 export class AppModule {}

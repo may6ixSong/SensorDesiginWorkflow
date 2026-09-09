@@ -30,7 +30,6 @@ const SECTIONS: Section[] = [
     title: 'Versions and releases',
     body: [
       'Uploading a working copy bumps the minor version and stays visible only to the workflow owners. Release promotes it to the next major version, and that is the version recipient departments see.',
-      'The Recipient-dept view toggle in the top bar shows the board exactly as a receiving department sees it — working copies disappear.',
     ],
   },
   {

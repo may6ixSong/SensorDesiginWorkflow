@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Box } from '@mui/material';
-import { WorkflowBriefDto, WorkflowDto, WorkflowPhase } from '@/types/domain';
+import { Tier, WorkflowBriefDto, WorkflowDto, WorkflowPhase } from '@/types/domain';
 import { useCanvasStore } from '@/store/canvasStore';
 import { toast } from '@/store/toastStore';
+import { useArtifactServices } from '@/api/hooks/useHub';
 import {
-  CanvasMemo, CanvasNode, connectedSet, countOrphans, isOrphanPhase, laneG, getPW,
+  CanvasMemo, CanvasNode, connectedSet, countOrphans, effectiveTier, isOrphanPhase, laneG, getPW,
   phaseAtX, resizePhase, wallAdj, todayX,
   resolveNodePhases,
 } from '@/lib/canvasModel';
@@ -50,6 +51,12 @@ export function Canvas({
   workflow, phases, canEdit, onOpenIncoming, workflowDirectory, onSaveLayout, onCancelEdit,
 }: Props) {
   const workflowById = useMemo(() => new Map(workflowDirectory.map((d) => [d.id, d])), [workflowDirectory]);
+  /** 블록 아이콘/LIVE 배지에 쓸 서비스별 tier(Hub 설계서 §5.1) — Hub 레지스트리 캐시를 그대로 쓴다. */
+  const { data: artifactServices } = useArtifactServices();
+  const tierByServiceKey = useMemo(
+    () => Object.fromEntries((artifactServices ?? []).map((s) => [s.key, s.defaultTier])) as Record<string, Tier>,
+    [artifactServices],
+  );
   const vpRef = useRef<HTMLDivElement>(null);
   const cvRef = useRef<HTMLDivElement>(null);
   const elRefs = useRef(new Map<string, HTMLDivElement>());
@@ -639,6 +646,7 @@ export function Canvas({
             <DeliverableNode
               key={d.id}
               d={d}
+              tier={effectiveTier(d, tierByServiceKey)}
               phase={phases.find((p) => p.id === d.phase)}
               orphan={d.origin !== 'incoming' && isOrphanPhase(phases, d.phase)}
               recvWorkflow={d.recvWorkflowId ? workflowById.get(d.recvWorkflowId) : undefined}

@@ -19,6 +19,8 @@ export interface MilestoneDto {
 export interface ProjectDetailDto {
   _id: string;
   code: string;
+  /** 같은 code라도 다른 프로젝트로 취급하는 리비전. 없으면 빈 문자열(Hub 설계서 §19). */
+  revision: string;
   name: string;
   /**
    * 산출물 "Received from" 후보 부서 목록 — 과제마다 자유롭게 추가/삭제한다
@@ -42,6 +44,7 @@ export function toProjectDetailDto(project: ProjectDocument): ProjectDetailDto {
   return {
     _id: project._id.toString(),
     code: project.code,
+    revision: project.revision ?? '',
     name: project.name,
     departments: [...(project.departments ?? [])],
     status: project.status,
