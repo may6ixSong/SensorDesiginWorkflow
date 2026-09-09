@@ -357,9 +357,12 @@ export function DeliverableDialog({
 
       {/* B — 요약 / 버전 트리 / 기본 정보 / 연결은 한 레일, 전달(Handoff)만 다시 별도
           탭으로 분리한다(사용자 요청 — 예전처럼). 받는 산출물(received)이면 애초에
-          전달 섹션 자체가 없으므로 탭 바를 안 띄운다. */}
+          전달 섹션 자체가 없으므로 탭 바를 안 띄운다. Tier A 연동 산출물(calypsoLinked/
+          externalLinked)도 마찬가지로 숨긴다 — recvDept/recvContact는 SIREN 자체 부서
+          모델이라, 실제 권한을 그 서비스가 따로 관리하는 산출물에 편집 가능한 채로
+          노출하면 두 값이 서로 다른 답을 주게 된다. */}
       <Box sx={{ flex: 1, minWidth: 320, display: 'flex', flexDirection: 'column', background: T.sf2 }}>
-        {!received && (
+        {!received && !calypsoLinked && !externalLinked && (
           <Box sx={{ flex: '0 0 auto', display: 'flex', gap: '2px', padding: '10px 14px 0', borderBottom: `1px solid ${T.ln}` }}>
             {([
               { key: 'overview' as const, label: 'Overview' },
@@ -382,7 +385,7 @@ export function DeliverableDialog({
           </Box>
         )}
 
-        {bTab === 'handoff' && !received ? (
+        {bTab === 'handoff' && !received && !calypsoLinked && !externalLinked ? (
           <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '14px' }}>
             <HandoffSection d={d} own={own} onSave={onSaveRecv} />
           </Box>
