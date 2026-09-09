@@ -546,6 +546,8 @@ export function BoardPage() {
               phases={phaseList}
               projectCode={project?.code}
               projectRevision={project?.revision}
+              projectId={projectId}
+              myDepartments={myDepartments}
               intent={addDlgIntent}
               onClose={() => st.getState().setAddDlg(false)}
               onCreate={({ name, phaseId, artifactKey, serviceKey, externalArtifactId, artifactTypeKey }) => {

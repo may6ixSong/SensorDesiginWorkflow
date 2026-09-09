@@ -78,6 +78,9 @@ export class DeliverablesService {
     artifactTypeKey: string | undefined,
   ): Promise<string | null> {
     if (!serviceKey) return null;
+    // Calypso는 Hub 레지스트리에 없다(SIREN 내장 기능이라 §19.1) - findByKeyOrThrow가
+    // 던져버리므로 여기서 먼저 걸러낸다. Calypso엔 artifactTypes 개념도 없다.
+    if (serviceKey === 'calypso') return null;
     const svc = await this.hub.findByKeyOrThrow(serviceKey);
     const types = svc.artifactTypes ?? [];
     if (types.length === 0) return null;

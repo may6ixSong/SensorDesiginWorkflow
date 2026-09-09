@@ -21,6 +21,7 @@ import { SlidePanel } from '@/components/common/SlidePanel';
 import { VersionTree } from '@/components/deliverable/VersionTree';
 import { VersionContents } from '@/components/deliverable/VersionContents';
 import { ExternalArtifactPicker } from '@/components/deliverable/ExternalArtifactPicker';
+import { CalypsoArtifactPicker } from '@/components/deliverable/CalypsoArtifactPicker';
 import { ArtifactVersionTree } from '@/components/artifact/ArtifactVersionTree';
 import { ArtifactVersionContents } from '@/components/artifact/ArtifactVersionContents';
 import { ArtifactAccessPanel } from '@/components/artifact/ArtifactAccessPanel';
@@ -428,7 +429,8 @@ export function DeliverableDialog({
 
             {own && (
               <BasicInfoCard
-                d={d} phases={phases} nodes={nodes} project={project} onSaveInfo={onSaveInfo}
+                d={d} phases={phases} nodes={nodes} project={project} myDepartments={myDepartments}
+                onSaveInfo={onSaveInfo}
               />
             )}
 
@@ -771,10 +773,15 @@ function VersionSummary({
  * 아니고, Source를 실제로 어떻게 고를지(예: Artifact list에서 등록한 산출물을 고르는 식)는
  * 나중에 다시 설계한다. 지금은 있던 값을 그대로 들고 저장만 한다.
  */
+type SourceMode = 'none' | 'service' | 'calypso';
+const sourceModeFor = (serviceKey: string | null): SourceMode =>
+  serviceKey === 'calypso' ? 'calypso' : serviceKey ? 'service' : 'none';
+
 function BasicInfoCard({
-  d, phases, nodes, project, onSaveInfo,
+  d, phases, nodes, project, myDepartments, onSaveInfo,
 }: {
   d: CanvasNode; phases: WorkflowPhase[]; nodes: CanvasNode[]; project?: ProjectDetailDto;
+  myDepartments: string[];
   onSaveInfo: Props['onSaveInfo'];
 }) {
   const { data: services } = useArtifactServices();
@@ -791,6 +798,7 @@ function BasicInfoCard({
   );
 
   const [name, setName] = useState(d.name);
+  const [sourceMode, setSourceMode] = useState<SourceMode>(sourceModeFor(d.serviceKey));
   const [serviceKey, setServiceKey] = useState(d.serviceKey ?? '');
   const [artifactTypeKey, setArtifactTypeKey] = useState(d.artifactTypeKey ?? '');
   // 예전엔 이 화면에서 아예 편집할 수 없었다 — 오타를 내면 고칠 방법이 없는 게 가장
@@ -802,6 +810,7 @@ function BasicInfoCard({
 
   useEffect(() => {
     setName(d.name);
+    setSourceMode(sourceModeFor(d.serviceKey));
     setServiceKey(d.serviceKey ?? '');
     setArtifactTypeKey(d.artifactTypeKey ?? '');
     setExternalArtifactId(d.externalArtifactId ?? '');
@@ -809,6 +818,17 @@ function BasicInfoCard({
 
   const selectedService = (services ?? []).find((s) => s.key === serviceKey) ?? null;
   const artifactTypes = selectedService?.artifactTypes ?? [];
+
+  /** Tier A(연동된 서비스)와 Calypso는 등록 방법이 완전히 다르다 — code+revision 후보
+   * 검색 vs 내가 view 권한 있는 Calypso artifact 목록. 그래서 같은 dropdown 하나에
+   * 섞지 않고 먼저 방식부터 고르게 한다(사용자 요청). */
+  const switchSourceMode = (mode: SourceMode) => {
+    setSourceMode(mode);
+    setExternalArtifactId('');
+    setArtifactTypeKey('');
+    setServiceKey(mode === 'calypso' ? 'calypso' : '');
+    setTypeErr(false);
+  };
 
   const submit = () => {
     if (!name.trim()) { setNameErr(true); return; }
@@ -828,47 +848,89 @@ function BasicInfoCard({
       <Field label="Name">
         <TextInput value={name} onChange={(v) => { setName(v); setNameErr(false); }} error={nameErr} />
       </Field>
-      <Field label="Source — the registered system this artifact lives in" sx={{ mb: artifactTypes.length > 1 ? '12px' : 0 }}>
-        <SelectInput
-          value={serviceKey}
-          onChange={(v) => {
-            setServiceKey(v);
-            const svc = (services ?? []).find((s) => s.key === v);
-            const types = svc?.artifactTypes ?? [];
-            // 종류가 1개뿐이면 고르라고 묻지 않고 그 1개를 자동으로 쓴다(§19.1).
-            setArtifactTypeKey(types.length === 1 ? types[0].key : '');
-            setExternalArtifactId('');
-            setTypeErr(false);
-          }}
-          options={[
-            { value: '', label: 'Not linked — record versions here' },
-            ...(services ?? []).map((s) => ({ value: s.key, label: s.name })),
-          ]}
-        />
+      <Field label="Source — where this deliverable's real data lives" sx={{ mb: '12px' }}>
+        <Box sx={{ display: 'flex', gap: '5px' }}>
+          {([
+            { m: 'none' as const, label: 'Not linked' },
+            { m: 'service' as const, label: 'Connected Service' },
+            { m: 'calypso' as const, label: 'Calypso' },
+          ]).map(({ m, label }) => (
+            <Box
+              key={m}
+              component="button"
+              type="button"
+              onClick={() => switchSourceMode(m)}
+              sx={{
+                flex: 1, fontSize: 11.5, fontWeight: 600, padding: '7px 8px',
+                borderRadius: '7px', transition: '.14s', cursor: CURSOR_POINTER,
+                background: sourceMode === m ? T.tl2 : T.sf,
+                border: `1px solid ${sourceMode === m ? T.tl : T.ln2}`,
+                color: sourceMode === m ? T.tl : T.dm,
+                '&:hover': { background: sourceMode === m ? T.tl2 : T.sf3 },
+              }}
+            >
+              {label}
+            </Box>
+          ))}
+        </Box>
       </Field>
-      {artifactTypes.length > 1 && (
-        <Field label="Artifact type — this service provides more than one kind" sx={{ mb: '12px' }}>
-          <SelectInput
-            value={artifactTypeKey}
-            onChange={(v) => { setArtifactTypeKey(v); setTypeErr(false); }}
-            options={[
-              { value: '', label: 'Choose one…' },
-              ...artifactTypes.map((t) => ({ value: t.key, label: t.name })),
-            ]}
-          />
-          {typeErr && (
-            <Box sx={{ fontSize: 11, color: T.rd, mt: '5px' }}>
-              {selectedService?.name} provides more than one artifact type — pick one.
+
+      {sourceMode === 'service' && (
+        <>
+          <Field label="Connected service" sx={{ mb: artifactTypes.length > 1 ? '12px' : 0 }}>
+            <SelectInput
+              value={serviceKey}
+              onChange={(v) => {
+                setServiceKey(v);
+                const svc = (services ?? []).find((s) => s.key === v);
+                const types = svc?.artifactTypes ?? [];
+                // 종류가 1개뿐이면 고르라고 묻지 않고 그 1개를 자동으로 쓴다(§19.1).
+                setArtifactTypeKey(types.length === 1 ? types[0].key : '');
+                setExternalArtifactId('');
+                setTypeErr(false);
+              }}
+              options={[
+                { value: '', label: 'Choose a service…' },
+                ...(services ?? []).map((s) => ({ value: s.key, label: s.name })),
+              ]}
+            />
+          </Field>
+          {artifactTypes.length > 1 && (
+            <Field label="Artifact type — this service provides more than one kind" sx={{ mb: '12px' }}>
+              <SelectInput
+                value={artifactTypeKey}
+                onChange={(v) => { setArtifactTypeKey(v); setTypeErr(false); }}
+                options={[
+                  { value: '', label: 'Choose one…' },
+                  ...artifactTypes.map((t) => ({ value: t.key, label: t.name })),
+                ]}
+              />
+              {typeErr && (
+                <Box sx={{ fontSize: 11, color: T.rd, mt: '5px' }}>
+                  {selectedService?.name} provides more than one artifact type — pick one.
+                </Box>
+              )}
+            </Field>
+          )}
+          {serviceKey && (
+            <Box sx={{ mb: '12px' }}>
+              <ExternalArtifactPicker
+                service={selectedService}
+                projectCode={project?.code}
+                projectRevision={project?.revision}
+                value={externalArtifactId}
+                onChange={setExternalArtifactId}
+              />
             </Box>
           )}
-        </Field>
+        </>
       )}
-      {serviceKey && (
+
+      {sourceMode === 'calypso' && (
         <Box sx={{ mb: '12px' }}>
-          <ExternalArtifactPicker
-            service={selectedService}
-            projectCode={project?.code}
-            projectRevision={project?.revision}
+          <CalypsoArtifactPicker
+            projectId={project?._id}
+            myDepartments={myDepartments}
             value={externalArtifactId}
             onChange={setExternalArtifactId}
           />
