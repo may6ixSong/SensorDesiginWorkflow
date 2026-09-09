@@ -9,8 +9,11 @@ import { CURSOR_POINTER, FONT_MONO, T } from '@/theme/tokens';
 /**
  * tier별 블록 아이콘(사용자 요청) — B는 기존처럼 문서, A는 "그 서비스가 들고 있는
  * 진짜 산출물"이라는 느낌의 패키지 아이콘, C/D는 경로/링크 느낌의 체인 아이콘.
+ * 출처(serviceKey)가 아예 없는 산출물은 tier와 무관하게 별도의 점선 박스 아이콘을
+ * 쓴다 — C/D의 link 아이콘과 헷갈린다는 지적(사용자 요청)에 따라 명확히 구분한다.
  */
-function iconForTier(tier: Tier): IconName {
+function iconForNode(serviceKey: string | null, tier: Tier): IconName {
+  if (!serviceKey) return 'unlinked';
   if (tier === 'A') return 'artifact';
   if (tier === 'B') return 'word';
   return 'link';
@@ -248,7 +251,7 @@ export function DeliverableNode({
 
       <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: '10px', pl: '12px' }}>
         <Box component="span" sx={{ color: col, flex: '0 0 auto' }}>
-          <Icon name={iconForTier(tier)} size={20} />
+          <Icon name={iconForNode(d.serviceKey, tier)} size={20} />
         </Box>
         <Box
           sx={{
