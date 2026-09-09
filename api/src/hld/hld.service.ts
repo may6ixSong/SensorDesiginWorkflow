@@ -60,7 +60,10 @@ export class HldService {
 
     if (d.serviceKey && d.externalArtifactId) {
       const svc = await this.hub.findByKeyOrThrow(d.serviceKey);
-      const v = await this.observer.currentVersion(svc, d.externalArtifactId, actor.knoxId);
+      // Release는 개인화된 조회가 아니라 공식 행위다 - 누가 눌러도 얼려지는 값이 같아야
+      // 하므로 admin 시야(isAdmin=true)를 절대 넘기지 않는다(그래도 isReleased만 보므로
+      // 결과는 같겠지만, 재현 가능성을 명시적으로 지킨다).
+      const v = await this.observer.currentVersion(svc, d.externalArtifactId, actor.knoxId, false);
       if (!v || !v.isReleased) return null;
       return {
         version: v.versionLabel,

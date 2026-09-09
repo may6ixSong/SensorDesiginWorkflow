@@ -43,18 +43,29 @@ export class DeliverablesService {
     return { svc, externalArtifactId: d.externalArtifactId };
   }
 
+  /**
+   * SIREN admin에게 그 서비스가 스스로 지원하면(RPM 등) member가 아니어도 편집자 시야를
+   * 열어준다 — 실제 검증된 admin(realKnoxId 기준)일 때만이고, 사용자 시뮬레이션 중에는
+   * 꺼야 한다(§13.3 규칙 2와 같은 이유: 시뮬레이션 중엔 Admin의 super 권한이 아니라
+   * 시뮬레이션 대상 본인의 실제 권한으로 보여야 한다 - isAdmin만 보면 realKnoxId 기준이라
+   * 시뮬레이션 중에도 true로 남으므로 isImpersonating도 함께 봐야 한다).
+   */
+  private isAdminVisible(actor: Actor): boolean {
+    return actor.isAdmin && !actor.isImpersonating;
+  }
+
   /** fail-closed(§19.2) - 연동 대상이 아니거나 서비스가 응답하지 않으면 접근 없음으로 취급한다. */
   async liveAccess(id: string, actor: Actor): Promise<ObserverAccess> {
     const target = await this.liveTarget(id);
     if (!target) return { canView: false, canEdit: false };
-    return this.observer.access(target.svc, target.externalArtifactId, actor.knoxId);
+    return this.observer.access(target.svc, target.externalArtifactId, actor.knoxId, this.isAdminVisible(actor));
   }
 
   /** 그 서비스가 이미 knoxId 기준으로 필터링해 준 목록을 그대로 돌려준다 - 다시 마스킹하지 않는다. */
   async liveVersions(id: string, actor: Actor): Promise<ObserverVersionRecord[]> {
     const target = await this.liveTarget(id);
     if (!target) return [];
-    return this.observer.versions(target.svc, target.externalArtifactId, actor.knoxId);
+    return this.observer.versions(target.svc, target.externalArtifactId, actor.knoxId, this.isAdminVisible(actor));
   }
 
   /**

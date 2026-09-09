@@ -41,6 +41,12 @@ const TIMEOUT_MS = 5000;
  *
  * transport가 http가 아니거나 baseUrl이 없으면(B/C/D 티어) 모든 호출이 조용히
  * null/빈 값을 반환한다 — 그런 서비스는 애초에 이 어댑터의 대상이 아니다.
+ *
+ * currentVersion/versions/access의 isAdmin은 RPM처럼 그 계약을 구현한 서비스가
+ * &isAdmin=true를 받으면 member가 아니어도 편집자 시야(작업중 버전 · editors 목록)를
+ * 내려주는, 서비스가 자발적으로 지원하는 선택적 확장이다 — 계약을 구현하지 않은
+ * 서비스에는 그냥 무해한 여분 쿼리 파라미터다. 호출부는 이 값을 "실제 검증된 admin"
+ * 판단 그대로 넘겨야 한다(DeliverablesService 참고 - 시뮬레이션 중에는 꺼야 한다).
  */
 @Injectable()
 export class ObserverClientService {
@@ -68,13 +74,19 @@ export class ObserverClientService {
     }
   }
 
+  /** isAdmin=true면 &isAdmin=true를 붙인다 — false일 땐 URL을 깔끔하게 유지하려 아예 안 붙인다. */
+  private adminParam(isAdmin: boolean): string {
+    return isAdmin ? '&isAdmin=true' : '';
+  }
+
   async currentVersion(
     svc: ArtifactServiceDocument,
     externalArtifactId: string,
     knoxId: string,
+    isAdmin: boolean,
   ): Promise<ObserverVersionRecord | null> {
     if (!this.callable(svc)) return null;
-    const url = `${svc.baseUrl}/artifacts/${encodeURIComponent(externalArtifactId)}/current-version?knoxId=${encodeURIComponent(knoxId)}`;
+    const url = `${svc.baseUrl}/artifacts/${encodeURIComponent(externalArtifactId)}/current-version?knoxId=${encodeURIComponent(knoxId)}${this.adminParam(isAdmin)}`;
     return this.getJson(url);
   }
 
@@ -82,9 +94,10 @@ export class ObserverClientService {
     svc: ArtifactServiceDocument,
     externalArtifactId: string,
     knoxId: string,
+    isAdmin: boolean,
   ): Promise<ObserverVersionRecord[]> {
     if (!this.callable(svc)) return [];
-    const url = `${svc.baseUrl}/artifacts/${encodeURIComponent(externalArtifactId)}/versions?knoxId=${encodeURIComponent(knoxId)}`;
+    const url = `${svc.baseUrl}/artifacts/${encodeURIComponent(externalArtifactId)}/versions?knoxId=${encodeURIComponent(knoxId)}${this.adminParam(isAdmin)}`;
     const data = await this.getJson(url);
     return Array.isArray(data) ? data : [];
   }
@@ -94,9 +107,10 @@ export class ObserverClientService {
     svc: ArtifactServiceDocument,
     externalArtifactId: string,
     knoxId: string,
+    isAdmin: boolean,
   ): Promise<ObserverAccess> {
     if (!this.callable(svc)) return { canView: false, canEdit: false };
-    const url = `${svc.baseUrl}/artifacts/${encodeURIComponent(externalArtifactId)}/access?knoxId=${encodeURIComponent(knoxId)}`;
+    const url = `${svc.baseUrl}/artifacts/${encodeURIComponent(externalArtifactId)}/access?knoxId=${encodeURIComponent(knoxId)}${this.adminParam(isAdmin)}`;
     const data = await this.getJson(url);
     if (!data) return { canView: false, canEdit: false };
     return { canView: data.canView === true, canEdit: data.canEdit === true };
