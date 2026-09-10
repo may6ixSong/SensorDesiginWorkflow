@@ -182,15 +182,19 @@
         --s-ring: rgba(143, 134, 255, 0.4);
       }
 
+      /* 커서 hotspot(9 8)은 두 SVG의 화살촉 꼭짓점이자 pointer 링의 중심 좌표다.
+         셋(두 SVG + 아래 값 + tokens.ts의 CURSOR_POINTER)이 전부 같아야 버튼 위로
+         들어갈 때 커서가 제자리에서 바뀐다 — 예전 포인터는 조준선의 정중앙(16 16)을
+         기준점으로 써서 hover할 때마다 커서가 튀었다. */
       html,
       body {
         background: var(--s-bg);
-        cursor: url('/cursors/default.svg') 4 4, auto;
+        cursor: url('/cursors/default.svg') 9 8, auto;
       }
 
       a,
       button:not(:disabled) {
-        cursor: url('/cursors/pointer.svg') 16 16, pointer;
+        cursor: url('/cursors/pointer.svg') 9 8, pointer;
       }
       button:disabled {
         cursor: not-allowed;

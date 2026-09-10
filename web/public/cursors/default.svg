@@ -1,6 +1,32 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" fill="none">
-  <path d="M4 4 L4 24.5 L9.2 19.8 L12.6 27.5 L16.3 25.9 L13 18.3 L20 18.1 Z"
-    fill="#ffffff" stroke="#0c9a83" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" />
-  <circle cx="9.2" cy="19.8" r="2.4" fill="#0c9a83" />
-  <circle cx="9.2" cy="19.8" r="1" fill="#ffffff" />
+<!--
+  SIREN 기본 커서.
+
+  · 화살촉을 얇고 예리하게 세웠다 — "정밀 계측기"라는 팔레트 방향과 같은 결이다.
+  · 흰 테두리는 장식이 아니라 가독성이다. 캔버스가 라이트/다크로 바뀌고 그 위에
+    블록·연결선이 겹치므로 단색 화살표만으로는 배경에 묻힌다.
+  · 테두리는 stroke를 그린 흰 사본을 아래에 깔아 만든다. paint-order 속성 대신
+    이 방식을 쓰는 건 커서 이미지 래스터라이저마다 그 속성 지원이 다르기 때문이다.
+
+  ★ 화살촉 꼭짓점은 (9,8)이고 그것이 곧 hotspot이다. 32x32 안에서 굳이 안쪽에 들여둔
+    이유는 pointer.svg가 이 지점을 감싸는 링을 그리기 때문이다 — 두 커서가 같은
+    hotspot을 써야 버튼 위로 들어갈 때 커서가 제자리에서 바뀐다.
+  ★ 이 좌표는 web/index.html과 web/src/theme/tokens.ts의 CURSOR_POINTER에도 적혀 있다.
+    셋이 어긋나면 hover할 때마다 커서가 튄다.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <defs>
+    <linearGradient id="siren-arrow" x1="0" y1="0" x2="0.55" y2="1">
+      <stop offset="0" stop-color="#7b70ff"/>
+      <stop offset="1" stop-color="#3f34bd"/>
+    </linearGradient>
+    <filter id="siren-lift" x="-60%" y="-60%" width="220%" height="220%">
+      <feDropShadow dx="0" dy="1.1" stdDeviation="1.1" flood-color="#0b0f1c" flood-opacity="0.4"/>
+    </filter>
+  </defs>
+
+  <path d="M9 8 L9 24.24 L13.1 20.38 L15.97 26.86 L18.68 25.71 L15.89 19.32 L21.22 18.82 Z"
+        fill="#ffffff" stroke="#ffffff" stroke-width="3" stroke-linejoin="round"
+        filter="url(#siren-lift)"/>
+  <path d="M9 8 L9 24.24 L13.1 20.38 L15.97 26.86 L18.68 25.71 L15.89 19.32 L21.22 18.82 Z"
+        fill="url(#siren-arrow)"/>
 </svg>
