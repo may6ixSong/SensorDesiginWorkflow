@@ -81,6 +81,18 @@ Workflow {
 }
 ```
 
+> **`canvasLock`의 범위는 캔버스뿐이다.** `Workflow` 문서 안에 같이 들어 있지만, 이 필드가
+> workflow 전체를 잠그는 게 아니다.
+> - lock 점유·갱신·해제(`POST`/`DELETE /workflows/:id/canvas-lock`)와 캔버스 저장
+>   (`PUT /workflows/:id/canvas`)은 **`canvasLock` 필드만 원자적으로 `$set`** 한다. 문서 전체를
+>   다시 쓰지 않는다.
+> - `PATCH /workflows/:id`(Name/Description/Department)와 `PATCH /workflows/:id/phases`는
+>   **`canvasLock`을 확인하지도, 건드리지도 않는다.** A가 캔버스를 편집(=lock 점유) 하는 동안에도
+>   B는 그 workflow의 description을 얼마든지 바꿀 수 있다 — lock은 오직 `blocks`/`edges`/`memos`/
+>   `layout` 저장(=캔버스 그 자체)에만 관여한다(03장 §3.3).
+> - 구현상 두 업데이트가 서로 다른 필드 집합을 `$set`하므로, Mongoose 레벨에서 자연히 경쟁하지
+>   않는다. 굳이 트랜잭션을 쓸 필요가 없다.
+
 ### 마이그레이션 (구 → 신)
 
 | 구 필드 | 신 필드 | 변환 |
@@ -115,8 +127,8 @@ Artifact {
   editAccess: { departments: string[], users: string[] }
   viewAccess: { departments: string[], users: string[] }   // == recipient
 
-  // --- recipient (A 전용) ---
-  recipients: { departments: string[], users: string[] }
+  // A Tier는 recipient를 여기 두지 않는다. workflow마다 달라질 수 있어서
+  // Block.recipients(§4)에 저장한다 — 01장 §4.1 참조.
 
   // --- publish 이력 ---
   versions: [ArtifactVersion]         // 최신이 index 0
@@ -144,12 +156,27 @@ ArtifactVersion {
 ### 규칙
 
 - **`tier === 'A'` 이면 `editAccess`/`viewAccess` 를 쓰지 않는다.** 값이 들어와도 BE가 무시하고,
-  응답에서도 비운다. A의 권한은 전적으로 그 서비스가 판정한다.
-- **`tier !== 'A'` 이면 `recipients` 를 쓰지 않는다.** recipient는 `viewAccess` 에서 파생한다.
+  응답에서도 비운다. A의 권한은 전적으로 그 서비스가 판정한다. recipient는 artifact가 아니라
+  block에 있다(§4).
+- **`tier !== 'A'` 이면 `recipients` 개념은 `viewAccess` 에서 파생한다.** 별도 필드를 두지 않고,
   DTO 조립 시 `recipients = viewAccess` 로 채워 내려주되 **편집은 막는다**(단일 진실은 `viewAccess`).
 - `versions[0].tier` 가 그 산출물의 "현재 tier"이며, `artifact.tier` 는 그 값을 캐시한 것이다.
 - **버전 가시성** — `isPublished: false` 인 엔트리는 그 산출물의 giver(=`editAccess` 해당자,
   A는 서비스 판정)에게만 응답에 담긴다. 그 외 전원은 published만 본다.
+- **Mapping 범위 — 같은 과제(project)만.** workflow의 block을 어떤 artifact에 매핑할 때, 후보는
+  **그 workflow와 `projectId`가 같은 artifact로 한정**한다. 같은 `code`라도 `revision`이 다르면
+  다른 project이므로(01장·02장 §1) 자동으로 후보에서 빠진다. Admin이 여러 과제를 동시에 볼 수
+  있어도 이 제약은 그대로 적용된다 — 매핑 API는 `artifact.projectId !== workflow.projectId`
+  이면 400으로 거부한다.
+- **A Tier의 버전 보고 규칙** — 그 서비스는 자기 버전 체계를 그대로 쓰되, SIREN에는 **"official한
+  버전"만** 넘긴다.
+  - 서비스가 minor 단위까지 명확히 태깅한다면 그 minor까지 그대로 보낸다(예: `v1.3`).
+  - **RPM처럼 minor 개념이 없고 snapshot만 찍는 서비스**는, 확정된 release 버전들과 함께
+    **`latest(+)` 항목 하나**만 추가로 보낸다 — 지금 구현되어 있는 RPM 어댑터 동작과 동일하다.
+    `latest(+)`는 `isPublished: false`(작업중) 스냅샷을 나타내는 자리표시자이며, giver 판정
+    대상에게만 보인다(§7의 가시성 규칙을 그대로 따른다).
+  - 이 규칙은 `ArtifactVersion.versionLabel` 에 들어오는 값의 **의미**에 대한 것이고, 스키마
+    필드를 추가하지 않는다 — `latest(+)` 도 그냥 `versionLabel: "latest+"` 인 한 엔트리다.
 
 ### `major` 판정
 
@@ -177,9 +204,19 @@ Block {
   workflowId
   phaseId: string
   artifactId: ObjectId | null   // null = 아직 출처가 정해지지 않은 정상 빈 상태(= release 제외)
+                                 // 매핑 시 artifact.projectId === projectId 만 허용(§3)
   name: string                  // artifact 미매핑 상태에서의 임시 표기. 매핑되면 artifact.name 우선
   layout: { x, y, w, h }
   intent: 'own' | 'received'    // 지금은 항상 'own'. TODO T2 에서 다시 쓴다
+
+  // A Tier artifact가 매핑된 block에서만 의미가 있다. B/C/D는 항상 비워둔다
+  // (그 경우 recipient는 artifact.viewAccess 에서 파생 — §3).
+  // workflow마다 독립이라 여기, block에 둔다 — 01장 §4.1/§4.4.
+  recipients: {
+    editAccess: { departments: string[], users: string[] }
+    viewAccess: { departments: string[], users: string[] }
+  }
+
   createdBy: string
   isMock: boolean
 }
@@ -187,8 +224,10 @@ Block {
 
 - `series` / `seriesIdx` / `seriesTotal` 은 **유지**한다(반복 릴리스 일정 개념은 그대로).
 - `recvDept` / `recvContact` / `recvWorkflowId` / `sourceDept` / `sourceContact` 는 **제거**한다 —
-  수신 대상은 이제 artifact의 recipient가 유일한 진실이다.
+  수신 대상은 이제 artifact의 recipient(B/C/D) 또는 block의 recipients(A)가 유일한 진실이다.
 - `versions` 는 제거하고 `artifactId` 참조로 대체한다.
+- `recipients` 편집 권한은 그 workflow의 **Edit Access**다(04장 §3.3). recipient에 속하는 것과
+  recipient를 편집할 수 있는 것은 별개다(01장 §4.2).
 
 ---
 
@@ -321,7 +360,7 @@ ReleaseItem {
 |---|---|---|
 | `GET` | `/artifacts/:id` | 열람 권한(01장 §4.2) 없으면 403. 버전은 권한에 따라 마스킹 |
 | `PUT` | `/artifacts/:id/access` | B/C/D만. `{ editAccess, viewAccess }` |
-| `PUT` | `/artifacts/:id/recipients` | **A만.** `{ departments, users }` |
+| `PUT` | `/workflows/:wfId/blocks/:blockId/recipients` | **A Tier block만.** `{ editAccess, viewAccess }`. workflow Edit Access 필요 |
 | `GET` | `/artifacts/pickable` | 받는 산출물 선택 후보 목록 (04장 §6). TODO T2에서 사용 |
 
 ### 7.4 Release

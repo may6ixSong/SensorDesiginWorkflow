@@ -169,8 +169,9 @@ flow 삭제 confirm 문구:
 - 다중 선택 가능하며, 선택 해제하면 전체로 돌아온다.
 - 후보는 그 과제에 등록된 부서(`Project.departments`).
 - **recipient 판정**은 tier에 따라 다르다(04장 §3):
-  - A → `artifact.recipients.departments`
-  - B/C/D → `artifact.viewAccess.departments`
+  - A → **그 block**의 `recipients.editAccess.departments` + `recipients.viewAccess.departments`
+    (workflow마다 다를 수 있다 — artifact가 아니라 block에 저장된 값)
+  - B/C/D → **그 artifact**의 `viewAccess.departments` (모든 workflow에서 동일)
 - 편집 모드에서도 필터는 쓸 수 있다(§4.3).
 
 ### 6.2 만들지 않는 필터

@@ -132,7 +132,8 @@ CIS(CMOS Image Sensor) 설계 산출물을 workflow 캔버스 위에서 흐름�
 | 버전 개념 | **없음.** 모든 편집은 overwrite. 스냅샷도 찍지 않는다 |
 | Edit / View가 보는 화면 | **완전히 동일**. 블록에 버전 숫자를 쓰지 않고, publish 상태 배지만 표시 |
 | 동시 편집 | **lock으로 단독 점유.** TTL 10분, 편집 중 자동 갱신, 만료 후 자유 점유, Admin 강제 해제 |
-| Schedule · Edit Information | lock 대상 아님. 항상 latest overwrite |
+| Lock의 범위 | **캔버스(blocks/edges/memos/layout)에만.** `Workflow` 문서의 `canvasLock` 필드만 원자적으로 갱신 |
+| Schedule · Edit Information | **lock 대상 아님.** A가 캔버스를 편집 중이어도 B는 Name/Description/Phase를 동시에 바꿀 수 있다. 항상 latest overwrite |
 | 새 Artifact 추가 | **버튼 1개**로 통합. 내가 주는 산출물 기준으로만 생성 (받는 산출물 UX는 TODO) |
 | Flow 클릭 | 연결된 블록을 highlight → **confirm 후 삭제** |
 | 편집 모드 표시 | 캔버스 배경색을 편집용으로 전환 (light/dark 각각) |
@@ -144,14 +145,16 @@ CIS(CMOS Image Sensor) 설계 산출물을 workflow 캔버스 위에서 흐름�
 
 | 항목 | 결정 |
 |---|---|
-| B/C/D 권한 | **SIREN이 artifact 단위로 보관**하고 여러 workflow가 공유한다 |
-| B/C/D recipient | **View 권한 목록이 곧 recipient.** 별도 설정 없음 |
-| A Tier 권한 | 그 서비스가 관리한다. SIREN은 관여하지 않는다 |
-| A Tier recipient | SIREN에 **별도 설정**. 서비스와 어떤 의존도 갖지 않는 순수 알림 대상 |
-| Recipient 설정 권한 | workflow **Edit Access** (향후 A Tier 서비스의 edit 권한자로 좁힐 예정) |
+| B/C/D 권한 | **SIREN이 artifact 단위로 보관**하고 여러 workflow가 공유한다 (Calypso/HPC처럼 중앙 관리되므로) |
+| B/C/D recipient | **View 권한 목록이 곧 recipient.** artifact 하나에 붙어 모든 workflow에 동일하게 적용 |
+| A Tier 권한 | 그 서비스가 관리한다. SIREN은 실제 데이터 접근에 관여하지 않는다 |
+| A Tier recipient | SIREN이 **block(=그 workflow 안의 자리) 단위로 저장**. 같은 artifact도 workflow마다 recipient 구성이 다를 수 있고, edit/view 두 단계로 나뉜다 |
+| Recipient 설정(편집) 권한 | workflow **Edit Access** (향후 A Tier 서비스의 edit 권한자로 좁힐 예정) |
 | Recipient 탭 열람 | View 권한자에게 **읽기 전용**으로 노출 |
-| 상세 slide 열람 (A) | workflow Edit Access **또는** 그 artifact의 recipient여야 열린다 |
+| 상세 slide 열람 (A) | **2단 게이트.** ① SIREN recipient(edit/view)에 속하는가 → ② 그 서비스에서 view 권한이 있는가(라이브 조회). 둘 다 통과해야 열린다. **workflow Edit Access만으로는 더 이상 열리지 않는다** |
 | 상세 slide 열람 (B/C/D) | 그 artifact의 Edit/View 권한이 있어야 열린다. **workflow Edit Access만으로는 열리지 않는다** |
+| Mapping 범위 | block을 artifact에 매핑할 때, **같은 project(code+revision)의 artifact만** 후보로 나온다 |
+| A Tier 버전 보고 | 서비스는 **official한 버전만** SIREN에 전달. minor가 없는 snapshot형(RPM 등)은 release 버전 + `latest(+)` 하나만 |
 | 미매핑 블록 | recipient UI를 감추고, release 대상에서 제외 |
 | slide 내부 콘텐츠 | **TODO** — 이번 범위 밖. 대규모 개편 예정 |
 | 받는 산출물의 선택 범위 | A = 그 서비스의 view 권한 보유 · B/C = 주는 쪽 편집 권한자가 view 권한을 준 것만 · D = 자유 (UI는 TODO T2) |
@@ -162,13 +165,14 @@ CIS(CMOS Image Sensor) 설계 산출물을 workflow 캔버스 위에서 흐름�
 |---|---|
 | 대상 | tier 매핑이 끝난 산출물 **전체 자동 포함** (미매핑 블록·메모 제외) |
 | Highlight | 이전 release 대비 **major(=publish) 버전이 달라진 것**만. minor는 비교하지 않는다 |
-| Source 버전 선택 | flow로 연결된 **직전 1홉** upstream 산출물의 버전을 고른다. 기본값은 그 산출물의 **최신 published** |
+| Source 버전 선택 | **이전 release 대비 변경된(`changed:true`) 산출물만** 고른다. 변경 없는 산출물은 직전 release의 선택을 그대로 이어받아 다시 묻지 않는다. 선택 대상은 flow로 연결된 **직전 1홉** upstream. 기본값은 그 산출물의 **최신 published** |
 | Source가 미발행일 때 | **release는 그대로 진행.** 해당 칸을 `없음(None)`으로 남기고, 받는 쪽에는 "아직 전달되지 않음"으로 표시 |
 | 산출물 자체가 미발행일 때 | 동일하게 포함하고 `Not published`로 표기 |
 | Release note | **release 전체에 1개.** 산출물별 publish note는 각 산출물이 관리하며 release에 복제하지 않는다 |
 | 권한 | **Edit Access 전원** |
 | 철회 / Revoke | **절대 불가.** 삭제도 불가 |
-| 버전 표기 | workflow별 정수 시퀀스 + 날짜 |
+| 버전 표기 | **단일 정수 시퀀스** `v1, v2, v3 …` + 날짜 (major.minor 아님) |
+| artifact별 타임라인 | 별도 목록이 아니라 **버전 트리 위에 `v{n}` 마커**로 표기 |
 | 저장 범위 | 그 시점의 산출물 버전·경로·링크, 수신 부서, source 버전·경로·링크, 날짜, note, 실행자 등 **최대한 많이** |
 | 캔버스 스냅샷 | **저장하지 않는다.** 재현도 하지 않고, 표(table) 형식 산출물 목록만 남긴다 |
 | 알림 | 각 부서는 **자기가 받을 산출물만** 전달받는다. 변경이 없어도 알림은 간다 |

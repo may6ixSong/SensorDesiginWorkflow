@@ -62,11 +62,12 @@
 GET /workflows/:id/release/preview
    ↓
 ┌─ Release 다이얼로그 ───────────────────────────────────┐
-│  Release #4 · 2026-09-10                              │
+│  v4 · 2026-09-10                                       │
 │                                                        │
 │  ┌ 산출물 표 ───────────────────────────────────────┐ │
 │  │ 산출물명 │ Tier │ 버전 │ 수신 부서 │ Source 버전 │ │
-│  │ ...      │      │      │           │  ▼ 선택     │ │
+│  │ (변경)   │      │      │           │  ▼ 선택     │ │  ← changed:true 인 행만 picker
+│  │ (그대로) │      │      │           │  (자동 유지) │ │  ← 나머지는 직전 release의 값을 그대로
 │  └──────────────────────────────────────────────────┘ │
 │                                                        │
 │  Release note (필수)                                   │
@@ -78,10 +79,21 @@ GET /workflows/:id/release/preview
 POST /workflows/:id/releases
 ```
 
-### 4.2 Source 버전 선택
+release의 표기는 **단일 정수 시퀀스**다 — `v1`, `v2`, `v3` … (major.minor 같은 두 자리가 아니다).
+`Workflow.releaseSeq` 를 그대로 `v{n}` 으로 보여준다.
 
-각 산출물마다, **flow로 연결된 직전 1홉(upstream)** 산출물의 버전을 고른다.
+### 4.2 Source 버전 선택 — 바뀐 산출물만 고른다
 
+Source 버전을 다시 고르는 것은 **이번 release에서 `changed: true` 인 산출물에 한해서만**이다.
+바뀌지 않은 산출물은 **직전 release에서 이미 골라둔 source 선택을 그대로 이어받는다** — 사용자가
+매번 똑같은 선택을 반복하지 않게 한다.
+
+| 그 산출물이 | Source 선택 UI | 저장되는 값 |
+|---|---|---|
+| **`changed: true`** (major가 바뀌었거나 `firstTime`) | picker를 보여준다 | 사용자가 고른 값 |
+| **`changed: false`** (바뀌지 않음) | picker를 보여주지 않는다 | **직전 release의 `sources` 값을 그대로 복사** |
+
+- picker가 뜬 산출물마다, **flow로 연결된 직전 1홉(upstream)** 산출물의 버전을 고른다.
 - **범위는 직전 1홉만이다.** A → B → C 에서 C를 release할 때 C의 source는 B뿐이다.
   A는 B를 release할 때 이미 기록되므로, release history를 타고 가면 전체 계보가 복원된다.
 - 후보 목록: 그 source 산출물의 **published 버전 전체**(최신순).
@@ -90,6 +102,8 @@ POST /workflows/:id/releases
   - **release는 그대로 진행된다.** 막지 않는다.
   - 표에서는 `없음 / None` 으로 표기하고, 받는 쪽 화면에는 **"아직 전달되지 않음"** 으로 보인다.
 - upstream이 아예 없는 산출물은 source 칸이 빈 상태로 정상이다.
+- **첫 release(그 workflow의 첫 번째 release, 또는 그 산출물이 처음 등장한 회차)에는 이어받을
+  직전 값이 없으므로, `firstTime: true` 항목은 항상 `changed: true` 취급으로 picker를 보여준다.**
 
 ### 4.3 Release note
 
@@ -153,8 +167,8 @@ CC·DD 부서는 A가 있었다는 사실조차 알림에서 보지 못한다.
 
 | Tier | 알림 대상 |
 |---|---|
-| A | `artifact.recipients` 의 부서 + 사용자 |
-| B/C/D | `artifact.viewAccess` 의 부서 + 사용자 **및 `editAccess` 해당자** |
+| A | **그 block**의 `recipients.editAccess` + `recipients.viewAccess` 의 부서 + 사용자 (workflow별로 다를 수 있다) |
+| B/C/D | **그 artifact**의 `viewAccess` 의 부서 + 사용자 **및 `editAccess` 해당자** |
 
 - 부서 → 실제 사람은 **그 과제 members 중 해당 부서 전원**으로 전개한다.
 - 같은 사람이 여러 경로로 걸리면 **한 통으로 합친다**(중복 발송 금지).
@@ -194,7 +208,7 @@ export interface NotificationSender {
 
 ### 7.1 workflow별 목록 · 상세
 
-- **목록**: 그 workflow의 release를 최신순으로. 각 행에 `#seq`, 날짜, 실행자, 산출물 수,
+- **목록**: 그 workflow의 release를 최신순으로. 각 행에 `v{seq}`, 날짜, 실행자, 산출물 수,
   변경된 산출물 수, note 첫 줄.
 - **상세**: 그 시점의 **표**. 캔버스는 재현하지 않는다.
 
@@ -218,12 +232,20 @@ export interface NotificationSender {
 - `recipientDepartments` 인덱스로 조회한다.
 - 정렬은 날짜 최신순. 산출물명·workflow로 2차 필터를 건다.
 
-### 7.3 artifact별 타임라인
+### 7.3 artifact별 타임라인 — 버전 트리에 마커로 표기
 
-- 산출물 상세 slide 안에서 "이 산출물이 포함된 release" 를 시간순으로 보여준다.
-- 각 항목: release `#seq`, 날짜, 그때의 버전, 그때의 수신 부서, 그때의 source 버전.
-- **이게 산출물 tracking의 본체다** — 한 산출물이 언제 어떤 버전으로 누구에게 갔는지가 한 화면에 모인다.
-- `items.artifactId` 인덱스로 조회한다.
+별도의 타임라인 목록 화면을 새로 만들지 않는다. **산출물 상세 slide의 버전 트리(§7 버전 가시성)
+위에, 그 버전이 release로 나갔던 시점을 마커로 얹는다.**
+
+- 버전 트리의 각 항목(버전 하나) 옆에, 그 버전이 **처음으로 포함되어 나간 release**를
+  `v{seq}` 배지로 붙인다. 같은 버전이 바뀌지 않아 여러 release에 계속 실렸다면(§4.2 "그대로"
+  케이스), 그 버전 하나에 **`v3, v5, v6` 처럼 여러 release 배지가 나열**된다.
+- 배지를 클릭하면 그 release의 상세(§7.1)로 이동해, 그때 어느 부서에 갔는지·그때의 source가
+  무엇이었는지를 확인할 수 있다.
+- 열람 권한(04장 §7)이 없는 버전에는 배지를 그리지 않는다 — working 버전이 release에 실릴 일은
+  없으므로(publish된 것만 대상) 이 경우는 발생하지 않지만, 방어적으로 마스킹 규칙을 그대로 따른다.
+- **이게 산출물 tracking의 본체다** — 한 산출물이 언제 어떤 버전으로 누구에게 갔는지가 그
+  산출물 화면 하나에서 바로 보인다. 조회는 `items.artifactId` 인덱스로 한다.
 
 ---
 
@@ -239,7 +261,9 @@ export interface NotificationSender {
      release를 막지는 않는다.
    - C/D는 SIREN 로컬 기록에서 찾는다.
 3. 직전 release와 `majorKey` 를 비교해 `changed` 를 계산한다.
-4. flow 그래프에서 직전 1홉 upstream을 모아 source 후보와 기본값을 만든다.
+4. **`changed: true`인 항목만** flow 그래프에서 직전 1홉 upstream을 모아 source 후보와
+   기본값(최신 published)을 만든다. **`changed: false`인 항목은 직전 release의 `items[].sources`
+   값을 그대로 복사**한다(§4.2) — source 후보 계산도, 사용자 선택도 필요 없다.
 5. tier별 규칙으로 recipient를 계산한다.
 
 > **평소 캔버스 렌더링은 외부 서비스를 한 번도 호출하지 않는다.** 라이브 조회는 preview/release

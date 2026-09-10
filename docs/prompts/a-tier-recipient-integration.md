@@ -13,9 +13,12 @@ SIREN에 **recipient(수신 대상)** 개념이 새로 생겼다.
 
 - SIREN의 workflow는 자기 산출물들을 **부서 단위로 release(전달)** 한다.
 - 산출물마다 "이걸 받을 부서/사용자"가 정해져 있다.
-- **B/C/D Tier**는 SIREN이 권한을 직접 들고 있으므로, view 권한 목록이 곧 recipient다.
-- **A Tier**는 권한을 그 서비스가 관리한다. 그래서 SIREN은 권한에 관여하지 않고,
-  **알림을 받을 recipient만 따로 보관**한다.
+- **B/C/D Tier**는 SIREN이 권한을 직접 들고 있으므로, view 권한 목록이 곧 recipient다. 이건
+  Calypso나 HPC 공용 DB처럼 **권한이 한 군데서 중앙 관리**되는 산출물이라, 같은 산출물을
+  참조하는 모든 workflow에서 recipient가 동일하다.
+- **A Tier**는 권한을 그 서비스가 관리한다. 그래서 SIREN은 **실제 접근 권한에는 관여하지
+  않지만**, recipient(알림 대상)는 SIREN이 **workflow마다 따로** 보관한다 — 같은 산출물이라도
+  workflow X에서는 AA 부서가, workflow Y에서는 BB 부서가 recipient일 수 있다.
 
 여기까지는 서비스 쪽에 아무 영향이 없다. 문제는 다음 두 가지다.
 
@@ -25,7 +28,10 @@ SIREN에 **recipient(수신 대상)** 개념이 새로 생겼다.
 
 ### 무엇이 필요한가
 
-계약의 **선택 항목이던 `access` 엔드포인트를 필수로 승격**한다.
+계약의 **선택 항목이던 `access` 엔드포인트를 필수로 승격**한다. **`canView`/`canEdit` 두 값이면
+충분하다 — "이 산출물의 편집자가 누구인지" 목록(`editors`)은 요청하지 않는다.** 그건 그 서비스
+안에서 알아서 관리할 값이고, SIREN 쪽의 "누가 알림/열람 대상인지"는 SIREN의 recipient가
+전담한다(§0). 두 목록을 서비스가 동기화해서 들고 있을 필요가 없다.
 
 ```
 GET /artifacts/{artifactId}/access?knoxId={knoxId}
@@ -33,8 +39,7 @@ GET /artifacts/{artifactId}/access?knoxId={knoxId}
 200 OK
 {
   "canView": true,
-  "canEdit": false,
-  "editors": ["knox.id.1", "knox.id.2"]     // canEdit 인 호출자에게만. 없으면 생략 가능
+  "canEdit": false
 }
 ```
 
@@ -82,17 +87,35 @@ SIREN 화면에서 어떤 사용자를 그 산출물의 **recipient로 등록**�
 
 혼동을 막기 위해 적어 둔다. **아래는 SIREN 내부 규칙이며 서비스가 구현할 것은 없다.**
 
-SIREN 화면에서 A Tier 산출물의 상세를 열 수 있는 사람은 이제 다음뿐이다.
+SIREN 화면에서 A Tier 산출물의 상세를 열 수 있는 사람은 **두 단계를 모두 통과**해야 한다.
 
 ```
-그 산출물이 놓인 workflow의 Edit 권한자
-또는
-SIREN에 등록된 그 산출물의 recipient (부서 또는 개인)
+1단계 (SIREN)   SIREN에 등록된 그 산출물의 recipient(부서 또는 개인)에 속하는가?
+                  아니다 → 여기서 막힌다. 서비스에 물어보지도 않는다.
+                  (workflow의 Edit 권한자여도 recipient가 아니면 막힌다 — 예전 규칙이 바뀌었다.)
+
+2단계 (그 서비스)  요청 ①의 access 로 canView 가 true 인가?
+                  아니다 → 막힌다.
+                  맞다  → 열린다. canEdit 여부로 working 버전까지 보이는지가 갈린다.
 ```
 
-> 즉 **그 서비스에 view 권한이 있어도, SIREN의 recipient가 아니면 SIREN 화면에서는 안 보인다.**
-> 이건 SIREN이 "누가 무엇을 받는지"를 명시적으로 관리하기 위한 규칙이며, 서비스 자신의 화면에는
-> 아무 영향이 없다. 그 서비스에서는 원래대로 자기 권한 체계대로 보여주면 된다.
+> 즉 **그 서비스에 view 권한이 있어도, SIREN의 recipient가 아니면 1단계에서 이미 막혀 SIREN
+> 화면에는 안 보인다.** 반대로 SIREN의 recipient여도 그 서비스에서 view 권한이 없으면 2단계에서
+> 막힌다. 이건 SIREN이 "누가 무엇을 받는지"를 명시적으로 관리하기 위한 규칙이며, 서비스 자신의
+> 화면에는 아무 영향이 없다. 그 서비스에서는 원래대로 자기 권한 체계대로 보여주면 된다.
+
+---
+
+## 3.1 참고: SIREN에 넘길 버전은 "official"만 (서비스 변경 가능성 있음)
+
+버전 목록을 SIREN에 줄 때는 **official하게 확정된 값만** 넘겨 달라.
+
+- minor 단위까지 명확히 태깅되어 있으면 그대로 넘겨도 된다.
+- **RPM처럼 minor 개념이 없고 snapshot만 찍는 서비스는**, 확정된 release 버전들 + **`latest(+)`
+  항목 하나**만 추가로 보내는 지금 방식을 그대로 유지하면 된다. 이 방식은 이미 반영되어 있고,
+  추가 대응이 필요하지 않다.
+- 내부 빌드 번호·해시처럼 사람이 못 알아보는 값만 있고 official 값이 전혀 없다면, 그 상태를
+  그대로 넘기지 말고 위 두 방식(release 버전, 또는 release 버전 + latest(+))으로 정리해서 달라.
 
 ---
 
@@ -118,8 +141,10 @@ SIREN 내부에서 `isReleased` 를 **`isPublished`** 로 개명했다. 산출�
 
 ## 6. 체크리스트
 
-- [ ] `GET /artifacts/{id}/access?knoxId=` 구현 (`canView`, `canEdit`, 선택적 `editors`)
+- [ ] `GET /artifacts/{id}/access?knoxId=` 구현 (`canView`, `canEdit` 두 값만. `editors` 불필요)
 - [ ] 권한 없는 사용자에게 403이 아닌 `200 {canView:false, canEdit:false}` 반환
 - [ ] 응답 지연을 수백 ms 이내로 (필요하면 캐시)
 - [ ] 권한 없는 사용자가 링크로 진입했을 때의 안내 화면 확인
 - [ ] `isReleased` 를 계속 정확히 신고하는지 확인
+- [ ] SIREN에 넘기는 버전이 official 값뿐인지 확인 (§3.1) — minor 개념이 없으면 release 버전 +
+      `latest(+)` 로 정리해서 전달

@@ -46,7 +46,38 @@ export const REDUCED = { duration: 0 };   // prefers-reduced-motion 대체값
 | 캔버스 배경(편집 모드 전환) | `MOTION.surface` |
 | 토스트 | 아래에서 올라오며 `MOTION.panel`, 사라질 때 `fade` |
 | 리스트 정렬·필터 변화 | `layout` 프로퍼티로 자동 보간 |
-| 페이지 전환 | `fade` + 8px 상승 |
+| 페이지 전환(routing) | **방향성 전환.** 단순 fade가 아니라 §1.4.1 규칙을 따른다 |
+
+### 1.4.1 페이지 전환 — 그냥 나타나지 않는다
+
+라우팅이 바뀔 때 새 화면이 갑자기 뜨는 게 아니라, **어느 화면에서 어느 화면으로 가는지에 따라
+방향이 있는 전환**을 쓴다. 책장을 넘기듯 "더 안으로 들어가는지" "더 밖으로 나오는지"가 느껴지게
+하는 것이 목표다.
+
+- 라우트마다 **깊이(depth)**를 매긴다 — 예: Home(0) → Project(1) → Workflow(2) →
+  Artifact 상세(3). 정확한 트리는 실제 라우트 구조가 정해질 때 `web/src/router/routeDepth.ts`
+  한 곳에 정의한다.
+- 이동 직전/직후 경로의 depth를 비교해 **방향을 계산**한다.
+  - **더 깊은 곳으로(forward)**: 새 화면이 오른쪽에서 들어오며 이전 화면은 왼쪽으로 살짝
+    밀려나며 사라진다.
+  - **더 얕은 곳으로(back)**: 정반대 방향 — 새 화면이 왼쪽에서 들어오고 이전 화면은
+    오른쪽으로 밀려난다.
+  - **같은 깊이(형제 전환, 예: 탭처럼 workflow A → workflow B)**: 방향 없이 `fade`만.
+- 브라우저 뒤로가기/앞으로가기도 History API의 이동 방향을 읽어 같은 규칙을 적용한다 —
+  사용자가 실제로 "뒤로 갔는지"와 화면이 밀리는 방향이 항상 일치해야 한다.
+- 구현은 `framer-motion` 의 `AnimatePresence` + 방향을 실은 `custom` variant로 처리한다.
+  ```ts
+  // web/src/app/PageTransition.tsx (개념 스케치)
+  const direction = depthOf(to) > depthOf(from) ? 1 : depthOf(to) < depthOf(from) ? -1 : 0;
+  const variants = {
+    enter: (d: number) => ({ x: d === 0 ? 0 : d * 24, opacity: 0 }),
+    center: { x: 0, opacity: 1 },
+    exit: (d: number) => ({ x: d === 0 ? 0 : d * -24, opacity: 0 }),
+  };
+  ```
+- 실제 3D 종이 넘김 효과까지는 만들지 않는다 — **방향이 있는 슬라이드 + fade** 정도로 "책장을
+  넘기는 감성"을 충분히 낼 수 있다. 과한 효과는 오히려 반응성을 해친다(전환은 200ms 내외).
+- 이 규칙 하나로 시스템 전체 라우팅 전환에 일관되게 적용한다 — 화면마다 다른 전환을 만들지 않는다.
 
 ### 1.5 지켜야 할 선
 
