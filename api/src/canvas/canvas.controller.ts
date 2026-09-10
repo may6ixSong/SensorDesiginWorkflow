@@ -2,9 +2,10 @@ import { Body, Controller, Param, Put, UseGuards } from '@nestjs/common';
 import { WorkflowAccessGuard } from '../common/guards/workflow-access.guard';
 import { WorkflowAccess } from '../common/decorators/workflow-access.decorator';
 import { CurrentActor } from '../common/decorators/current-actor.decorator';
-import { CurrentWorkflow } from '../common/decorators/current-workflow.decorator';
+import { CurrentProject, CurrentWorkflow } from '../common/decorators/current-workflow.decorator';
 import { Actor } from '../common/actor';
 import { WorkflowDocument } from '../workflows/schemas/workflow.schema';
+import { ProjectDocument } from '../projects/schemas/project.schema';
 import { CanvasService } from './canvas.service';
 import { PutCanvasDto } from './dto/put-canvas.dto';
 
@@ -19,9 +20,10 @@ export class CanvasController {
     @Param('workflowId') _workflowId: string,
     @Body() dto: PutCanvasDto,
     @CurrentWorkflow() workflow: WorkflowDocument,
+    @CurrentProject() project: ProjectDocument,
     @CurrentActor() me: Actor,
   ) {
-    const result = await this.canvas.apply(workflow, dto, me);
+    const result = await this.canvas.apply(workflow, project, dto, me);
     return { data: result };
   }
 }

@@ -3,7 +3,7 @@ import { Document, Types, SchemaTypes } from 'mongoose';
 // @Prop의 런타임 type은 반드시 SchemaTypes.ObjectId를 쓴다 - Types.ObjectId(값 클래스)를 주면
 // Mongoose가 Mixed 경로를 만들고, Mixed는 캐스팅을 하지 않아 문자열 id 필터가 전부 0건이 된다.
 // (필드의 TypeScript 타입으로서의 Types.ObjectId는 그대로 쓴다.)
-import { Layout, LayoutSchema } from '../../deliverables/schemas/deliverable.schema';
+import { Layout, LayoutSchema } from '../../blocks/schemas/block.schema';
 
 export type MemoDocument = Memo & Document;
 

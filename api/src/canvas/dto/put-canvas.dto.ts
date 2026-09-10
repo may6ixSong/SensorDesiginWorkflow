@@ -1,38 +1,20 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsBoolean, IsNumber, IsObject, IsOptional, IsString, ValidateNested } from 'class-validator';
+import { IsArray, IsBoolean, IsObject, IsOptional, IsString, ValidateNested } from 'class-validator';
+import { LayoutDto } from '../../blocks/dto/block-crud.dto';
 
-/**
- * class-validator 데코레이터가 전혀 없으면 전역 ValidationPipe({ whitelist: true })가
- * 모든 필드를 걷어내 dto가 사실상 빈 객체가 된다(실측 확인된 버그) - 그래서 평범한
- * interface가 아니라 데코레이터를 가진 class로 정의한다.
- */
-export class CanvasLayoutInput {
-  @IsNumber()
-  x: number;
-
-  @IsNumber()
-  y: number;
-
-  @IsNumber()
-  w: number;
-
-  @IsNumber()
-  h: number;
-}
-
-export class CanvasDeliverableInput {
+export class CanvasBlockDto {
   @IsString()
   id: string;
 
-  @ValidateNested()
-  @Type(() => CanvasLayoutInput)
-  layout: CanvasLayoutInput;
-
   @IsString()
   phaseId: string;
+
+  @ValidateNested()
+  @Type(() => LayoutDto)
+  layout: LayoutDto;
 }
 
-export class CanvasMemoInput {
+export class CanvasMemoDto {
   @IsOptional()
   @IsString()
   id?: string;
@@ -44,11 +26,11 @@ export class CanvasMemoInput {
   text: string;
 
   @ValidateNested()
-  @Type(() => CanvasLayoutInput)
-  layout: CanvasLayoutInput;
+  @Type(() => LayoutDto)
+  layout: LayoutDto;
 }
 
-export class CanvasEdgeInput {
+export class CanvasEdgeDto {
   @IsOptional()
   @IsString()
   id?: string;
@@ -67,23 +49,28 @@ export class CanvasEdgeInput {
   auto?: boolean;
 }
 
+/**
+ * 캔버스 일괄 저장. 배치 계산은 전부 FE 메모리에서 이뤄지고, BE는 좌표의 최소 유효성과
+ * phaseId 실재 여부만 검사한 뒤 신뢰하고 저장한다.
+ *
+ * ★ **이 PUT만이 canvasLock을 요구한다**(설계서 03장 §3.3).
+ */
 export class PutCanvasDto {
   @IsArray()
   @ValidateNested({ each: true })
-  @Type(() => CanvasDeliverableInput)
-  deliverables: CanvasDeliverableInput[];
+  @Type(() => CanvasBlockDto)
+  blocks: CanvasBlockDto[];
 
   @IsArray()
   @ValidateNested({ each: true })
-  @Type(() => CanvasMemoInput)
-  memos: CanvasMemoInput[];
+  @Type(() => CanvasMemoDto)
+  memos: CanvasMemoDto[];
 
   @IsArray()
   @ValidateNested({ each: true })
-  @Type(() => CanvasEdgeInput)
-  edges: CanvasEdgeInput[];
+  @Type(() => CanvasEdgeDto)
+  edges: CanvasEdgeDto[];
 
-  /** Phase 레인 폭(phase.id → px). 조절한 적 없으면 생략 — 기존 저장값을 그대로 둔다. */
   @IsOptional()
   @IsObject()
   phaseWidths?: Record<string, number>;

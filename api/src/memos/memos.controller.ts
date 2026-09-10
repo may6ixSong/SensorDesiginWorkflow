@@ -1,16 +1,16 @@
 import { Controller, Get, Param, UseGuards } from '@nestjs/common';
 import { WorkflowAccessGuard } from '../common/guards/workflow-access.guard';
 import { WorkflowAccess } from '../common/decorators/workflow-access.decorator';
-import { CurrentActor } from '../common/decorators/current-actor.decorator';
-import { CurrentWorkflow } from '../common/decorators/current-workflow.decorator';
-import { Actor } from '../common/actor';
-import { WorkflowDocument } from '../workflows/schemas/workflow.schema';
 import { MemosService } from './memos.service';
 
 /**
- * 6.3 - "memos 열람 정책 결정 필요"(설계서 8.2-1). 목업 원칙("Edit 권한자만 메모를 본다")을
- * 기본값으로 채택하되, 403 대신 View 권한자에게는 빈 배열을 반환해 FE가 별도
- * 에러 처리 없이 동작하게 한다.
+ * 메모는 **캔버스의 일부**다.
+ *
+ * 예전에는 Edit 권한자에게만 보여줬지만, 이제 캔버스는 Edit/View 권한자가 **완전히
+ * 동일한 화면**을 본다(설계서 03장 §1). 메모만 한쪽에서 사라지면 같은 캔버스가 아니게
+ * 되므로 view 권한자에게도 그대로 내려준다.
+ *
+ * 권한 자체는 WorkflowAccessGuard가 이미 검증했다 — 여기 도달했다면 최소 view는 있다.
  */
 @UseGuards(WorkflowAccessGuard)
 @Controller('workflows/:workflowId/memos')
@@ -19,9 +19,7 @@ export class MemosController {
 
   @WorkflowAccess('view')
   @Get()
-  async list(@Param('workflowId') workflowId: string, @CurrentActor() me: Actor, @CurrentWorkflow() workflow: WorkflowDocument) {
-    if (!workflow.owners.includes(me.knoxId)) return { data: [] };
-    const memos = await this.memos.listForWorkflow(workflowId);
-    return { data: memos };
+  async list(@Param('workflowId') workflowId: string) {
+    return { data: await this.memos.listForWorkflow(workflowId) };
   }
 }

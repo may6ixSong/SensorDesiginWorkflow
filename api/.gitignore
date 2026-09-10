@@ -9,3 +9,7 @@ package-lock.json
 .env
 .env.*
 !.env.example
+
+# 로컬 개발용 env (.env.example을 복사해 쓴다)
+.env
+.env.development

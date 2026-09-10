@@ -58,15 +58,21 @@ export type ProjectDocument = Project & Document;
 
 @Schema({ timestamps: true })
 export class Project {
+  /** 생성 후 수정 절대 불가 — revision과 함께 (code, revision)이 과제의 신원이다. */
   @Prop({ required: true, trim: true })
   code: string;
 
   /**
-   * 같은 code라도 revision이 다르면 완전히 다른 프로젝트로 취급한다(Hub 설계서 §19) —
-   * 리비전이 없는 기존 프로젝트는 빈 문자열이다. 유니크 제약은 (code, revision) 조합에
-   * 걸려 있다(스키마 파일 하단 index) — 단일 `code`엔 더 이상 걸지 않는다.
+   * 같은 code라도 revision이 다르면 완전히 다른 프로젝트로 취급한다 — 유니크 제약은
+   * (code, revision) 조합에 걸려 있다(파일 하단 index).
+   *
+   * ★ 형식은 `EVT` + 0 이상의 정수다(`EVT0`, `EVT1`, …). 검증은
+   *   common/constants/revision.ts 의 REVISION_RE 한 곳에서만 한다.
+   * ★ `code`와 함께 **생성 후 수정 절대 불가**다(설계서 README §3.1). UpdateProjectDto에
+   *   두 필드가 없고, 들어오면 서비스가 400으로 거부한다. 바꿔야 하면 Admin이 DB를
+   *   직접 고친다 — UI 경로를 만들지 않는다.
    */
-  @Prop({ default: '', trim: true })
+  @Prop({ required: true, trim: true })
   revision: string;
 
   @Prop({ required: true, trim: true })
@@ -76,12 +82,11 @@ export class Project {
    * 이 과제가 인정하는 부서(팀) 목록 — 전사 고정 DEPARTMENTS(analog 등 6종,
    * common/constants/departments.ts)와는 별개 축이며, 프로젝트마다 자유롭게
    * 추가/삭제한다(PATCH /projects/:id/departments). 세 가지 용도로 쓰인다:
-   *  1) 산출물을 누구/어느 부서로부터 받는지 표시할 때의 후보 목록
-   *     (Deliverable.sourceDept/sourceContact)
+   *  1) workflow / artifact 의 Edit·View Access 에 넣을 수 있는 부서 후보
+   *     (설계서 01장 §3.3, §4.3 — 부서는 어디서나 다중 선택이다)
    *  2) 프로젝트 멤버(ProjectMember.departments)가 속할 수 있는 부서 후보
-   *  3) workflow를 만든 사람의 소속 부서가 곧 그 workflow의 분류(Workflow.domain)가
-   *     된다 — 예전의 "설계 도메인" 시스템(workflowDomains/workflow-domains 라우트)은
-   *     완전히 폐지되었고, 이 필드가 그 자리를 대신한다.
+   *  3) workflow 가 소속되는 부서(Workflow.department)의 후보. 예전의 "설계 도메인"
+   *     시스템은 완전히 폐지되었고, 이 필드가 그 자리를 대신한다.
    *
    * 신규 과제는 늘 이 6개로 시작한다: Analog · Digital · APS · PI/PD · Solution · PTE.
    * 이 필드가 없는(과거) 과제 문서는 ProjectsService.ensureDepartments가 처음 조회되는
@@ -113,6 +118,15 @@ export class Project {
    */
   @Prop({ type: [String], default: [] })
   managers: string[];
+
+  /**
+   * 화면 표시 전용 부가 필드 (제품 이미지 URL, 화소수, 고객사 등). 자유 문자열 맵이다.
+   *
+   * ★ **다른 시스템 연동에 절대 쓰지 않는다.** 연동 키는 항상 (code, revision)이다.
+   *   실제 어떤 항목을 둘지는 아직 정하지 않았고, 정해지면 여기 주석에 목록을 남긴다.
+   */
+  @Prop({ type: Object, default: () => ({}) })
+  meta: Record<string, string>;
 
   @Prop({ default: 'ACTIVE' })
   status: string;

@@ -5,46 +5,72 @@ import { Document, Types, SchemaTypes } from 'mongoose';
 // (필드의 TypeScript 타입으로서의 Types.ObjectId는 그대로 쓴다.)
 
 /**
- * 버전과 접근 권한에 관한 것만 남긴다 (Hub 설계서 §12).
+ * 버전과 접근 권한에 관한 것만 남긴다.
  *
- * 워크플로우는 대시보드다 - 노드 하나 만들고 flow 하나 잇는 것까지 감사 로그를 남기지
- * 않는다. 그래서 DELIVERABLE_CREATE / LAYOUT_UPDATE / EDGE_ADD / EDGE_DELETE /
- * WORKFLOW_CREATE / WORKFLOW_UPDATE / WORKFLOW_PHASES_UPDATE /
- * WORKFLOW_VIEW_GRANT_* / RECV_UPDATE / PROJECT_UPDATE / PROJECT_MILESTONES_UPDATE /
- * PROJECT_DEPARTMENTS_UPDATE / WORKFLOW_DOMAIN_SET / PROJECT_MEMBER_DEPARTMENT_ADD가 빠졌다.
+ * 워크플로우는 대시보드다 — 노드 하나 만들고 flow 하나 잇는 것까지 전부 남기지는 않는다.
+ * 대신 **권한이 바뀌는 순간과 데이터가 사라지는 순간**은 빠짐없이 남긴다: 권한 다툼이
+ * 생겼을 때 되짚을 수 있어야 하고, release는 되돌릴 수 없기 때문이다.
  *
- * VERSION_UPLOAD와 FILE_DOWNLOAD는 정책적으로 뺀 게 아니라 **구조상 사라졌다** -
+ * VERSION_UPLOAD와 FILE_DOWNLOAD는 정책적으로 뺀 게 아니라 **구조상 사라졌다** —
  * 업로드와 다운로드가 모두 각 산출물 서비스에서 일어나므로 SIREN이 관측할 사건이 아니다.
  *
- * 이미 저장된 옛 action 값(예: LAYOUT_UPDATE)은 그대로 남는다 - Mongoose enum 제약은
- * 저장 시점에만 걸리고 기존 문서를 다시 검증하지 않으므로 마이그레이션이 필요 없다.
+ * 이미 저장된 옛 action 값(예: HLD_RELEASE, DELIVERABLE_DELETE)은 그대로 남는다 —
+ * Mongoose enum 제약은 저장 시점에만 걸리고 기존 문서를 다시 검증하지 않으므로
+ * 마이그레이션이 필요 없다. 그래서 옛 값도 목록에 남겨 둔다.
  */
 export const AUDIT_ACTIONS = [
-  // 버전 · 릴리스
-  'RELEASE',
-  'HLD_RELEASE',
-  /** C/D 티어 수동 버전 입력·수정. 가드레일의 전제다 (§9.2). */
-  'MANUAL_VERSION_ASSERT',
-  /** 산출물이 Hub 서비스에 처음 묶인 시점 - 티어 전환의 표시 (§5.3). */
+  // --- Release (workflow → 부서 전달). 철회가 불가능하므로 반드시 남긴다 ---
+  'RELEASE_CREATE',
+
+  // --- Publish (산출물의 버전 확정) ---
+  /** C/D 티어 수동 버전 입력. 가드레일의 전제다. */
+  'ARTIFACT_VERSION_ASSERT',
+  /** 산출물이 Hub 서비스에 처음 묶인 시점 — 티어 전환의 표시. */
   'ARTIFACT_SERVICE_LINKED',
-  /** 과제(code+revision)와 외부 서비스 프로젝트를 잇는 확정 링크 (§19.3). */
   'PROJECT_SERVICE_LINK_CREATE',
   'PROJECT_SERVICE_LINK_DELETE',
 
-  // 접근 권한 · 데이터 소실
-  'DELIVERABLE_DELETE',
-  'WORKFLOW_OWNER_ADD',
-  'WORKFLOW_OWNER_REMOVE',
+  // --- 권한 변경 ---
+  'WORKFLOW_ACCESS_REPLACE',
+  /** 부서 변경은 editAccess 교체를 동반하므로 사실상 권한 이양이다. */
+  'WORKFLOW_DEPARTMENT_CHANGE',
+  'ARTIFACT_ACCESS_REPLACE',
+  /** A Tier의 recipient — 알림 대상이자 slide 열람 게이트라 권한 변경으로 취급한다. */
+  'BLOCK_RECIPIENTS_REPLACE',
+  /**
+   * 블록이 가리키는 artifact가 바뀌었다. 단순 이름 변경이 아니라 **무엇이 누구에게
+   * 전달되는지가 통째로 달라지는** 사건이라(B/C/D는 recipient가 artifact에서 나온다)
+   * 권한 변경과 같은 무게로 남긴다.
+   */
+  'BLOCK_ARTIFACT_REMAP',
   'PROJECT_MANAGER_ADD',
   'PROJECT_MANAGER_REMOVE',
   'PROJECT_MEMBER_ADD',
   'PROJECT_MEMBER_REMOVE',
 
-  // Admin
-  /** 사용자 시뮬레이션 시작. 실제 행위자와 대상을 구분해 남긴다 (§13.3 규칙 4). */
+  // --- 생성 · 소실 ---
+  'PROJECT_CREATE',
+  'WORKFLOW_CREATE',
+  'ARTIFACT_CREATE',
+  'BLOCK_CREATE',
+  'BLOCK_DELETE',
+  'CANVAS_SAVE',
+  /** Admin이 남의 편집 세션을 강제로 끊은 순간. */
+  'CANVAS_LOCK_FORCE_RELEASE',
+
+  // --- Admin ---
+  /** 사용자 시뮬레이션 시작. 실제 행위자와 대상을 구분해 남긴다. */
   'IMPERSONATION_START',
   'ARTIFACT_SERVICE_REGISTER',
   'ARTIFACT_SERVICE_UPDATE',
+
+  // --- 폐기됐지만 과거 문서에 남아 있는 값 (읽기 호환용) ---
+  'RELEASE',
+  'HLD_RELEASE',
+  'MANUAL_VERSION_ASSERT',
+  'DELIVERABLE_DELETE',
+  'WORKFLOW_OWNER_ADD',
+  'WORKFLOW_OWNER_REMOVE',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 

@@ -3,10 +3,11 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ProjectSchema } from '../projects/schemas/project.schema';
 import { WorkflowSchema } from '../workflows/schemas/workflow.schema';
-import { DeliverableSchema } from '../deliverables/schemas/deliverable.schema';
+import { ArtifactSchema } from '../artifacts/schemas/artifact.schema';
+import { BlockSchema } from '../blocks/schemas/block.schema';
 import { MemoSchema } from '../memos/schemas/memo.schema';
 import { EdgeSchema } from '../edges/schemas/edge.schema';
-import { HldReleaseSchema } from '../hld/schemas/hld-release.schema';
+import { ReleaseSchema } from '../releases/schemas/release.schema';
 import { ArtifactServiceSchema } from '../hub/schemas/artifact-service.schema';
 import { HubSyncCheckpointSchema } from '../hub/schemas/hub-sync-checkpoint.schema';
 import { isUsingRealDb, ModelDef, registerModels } from './model-registration';
@@ -17,10 +18,11 @@ const logger = new Logger('DatabaseModule');
 const ALL_MODELS: ModelDef[] = [
   { name: 'Project', schema: ProjectSchema },
   { name: 'Workflow', schema: WorkflowSchema },
-  { name: 'Deliverable', schema: DeliverableSchema },
+  { name: 'Artifact', schema: ArtifactSchema },
+  { name: 'Block', schema: BlockSchema },
   { name: 'Memo', schema: MemoSchema },
   { name: 'Edge', schema: EdgeSchema },
-  { name: 'HldRelease', schema: HldReleaseSchema },
+  { name: 'Release', schema: ReleaseSchema },
   { name: 'ArtifactService', schema: ArtifactServiceSchema },
   { name: 'HubSyncCheckpoint', schema: HubSyncCheckpointSchema },
 ];
