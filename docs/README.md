@@ -21,7 +21,13 @@ CIS(CMOS Image Sensor) 설계 산출물을 workflow 캔버스 위에서 흐름�
 | [04-artifact-and-publish.md](04-artifact-and-publish.md) | Tier A~D, publish, recipient, 상세 slide 열람 |
 | [05-release.md](05-release.md) | Release 절차, 알림, Release history |
 | [06-ui-motion-and-migration.md](06-ui-motion-and-migration.md) | 모션 시스템, i18n, HLD 제거, 마이그레이션, TODO |
-| [prompts/a-tier-recipient-integration.md](prompts/a-tier-recipient-integration.md) | A Tier 연동 서비스에 전달할 변경 요청 프롬프트 |
+| [prompts/a-tier-recipient-integration.md](prompts/a-tier-recipient-integration.md) | A Tier 연동 서비스에 전달할 **정책** 변경 요청 프롬프트 |
+| [prompts/rpm-access-endpoint.md](prompts/rpm-access-endpoint.md) | 위 요청 ①을 **구현 수준**으로 구체화한 것 — RPM 등 A Tier 서비스 세션에 그대로 전달 |
+| [prompts/db-migration-v3.md](prompts/db-migration-v3.md) | 실제 MongoDB를 v3 스키마로 옮기는 일회성 마이그레이션 스크립트 작성 프롬프트 |
+
+> `prompts/` 아래 문서는 **SIREN·Calypso 저장소 밖에서 수행해야 하는 작업**을 다른 세션에
+> 그대로 붙여넣기 위한 것이다. 이 저장소의 코드로는 끝낼 수 없는 일(실 DB 변경, 외부 서비스
+> API 추가)만 여기 모아 둔다.
 
 ---
 
@@ -199,7 +205,8 @@ CIS(CMOS Image Sensor) 설계 산출물을 workflow 캔버스 위에서 흐름�
 | T3 | 알림 전송 인프라 | 실제 메일 발송 + SIREN 내 "My workspace"·알림 페이지 신설 |
 | T4 | B/C/D release 알림의 세분화 | view·edit 권한자 모두에게 알림, workflow 소속 부서에는 별도 notice — 규칙 구체화 필요 |
 | T5 | Owner 이양 | 현재 불가. 요청이 오면 열 수 있도록 코드에 TODO 주석 유지 |
-| T6 | A Tier 연동 서비스의 slide 차단 규칙 반영 | `prompts/a-tier-recipient-integration.md` 참조 |
+| T6 | A Tier 연동 서비스의 slide 차단 규칙 반영 | SIREN 쪽은 완료(게이트 1·2 모두 동작). 남은 것은 **서비스 쪽 `access` 구현**이다 — `prompts/rpm-access-endpoint.md` 를 그 서비스 세션에 전달 |
+| T8 | 실 DB 마이그레이션 | 인메모리 모드는 시드가 새 스키마로 다시 만들어져 해당 없음. 실 DB 환경에서만 `prompts/db-migration-v3.md` 를 desktop 세션에 전달 |
 | T7 | Release Revoke | **열지 않기로 약속된 시나리오.** 요청이 와도 재논의 대상 |
 
 ## 5. 리뷰가 필요한 가정
