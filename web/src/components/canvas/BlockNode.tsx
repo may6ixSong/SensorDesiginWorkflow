@@ -2,7 +2,7 @@ import { Box } from '@mui/material';
 import { CanvasNode, stOf, tierStyle } from '@/lib/canvasModel';
 import { WorkflowPhase } from '@/types/domain';
 import { Icon, IconName } from '@/components/common/Icon';
-import { CURSOR_POINTER, R, T } from '@/theme/tokens';
+import { CURSOR_POINTER, R, T, TNUM } from '@/theme/tokens';
 
 /**
  * tier별 블록 아이콘 — A는 그 서비스가 들고 있는 "살아 있는" 산출물이라 패키지,
@@ -101,7 +101,10 @@ export function BlockNode({
           : 'box-shadow .18s, transform .18s, border-color .16s, opacity .18s',
         '&:hover': edit
           ? {}
-          : { transform: 'translateY(-2px)', boxShadow: T.shLg, borderColor: T.ln2 },
+          : {
+            transform: 'translateY(-2px)', boxShadow: T.shLg, borderColor: T.ln2,
+            '& .blk-open': { opacity: 1 },
+          },
       }}
     >
       {/* tier 색 스파인 — 블록의 신뢰도 등급을 색 하나로 계속 상기시킨다. */}
@@ -113,24 +116,35 @@ export function BlockNode({
         }}
       />
 
-      {/* 상세 버튼 — 조회 모드에서 블록을 클릭해 흐름을 하이라이트했을 때만 뜬다.
-          단순 클릭으로 dialog가 열리지 않게 해 흐름 추적과 상세 열기를 분리한다. */}
-      {!edit && isSel && (
+      {/* 상세 열기.
+          단순 클릭은 flow 하이라이트라서, 상세는 따로 눌러야 열린다.
+          ★ 예전에는 블록 **위쪽 바깥**에 떠 있는 버튼이었는데, 블록이 캔버스 위쪽에
+            있으면 phase 헤더 띠에 그대로 가려져 누를 수가 없었다(실측). 그래서 블록
+            **안쪽** 모서리로 들여놨다 — 카드 경계를 넘지 않으니 무엇에도 가리지 않는다. */}
+      {!edit && (
         <Box
+          className="blk-open"
           component="button"
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => { e.stopPropagation(); onOpen(d.id); }}
+          title="Open details"
+          aria-label={`Open ${d.name}`}
           sx={{
-            position: 'absolute', left: '50%', top: -42, transform: 'translateX(-50%)',
-            display: 'inline-flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap',
-            background: T.inv, color: T.invTx, fontSize: 13, fontWeight: 600,
-            padding: '7px 14px', borderRadius: `${R.sm}px`, boxShadow: T.shLg, zIndex: 40,
-            cursor: CURSOR_POINTER, border: 'none', fontFamily: 'inherit',
-            animation: 'sirenPop .16s ease-out',
-            '&:hover': { filter: 'brightness(1.25)' },
+            position: 'absolute', right: 6, bottom: 6, zIndex: 5,
+            width: 20, height: 20, padding: 0,
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            borderRadius: '50%', fontFamily: 'inherit',
+            background: isSel ? T.pr : T.sf3, color: isSel ? T.prTx : T.dm,
+            border: `1px solid ${isSel ? 'transparent' : T.ln2}`,
+            cursor: CURSOR_POINTER,
+            // 선택된 블록에서는 늘 보이고, 그 외에는 hover에서만 나타난다 —
+            // 카드 여덟 개가 동시에 버튼을 들고 있으면 캔버스가 시끄러워진다.
+            opacity: isSel ? 1 : 0,
+            transition: 'opacity .14s ease, background .14s ease',
+            '&:hover': { background: T.pr, color: T.prTx, borderColor: 'transparent' },
           }}
         >
-          <Icon name="eye" /> Details
+          <Icon name="eye" />
         </Box>
       )}
 
@@ -161,6 +175,14 @@ export function BlockNode({
           )}
 
           <Box sx={{ flex: 1 }} />
+
+          {/* 같은 산출물이 여러 phase에 걸쳐 놓인 경우의 회차(2/3 …).
+              아래쪽에 두면 Details 버튼과 자리가 겹쳐서 윗줄로 올렸다. */}
+          {d.seriesTotal > 1 && (
+            <Box sx={{ fontSize: 10, color: T.dm2, fontWeight: 600, flexShrink: 0, ...TNUM }}>
+              {d.seriesIdx}/{d.seriesTotal}
+            </Box>
+          )}
 
           {/* 열람 권한이 없으면 자물쇠만 — 상태 자체가 정보라 배지를 그리지 않는다. */}
           {d.artifactMasked ? (
@@ -194,7 +216,8 @@ export function BlockNode({
         <Box sx={{ flex: 1 }} />
 
         {/* 아랫줄 — 수신 부서(누구에게 가는가)와 회차 */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: '4px', mt: '8px', minWidth: 0 }}>
+        {/* 오른쪽 아래 모서리는 Details 버튼 자리라 그만큼 비워 둔다(편집 모드는 그립 자리). */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: '4px', mt: '8px', minWidth: 0, pr: '24px' }}>
           {orphan ? (
             <Box sx={{ fontSize: 10.5, fontWeight: 600, color: T.danger, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
               <Icon name="warn" /> No schedule
@@ -224,12 +247,6 @@ export function BlockNode({
           )}
 
           <Box sx={{ flex: 1 }} />
-
-          {d.seriesTotal > 1 && (
-            <Box sx={{ fontSize: 10, color: T.dm2, fontWeight: 600, flexShrink: 0 }}>
-              {d.seriesIdx}/{d.seriesTotal}
-            </Box>
-          )}
         </Box>
       </Box>
 

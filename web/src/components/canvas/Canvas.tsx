@@ -129,10 +129,30 @@ export function Canvas({
     centeredForRef.current = workflow.id;
     const vp = vpRef.current;
     if (!vp) return;
-    const todayCanvas = tx ?? W / 2;
     const containZ = Math.min(vp.clientWidth / W, vp.clientHeight / H, ZOOM_MAX);
     const fitZ = Math.max(ZOOM_MIN, Math.max(containZ, ZOOM_DEFAULT_FLOOR));
-    const c = clampVP(fitZ, vp.clientWidth / 2 - todayCanvas * fitZ, 0);
+
+    /*
+     * 기본은 today 중앙이다 — 이 캔버스는 일정 위에 놓인 화면이라 "지금"이 기준점이다.
+     * 다만 today가 작업이 끝난 한참 뒤라면(과제 후반부) 블록이 전부 화면 왼쪽 밖으로
+     * 밀려나, 처음 들어온 사람이 **빈 캔버스**를 본다. 그래서 today 중앙으로 잡아 본 뒤
+     * 그 화면에 블록이 하나도 안 걸치면 블록 무리 쪽으로 되돌린다.
+     */
+    const todayCanvas = tx ?? W / 2;
+    const centerOn = (cx: number) => clampVP(fitZ, vp.clientWidth / 2 - cx * fitZ, 0);
+
+    let c = centerOn(todayCanvas);
+    const blocks = allBlocks();
+    if (blocks.length) {
+      const visW = vp.clientWidth / c.z;
+      const left = -c.x / c.z;
+      const anyVisible = blocks.some((b) => b.x + b.w > left && b.x < left + visW);
+      if (!anyVisible) {
+        const minX = Math.min(...blocks.map((b) => b.x));
+        const maxX = Math.max(...blocks.map((b) => b.x + b.w));
+        c = centerOn((minX + maxX) / 2);
+      }
+    }
     st.getState().setVP(c.z, c.x, c.y);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workflow.id, hasNodes]);

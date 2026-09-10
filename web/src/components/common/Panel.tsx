@@ -137,6 +137,20 @@ export function SelectInput({
       sx={{
         ...controlSx,
         cursor: disabled ? 'not-allowed' : CURSOR_POINTER,
+        // 네이티브 화살표는 OS마다 굵기/색이 달라 나머지 컨트롤과 따로 논다 —
+        // 지우고 같은 선 색(T.dm2)의 chevron을 배경으로 직접 그린다.
+        appearance: 'none',
+        paddingRight: '30px',
+        // data URI 안에서는 CSS 변수가 풀리지 않으므로 색을 직접 박는다 —
+        // 라이트/다크 어느 쪽 배경에서도 같은 대비로 읽히는 중간 회색을 골랐다.
+        backgroundImage:
+          "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23888e9c' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E\")",
+        backgroundRepeat: 'no-repeat',
+        backgroundPosition: 'right 11px center',
+        backgroundSize: '10px 6px',
+        opacity: disabled ? 0.6 : 1,
+        transition: 'border-color .16s ease, box-shadow .16s ease',
+        '&:hover:not(:disabled)': { borderColor: T.ln3 },
         // See SelectBox — the native popup keeps its default light background even
         // under color-scheme:dark, so options need an explicit background to pair
         // with the inherited text color.

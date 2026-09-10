@@ -5,12 +5,13 @@ import { AccessGrant, ArtifactVersionDto, BlockDto, ProjectDetailDto, isMaskedAr
 import { SlidePanel } from '@/components/common/SlidePanel';
 import { SirenButton, Badge } from '@/components/common/SirenButton';
 import { Card, Ey } from '@/components/common/Panel';
-import { Icon } from '@/components/common/Icon';
+import { TabPanel, Tabs } from '@/components/common/Tabs';
+import { Icon, IconName } from '@/components/common/Icon';
 import { UserAvatar } from '@/components/common/Avatar';
 import { useDirectory } from '@/app/providers/DirectoryProvider';
 import { AccessGrantEditor } from '@/components/dialogs/AccessGrantEditor';
 import { fmtAt } from '@/lib/canvasModel';
-import { CURSOR_POINTER, FONT_MONO, R, T, TIER_COLOR, TNUM } from '@/theme/tokens';
+import { FONT_MONO, R, T, TIER_COLOR, TNUM } from '@/theme/tokens';
 
 type Tab = 'versions' | 'recipients';
 
@@ -21,6 +22,44 @@ function SlideHeader({ name }: { name: string }) {
       <Ey>Artifact</Ey>
       <Box sx={{ fontSize: 17, fontWeight: 700, mt: '2px' }}>{name}</Box>
     </>
+  );
+}
+
+/**
+ * 패널이 "내용 대신 상태"를 보여 줘야 할 때 쓰는 자리.
+ *
+ * 아이콘을 원형 우물(well) 안에 넣어 크게 세운다 — 예전처럼 본문 폰트 크기의 선 아이콘만
+ * 덩그러니 두면 화면이 그냥 비어 보이고, 무엇이 문제인지도 읽히지 않는다.
+ */
+function EmptyState({
+  icon, title, body, tone = 'neutral',
+}: {
+  icon: IconName; title: string; body: string; tone?: 'neutral' | 'locked';
+}) {
+  const locked = tone === 'locked';
+  return (
+    <Box
+      sx={{
+        flex: 1, display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        padding: '40px 28px', textAlign: 'center',
+      }}
+    >
+      <Box
+        sx={{
+          width: 56, height: 56, borderRadius: '50%', mb: '14px',
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          background: locked ? T.dangerSoft : T.sf3,
+          border: `1px solid ${locked ? T.dangerLine : T.ln}`,
+          color: locked ? T.danger : T.dm2,
+          '& svg': { width: 24, height: 24 },
+        }}
+      >
+        <Icon name={icon} />
+      </Box>
+      <Box sx={{ fontSize: 14, fontWeight: 700, color: T.tx, mb: '6px' }}>{title}</Box>
+      <Box sx={{ fontSize: 12.5, color: T.dm2, lineHeight: 1.65, maxWidth: 340 }}>{body}</Box>
+    </Box>
   );
 }
 
@@ -65,20 +104,14 @@ export function ArtifactSlide({
   if (isMaskedArtifact(artifact)) {
     return (
       <SlidePanel open onClose={onClose} width="560px" header={<SlideHeader name={artifact.name} />}>
-        <Box
-          sx={{
-            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            gap: '10px', padding: '52px 24px', color: T.dm,
-          }}
-        >
-          <Box sx={{ color: T.dm2, transform: 'scale(1.6)' }}><Icon name="lock" /></Box>
-          <Box sx={{ fontSize: 14, fontWeight: 600, color: T.tx }}>{t('artifact.noAccess')}</Box>
-          <Box sx={{ fontSize: 12, color: T.dm2, textAlign: 'center', maxWidth: 340, lineHeight: 1.6 }}>
-            {artifact.tier === 'A'
-              ? 'Tier A access is granted by the owning service and by this workflow’s recipient list.'
-              : 'Ask the artifact owner to grant you view access.'}
-          </Box>
-        </Box>
+        <EmptyState
+          icon="lock"
+          tone="locked"
+          title={t('artifact.noAccess')}
+          body={artifact.tier === 'A'
+            ? 'Tier A access is granted by the owning service and by this workflow’s recipient list.'
+            : 'Ask the artifact owner to grant you view access.'}
+        />
       </SlidePanel>
     );
   }
@@ -87,14 +120,12 @@ export function ArtifactSlide({
   if (!artifact) {
     return (
       <SlidePanel open onClose={onClose} width="560px" header={<SlideHeader name={block.name} />}>
-        <Box sx={{ padding: '40px 24px', textAlign: 'center', color: T.dm }}>
-          <Box sx={{ color: T.dm2, transform: 'scale(1.6)', mb: '12px' }}><Icon name="unlinked" /></Box>
-          <Box sx={{ fontSize: 13.5, fontWeight: 600, color: T.tx, mb: '4px' }}>No source yet</Box>
-          <Box sx={{ fontSize: 12, color: T.dm2, lineHeight: 1.6 }}>
-            This block holds a place on the canvas. Map it to an artifact to start tracking versions.
-          </Box>
-          {/* TODO(T1): 여기에 산출물 매핑 UI가 들어간다. */}
-        </Box>
+        {/* TODO(T1): 여기에 산출물 매핑 UI가 들어간다. */}
+        <EmptyState
+          icon="unlinked"
+          title="No source yet"
+          body="This block holds a place on the canvas. Map it to an artifact to start tracking versions."
+        />
       </SlidePanel>
     );
   }
@@ -134,40 +165,31 @@ export function ArtifactSlide({
       </Box>
 
       {/* ── 탭 ── */}
-      <Box sx={{ display: 'flex', gap: '2px', borderBottom: `1px solid ${T.ln}`, mb: '14px' }}>
-        {([
-          ['versions', 'Versions'],
-          ['recipients', t('artifact.recipients')],
-        ] as [Tab, string][]).map(([key, label]) => (
-          <Box
-            key={key}
-            component="button"
-            onClick={() => setTab(key)}
-            sx={{
-              padding: '8px 13px', fontSize: 12.5, fontWeight: 600, fontFamily: 'inherit',
-              background: 'none', border: 'none', cursor: CURSOR_POINTER,
-              color: tab === key ? T.pr : T.dm,
-              borderBottom: `2px solid ${tab === key ? T.pr : 'transparent'}`, mb: '-1px',
-            }}
-          >
-            {label}
-          </Box>
-        ))}
-      </Box>
+      <Tabs
+        tabs={[
+          { key: 'versions' as Tab, label: 'Versions', badge: artifact.versions.length || undefined },
+          { key: 'recipients' as Tab, label: t('artifact.recipients') },
+        ]}
+        value={tab}
+        onChange={setTab}
+        sx={{ mb: '14px' }}
+      />
 
-      {tab === 'versions' && <VersionsTab versions={artifact.versions} />}
+      <TabPanel tabKey={tab}>
+        {tab === 'versions' && <VersionsTab versions={artifact.versions} />}
 
-      {tab === 'recipients' && (
-        <RecipientsTab
-          block={block}
-          isATier={isATier}
-          canEdit={canEditRecipients}
-          departmentOptions={project?.departments ?? []}
-          onSaveBlockRecipients={onSaveBlockRecipients}
-          onSaveArtifactAccess={onSaveArtifactAccess}
-          saving={saving}
-        />
-      )}
+        {tab === 'recipients' && (
+          <RecipientsTab
+            block={block}
+            isATier={isATier}
+            canEdit={canEditRecipients}
+            departmentOptions={project?.departments ?? []}
+            onSaveBlockRecipients={onSaveBlockRecipients}
+            onSaveArtifactAccess={onSaveArtifactAccess}
+            saving={saving}
+          />
+        )}
+      </TabPanel>
 
       {own && onDelete && (
         <Box sx={{ mt: '20px', pt: '16px', borderTop: `1px solid ${T.ln}` }}>

@@ -5,9 +5,10 @@ import { AccessGrant, Milestone, WorkflowDto } from '@/types/domain';
 import { ModalShell } from '@/components/common/ModalShell';
 import { SirenButton } from '@/components/common/SirenButton';
 import { Ey, Field, SelectInput, TextInput } from '@/components/common/Panel';
+import { TabPanel, Tabs } from '@/components/common/Tabs';
 import { Icon } from '@/components/common/Icon';
 import { ConfirmDialog } from '@/components/dialogs/ConfirmDialog';
-import { CURSOR_POINTER, R, T } from '@/theme/tokens';
+import { R, T } from '@/theme/tokens';
 import { ScheduleDraft } from './ScheduleEditor';
 import { WorkflowPhasesPanel } from './WorkflowPhasesPanel';
 import { WorkflowPermissionPanel } from './WorkflowPermissionPanel';
@@ -78,54 +79,38 @@ export function WorkflowSettingsDialog({
           <Box sx={{ fontSize: 17, fontWeight: 700, mt: '2px' }}>{workflow.name}</Box>
         </>
       }
-      belowHeader={
-        <Box sx={{ display: 'flex', gap: '2px', mt: '11px', borderBottom: `1px solid ${T.ln}` }}>
-          {tabs.map(({ key, label }) => (
-            <Box
-              key={key}
-              component="button"
-              onClick={() => setTab(key)}
-              sx={{
-                padding: '8px 13px', fontSize: 12.5, fontWeight: 600, fontFamily: 'inherit',
-                color: tab === key ? T.pr : T.dm, background: 'none', border: 'none',
-                borderBottom: `2px solid ${tab === key ? T.pr : 'transparent'}`,
-                mb: '-1px', cursor: CURSOR_POINTER,
-              }}
-            >
-              {label}
-            </Box>
-          ))}
-        </Box>
-      }
+      belowHeader={<Tabs tabs={tabs} value={tab} onChange={setTab} sx={{ mt: '11px' }} />}
     >
-      {tab === 'details' && (
-        <DetailsTab
-          workflow={workflow}
-          myDepartments={myDepartments}
-          onSave={onSave}
-          saving={saving}
-          error={saveError}
-        />
-      )}
-      {tab === 'schedule' && (
-        <WorkflowPhasesPanel
-          phases={workflow.phases}
-          milestones={milestones}
-          orphanCount={orphanCount}
-          onSave={onSavePhases}
-          saving={savingPhases}
-          error={phasesError}
-        />
-      )}
-      {tab === 'permissions' && (
-        <PermissionsTab
-          workflow={workflow}
-          own={own}
-          departmentOptions={departmentOptions}
-          onSaveAccess={onSaveAccess}
-          saving={savingAccess}
-        />
-      )}
+      <TabPanel tabKey={tab}>
+        {tab === 'details' && (
+          <DetailsTab
+            workflow={workflow}
+            myDepartments={myDepartments}
+            onSave={onSave}
+            saving={saving}
+            error={saveError}
+          />
+        )}
+        {tab === 'schedule' && (
+          <WorkflowPhasesPanel
+            phases={workflow.phases}
+            milestones={milestones}
+            orphanCount={orphanCount}
+            onSave={onSavePhases}
+            saving={savingPhases}
+            error={phasesError}
+          />
+        )}
+        {tab === 'permissions' && (
+          <PermissionsTab
+            workflow={workflow}
+            own={own}
+            departmentOptions={departmentOptions}
+            onSaveAccess={onSaveAccess}
+            saving={savingAccess}
+          />
+        )}
+      </TabPanel>
     </ModalShell>
   );
 }

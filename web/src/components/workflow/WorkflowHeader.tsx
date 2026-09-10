@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { WorkflowDto } from '@/types/domain';
 import { SirenButton } from '@/components/common/SirenButton';
 import { Icon } from '@/components/common/Icon';
-import { CURSOR_POINTER, R, T } from '@/theme/tokens';
+import { R, T } from '@/theme/tokens';
 
 interface WorkflowHeaderProps {
   workflow: WorkflowDto;
