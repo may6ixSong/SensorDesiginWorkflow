@@ -18,8 +18,8 @@ interface WorkflowHeaderProps {
   onChangeRecipientFilter: (next: string[]) => void;
   /** Workflow settings(Details/Schedule/Permissions 탭) 열기. */
   onOpenSettings: () => void;
-  /** Release 다이얼로그 열기 — TODO(Phase 8)에서 연결한다. */
   onOpenRelease?: () => void;
+  onOpenHistory?: () => void;
 }
 
 const ICON_BUTTON_SIZE = 19.5;
@@ -33,7 +33,7 @@ const ICON_BUTTON_SIZE = 19.5;
  */
 export function WorkflowHeader({
   workflow, orphanCount, canEdit, departmentOptions, recipientFilter,
-  onChangeRecipientFilter, onOpenSettings, onOpenRelease,
+  onChangeRecipientFilter, onOpenSettings, onOpenRelease, onOpenHistory,
 }: WorkflowHeaderProps) {
   const { t } = useTranslation();
   const [filterAnchor, setFilterAnchor] = useState<HTMLElement | null>(null);
@@ -139,6 +139,15 @@ export function WorkflowHeader({
             })}
           </Menu>
         </>
+      )}
+
+      {/* Release 이력은 view 권한자도 본다 — 무엇이 언제 전달됐는지는 받는 쪽도 알아야 한다. */}
+      {onOpenHistory && (
+        <Tooltip title={t('release.history')}>
+          <SirenButton variant="ghost" onClick={onOpenHistory} aria-label={t('release.history')}>
+            <Icon name="hist" />
+          </SirenButton>
+        </Tooltip>
       )}
 
       {canEdit && onOpenRelease && (

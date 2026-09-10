@@ -10,11 +10,14 @@ import { PhaseInfoDialog } from '@/components/dialogs/PhaseInfoDialog';
 import { WorkflowSettingsDialog } from '@/components/dialogs/WorkflowSettingsDialog';
 import { AddDeliverableDialog } from '@/components/dialogs/AddDeliverableDialog';
 import { NoteDialog } from '@/components/dialogs/NoteDialog';
+import { ReleaseDialog } from '@/components/release/ReleaseDialog';
+import { ReleaseHistoryDialog } from '@/components/release/ReleaseHistoryDialog';
 import { Toast } from '@/components/common/Toast';
 import { useProject, useProjectWorkflows, useProjectMilestones, useProjects } from '@/api/hooks/useProjects';
 import { useUpdateWorkflow, useReplaceWorkflowAccess, useWorkflow, useUpdateWorkflowPhases } from '@/api/hooks/useWorkflow';
 import { useBlocks, useCreateBlock, useDeleteBlock, useReplaceBlockRecipients } from '@/api/hooks/useBlocks';
 import { useReplaceArtifactAccess } from '@/api/hooks/useArtifacts';
+import { useCreateRelease, useReleasePreview, useReleases } from '@/api/hooks/useReleases';
 import { useMemos } from '@/api/hooks/useMemos';
 import { useEdges } from '@/api/hooks/useEdges';
 import { usePutCanvas } from '@/api/hooks/useCanvas';
@@ -69,6 +72,16 @@ export function BoardPage() {
   const [phasesErr, setPhasesErr] = useState<string | null>(null);
   /** 수신 부서 필터 — 걸린 블록은 흐려질 뿐 사라지지 않는다(설계서 03장 §6.1). */
   const [recipientFilter, setRecipientFilter] = useState<string[]>([]);
+  const [releaseOpen, setReleaseOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+
+  /**
+   * preview는 연동 서비스에 라이브로 버전을 물어보므로 평소 조회보다 느리다 —
+   * 다이얼로그를 연 순간에만 부른다.
+   */
+  const releasePreview = useReleasePreview(workflowId, releaseOpen);
+  const releases = useReleases(workflowId);
+  const createRelease = useCreateRelease(workflowId ?? '');
 
   const myDepartments = useMemo(
     () => myDeptsOf(project, me?.KnoxID, isAdmin),
@@ -214,6 +227,8 @@ export function BoardPage() {
               setSaveErr(null); setPhasesErr(null);
               st.getState().setWorkflowSettingsTab('details');
             }}
+            onOpenRelease={() => setReleaseOpen(true)}
+            onOpenHistory={() => setHistoryOpen(true)}
           />
 
           <Canvas
@@ -366,6 +381,41 @@ export function BoardPage() {
                     onError: (e: any) => toast(e?.response?.data?.message ?? 'Failed to add'),
                   },
                 );
+              }}
+            />
+          )}
+
+          {releaseOpen && (
+            <ReleaseDialog
+              workflowName={workflow.name}
+              preview={releasePreview.data ?? null}
+              loading={releasePreview.isLoading}
+              saving={createRelease.isPending}
+              onClose={() => setReleaseOpen(false)}
+              onRelease={({ note, sources }) =>
+                createRelease.mutate(
+                  { note, sources },
+                  {
+                    onSuccess: (created) => {
+                      setReleaseOpen(false);
+                      toast(`Released ${created.label}`);
+                    },
+                    onError: (e: any) => toast(e?.response?.data?.message ?? 'Release failed'),
+                  },
+                )
+              }
+            />
+          )}
+
+          {historyOpen && (
+            <ReleaseHistoryDialog
+              workflowName={workflow.name}
+              releases={releases.data ?? []}
+              departmentOptions={project?.departments ?? []}
+              onClose={() => setHistoryOpen(false)}
+              onOpenArtifact={(blockId) => {
+                setHistoryOpen(false);
+                st.getState().openDeliverable(blockId);
               }}
             />
           )}
