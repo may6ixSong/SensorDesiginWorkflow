@@ -41,7 +41,7 @@ export function ProjectListPage() {
                 Projects
               </Box>
               <Box sx={{ fontSize: 12, color: T.dm, mt: '5px' }}>
-                Projects and deliverable boards you own
+                Every project you belong to
               </Box>
             </Box>
             <Box sx={{ flex: 1 }} />

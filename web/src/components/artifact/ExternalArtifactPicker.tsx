@@ -36,7 +36,7 @@ export function ExternalArtifactPicker({ service, projectCode, projectRevision, 
 
   if (!service) return null;
 
-  const fieldLabel = label ?? `External artifact ID — the exact ${service.name} project this deliverable maps to`;
+  const fieldLabel = label ?? `External artifact ID — the exact ${service.name} project this artifact maps to`;
 
   if (!supportsSearch) {
     return (

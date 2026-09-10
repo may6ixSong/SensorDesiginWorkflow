@@ -60,7 +60,7 @@ export function PhaseInfoDialog({ workflowName, phase: p, nodes, onClose, onOpen
         {stat('Released', `${rel}/${ds.length}`, T.pr)}
       </Row>
       <Card>
-        <Ey sx={{ mb: '10px' }}>Key Deliverables</Ey>
+        <Ey sx={{ mb: "10px" }}>Blocks in this phase</Ey>
         {ds.length ? (
           ds.map((d) => {
             const s = stOf(d);
@@ -86,7 +86,7 @@ export function PhaseInfoDialog({ workflowName, phase: p, nodes, onClose, onOpen
             );
           })
         ) : (
-          <Box sx={{ fontSize: 12.5, color: T.dm2 }}>No deliverables</Box>
+          <Box sx={{ fontSize: 12.5, color: T.dm2 }}>No blocks</Box>
         )}
       </Card>
     </ModalShell>

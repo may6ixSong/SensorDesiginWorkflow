@@ -7,7 +7,8 @@ const TIMEOUT_MS = 5000;
  * Calypso는 Hub 레지스트리에 등록돼 있지 않다(SIREN 내장 기능이라 Service Manage
  * 목록에도 없음 — §19.1) — 그래서 ObserverClientService(레지스트리 기반)로는 못 부르고
  * 이 전용 클라이언트로 부른다. 평소 열람은 브라우저가 Calypso api를 직접 호출하지만,
- * HLD Release 스냅샷(§19.4)만은 백엔드가 직접 Calypso의 현재 버전을 물어봐야 한다.
+ * release를 만드는 순간만은 백엔드가 직접 Calypso의 현재 버전을 물어봐야 한다 — 그 시점의
+ * 버전을 기록에 얼려야 하므로 브라우저가 보여준 값을 믿을 수 없다.
  *
  * Calypso는 knoxId 쿼리 파라미터가 아니라 자기 헤더 체계(X-Knox-Id 등)로 호출자를
  * 식별한다 — 그래서 여기서만 헤더 방식을 쓴다.

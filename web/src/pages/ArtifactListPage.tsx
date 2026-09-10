@@ -67,8 +67,32 @@ function ArtifactList({ project }: { project: ProjectDetailDto }) {
       </Box>
 
       {isError ? (
-        <Box sx={{ fontSize: 12.5, color: T.dm }}>Could not reach Calypso. Check CALYPSO_API and its CORS_ORIGIN.</Box>
-      ) : isLoading ? null : data.length === 0 ? (
+        <Box
+          sx={{
+            border: `1px solid ${T.dangerLine}`, background: T.dangerSoft, color: T.danger,
+            borderRadius: '12px', padding: '18px 20px', fontSize: 12.5, lineHeight: 1.65,
+          }}
+        >
+          <Box sx={{ fontWeight: 700, mb: '4px' }}>Could not reach Calypso</Box>
+          This list lives in Calypso, not in SIREN. Check <code>CALYPSO_API</code> and its
+          {' '}<code>CORS_ORIGIN</code>, then reload.
+        </Box>
+      ) : isLoading ? (
+        /* 로딩 중에 아무것도 안 그리면 "빈 목록"과 구분이 안 된다 — 특히 Calypso가 응답하지
+           않아 재시도가 도는 동안 화면이 통째로 비어 보였다(실측). 자리만이라도 잡아 둔다. */
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
+          {[0, 1, 2].map((i) => (
+            <Box
+              key={i}
+              sx={{
+                height: 62, borderRadius: '12px', border: `1px solid ${T.ln}`, background: T.sf,
+                animation: 'sirenPulse 1.4s ease-in-out infinite',
+                animationDelay: `${i * 0.16}s`,
+              }}
+            />
+          ))}
+        </Box>
+      ) : data.length === 0 ? (
         <Box
           sx={{
             border: `1px dashed ${T.ln2}`, borderRadius: '12px', background: T.sf,

@@ -379,7 +379,7 @@ export function Canvas({
         const cx = b.x + b.w / 2;
         const np = phaseAtX(phases, s.phasePW, cx);
         if (np !== b.phase) {
-          alert("Can't move a received deliverable out of its phase.");
+          alert("Can't move a received artifact out of its phase.");
           b.x = D.origX;
           b.y = D.origY;
         } else {

@@ -18,10 +18,15 @@ const BAR_H = 22;
 const BAR_GAP = 5;
 const ROW_PAD = 9;
 
+/**
+ * 캔버스 범례(components/canvas/Legend.tsx)와 **글자·색이 같아야 한다** — 같은 3상태를
+ * 두 화면에서 다른 이름으로 부르면 그 자체가 오해가 된다(설계서 04장 §8).
+ * 특히 'Released'는 workflow가 부서에 전달하는 다른 층위의 용어라 여기서 쓰지 않는다.
+ */
 const LEGEND = [
-  { key: 'released', label: 'Released', c: T.pr },
-  { key: 'progress', label: 'In progress', c: T.warn },
-  { key: 'pending', label: 'Not submitted', c: T.dm2 },
+  { key: 'pending', label: 'Not published', c: T.dm2 },
+  { key: 'progress', label: 'New since last release', c: T.pr },
+  { key: 'released', label: 'Published', c: T.ok },
 ] as const;
 
 /**
@@ -343,9 +348,10 @@ function WorkflowTimelineRow({
               }}
             >
               {/* 상태 비율 — 막대 배경을 그대로 채운다(별도 미니 바를 겹치지 않는다). */}
+              {/* 색은 위 LEGEND와 같은 것을 쓴다 — published는 ok, 신규는 pr. */}
               <Box sx={{ position: 'absolute', inset: 0, display: 'flex' }}>
-                <Box sx={{ width: `${pct(c.released)}%`, background: T.prSoft }} />
-                <Box sx={{ width: `${pct(c.inProgress)}%`, background: T.warnSoft }} />
+                <Box sx={{ width: `${pct(c.released)}%`, background: T.okSoft }} />
+                <Box sx={{ width: `${pct(c.inProgress)}%`, background: T.prSoft }} />
               </Box>
               <Box
                 sx={{

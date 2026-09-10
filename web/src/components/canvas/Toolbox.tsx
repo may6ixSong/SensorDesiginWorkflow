@@ -36,7 +36,7 @@ export function Toolbox({ canEdit, edit, onToggleEdit, onCancel, onAdd, onAddRec
             <TbBtn title="Cancel changes" icon="undo" danger onClick={onCancel} />
           </Group>
           <Group>
-            <TbBtn title="Add deliverable" icon="plus" onClick={onAdd} />
+            <TbBtn title="Add block" icon="plus" onClick={onAdd} />
             <TbBtn title="Add artifact I need to receive" icon="inbox" onClick={onAddReceived} />
             <Sep />
             <TbBtn title="Add memo" icon="note" onClick={onNote} />

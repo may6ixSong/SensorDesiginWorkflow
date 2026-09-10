@@ -8,7 +8,7 @@ import { Canvas } from '@/components/canvas/Canvas';
 import { ArtifactSlide } from '@/components/dialogs/ArtifactSlide';
 import { PhaseInfoDialog } from '@/components/dialogs/PhaseInfoDialog';
 import { WorkflowSettingsDialog } from '@/components/dialogs/WorkflowSettingsDialog';
-import { AddDeliverableDialog } from '@/components/dialogs/AddDeliverableDialog';
+import { AddBlockDialog } from '@/components/dialogs/AddBlockDialog';
 import { NoteDialog } from '@/components/dialogs/NoteDialog';
 import { ReleaseDialog } from '@/components/release/ReleaseDialog';
 import { ReleaseHistoryDialog } from '@/components/release/ReleaseHistoryDialog';
@@ -354,13 +354,9 @@ export function BoardPage() {
           )}
 
           {addDlg && (
-            <AddDeliverableDialog
+            <AddBlockDialog
               workflowName={workflow.name}
               phases={phaseList}
-              projectCode={project?.code}
-              projectRevision={project?.revision}
-              projectId={projectId}
-              myDepartments={myDepartments}
               onClose={() => st.getState().setAddDlg(false)}
               onCreate={({ name, phaseId }) => {
                 createBlock.mutate(
@@ -376,7 +372,7 @@ export function BoardPage() {
                       // "추가를 취소"한 게 된다.
                       s.trackAddedDeliverable(created.id);
                       s.setFocusReq(fresh.id);
-                      toast('Artifact added');
+                      toast('Block added');
                     },
                     onError: (e: any) => toast(e?.response?.data?.message ?? 'Failed to add'),
                   },
