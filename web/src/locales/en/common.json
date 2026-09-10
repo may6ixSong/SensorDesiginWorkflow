@@ -48,7 +48,26 @@
     "confirmRemoveViewGrantTitle": "Remove view access",
     "confirmRemoveViewGrantMessage": "Remove {{name}} ({{knoxId}})'s view access to this workflow?",
     "phasesOrphanWarning": "{{count}} artifact(s) have no release schedule.",
-    "resetToMilestones": "Reset to project milestones"
+    "resetToMilestones": "Reset to project milestones",
+    "departmentLabel": "Department",
+    "departmentHint": "The department this workflow belongs to.",
+    "departmentChangeWarning": "Changing the department may change who can access this workflow.",
+    "save": "Save",
+    "saveConfirmTitle": "Save changes",
+    "saveConfirmMessage": "Save your changes?",
+    "permissionsHint": "Edit and view access for this workflow",
+    "owner": "Owner",
+    "ownerNote": "The workflow owner cannot be transferred.",
+    "editAccess": "Edit access",
+    "viewAccess": "View access",
+    "departments": "Departments",
+    "users": "Members",
+    "addDepartment": "Add department",
+    "addUser": "Add member",
+    "pinnedDepartment": "This workflow's department — it cannot be removed.",
+    "noneYet": "None yet",
+    "lockedBy": "{{name}} is editing ({{remain}})",
+    "forceUnlock": "Force unlock"
   },
   "schedule": {
     "namePlaceholder": "e.g. KO",
@@ -85,5 +104,45 @@
     "deleteWarning": "This cannot be undone.",
     "delete": "Delete",
     "cancel": "Cancel"
+  },
+  "canvas": {
+    "editing": "Editing",
+    "save": "Save",
+    "discard": "Discard changes",
+    "saveConfirmMessage": "Save your changes?",
+    "discardConfirmTitle": "Discard changes",
+    "discardConfirmMessage": "Discard all changes? This cannot be undone.",
+    "deleteFlowTitle": "Delete connection",
+    "deleteFlowMessage": "Delete this connection?",
+    "addArtifact": "Add artifact",
+    "recipientFilter": "Recipient department",
+    "allDepartments": "All departments",
+    "lockExpired": "Your editing session has expired. Re-enter edit mode and try again."
+  },
+  "artifact": {
+    "published": "Published",
+    "notPublished": "Not published",
+    "newSinceRelease": "New since last release",
+    "noAccess": "You do not have access to this artifact.",
+    "noPublishedVersion": "No published version yet.",
+    "recipients": "Recipients",
+    "recipientsReadOnly": "You can see who receives this artifact, but not change it."
+  },
+  "release": {
+    "title": "Release",
+    "confirmTitle": "Release",
+    "confirmMessage": "Release with these contents? A release cannot be revoked or undone.",
+    "note": "Release note",
+    "noteRequired": "A release note is required.",
+    "sourceNone": "None",
+    "notDelivered": "Not delivered yet",
+    "changed": "Changed",
+    "history": "Release history",
+    "carriedOver": "Carried over from the last release"
+  },
+  "project": {
+    "codeImmutable": "Project code and revision cannot be changed after creation.",
+    "noAccess": "You do not have access to this project.",
+    "noWorkflowAccess": "You do not have access to this workflow."
   }
 }

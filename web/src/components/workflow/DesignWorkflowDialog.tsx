@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQueries } from '@tanstack/react-query';
 import { apiClient, ApiEnvelope } from '@/api/client';
 import { queryKeys } from '@/api/queryKeys';
-import { DeliverableDto, DeliverablesListResponse, EdgeDto, Milestone, WorkflowDto } from '@/types/domain';
+import { BlockDto, EdgeDto, Milestone, WorkflowDto } from '@/types/domain';
 import { Icon } from '@/components/common/Icon';
 import { CURSOR_POINTER, FONT_MONO, T } from '@/theme/tokens';
 import { buildDomainModel, withAlpha, lighten, darken, DomainWorkflowModel, UNASSIGNED_DOMAIN } from '@/lib/domainWorkflow';
@@ -140,24 +140,24 @@ function WorkflowStage({
   const [dragging, setDragging] = useState(false);
   const fittedRef = useRef(false);
 
-  /* 모든 workflow의 산출물 — 캐시 키가 보드와 같아 이미 열어본 workflow는 즉시 뜬다. */
+  /* 모든 workflow의 블록 — 캐시 키가 보드와 같아 이미 열어본 workflow는 즉시 뜬다. */
   const results = useQueries({
     queries: workflows.map((w) => ({
-      queryKey: queryKeys.deliverables(w.id),
+      queryKey: queryKeys.blocks(w.id),
       staleTime: 15_000,
       queryFn: async () => {
-        const res = await apiClient.get<DeliverablesListResponse>(`/workflows/${w.id}/deliverables`);
+        const res = await apiClient.get<BlockDto[]>(`/workflows/${w.id}/blocks`);
         return res.data;
       },
     })),
   });
   const sig = results.map((r) => `${r.status}:${r.dataUpdatedAt}`).join('|');
   const { byWorkflow, loading } = useMemo(() => {
-    const m = new Map<string, DeliverableDto[]>();
+    const m = new Map<string, BlockDto[]>();
     let anyLoading = false;
     workflows.forEach((w, i) => {
       const data = results[i]?.data;
-      m.set(w.id, data?.data ?? []);
+      m.set(w.id, data ?? []);
       if (!data) anyLoading = true;
     });
     return { byWorkflow: m, loading: anyLoading };

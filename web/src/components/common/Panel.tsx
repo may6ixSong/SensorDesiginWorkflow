@@ -121,7 +121,11 @@ export function SelectInput({
 }: {
   value: string;
   onChange: (v: string) => void;
-  options: { value: string; label: string }[];
+  /**
+   * option마다 disabled를 줄 수 있다 — 지금 선택된 값이 후보 목록에 없을 때 그 값을
+   * "선택된 채로 고를 수는 없는" 항목으로 끼워 보여주는 데 쓴다(설계서 01장 §3.5).
+   */
+  options: { value: string; label: string; disabled?: boolean }[];
   disabled?: boolean;
 }) {
   return (
@@ -140,7 +144,7 @@ export function SelectInput({
       }}
     >
       {options.map((o) => (
-        <option key={o.value} value={o.value}>
+        <option key={o.value} value={o.value} disabled={o.disabled}>
           {o.label}
         </option>
       ))}

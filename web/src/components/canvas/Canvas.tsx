@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Box } from '@mui/material';
-import { Tier, WorkflowBriefDto, WorkflowDto, WorkflowPhase } from '@/types/domain';
+import { WorkflowDto, WorkflowPhase } from '@/types/domain';
 import { useCanvasStore } from '@/store/canvasStore';
 import { toast } from '@/store/toastStore';
-import { useArtifactServices } from '@/api/hooks/useHub';
 import {
-  CanvasMemo, CanvasNode, connectedSet, countOrphans, effectiveTier, isOrphanPhase, laneG, getPW,
+  CanvasMemo, CanvasNode, connectedSet, countOrphans, isOrphanPhase, laneG, getPW,
   phaseAtX, resizePhase, wallAdj, todayX,
   resolveNodePhases,
 } from '@/lib/canvasModel';
@@ -16,7 +15,7 @@ import { FONT_MONO, T } from '@/theme/tokens';
 import { Icon } from '@/components/common/Icon';
 import { PhaseStepper } from './PhaseStepper';
 import { EdgeLayer } from './EdgeLayer';
-import { DeliverableNode } from './DeliverableNode';
+import { BlockNode } from './BlockNode';
 import { MemoBlock } from './MemoBlock';
 import { Toolbox } from './Toolbox';
 import { Legend } from './Legend';
@@ -25,10 +24,12 @@ interface Props {
   workflow: WorkflowDto;
   phases: WorkflowPhase[];
   canEdit: boolean;
-  /** origin==='incoming'인 노드를 열 때(읽기 전용 상세) 호출된다. */
-  onOpenIncoming: (id: string) => void;
-  /** "다른 IP에 준다" 배지(→ IP명) 해석용 — 과제 소속 workflow 전체(id/name/color). */
-  workflowDirectory: WorkflowBriefDto[];
+  /**
+   * 수신 부서 필터 — 선택된 부서가 recipient에 없는 블록을 흐리게 한다.
+   * **숨기지 않는다**: flow 구조가 끊겨 보이면 안 되기 때문이다(설계서 03장 §6.1).
+   * 비어 있으면 전체를 그대로 보여준다.
+   */
+  recipientFilter?: string[];
   /** 저장 완료(성공/실패 무관) 후 호출할 콜백을 받는다 — 편집 종료를 저장 이후로 미뤄 쿼리 재활성화 레이스를 막는다. */
   onSaveLayout: (onSettled: () => void) => void;
   /**
@@ -48,15 +49,18 @@ type Blk = CanvasNode | CanvasMemo;
  * flow 하이라이트가 모두 여기서 완결된다 (설계서 3.7~3.9, 7.1, 부록 A.7).
  */
 export function Canvas({
-  workflow, phases, canEdit, onOpenIncoming, workflowDirectory, onSaveLayout, onCancelEdit,
+  workflow, phases, canEdit, recipientFilter, onSaveLayout, onCancelEdit,
 }: Props) {
-  const workflowById = useMemo(() => new Map(workflowDirectory.map((d) => [d.id, d])), [workflowDirectory]);
+  /**
+   * 수신 부서 필터 — 걸린 블록은 흐려질 뿐 사라지지 않는다. 필터가 비어 있으면 아무것도
+   * 흐리게 하지 않는다(설계서 03장 §6.1).
+   */
+  const isFilteredOut = useMemo(() => {
+    const wanted = recipientFilter ?? [];
+    if (!wanted.length) return () => false;
+    return (n: CanvasNode) => !n.recipientDepartments.some((d) => wanted.includes(d));
+  }, [recipientFilter]);
   /** 블록 아이콘/LIVE 배지에 쓸 서비스별 tier(Hub 설계서 §5.1) — Hub 레지스트리 캐시를 그대로 쓴다. */
-  const { data: artifactServices } = useArtifactServices();
-  const tierByServiceKey = useMemo(
-    () => Object.fromEntries((artifactServices ?? []).map((s) => [s.key, s.defaultTier])) as Record<string, Tier>,
-    [artifactServices],
-  );
   const vpRef = useRef<HTMLDivElement>(null);
   const cvRef = useRef<HTMLDivElement>(null);
   const elRefs = useRef(new Map<string, HTMLDivElement>());
@@ -382,16 +386,11 @@ export function Canvas({
     // 이동 없이 클릭한 경우 (편집 모드)
     if (s.link && s.link !== id) {
       const target = st.getState().nodes.find((n) => n.id === id);
-      if (target && target.origin === 'incoming') {
-        toast("Can't link into a received artifact — link from it instead");
-        s.setLink(null);
-        return;
-      }
       if (target) {
         if (!s.edges.some((x) => x.from === s.link && x.to === id)) {
           s.setEdges([
             ...s.edges,
-            { id: `tmp-${Date.now()}`, from: s.link!, to: id, auto: false, bidirectional: false },
+            { id: `tmp-${Date.now()}`, from: s.link!, to: id, auto: false, bi: false },
           ]);
         }
         s.setLink(null);
@@ -488,9 +487,8 @@ export function Canvas({
       s.enterEdit();
       return;
     }
-    // 산출물의 Phase 메타데이터 확정 — 좌표는 건드리지 않는다(겹침 허용, 위 주석 참고).
-    // origin==='incoming' 노드는 위치가 이 캔버스 소유가 아니므로 재배정 대상에서 뺀다.
-    const { reassigned } = resolveNodePhases(s.nodes.filter((n) => n.origin !== 'incoming'), phases, s.phasePW);
+    // 블록의 Phase 메타데이터 확정 — 좌표는 건드리지 않는다(겹침 허용, 위 주석 참고).
+    const { reassigned } = resolveNodePhases(s.nodes, phases, s.phasePW);
     if (reassigned) s.bumpBlocks();
     // 저장이 끝난 뒤에야 edit을 끈다 — 그 전에 끄면 disabled 쿼리가 재활성화되며
     // 아직 반영 안 된 서버 데이터로 로컬 편집 결과를 덮어써 버릴 수 있다.
@@ -643,13 +641,12 @@ export function Canvas({
           ))}
 
           {nodes.map((d) => (
-            <DeliverableNode
+            <BlockNode
               key={d.id}
               d={d}
-              tier={effectiveTier(d, tierByServiceKey)}
               phase={phases.find((p) => p.id === d.phase)}
-              orphan={d.origin !== 'incoming' && isOrphanPhase(phases, d.phase)}
-              recvWorkflow={d.recvWorkflowId ? workflowById.get(d.recvWorkflowId) : undefined}
+              orphan={isOrphanPhase(phases, d.phase)}
+              filteredOut={isFilteredOut(d)}
               edit={edit}
               canEdit={canEdit}
               isSel={sel === d.id}
@@ -657,7 +654,7 @@ export function Canvas({
               hasHl={!!hlSet}
               dimLink={!!link && link !== d.id}
               linkActive={link === d.id}
-              onOpen={(id) => (d.origin === 'incoming' ? onOpenIncoming(id) : st.getState().openDeliverable(id))}
+              onOpen={(id: string) => st.getState().openDeliverable(id)}
               onPinClick={onPinClick}
               onGripDown={onGripDown}
               registerRef={registerRef}

@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
 import { Box } from '@mui/material';
 import { Link } from 'react-router-dom';
-import { DeliverableDto, Milestone, ScheduleSpan, WorkflowDto } from '@/types/domain';
-import { useDeliverables } from '@/api/hooks/useDeliverables';
+import { BlockDto, Milestone, ScheduleSpan, WorkflowDto } from '@/types/domain';
+import { useBlocks } from '@/api/hooks/useBlocks';
 import {
   DAY_MS, DateRange, dayMs, monthTicks, rangeOf, ratioIn, shortDate, sortSchedule, spanDays,
 } from '@/lib/schedule';
@@ -24,16 +24,20 @@ const LEGEND = [
   { key: 'pending', label: 'Not submitted', c: T.dm2 },
 ] as const;
 
-function statusCounts(deliverables: DeliverableDto[]) {
+/**
+ * 캔버스와 같은 publish 3상태를 집계한다(설계서 03장 §2.2) — 버전 배열을 다시 훑지
+ * 않고 서버가 계산해 내려준 publishState를 그대로 쓴다.
+ */
+function statusCounts(blocks: BlockDto[]) {
   let notSubmitted = 0;
   let inProgress = 0;
   let released = 0;
-  deliverables.forEach((d) => {
-    if (!d.versions.length) notSubmitted++;
-    else if (d.workingVersion) inProgress++;
-    else released++;
+  blocks.forEach((b) => {
+    if (b.publishState === 'published') released++;
+    else if (b.publishState === 'newlyPublished') inProgress++;
+    else notSubmitted++;
   });
-  return { notSubmitted, inProgress, released, total: deliverables.length };
+  return { notSubmitted, inProgress, released, total: blocks.length };
 }
 
 /**
@@ -81,7 +85,8 @@ export function ProjectTimeline({
    * 같은 화면을 보고 있다는 감각이 깨진다.
    */
   const shown = useMemo(
-    () => (mineOnly && myKnoxId ? workflows.filter((w) => (w.owners ?? []).includes(myKnoxId)) : workflows),
+    // Owner는 workflow마다 정확히 1명이다(설계서 01장 §3.6).
+    () => (mineOnly && myKnoxId ? workflows.filter((w) => w.ownerKnoxId === myKnoxId) : workflows),
     [workflows, mineOnly, myKnoxId],
   );
 
@@ -258,11 +263,11 @@ function WorkflowTimelineRow({
 }: {
   projectId: string; workflow: WorkflowDto; geo: Geometry;
 }) {
-  const { data: deliverablesResp } = useDeliverables(workflow.id);
-  const deliverables = deliverablesResp?.data;
+  const { data: blocks } = useBlocks(workflow.id);
+  const deliverables = blocks;
 
   const byPhase = useMemo(() => {
-    const m = new Map<string, DeliverableDto[]>();
+    const m = new Map<string, BlockDto[]>();
     (deliverables ?? []).forEach((d) => {
       const arr = m.get(d.phaseId) ?? [];
       arr.push(d);
@@ -318,7 +323,12 @@ function WorkflowTimelineRow({
           const pct = (n: number) => (c.total ? (n / c.total) * 100 : 0);
           const title = items.length
             ? items
-                .map((d) => `${d.name} — ${!d.versions.length ? 'Not submitted' : d.workingVersion ? 'In progress' : 'Released'}`)
+                .map((d) => {
+                  const label = d.publishState === 'published' ? 'Published'
+                    : d.publishState === 'newlyPublished' ? 'New since last release'
+                    : 'Not published';
+                  return `${d.name} — ${label}`;
+                })
                 .join('\n')
             : 'No artifacts in this phase';
 

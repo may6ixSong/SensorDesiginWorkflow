@@ -11,7 +11,7 @@
  *
  * React/DOM을 전혀 모르는 순수 함수만 모아 뒀다.
  */
-import { DeliverableDto, WorkflowDto } from '@/types/domain';
+import { BlockDto, WorkflowDto } from '@/types/domain';
 
 export const UNASSIGNED_DOMAIN = 'UNASSIGNED';
 
@@ -28,9 +28,19 @@ export interface StatusCounts {
   total: number;
 }
 
-export function statusOf(d: DeliverableDto): 'released' | 'inProgress' | 'notSubmitted' {
-  if (!d.versions.length) return 'notSubmitted';
-  return d.workingVersion ? 'inProgress' : 'released';
+/**
+ * 블록 하나의 상태.
+ *
+ * 캔버스와 같은 publish 3상태를 쓰되(설계서 03장 §2.2), 이 화면은 "얼마나 진척됐나"를
+ * 집계하는 곳이라 세 값을 그대로 쓴다:
+ *   newlyPublished — 마지막 release 이후 major가 올라갔다(= 다음 release 대상)
+ *   published      — 전달까지 끝났다
+ *   unpublished    — 아직 publish된 버전이 없다 (미매핑 블록도 여기에 들어간다)
+ */
+export function statusOf(b: BlockDto): 'released' | 'inProgress' | 'notSubmitted' {
+  if (b.publishState === 'published') return 'released';
+  if (b.publishState === 'newlyPublished') return 'inProgress';
+  return 'notSubmitted';
 }
 
 function emptyCounts(): StatusCounts {
@@ -46,7 +56,7 @@ function addCounts(a: StatusCounts, b: StatusCounts): StatusCounts {
   };
 }
 
-function countStatuses(items: DeliverableDto[]): StatusCounts {
+function countStatuses(items: BlockDto[]): StatusCounts {
   const c = emptyCounts();
   items.forEach((d) => {
     c[statusOf(d)]++;
@@ -98,7 +108,7 @@ function assignColors(keys: string[]): Map<string, string> {
 
 /**
  * workflow 목록 + IP별 산출물(own)로 도메인 모델을 만든다.
- * @param deliverablesByIp workflowId → 그 IP가 주는 산출물(own). incoming은 반대편에서
+ * @param blocksByWorkflow workflowId → 그 workflow의 캔버스 블록. 다른 workflow의 것은
  *   이미 한 번 세므로 넣지 않는다(항로 중복 방지).
  * @param knownDomains 과제에 등록된 부서 목록(Project.departments). IP가 하나도 배정되지
  *   않은 부서도 빈 섹션으로 보여 주기 위한 것 — 이걸 넘기지 않으면 IP가 실제로 가진
@@ -106,7 +116,7 @@ function assignColors(keys: string[]): Map<string, string> {
  */
 export function buildDomainModel(
   workflows: WorkflowDto[],
-  deliverablesByIp: Map<string, DeliverableDto[]>,
+  blocksByWorkflow: Map<string, BlockDto[]>,
   knownDomains: string[] = [],
 ): DomainWorkflowModel {
   const grouped = new Map<string, WorkflowDto[]>();
@@ -133,7 +143,7 @@ export function buildDomainModel(
   const domains: DomainGroup[] = domainKeys.map((key) => {
     const members = [...(grouped.get(key) ?? [])].sort((a, b) => a.name.localeCompare(b.name));
     const counts = members.reduce(
-      (acc, workflow) => addCounts(acc, countStatuses(deliverablesByIp.get(workflow.id) ?? [])),
+      (acc, workflow) => addCounts(acc, countStatuses(blocksByWorkflow.get(workflow.id) ?? [])),
       emptyCounts(),
     );
     return { key, label: key, color: colorOf.get(key) ?? DOMAIN_PALETTE[0], workflows: members, counts };
