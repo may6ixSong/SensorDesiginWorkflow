@@ -59,6 +59,12 @@
         --s-pr-line: #c7c2f2;
         --s-pr-tx: #ffffff;
 
+        /* 상단바 SIREN 마크(SirenMark)·favicon 전용 — 예전엔 초록(#0c9a83) 계열이었는데,
+           강조색이 인디고 하나로 통일된 뒤로는 로고만 혼자 다른 색이라 어색했다.
+           별도 팔레트를 만들지 않고 --s-pr을 그대로 쓴다. */
+        --siren-tl: var(--s-pr);
+        --siren-tl2: var(--s-pr-soft);
+
         /* ── Tier ── A→D 신뢰도 내림차순. 이 순서가 색에서 읽혀야 한다 */
         --s-tier-a: #0e8f66;
         --s-tier-a-soft: #e3f5ee;
@@ -130,6 +136,9 @@
         --s-pr-soft: #1d1b3a;
         --s-pr-line: #3b3672;
         --s-pr-tx: #0a0c14;
+
+        --siren-tl: var(--s-pr);
+        --siren-tl2: var(--s-pr-soft);
 
         --s-tier-a: #34d399;
         --s-tier-a-soft: #10281f;
