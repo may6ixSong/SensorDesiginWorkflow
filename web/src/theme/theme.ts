@@ -1,5 +1,5 @@
 import { createTheme, Theme } from '@mui/material/styles';
-import { FONT_MONO, FONT_SANS, R, T } from './tokens';
+import { FONT_SANS, R, T } from './tokens';
 import { ThemeMode } from './themeVars';
 
 export { T, TIER_COLOR, R, SP, FONT_MONO, FONT_SANS, TNUM, CURSOR_POINTER, FOCUS_RING } from './tokens';

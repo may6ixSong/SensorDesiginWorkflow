@@ -1,188 +1,109 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Box, CircularProgress, Stack, Typography } from '@mui/material';
+import { useTranslation } from 'react-i18next';
 import { AppShell } from '@/components/layout/AppShell';
 import { WorkflowHeader } from '@/components/workflow/WorkflowHeader';
 import { Canvas } from '@/components/canvas/Canvas';
-import { DeliverableDialog } from '@/components/dialogs/DeliverableDialog';
-import { IncomingDeliverableDialog } from '@/components/dialogs/IncomingDeliverableDialog';
-import { HldReleaseDialog } from '@/components/dialogs/HldReleaseDialog';
+import { ArtifactSlide } from '@/components/dialogs/ArtifactSlide';
 import { PhaseInfoDialog } from '@/components/dialogs/PhaseInfoDialog';
 import { WorkflowSettingsDialog } from '@/components/dialogs/WorkflowSettingsDialog';
 import { AddDeliverableDialog } from '@/components/dialogs/AddDeliverableDialog';
 import { NoteDialog } from '@/components/dialogs/NoteDialog';
 import { Toast } from '@/components/common/Toast';
-import {
-  useProject, useProjectWorkflowDirectory, useProjectWorkflows, useProjectMilestones, useProjects,
-  useUpdateWorkflowDomain,
-} from '@/api/hooks/useProjects';
-import {
-  useAddOwner, useAddViewGrant, useWorkflow, useRemoveOwner, useRemoveViewGrant, useUpdateWorkflow,
-  useUpdateWorkflowPhases,
-} from '@/api/hooks/useWorkflow';
-import {
-  useAssertVersion, useCreateDeliverable, useDeleteDeliverable, useDeliverables, useRelease,
-  useUpdateDeliverable, useUpdateRecv,
-} from '@/api/hooks/useDeliverables';
+import { useProject, useProjectWorkflows, useProjectMilestones, useProjects } from '@/api/hooks/useProjects';
+import { useUpdateWorkflow, useReplaceWorkflowAccess, useWorkflow, useUpdateWorkflowPhases } from '@/api/hooks/useWorkflow';
+import { useBlocks, useCreateBlock, useDeleteBlock, useReplaceBlockRecipients } from '@/api/hooks/useBlocks';
+import { useReplaceArtifactAccess } from '@/api/hooks/useArtifacts';
 import { useMemos } from '@/api/hooks/useMemos';
 import { useEdges } from '@/api/hooks/useEdges';
-import { useHldReleases } from '@/api/hooks/useHld';
 import { usePutCanvas } from '@/api/hooks/useCanvas';
 import { useCanvasStore } from '@/store/canvasStore';
 import { useAuth } from '@/app/providers/AuthProvider';
 import { toast } from '@/store/toastStore';
-import {
-  applyLatestReleaseBadges, countOrphans, placeIncomingNodes, placeInLane, toCanvasEdge,
-  toCanvasEdgeFromSnapshot, toCanvasMemo, toCanvasMemoFromSnapshot, toCanvasNode, toCanvasNodeFromSnapshot,
-} from '@/lib/canvasModel';
-import { DeliverableDto, WorkflowPhase } from '@/types/domain';
+import { countOrphans, placeInLane, toCanvasEdge, toCanvasMemo, toCanvasNode } from '@/lib/canvasModel';
 import { T } from '@/theme/tokens';
-import { canEditWorkflow } from '@/lib/access';
+import { canEditWorkflow, myDepartments as myDeptsOf } from '@/lib/access';
 
 export function BoardPage() {
   const { projectId, workflowId } = useParams<{ projectId: string; workflowId: string }>();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { user: me, isAdmin } = useAuth();
 
   const { data: projects } = useProjects();
-  /**
-   * Project Information 상세 — 캔버스는 쓰지 않고, workflow settings의 Details 탭에서
-   * 편집자 본인의 부서 목록(department 재배정 picker 제한)을 구하는 데만 쓴다.
-   */
   const { data: project } = useProject(projectId);
   /** 과제 공통 일정 — 캔버스는 쓰지 않고, "과제 일정으로 되돌리기"에만 필요하다. */
   const { data: milestones } = useProjectMilestones(projectId);
   const { data: workflows } = useProjectWorkflows(projectId);
-  const { data: workflowDirectory } = useProjectWorkflowDirectory(projectId);
   const { data: workflow, isLoading: workflowLoading } = useWorkflow(workflowId);
-  const { data: deliverablesResp } = useDeliverables(workflowId);
-  const deliverables = deliverablesResp?.data;
-  const incoming = useMemo(() => deliverablesResp?.incoming ?? [], [deliverablesResp]);
+  const { data: blocks } = useBlocks(workflowId);
   const { data: memos } = useMemos(workflowId);
   const { data: edges } = useEdges(workflowId);
-  const { data: hlds } = useHldReleases(workflowId);
-  // Admin(Group==='Admin')은 서버가 내려주는 workflow.myAccess와 무관하게 owner와
-  // 동등한 super 권한을 갖는다 — 캔버스를 라이브로 볼지(Edit) 최신 HLD 스냅샷으로
-  // 볼지(View) 가르는 기준도 이 값이어야 한다(§19.3). myAccess를 그대로 쓰면 Admin도
-  // "아직 Release가 없다"는 이유로 빈 캔버스를 보게 되는 버그가 생긴다(실측 확인).
-  const isOwner = canEditWorkflow(workflow, isAdmin);
+
+  /**
+   * 캔버스 편집 권한. 서버가 내려주는 myAccess에 Admin super 권한이 이미 반영되어 있지만,
+   * 목록 화면과 판정 기준을 하나로 맞추려 같은 헬퍼를 쓴다.
+   */
+  const canEdit = canEditWorkflow(workflow, isAdmin);
 
   const st = useCanvasStore;
-  const edit = useCanvasStore((s) => s.edit);
   const nodes = useCanvasStore((s) => s.nodes);
   const canvasMemos = useCanvasStore((s) => s.memos);
   const openId = useCanvasStore((s) => s.openId);
   const noteDlg = useCanvasStore((s) => s.noteDlg);
   const addDlg = useCanvasStore((s) => s.addDlg);
-  const addDlgIntent = useCanvasStore((s) => s.addDlgIntent);
-  const hldDlg = useCanvasStore((s) => s.hldDlg);
-  const hldSel = useCanvasStore((s) => s.hldSel);
-  const hldBack = useCanvasStore((s) => s.hldBack);
   const phInfo = useCanvasStore((s) => s.phInfo);
   const workflowSettingsTab = useCanvasStore((s) => s.workflowSettingsTab);
-  const incomingId = useCanvasStore((s) => s.incomingId);
 
   const putCanvas = usePutCanvas(workflowId ?? '');
   const updateWorkflow = useUpdateWorkflow(workflowId ?? '');
-  const [detailsErr, setDetailsErr] = useState<string | null>(null);
+  const replaceAccess = useReplaceWorkflowAccess(workflowId ?? '');
   const updatePhases = useUpdateWorkflowPhases(workflowId ?? '');
+  const createBlock = useCreateBlock(workflowId ?? '');
+  const deleteBlock = useDeleteBlock(workflowId ?? '');
+  const replaceRecipients = useReplaceBlockRecipients(workflowId ?? '');
+  const replaceArtifactAccess = useReplaceArtifactAccess(workflowId ?? '');
+
+  const [saveErr, setSaveErr] = useState<string | null>(null);
   const [phasesErr, setPhasesErr] = useState<string | null>(null);
-  const createDeliverable = useCreateDeliverable(workflowId ?? '');
-  const updateDeliverable = useUpdateDeliverable(workflowId ?? '');
-  const deleteDeliverable = useDeleteDeliverable(workflowId ?? '');
-  const updateRecv = useUpdateRecv(workflowId ?? '');
-  const assertVersion = useAssertVersion(workflowId ?? '');
-  const release = useRelease(workflowId ?? '');
-  const addOwner = useAddOwner(workflowId ?? '');
-  const removeOwner = useRemoveOwner(workflowId ?? '');
-  const addViewGrant = useAddViewGrant(workflowId ?? '');
-  const removeViewGrant = useRemoveViewGrant(workflowId ?? '');
-  const updateDomain = useUpdateWorkflowDomain(projectId ?? '');
+  /** 수신 부서 필터 — 걸린 블록은 흐려질 뿐 사라지지 않는다(설계서 03장 §6.1). */
+  const [recipientFilter, setRecipientFilter] = useState<string[]>([]);
+
   const myDepartments = useMemo(
-    () => project?.members.find((m) => m.knoxId === me?.KnoxID)?.departments ?? [],
-    [project, me?.KnoxID],
+    () => myDeptsOf(project, me?.KnoxID, isAdmin),
+    [project, me?.KnoxID, isAdmin],
   );
 
   /**
    * 서버 데이터 → 캔버스 작업 모델 (편집 중에는 덮어쓰지 않는다).
-   * own(이 IP가 주는 산출물)과 incoming(다른 IP로부터 받는 산출물)을 하나의 nodes
-   * 배열로 합쳐서 같은 캔버스 위에 그린다 — incoming은 origin==='incoming'으로
-   * 표시돼 UI만 구분되고(점선 테두리 등), 그 외에는 own 노드와 똑같이 edge로 자유롭게
-   * 연결할 수 있어 "받아서 → 내가 작업해서 → 다음으로 넘긴다"는 흐름이 한 캔버스에
-   * 이어져 보인다. incoming은 이 workflow 소유가 아니라 위치를 저장할 곳이 없으므로,
-   * hydrate 직후 placeIncomingNodes로 own 노드와 겹치지 않는 자리에 매번 다시 배치한다.
-   */
-  /**
-   * View 권한은 라이브 캔버스가 아니라 가장 최근 Workflow(HLD) Release 스냅샷 하나로
-   * 구조와 버전을 함께 그린다(설계서 §19.3, §19.5) — flow 연결·배치가 그 뒤로 바뀌었을
-   * 수 있어, 라이브 구조에 과거 버전을 조인하면 그 시점에 없던 연결이 있었던 것처럼
-   * 보인다(실측 확인된 문제). Edit 권한은 계속 라이브 구조를 쓰되, 연동된(Calypso 포함)
-   * 산출물의 버전 배지만은 같은 최신 Release가 얼려둔 값으로 맞춘다 — 상시 동기화가
-   * 없어졌으므로(§19.4) 그게 SIREN이 실시간으로 아는 유일한 released 사실이기 때문이다.
-   * incoming(다른 workflow가 준 산출물)은 이 workflow 소유가 아니라 스냅샷에도 없으므로
-   * 두 경우 모두 라이브로 얹고 placeIncomingNodes로 매번 다시 배치한다.
+   *
+   * ★ Edit/View 권한자가 **완전히 동일한 캔버스**를 본다(설계서 03장 §1) — 예전처럼
+   *   View 권한자에게만 release 스냅샷을 보여주는 분기가 없다. 캔버스에는 version 개념이
+   *   아예 없어졌으므로 항상 지금 상태 하나뿐이다.
    */
   useEffect(() => {
     if (!workflowId || !workflow) return;
     if (st.getState().edit) return;
+    if (!blocks || !memos || !edges) return;
 
-    // myAccess는 서버가 owner 여부만으로 계산한 값이라 Admin의 super 권한을 모른다 —
-    // 그래서 isOwner(canEditWorkflow)로 판단해야 Admin도 항상 라이브 캔버스를 본다.
-    const viewOnly = !isOwner;
-    const latestHld = hlds?.[0] ?? null;
-    const incomingNodes = incoming.map((d) => toCanvasNode(d, 'incoming'));
-
-    if (viewOnly) {
-      const hasSnapshot = (latestHld?.canvas?.deliverables?.length ?? 0) > 0;
-      st.getState().hydrate(workflowId, {
-        nodes: [
-          ...(hasSnapshot
-            ? latestHld!.canvas.deliverables.map((sd) => toCanvasNodeFromSnapshot(workflowId, sd, latestHld!.items?.[sd.id]))
-            : []),
-          ...incomingNodes,
-        ],
-        memos: hasSnapshot ? latestHld!.canvas.memos.map((sm) => toCanvasMemoFromSnapshot(workflowId, sm)) : [],
-        edges: hasSnapshot ? latestHld!.canvas.edges.map(toCanvasEdgeFromSnapshot) : [],
-        phaseWidths: workflow.phaseWidths,
-      });
-      const s = st.getState();
-      placeIncomingNodes(s.nodes, workflow.phases ?? [], s.phasePW);
-      s.bumpBlocks();
-      return;
-    }
-
-    if (!deliverables || !memos || !edges) return;
     st.getState().hydrate(workflowId, {
-      nodes: applyLatestReleaseBadges(
-        [...deliverables.map((d) => toCanvasNode(d, 'own')), ...incomingNodes],
-        latestHld,
-      ),
+      nodes: blocks.map(toCanvasNode),
       memos: memos.map(toCanvasMemo),
       edges: edges.map(toCanvasEdge),
       phaseWidths: workflow.phaseWidths,
     });
-    const s = st.getState();
-    placeIncomingNodes(s.nodes, workflow.phases ?? [], s.phasePW);
-    // 사용자가 같은 Phase 안에서 옮겨둔 incoming 노드 위치를 다시 덮어씌운다 — 그
-    // Phase로 재배치된 것이 아니면(다른 IP가 스케줄을 바꿨으면) 무시한다.
-    const overrides = s.incomingOverrides;
-    s.nodes.forEach((n) => {
-      const ov = overrides[n.id];
-      if (n.origin === 'incoming' && ov && ov.phase === n.phase) {
-        n.x = ov.x;
-        n.y = ov.y;
-      }
-    });
-    s.bumpBlocks();
-  }, [workflowId, workflow, isOwner, deliverables, incoming, memos, edges, hlds, st]);
+    st.getState().bumpBlocks();
+  }, [workflowId, workflow, blocks, memos, edges, st]);
 
   /**
-   * 편집 모드로 둔 채 이 페이지를 떠나면(다른 workflow로 이동 포함) 캔버스 편집 상태가
-   * zustand 전역 store에 그대로 남아 있어, 저장하지 않고 나갔다가 다시 들어와도 계속
-   * "편집 중"으로 보이는 버그가 있었다 — canvasStore는 컴포넌트가 언마운트돼도 초기화되지
-   * 않는 모듈 상태이기 때문이다. 페이지를 떠날 때(=이 effect가 정리될 때) 편집 중이면
-   * 미저장 변경을 취소하고 편집 모드를 강제로 끈다. 나중에 들어올 동시수정 방지 기능도
-   * 이 지점(페이지 이탈 = 편집 세션 종료)에 편집 잠금 해제를 걸면 된다.
+   * 편집 모드로 둔 채 이 페이지를 떠나면 캔버스 편집 상태가 zustand 전역 store에 그대로
+   * 남아, 저장하지 않고 나갔다가 다시 들어와도 계속 "편집 중"으로 보인다 — canvasStore는
+   * 언마운트돼도 초기화되지 않는 모듈 상태이기 때문이다. 떠날 때 편집 중이면 미저장
+   * 변경을 취소한다.
+   *
+   * ★ 캔버스 lock 해제도 여기서 함께 일어나야 하지만, lock은 Canvas 컴포넌트가 편집 세션
+   *   진입/종료와 함께 직접 관리한다(설계서 03장 §3.1의 "페이지 이탈 = 세션 종료").
    */
   useEffect(() => {
     return () => {
@@ -190,36 +111,29 @@ export function BoardPage() {
     };
   }, [workflowId]);
 
-  const openNode = useMemo(() => nodes.find((n) => n.id === openId) ?? null, [nodes, openId]);
-  const incomingNode = useMemo(() => incoming.find((d) => d.id === incomingId) ?? null, [incoming, incomingId]);
+  const openBlock = useMemo(() => (blocks ?? []).find((b) => b.id === openId) ?? null, [blocks, openId]);
   /** 캔버스가 쓰는 일정은 오직 이 workflow의 phase다 — 과제 마일스톤이 아니다. */
   const phaseList = useMemo(() => workflow?.phases ?? [], [workflow?.phases]);
   const orphanCount = useMemo(() => countOrphans(nodes, phaseList), [nodes, phaseList]);
 
-  const closeDeliverable = () => {
-    const s = st.getState();
-    s.openDeliverable(null);
-    if (s.hldBack) {
-      s.setHldBack(false);
-      s.setHldDlg(true, s.hldSel);
-    }
-  };
+  const closeSlide = () => st.getState().openDeliverable(null);
 
-  /* 편집 종료 시 캔버스 일괄 저장 (설계서 5.5). Canvas는 저장이 끝난 뒤(성공/실패
-   * 무관)에만 편집 모드를 종료한다 — 그 전에 종료하면 disabled였던 조회 쿼리가
-   * 재활성화되며 아직 저장되지 않은 로컬 편집 결과를 stale 서버 데이터로 덮어쓸 수 있다. */
+  /**
+   * 편집 종료 시 캔버스 일괄 저장. Canvas는 저장이 끝난 뒤(성공/실패 무관)에만 편집 모드를
+   * 종료한다 — 그 전에 종료하면 disabled였던 조회 쿼리가 재활성화되며 아직 저장되지 않은
+   * 로컬 편집 결과를 stale 서버 데이터로 덮어쓸 수 있다.
+   *
+   * ★ 이 PUT만이 canvasLock을 요구한다. lock이 만료됐거나 남이 들고 있으면 409가 온다.
+   */
   const saveLayout = (onSettled?: () => void) => {
     const s = st.getState();
     putCanvas.mutate(
       {
-        // origin==='incoming'은 다른 workflow 소유라 이 IP의 캔버스 저장 대상이 아니다.
-        deliverables: s.nodes
-          .filter((n) => n.origin !== 'incoming')
-          .map((n) => ({
-            id: n.id,
-            layout: { x: n.x, y: n.y, w: n.w, h: n.h },
-            phaseId: n.phase,
-          })),
+        blocks: s.nodes.map((n) => ({
+          id: n.id,
+          layout: { x: n.x, y: n.y, w: n.w, h: n.h },
+          phaseId: n.phase,
+        })),
         memos: s.memos.map((m) => ({
           phaseId: m.phase,
           text: m.text,
@@ -228,76 +142,35 @@ export function BoardPage() {
         edges: s.edges.map((e) => ({
           fromId: e.from,
           toId: e.to,
-          bidirectional: e.bidirectional,
+          bidirectional: e.bi,
           auto: e.auto,
         })),
         phaseWidths: s.phasePW,
       },
       {
         onSuccess: () => { toast('Layout saved'); onSettled?.(); },
-        onError: () => { toast('Save failed'); onSettled?.(); },
+        onError: (e: any) => {
+          // 409 = 편집 세션 만료 또는 남이 점유 중. 그 사실을 그대로 알려 준다.
+          const status = e?.response?.status;
+          toast(status === 409 ? t('canvas.lockExpired') : 'Save failed');
+          onSettled?.();
+        },
       },
     );
   };
 
   /**
-   * "Cancel changes" — 이번 편집 세션 중 새로 추가된 산출물(sessionAddedDeliverableIds)은
-   * 이미 서버에 POST되어 있어 로컬 스냅샷 복원만으로는 취소되지 않는다. 실제로 삭제한
-   * 뒤에야 cancelEdit()으로 나머지(레이아웃/메모/엣지)를 스냅샷으로 되돌린다.
+   * "변경 취소" — 이번 편집 세션 중 새로 추가된 블록은 이미 서버에 POST되어 있어 로컬
+   * 스냅샷 복원만으로는 취소되지 않는다. 실제로 삭제한 뒤에야 나머지(레이아웃/메모/엣지)를
+   * 스냅샷으로 되돌린다.
    */
-  const handleCancelEdit = (sessionAddedDeliverableIds: string[]) => {
+  const handleCancelEdit = (sessionAddedIds: string[]) => {
     const finish = () => {
       st.getState().cancelEdit();
       toast('Changes cancelled');
     };
-    if (!sessionAddedDeliverableIds.length) {
-      finish();
-      return;
-    }
-    Promise.allSettled(sessionAddedDeliverableIds.map((id) => deleteDeliverable.mutateAsync(id))).then(finish);
-  };
-
-  /**
-   * 산출물 생성/Release 일정(series) 변경 결과를 로컬 캔버스에 즉시 반영한다.
-   * `useDeliverables` 쿼리는 편집 중엔 disabled라 invalidate만으로는 화면에 나타나지
-   * 않는다(설계서 7.1) — 그래서 응답으로 받은 DTO를 직접 store에 병합한다.
-   * 이미 로컬에 있던 노드는 위치/크기(x,y,w,h,phase)를 보존하고 메타데이터만 갱신하고,
-   * 새로 생긴 노드만 해당 Phase 레인 안쪽으로 배치한다(placeInLane) — 그렇지 않으면
-   * 서버 기본 좌표(0,0)가 그대로 쓰여 phase 라벨과 실제 표시 위치가 어긋난다.
-   */
-  const mergeDeliverableResults = (list: DeliverableDto[], phaseListForPlacement: WorkflowPhase[]) => {
-    const s = st.getState();
-    const existingById = new Map(s.nodes.map((n) => [n.id, n]));
-    const touched = list.map((d) => {
-      const local = existingById.get(d.id);
-      if (local) {
-        return {
-          ...local,
-          name: d.name,
-          artifactKey: d.artifactKey,
-          serviceKey: d.serviceKey,
-          externalArtifactId: d.externalArtifactId,
-          net: d.network,
-          series: d.series,
-          seriesIdx: d.seriesIdx,
-          seriesTotal: d.seriesTotal,
-          recvDept: d.recvDept,
-          recvContact: d.recvContact,
-          recvWorkflowId: d.recvWorkflowId,
-          sourceDept: d.sourceDept,
-          sourceContact: d.sourceContact,
-          versions: d.versions ?? [],
-          releasedVersion: d.releasedVersion ?? null,
-          workingVersion: d.workingVersion ?? null,
-          canEdit: d.canEdit,
-        };
-      }
-      const fresh = toCanvasNode(d);
-      placeInLane(fresh, phaseListForPlacement, s.phasePW);
-      return fresh;
-    });
-    const untouched = s.nodes.filter((n) => !touched.some((t) => t.id === n.id));
-    s.setNodes([...untouched, ...touched]);
+    if (!sessionAddedIds.length) { finish(); return; }
+    Promise.allSettled(sessionAddedIds.map((id) => deleteBlock.mutateAsync(id))).then(finish);
   };
 
   if (workflowLoading) {
@@ -321,10 +194,10 @@ export function BoardPage() {
         <Box sx={{ flex: 1, display: 'grid', placeItems: 'center', padding: '40px' }}>
           <Box sx={{ textAlign: 'center', maxWidth: 420 }}>
             <Typography sx={{ fontSize: 20, fontWeight: 700, mb: '10px' }}>
-              No viewable workflow
+              {t('project.noWorkflowAccess')}
             </Typography>
             <Typography sx={{ fontSize: 13, color: T.dm, lineHeight: 1.8 }}>
-              {me?.Name || me?.KnoxID} has no access to this project's Analog workflows.
+              {me?.Name || me?.KnoxID}
             </Typography>
           </Box>
         </Box>
@@ -333,137 +206,66 @@ export function BoardPage() {
           <WorkflowHeader
             workflow={workflow}
             orphanCount={orphanCount}
-            canEdit={isOwner}
-            onOpenHld={() => st.getState().setHldDlg(true, null)}
+            canEdit={canEdit}
+            departmentOptions={project?.departments ?? []}
+            recipientFilter={recipientFilter}
+            onChangeRecipientFilter={setRecipientFilter}
             onOpenSettings={() => {
-              setDetailsErr(null); setPhasesErr(null);
-              st.getState().setWorkflowSettingsTab(isOwner ? 'details' : 'permissions');
+              setSaveErr(null); setPhasesErr(null);
+              st.getState().setWorkflowSettingsTab('details');
             }}
           />
-          {!isOwner && !(hlds?.length ?? 0) && (
-            <Box
-              sx={{
-                display: 'flex', alignItems: 'center', gap: '9px', fontSize: 12.5, color: T.dm,
-                background: T.sf2, borderBottom: `1px solid ${T.ln}`, padding: '9px 22px',
-              }}
-            >
-              This workflow has no HLD Release yet — view-only access shows the latest release
-              snapshot, so there is nothing to display until its owners publish one.
-            </Box>
-          )}
+
           <Canvas
             workflow={workflow}
             phases={phaseList}
-            canEdit={isOwner}
-            onOpenIncoming={(id) => st.getState().setIncomingId(id)}
-            workflowDirectory={workflowDirectory ?? []}
+            canEdit={canEdit}
+            recipientFilter={recipientFilter}
             onSaveLayout={saveLayout}
             onCancelEdit={handleCancelEdit}
           />
 
-          {openNode && (
-            <DeliverableDialog
-              node={openNode}
-              phases={phaseList}
-              own={isOwner}
+          {openBlock && (
+            <ArtifactSlide
+              block={openBlock}
+              own={canEdit}
               project={project}
-              onClose={closeDeliverable}
-              onSaveInfo={({ name, artifactKey, serviceKey, externalArtifactId, artifactTypeKey }) => {
-                updateDeliverable.mutate(
+              onClose={closeSlide}
+              saving={replaceRecipients.isPending || replaceArtifactAccess.isPending}
+              onSaveBlockRecipients={(p) =>
+                replaceRecipients.mutate(
+                  { blockId: openBlock.id, ...p },
                   {
-                    id: openNode.id, name, artifactKey: artifactKey ?? '',
-                    serviceKey: serviceKey ?? '', externalArtifactId: externalArtifactId ?? '',
-                    artifactTypeKey: artifactTypeKey ?? '',
+                    onSuccess: () => toast('Recipients saved'),
+                    onError: (e: any) => toast(e?.response?.data?.message ?? 'Failed to save recipients'),
                   },
+                )
+              }
+              onSaveArtifactAccess={(p) => {
+                if (!openBlock.artifactId) return;
+                replaceArtifactAccess.mutate(
+                  { artifactId: openBlock.artifactId, ...p },
                   {
-                    onSuccess: (updated) => {
-                      mergeDeliverableResults([updated], phaseList);
-                      closeDeliverable();
-                      toast('Saved');
-                    },
-                    onError: (e: any) => toast(e?.response?.data?.message ?? 'Save failed'),
+                    onSuccess: () => toast('Access saved'),
+                    onError: (e: any) => toast(e?.response?.data?.message ?? 'Failed to save access'),
                   },
                 );
               }}
-              onAssertVersion={({ versionLabel, note, isReleased }) =>
-                assertVersion.mutate(
-                  { id: openNode.id, versionLabel, note, isReleased, tier: 'C' },
-                  {
-                    // useDeliverables 쿼리는 편집 중엔 disabled라, 응답을 직접 store에
-                    // 병합해야 방금 기록한 버전이 트리와 캔버스 배지에 바로 반영된다.
-                    onSuccess: (updated) => {
-                      mergeDeliverableResults([updated], phaseList);
-                      toast(isReleased ? 'Version released' : 'Working version recorded');
-                    },
-                    onError: (e: any) => toast(e?.response?.data?.message ?? 'Failed to record version'),
-                  },
-                )
+              onDelete={
+                canEdit
+                  ? () =>
+                      deleteBlock.mutate(openBlock.id, {
+                        onSuccess: () => {
+                          const s = st.getState();
+                          s.setNodes(s.nodes.filter((n) => n.id !== openBlock.id));
+                          s.setEdges(s.edges.filter((e) => e.from !== openBlock.id && e.to !== openBlock.id));
+                          closeSlide();
+                          toast('Removed from canvas');
+                        },
+                        onError: () => toast('Failed to remove'),
+                      })
+                  : undefined
               }
-              onRelease={(note) =>
-                release.mutate(
-                  { id: openNode.id, note },
-                  {
-                    onSuccess: (updated) => {
-                      mergeDeliverableResults([updated], phaseList);
-                      toast('Released');
-                    },
-                    onError: (e: any) => toast(e?.response?.data?.message ?? 'Release failed'),
-                  },
-                )
-              }
-              onSaveRecv={({ recvDept, recvContact }) =>
-                updateRecv.mutate(
-                  { id: openNode.id, recvDept, recvContact },
-                  {
-                    // useDeliverables 쿼리는 편집 중엔 disabled라, 응답을 직접 store에
-                    // 병합하지 않으면 "받은 산출물" 캔버스 배지(보라색 표시)가 편집을
-                    // 끝내기 전까지 안 나타난다 — 방금 추가한 걸 저장해도 구별이 안 되는
-                    // 버그였다.
-                    onSuccess: (updated) => {
-                      mergeDeliverableResults([updated], phaseList);
-                      toast('Handoff info saved');
-                    },
-                    onError: () => toast('Failed to save recipient department'),
-                  },
-                )
-              }
-              onDelete={() => {
-                deleteDeliverable.mutate(openNode.id, {
-                  onSuccess: () => {
-                    const s = st.getState();
-                    s.setNodes(s.nodes.filter((n) => n.id !== openNode.id));
-                    s.setEdges(s.edges.filter((e) => e.from !== openNode.id && e.to !== openNode.id));
-                    closeDeliverable();
-                    toast('Artifact deleted');
-                  },
-                  onError: () => toast('Failed to delete artifact'),
-                });
-              }}
-            />
-          )}
-
-          {incomingNode && (
-            <IncomingDeliverableDialog
-              d={incomingNode}
-              onClose={() => st.getState().setIncomingId(null)}
-            />
-          )}
-
-          {hldDlg && (
-            <HldReleaseDialog
-              workflowName={workflow.name}
-              releases={hlds ?? []}
-              nodes={nodes}
-              phases={phaseList}
-              selectedId={hldSel}
-              onSelect={(id) => st.getState().setHldSel(id)}
-              onClose={() => st.getState().setHldDlg(false)}
-              onOpenRow={(id) => {
-                const s = st.getState();
-                s.setHldDlg(false, s.hldSel);
-                s.setHldBack(true);
-                s.openDeliverable(id);
-              }}
             />
           )}
 
@@ -483,35 +285,43 @@ export function BoardPage() {
           {workflowSettingsTab && (
             <WorkflowSettingsDialog
               workflow={workflow}
-              own={!!isOwner}
+              own={canEdit}
               initialTab={workflowSettingsTab}
               milestones={milestones ?? []}
               orphanCount={orphanCount}
               onClose={() => st.getState().setWorkflowSettingsTab(null)}
-              onSaveDetails={({ name, description }) => {
-                setDetailsErr(null);
-                updateWorkflow.mutate({ name, description }, {
-                  onError: (e: any) => setDetailsErr(e?.response?.data?.message ?? 'Failed to save'),
-                });
-              }}
-              savingDetails={updateWorkflow.isPending}
-              detailsError={detailsErr}
               myDepartments={myDepartments}
-              onChangeDomain={(domain) => {
-                updateDomain.mutate(
-                  { workflowId: workflowId ?? '', domain },
+              departmentOptions={project?.departments ?? []}
+              onSave={({ name, description, department }) => {
+                setSaveErr(null);
+                updateWorkflow.mutate(
+                  { name, description, department },
                   {
-                    onSuccess: () => toast(domain ? `Assigned to ${domain}` : 'Domain cleared'),
-                    onError: (e: any) => toast(e?.response?.data?.message ?? 'Failed to reassign department'),
+                    onSuccess: (updated) => {
+                      toast(
+                        updated.department !== workflow.department
+                          ? `Moved to ${updated.department}`
+                          : 'Saved',
+                      );
+                    },
+                    onError: (e: any) => setSaveErr(e?.response?.data?.message ?? 'Failed to save'),
                   },
                 );
               }}
-              changingDomain={updateDomain.isPending}
+              saving={updateWorkflow.isPending}
+              saveError={saveErr}
+              onSaveAccess={(p) =>
+                replaceAccess.mutate(p, {
+                  onSuccess: () => toast('Permissions saved'),
+                  onError: (e: any) => toast(e?.response?.data?.message ?? 'Failed to save permissions'),
+                })
+              }
+              savingAccess={replaceAccess.isPending}
               onSavePhases={(next) => {
                 setPhasesErr(null);
                 updatePhases.mutate(next, {
                   onSuccess: (updated) => {
-                    // 레인 폭은 phase id 기준이라, 없어진 phase의 폭이 남아 있어도 무해하다.
+                    // 레인 폭은 phase id 기준이라 없어진 phase의 폭이 남아 있어도 무해하다.
                     // 대신 유실이 새로 생겼는지 바로 알려 준다.
                     const lost = countOrphans(st.getState().nodes, updated.phases);
                     toast(
@@ -525,18 +335,6 @@ export function BoardPage() {
               }}
               savingPhases={updatePhases.isPending}
               phasesError={phasesErr}
-              onAddOwner={(knoxId, department) =>
-                addOwner.mutate({ knoxId, department }, {
-                  onSuccess: () => toast('Edit access added'),
-                  onError: (e: any) =>
-                    toast(e?.response?.data?.message ?? 'Failed to add'),
-                })
-              }
-              onRemoveOwner={(knoxId) => removeOwner.mutate(knoxId)}
-              onAddViewGrant={(knoxId, department) =>
-                addViewGrant.mutate({ knoxId, department }, { onSuccess: () => toast('View access added') })
-              }
-              onRemoveViewGrant={(knoxId) => removeViewGrant.mutate(knoxId)}
             />
           )}
 
@@ -548,28 +346,22 @@ export function BoardPage() {
               projectRevision={project?.revision}
               projectId={projectId}
               myDepartments={myDepartments}
-              intent={addDlgIntent}
               onClose={() => st.getState().setAddDlg(false)}
-              onCreate={({ name, phaseId, artifactKey, serviceKey, externalArtifactId, artifactTypeKey }) => {
-                const wasReceived = addDlgIntent === 'received';
-                const intent = wasReceived ? 'received' : 'own';
-                createDeliverable.mutate(
-                  { name, phaseId, intent, artifactKey, serviceKey, externalArtifactId, artifactTypeKey },
+              onCreate={({ name, phaseId }) => {
+                createBlock.mutate(
+                  { name, phaseId, layout: { x: 0, y: 0, w: 295, h: 160 } },
                   {
                     onSuccess: (created) => {
                       const s = st.getState();
                       const fresh = toCanvasNode(created);
                       placeInLane(fresh, phaseList, s.phasePW);
                       s.setNodes([...s.nodes, fresh]);
-                      st.getState().setAddDlg(false);
+                      s.setAddDlg(false);
                       // 이번 편집 세션 중 새로 생겼다고 기록 — Cancel 시 실제로 삭제해야
-                      // "추가를 취소"한 게 된다(canvasStore.sessionAddedDeliverableIds).
-                      st.getState().trackAddedDeliverable(created.id);
-                      // "받아야 할 산출물"로 추가한 경우, 바로 상세를 열어 기본 정보를 채우도록
-                      // 유도한다 — 전달(Handoff) 탭은 이제 없으므로 개요 탭으로 연다.
-                      if (wasReceived) st.getState().openDeliverable(fresh.id);
-                      else st.getState().setFocusReq(fresh.id);
-                      toast('Deliverable added');
+                      // "추가를 취소"한 게 된다.
+                      s.trackAddedDeliverable(created.id);
+                      s.setFocusReq(fresh.id);
+                      toast('Artifact added');
                     },
                     onError: (e: any) => toast(e?.response?.data?.message ?? 'Failed to add'),
                   },

@@ -1,36 +1,49 @@
-import { Box, Chip, Stack, Tooltip, Typography } from '@mui/material';
+import { useState } from 'react';
+import { Box, Chip, Menu, MenuItem, Stack, Tooltip, Typography } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import { WorkflowDto } from '@/types/domain';
 import { SirenButton } from '@/components/common/SirenButton';
 import { Icon } from '@/components/common/Icon';
-import { T } from '@/theme/tokens';
+import { CURSOR_POINTER, R, T } from '@/theme/tokens';
 
 interface WorkflowHeaderProps {
   workflow: WorkflowDto;
   /** 이 workflow에서 일정을 잃은 산출물 수 — 0보다 크면 헤더에 경고 chip이 붙는다. */
   orphanCount: number;
-  /** Edit 권한(canEditWorkflow) — 있어야 설정(연필)·HLD Release 버튼이 보인다(사용자 요청). */
+  /** Edit 권한 — 있어야 설정(연필)·Release 버튼이 보인다. */
   canEdit: boolean;
-  onOpenHld: () => void;
+  /** 수신 부서 필터 후보 — 그 과제에 등록된 부서. */
+  departmentOptions: string[];
+  recipientFilter: string[];
+  onChangeRecipientFilter: (next: string[]) => void;
   /** Workflow settings(Details/Schedule/Permissions 탭) 열기. */
   onOpenSettings: () => void;
+  /** Release 다이얼로그 열기 — TODO(Phase 8)에서 연결한다. */
+  onOpenRelease?: () => void;
 }
 
-/** Workflow settings 아이콘 버튼 크기 — 이전 크기(26px, shield 13px의 2배)의 3/4. */
 const ICON_BUTTON_SIZE = 19.5;
 
 /**
- * workflow명, 설정(연필) 아이콘 버튼(workflow명 옆), HLD 버튼.
+ * workflow명 · 소속 부서 · 수신 부서 필터 · 설정 · Release.
  *
- * 예전에는 일정 편집·권한 관리 아이콘 버튼이 따로 있었지만(사용자 요청으로 통합),
- * 지금은 이 연필 버튼 하나가 WorkflowSettingsDialog를 열고 그 안에서 탭으로 갈라진다 —
- * 일정 편집이 여기 딸린 이유는 그대로다: phase는 이제 workflow가 소유한 데이터라
- * 과제 화면이 아니라 이 workflow의 보드가 제자리다.
+ * ★ 캔버스 편집 중에는 여기(app bar 아래)의 액션이 전부 잠긴다 — 그 처리는 Canvas가
+ *   편집 상태를 알고 있으므로 상위에서 내려주는 게 아니라, 편집 중 이 헤더 자체를
+ *   비활성 컨테이너로 감싸는 방식으로 한다(설계서 03장 §4.3).
  */
 export function WorkflowHeader({
-  workflow, orphanCount, canEdit, onOpenHld, onOpenSettings,
+  workflow, orphanCount, canEdit, departmentOptions, recipientFilter,
+  onChangeRecipientFilter, onOpenSettings, onOpenRelease,
 }: WorkflowHeaderProps) {
   const { t } = useTranslation();
+  const [filterAnchor, setFilterAnchor] = useState<HTMLElement | null>(null);
+
+  const toggle = (dep: string) =>
+    onChangeRecipientFilter(
+      recipientFilter.includes(dep)
+        ? recipientFilter.filter((d) => d !== dep)
+        : [...recipientFilter, dep],
+    );
 
   return (
     <Stack
@@ -43,9 +56,21 @@ export function WorkflowHeader({
 
       <Stack direction="row" alignItems="center" spacing={0.5} sx={{ flex: 1, minWidth: 0 }}>
         <Box sx={{ minWidth: 0, mr: 1 }}>
-          <Typography variant="subtitle1" fontWeight={700} noWrap>
-            {workflow.name}
-          </Typography>
+          <Stack direction="row" alignItems="center" spacing={0.75}>
+            <Typography variant="subtitle1" fontWeight={700} noWrap>
+              {workflow.name}
+            </Typography>
+            {/* 소속 부서는 권한의 근거라 이름 옆에 항상 보인다. */}
+            <Box
+              sx={{
+                fontSize: 10.5, fontWeight: 700, letterSpacing: '0.03em',
+                color: T.pr, background: T.prSoft, border: `1px solid ${T.prLine}`,
+                padding: '1px 7px', borderRadius: `${R.pill}px`, flexShrink: 0,
+              }}
+            >
+              {workflow.department}
+            </Box>
+          </Stack>
           <Typography variant="caption" color="text.secondary" noWrap>
             {workflow.description}
           </Typography>
@@ -53,7 +78,12 @@ export function WorkflowHeader({
 
         {canEdit && (
           <Tooltip title={t('workflow.settings')}>
-            <SirenButton variant="ghost" onClick={onOpenSettings} sx={{ padding: '6px 8px' }} aria-label={t('workflow.settings')}>
+            <SirenButton
+              variant="ghost"
+              onClick={onOpenSettings}
+              sx={{ padding: '6px 8px' }}
+              aria-label={t('workflow.settings')}
+            >
               <Icon name="edit" size={ICON_BUTTON_SIZE} />
             </SirenButton>
           </Tooltip>
@@ -71,9 +101,49 @@ export function WorkflowHeader({
         />
       )}
 
-      {canEdit && (
-        <SirenButton onClick={onOpenHld}>
-          <Icon name="grid" /> HLD Release
+      {/* 수신 부서 필터 — 고른 부서가 받는 산출물만 남기고 나머지는 흐려진다. */}
+      {departmentOptions.length > 0 && (
+        <>
+          <SirenButton
+            variant={recipientFilter.length ? 'primary' : 'ghost'}
+            onClick={(e) => setFilterAnchor(e.currentTarget as HTMLElement)}
+          >
+            <Icon name="list" />
+            {recipientFilter.length
+              ? `${t('canvas.recipientFilter')} · ${recipientFilter.length}`
+              : t('canvas.allDepartments')}
+          </SirenButton>
+          <Menu
+            anchorEl={filterAnchor}
+            open={Boolean(filterAnchor)}
+            onClose={() => setFilterAnchor(null)}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+            transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+          >
+            <MenuItem
+              onClick={() => { onChangeRecipientFilter([]); setFilterAnchor(null); }}
+              sx={{ fontSize: 13, fontWeight: recipientFilter.length ? 400 : 700 }}
+            >
+              {t('canvas.allDepartments')}
+            </MenuItem>
+            {departmentOptions.map((dep) => {
+              const on = recipientFilter.includes(dep);
+              return (
+                <MenuItem key={dep} onClick={() => toggle(dep)} sx={{ fontSize: 13, gap: '8px' }}>
+                  <Box sx={{ width: 14, display: 'inline-flex', color: on ? T.pr : 'transparent' }}>
+                    <Icon name="check" />
+                  </Box>
+                  {dep}
+                </MenuItem>
+              );
+            })}
+          </Menu>
+        </>
+      )}
+
+      {canEdit && onOpenRelease && (
+        <SirenButton variant="primary" onClick={onOpenRelease}>
+          <Icon name="send" /> {t('release.title')}
         </SirenButton>
       )}
     </Stack>
