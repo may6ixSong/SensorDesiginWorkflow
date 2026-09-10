@@ -72,7 +72,7 @@ export function VersionTree({ versions, selected, onSelect }: Props) {
                 <Box
                   sx={{
                     position: 'absolute', left: TRUNK_X, top: NODE_Y - 1,
-                    width: BRANCH_X - TRUNK_X, height: 2, background: T.am3,
+                    width: BRANCH_X - TRUNK_X, height: 2, background: T.warnLine,
                   }}
                 />
               )}
@@ -86,9 +86,9 @@ export function VersionTree({ versions, selected, onSelect }: Props) {
                   width: v.isReleased ? 14 : 10,
                   height: v.isReleased ? 14 : 10,
                   borderRadius: '50%',
-                  background: v.isReleased ? T.tl : T.sf,
-                  border: `2px solid ${v.isReleased ? T.tl : T.am3}`,
-                  boxShadow: isSel ? `0 0 0 4px ${v.isReleased ? T.tl2 : T.am2}` : 'none',
+                  background: v.isReleased ? T.pr : T.sf,
+                  border: `2px solid ${v.isReleased ? T.pr : T.warnLine}`,
+                  boxShadow: isSel ? `0 0 0 4px ${v.isReleased ? T.prSoft : T.warnSoft}` : 'none',
                   cursor: onSelect ? CURSOR_POINTER : 'default',
                   transition: 'box-shadow .15s',
                 }}
@@ -100,34 +100,34 @@ export function VersionTree({ versions, selected, onSelect }: Props) {
               onClick={() => onSelect?.(v)}
               sx={{
                 flex: 1, minWidth: 0, mb: '8px',
-                background: isSel ? (v.isReleased ? T.tl2 : T.am2) : T.sf,
-                border: `1px solid ${isSel ? (v.isReleased ? T.tl3 : T.am3) : T.ln}`,
+                background: isSel ? (v.isReleased ? T.prSoft : T.warnSoft) : T.sf,
+                border: `1px solid ${isSel ? (v.isReleased ? T.prLine : T.warnLine) : T.ln}`,
                 borderRadius: '9px', padding: '8px 11px 9px',
                 cursor: onSelect ? CURSOR_POINTER : 'default',
                 transition: 'background .15s, border-color .15s',
-                '&:hover': onSelect ? { borderColor: v.isReleased ? T.tl3 : T.am3 } : {},
+                '&:hover': onSelect ? { borderColor: v.isReleased ? T.prLine : T.warnLine } : {},
               }}
             >
               <Box sx={{ display: 'flex', alignItems: 'center', gap: '7px', flexWrap: 'wrap' }}>
                 <Box
                   sx={{
                     fontFamily: FONT_MONO, fontSize: 13, fontWeight: 600,
-                    color: v.isReleased ? T.tl : T.am,
+                    color: v.isReleased ? T.pr : T.warn,
                   }}
                 >
                   {v.versionLabel}
                 </Box>
                 <Badge
-                  color={v.isReleased ? T.tl : T.am}
-                  bg={v.isReleased ? T.tl2 : T.am2}
-                  borderColor={v.isReleased ? T.tl3 : T.am3}
+                  color={v.isReleased ? T.pr : T.warn}
+                  bg={v.isReleased ? T.prSoft : T.warnSoft}
+                  borderColor={v.isReleased ? T.prLine : T.warnLine}
                 >
                   {v.isReleased ? 'RELEASE' : 'WORKING'}
                 </Badge>
                 <Badge color={T.dm} bg={T.sf2} borderColor={T.ln}>
                   {v.tier}·{v.confidence}
                 </Badge>
-                {first && <Badge color={T.vi} bg={T.vi2} borderColor={T.vi3}>LATEST</Badge>}
+                {first && <Badge color={T.pr} bg={T.prSoft} borderColor={T.prLine}>LATEST</Badge>}
               </Box>
 
               {v.note && (

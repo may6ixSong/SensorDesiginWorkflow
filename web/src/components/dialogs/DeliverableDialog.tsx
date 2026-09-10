@@ -254,7 +254,7 @@ export function DeliverableDialog({
       onClose={onClose}
       header={
         <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: '11px' }}>
-          <Box component="span" sx={{ color: d.serviceKey ? T.tl : T.bl, mt: '4px' }}>
+          <Box component="span" sx={{ color: d.serviceKey ? T.pr : T.info, mt: '4px' }}>
             <Icon name={d.serviceKey ? 'link' : 'word'} size={18} />
           </Box>
           <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -262,10 +262,10 @@ export function DeliverableDialog({
             <Box sx={{ fontSize: 19, fontWeight: 700, mt: '3px', letterSpacing: '-.015em' }}>{d.name}</Box>
           </Box>
           <Box sx={{ display: 'flex', gap: '5px', mt: '5px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-            {orphan && <Badge color={T.rd} bg={T.rd2} borderColor={T.rd3}>Schedule lost</Badge>}
+            {orphan && <Badge color={T.danger} bg={T.dangerSoft} borderColor={T.dangerLine}>Schedule lost</Badge>}
             <Badge color={st.c} bg={st.bg} borderColor={st.bd}>{st.lb}</Badge>
             {d.serviceKey ? (
-              <Badge color={T.tl} bg={T.tl2} borderColor={T.tl3}>
+              <Badge color={T.pr} bg={T.prSoft} borderColor={T.prLine}>
                 {d.serviceKey === 'calypso' ? 'FILES' : d.serviceKey.toUpperCase()}
               </Badge>
             ) : (
@@ -279,7 +279,7 @@ export function DeliverableDialog({
           <SirenButton
             variant="ghost"
             onClick={() => setConfirmDeleteOpen(true)}
-            sx={{ color: T.rd, borderColor: T.rd3 }}
+            sx={{ color: T.danger, borderColor: T.dangerLine }}
           >
             <Icon name="trash" /> {DELETE_LABEL}
           </SirenButton>
@@ -374,8 +374,8 @@ export function DeliverableDialog({
                 onClick={() => setBTab(key)}
                 sx={{
                   padding: '8px 12px', fontSize: 12.5, fontWeight: 500, fontFamily: 'inherit',
-                  color: bTab === key ? T.tl : T.dm, background: 'none', border: 'none',
-                  borderBottom: `2px solid ${bTab === key ? T.tl : 'transparent'}`,
+                  color: bTab === key ? T.pr : T.dm, background: 'none', border: 'none',
+                  borderBottom: `2px solid ${bTab === key ? T.pr : 'transparent'}`,
                   mb: '-1px', cursor: CURSOR_POINTER,
                 }}
               >
@@ -495,7 +495,7 @@ function RecordVersionCard({
           <TextInput value={vNote} onChange={setVNote} placeholder="What changed in this version" />
         </Field>
       </Row>
-      {vErr && <Box sx={{ fontSize: 11, color: T.rd, margin: '-5px 0 9px' }}>{vErr}</Box>}
+      {vErr && <Box sx={{ fontSize: 11, color: T.danger, margin: '-5px 0 9px' }}>{vErr}</Box>}
       <Box sx={{ display: 'flex', gap: '7px', flexWrap: 'wrap' }}>
         <SirenButton onClick={() => submitVersion(false)}>
           <Icon name="up" /> Save working
@@ -508,7 +508,7 @@ function RecordVersionCard({
         <Box sx={{ mt: '10px', paddingTop: '10px', borderTop: `1px solid ${T.ln}` }}>
           <SirenButton
             onClick={() => { onRelease(vNote.trim()); setVNote(''); }}
-            sx={{ color: T.tl, borderColor: T.tl3 }}
+            sx={{ color: T.pr, borderColor: T.prLine }}
           >
             <Icon name="send" /> Release {vstr(latest)} as-is
           </SirenButton>
@@ -543,13 +543,13 @@ function ExternalVersionContents({
   }
 
   const by = v.giverKnoxId ? resolveUser(v.giverKnoxId) : null;
-  const accent = v.isReleased ? T.tl : T.am;
+  const accent = v.isReleased ? T.pr : T.warn;
 
   return (
     <Box
       sx={{
         background: T.sf, border: `1px solid ${T.ln}`, borderRadius: '12px',
-        boxShadow: T.sl, overflow: 'hidden', display: 'flex', flexDirection: 'column',
+        boxShadow: T.shLg, overflow: 'hidden', display: 'flex', flexDirection: 'column',
       }}
     >
       <Box sx={{ height: 4, background: accent, flex: '0 0 auto' }} />
@@ -558,7 +558,7 @@ function ExternalVersionContents({
           <Box sx={{ fontFamily: FONT_MONO, fontSize: 26, fontWeight: 600, color: accent, lineHeight: 1 }}>
             {v.versionLabel}
           </Box>
-          <Badge color={accent} bg={v.isReleased ? T.tl2 : T.am2} borderColor={v.isReleased ? T.tl3 : T.am3}>
+          <Badge color={accent} bg={v.isReleased ? T.prSoft : T.warnSoft} borderColor={v.isReleased ? T.prLine : T.warnLine}>
             {v.isReleased ? 'RELEASE' : 'WORKING'}
           </Badge>
           {!canEdit && <Badge color={T.dm} bg={T.sf2} borderColor={T.ln}>View only</Badge>}
@@ -654,20 +654,20 @@ function ExternalVersionList({
             key={`${v.versionLabel}-${i}`}
             onClick={() => onSelect(v)}
             sx={{
-              mb: '8px', background: isSel ? (v.isReleased ? T.tl2 : T.am2) : T.sf,
-              border: `1px solid ${isSel ? (v.isReleased ? T.tl3 : T.am3) : T.ln}`,
+              mb: '8px', background: isSel ? (v.isReleased ? T.prSoft : T.warnSoft) : T.sf,
+              border: `1px solid ${isSel ? (v.isReleased ? T.prLine : T.warnLine) : T.ln}`,
               borderRadius: '9px', padding: '8px 11px 9px', cursor: CURSOR_POINTER,
               transition: 'background .15s, border-color .15s',
             }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', gap: '7px', flexWrap: 'wrap' }}>
-              <Box sx={{ fontFamily: FONT_MONO, fontSize: 13, fontWeight: 600, color: v.isReleased ? T.tl : T.am }}>
+              <Box sx={{ fontFamily: FONT_MONO, fontSize: 13, fontWeight: 600, color: v.isReleased ? T.pr : T.warn }}>
                 {v.versionLabel}
               </Box>
-              <Badge color={v.isReleased ? T.tl : T.am} bg={v.isReleased ? T.tl2 : T.am2} borderColor={v.isReleased ? T.tl3 : T.am3}>
+              <Badge color={v.isReleased ? T.pr : T.warn} bg={v.isReleased ? T.prSoft : T.warnSoft} borderColor={v.isReleased ? T.prLine : T.warnLine}>
                 {v.isReleased ? 'RELEASE' : 'WORKING'}
               </Badge>
-              {i === 0 && <Badge color={T.vi} bg={T.vi2} borderColor={T.vi3}>LATEST</Badge>}
+              {i === 0 && <Badge color={T.pr} bg={T.prSoft} borderColor={T.prLine}>LATEST</Badge>}
             </Box>
             <Box sx={{ fontFamily: FONT_MONO, fontSize: 10, color: T.dm2, mt: '5px' }}>
               {v.giverKnoxId ?? '—'} · {v.observedAt ? fmtAt(v.observedAt) : '—'}
@@ -687,7 +687,7 @@ function ExternalVersionSummary({ versions, canEdit }: { versions: LiveVersionRe
     <Row>
       <Card sx={{ flex: 1, minWidth: 0 }}>
         <Ey>Recipient sees</Ey>
-        <Box sx={{ fontFamily: FONT_MONO, fontSize: 17, fontWeight: 600, color: T.tl, mt: '5px' }}>
+        <Box sx={{ fontFamily: FONT_MONO, fontSize: 17, fontWeight: 600, color: T.pr, mt: '5px' }}>
           {released ? released.versionLabel : '—'}
         </Box>
         <Box sx={{ fontSize: 10, color: T.dm2, mt: '3px' }}>
@@ -696,7 +696,7 @@ function ExternalVersionSummary({ versions, canEdit }: { versions: LiveVersionRe
       </Card>
       <Card sx={{ flex: 1, minWidth: 0, opacity: canEdit ? 1 : 0.5 }}>
         <Ey>Working copy</Ey>
-        <Box sx={{ fontFamily: FONT_MONO, fontSize: 17, fontWeight: 600, color: T.am, mt: '5px', display: 'flex', alignItems: 'center' }}>
+        <Box sx={{ fontFamily: FONT_MONO, fontSize: 17, fontWeight: 600, color: T.warn, mt: '5px', display: 'flex', alignItems: 'center' }}>
           {canEdit ? (working ? working.versionLabel : 'None') : <Icon name="lock" />}
         </Box>
         <Box sx={{ fontSize: 10, color: T.dm2, mt: '3px' }}>
@@ -754,14 +754,14 @@ function VersionSummary({
     <Row>
       <Card sx={{ flex: 1, minWidth: 0 }}>
         <Ey>Recipient sees</Ey>
-        <Box sx={{ fontFamily: FONT_MONO, fontSize: 17, fontWeight: 600, color: T.tl, mt: '5px' }}>
+        <Box sx={{ fontFamily: FONT_MONO, fontSize: 17, fontWeight: 600, color: T.pr, mt: '5px' }}>
           {relLabel ?? '—'}
         </Box>
         <Box sx={{ fontSize: 10, color: T.dm2, mt: '3px' }}>{relAt ?? 'No release yet'}</Box>
       </Card>
       <Card sx={{ flex: 1, minWidth: 0, opacity: own ? 1 : 0.5 }}>
         <Ey>Working copy</Ey>
-        <Box sx={{ fontFamily: FONT_MONO, fontSize: 17, fontWeight: 600, color: T.am, mt: '5px', display: 'flex', alignItems: 'center' }}>
+        <Box sx={{ fontFamily: FONT_MONO, fontSize: 17, fontWeight: 600, color: T.warn, mt: '5px', display: 'flex', alignItems: 'center' }}>
           {own ? (workLabel ?? 'None') : <Icon name="lock" />}
         </Box>
         <Box sx={{ fontSize: 10, color: T.dm2, mt: '3px' }}>
@@ -868,10 +868,10 @@ function BasicInfoCard({
               sx={{
                 flex: 1, fontSize: 11.5, fontWeight: 600, padding: '7px 8px',
                 borderRadius: '7px', transition: '.14s', cursor: CURSOR_POINTER,
-                background: sourceMode === m ? T.tl2 : T.sf,
-                border: `1px solid ${sourceMode === m ? T.tl : T.ln2}`,
-                color: sourceMode === m ? T.tl : T.dm,
-                '&:hover': { background: sourceMode === m ? T.tl2 : T.sf3 },
+                background: sourceMode === m ? T.prSoft : T.sf,
+                border: `1px solid ${sourceMode === m ? T.pr : T.ln2}`,
+                color: sourceMode === m ? T.pr : T.dm,
+                '&:hover': { background: sourceMode === m ? T.prSoft : T.sf3 },
               }}
             >
               {label}
@@ -911,7 +911,7 @@ function BasicInfoCard({
                 ]}
               />
               {typeErr && (
-                <Box sx={{ fontSize: 11, color: T.rd, mt: '5px' }}>
+                <Box sx={{ fontSize: 11, color: T.danger, mt: '5px' }}>
                   {selectedService?.name} provides more than one artifact type — pick one.
                 </Box>
               )}
@@ -949,8 +949,8 @@ function BasicInfoCard({
         {orphan && (
           <Box
             sx={{
-              display: 'flex', alignItems: 'flex-start', gap: '7px', fontSize: 11.5, color: T.rd,
-              background: T.rd2, border: `1px solid ${T.rd3}`, borderRadius: '8px',
+              display: 'flex', alignItems: 'flex-start', gap: '7px', fontSize: 11.5, color: T.danger,
+              background: T.dangerSoft, border: `1px solid ${T.dangerLine}`, borderRadius: '8px',
               padding: '8px 10px', mb: '8px', lineHeight: 1.6,
             }}
           >
@@ -966,16 +966,16 @@ function BasicInfoCard({
               sx={{
                 fontFamily: FONT_MONO, fontSize: 10.5, fontWeight: 600, padding: '4px 9px',
                 borderRadius: '7px', cursor: 'default',
-                background: relatedPhases.has(p.id) ? T.tl2 : T.sf,
-                border: `1px solid ${relatedPhases.has(p.id) ? T.tl : T.ln2}`,
-                color: relatedPhases.has(p.id) ? T.tl : T.dm2,
+                background: relatedPhases.has(p.id) ? T.prSoft : T.sf,
+                border: `1px solid ${relatedPhases.has(p.id) ? T.pr : T.ln2}`,
+                color: relatedPhases.has(p.id) ? T.pr : T.dm2,
               }}
             >
               {p.name}
             </Box>
           ))}
           {!phases.length && (
-            <Box sx={{ fontSize: 12, color: T.rd }}>
+            <Box sx={{ fontSize: 12, color: T.danger }}>
               This workflow has no phases — add a schedule first.
             </Box>
           )}
@@ -1005,7 +1005,7 @@ function FlowLinksCard({
           {dir === 'out' ? '→ Next' : '← Prev'}
         </Box>
         <Box sx={{ flex: 1, minWidth: 0, fontSize: 12.5 }}>{other.name}</Box>
-        <Box component="span" sx={{ fontFamily: FONT_MONO, fontSize: 10, color: op ? T.dm2 : T.rd }}>
+        <Box component="span" sx={{ fontFamily: FONT_MONO, fontSize: 10, color: op ? T.dm2 : T.danger }}>
           {op?.name ?? 'no schedule'}
         </Box>
       </Box>

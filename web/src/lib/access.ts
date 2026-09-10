@@ -1,39 +1,82 @@
 /**
- * workflow 편집 권한 판정 (2026-08-25 결정).
+ * FE 권한 판정 (설계서 01장).
  *
- * api는 workflow 접근을 차단하지 않는다 - 과제의 모든 IP를 내려주고, 그 중 무엇을 보여주고
- * 무엇을 편집 가능하게 할지는 web이 정한다. api가 주는 myAccess는 순수하게
- * "내가 이 IP의 owner인가"이므로, 여기서 Admin(Group === 'Admin') super 권한을 얹는다.
+ * ★ 여기 있는 판정은 전부 **UX 게이트**일 뿐이다. 실제 차단은 서버가 이미 끝냈고
+ *   (WorkflowAccessGuard), 권한 없는 값은 애초에 응답에 담겨 오지도 않는다.
+ *   그래서 이 함수들이 하는 일은 "버튼을 보여줄까 말까"를 정하는 것뿐이다.
  *
- * ⚠ 서버 응답 마스킹은 그대로 유지된다 - Admin이라도 owner가 아닌 IP의 작업중(minor)
- * 버전과 메모는 애초에 응답에 담겨오지 않는다(설계서 6.1). 즉 Admin은 "편집 UI가
- * 열린다"는 의미이고, 남이 아직 릴리즈하지 않은 파일까지 보게 되는 것은 아니다.
- *
- * isAdmin은 호출부에서 useAuth().isAdmin으로 받아 넘긴다 - 예전처럼 모듈 전역 변수를
- * 직접 읽으면 그 값이 비동기로(로그인 응답 도착 후) 바뀌어도 이미 렌더된/메모이즈된
- * 컴포넌트가 리렌더되리라는 보장이 없어, 실제 Admin이 admin으로 반영되지 않는 버그가
- * 있었다. 인자로 받으면 React가 useMemo/렌더 의존성으로 추적할 수 있다.
+ * ★ Admin은 시스템 전체 super 권한이다. 서버가 내려주는 myAccess에 이미 반영되어 있지만,
+ *   목록 화면처럼 서버 판정 없이 그리는 자리도 있어 isAdmin을 함께 받는다.
  */
+import { AccessGrant, ProjectDetailDto, WorkflowDto } from '@/types/domain';
+
+/** 그 workflow를 편집할 수 있는가 — 캔버스 편집, 설정, release 전부 이 게이트를 쓴다. */
 export const canEditWorkflow = (
-  workflow?: { myAccess: 'edit' | 'view' } | null,
+  workflow?: Pick<WorkflowDto, 'myAccess'> | null,
   isAdmin?: boolean,
 ): boolean => !!isAdmin || workflow?.myAccess === 'edit';
 
-/** 과제 안에서 편집 가능한 IP가 하나라도 있는가 (과제 정보 수정 게이트). */
-export const canManageProject = (
-  workflows?: { myAccess: 'edit' | 'view' }[] | null,
+/** 그 workflow를 열어볼 수 있는가. myAccess가 null이면 목록에 disabled로만 보인다. */
+export const canViewWorkflow = (
+  workflow?: Pick<WorkflowDto, 'myAccess'> | null,
   isAdmin?: boolean,
-): boolean => !!isAdmin || (workflows ?? []).some((workflow) => workflow.myAccess === 'edit');
+): boolean => !!isAdmin || (workflow?.myAccess ?? null) !== null;
 
 /**
- * 과제 마일스톤(공통 일정) 편집 권한 (2026-08-31 결정).
+ * "내가 이 과제에서 속한 부서" — **그 과제의 members 로스터 기준**이다(전사 소속이 아니라).
+ * 같은 사람이 과제마다 다른 부서일 수 있기 때문이다(설계서 01장 §2.4).
  *
- * 위 canManageProject(어느 workflow든 Edit 권한이 있으면 통과)와는 별개 게이트다 —
- * 마일스톤은 workflow owners가 아니라 Project.managers(Project Manager role)로 판단한다.
- * Workflow 하나의 Edit 권한자라고 해서 과제 전체의 공통 일정까지 고칠 수 있는 것은 아니다.
+ * Admin은 그 과제의 전체 부서를 가진 것으로 본다 — workflow 생성/부서 변경 dropdown이
+ * 자연스럽게 전체를 보여주게 된다.
+ */
+export function myDepartments(
+  project: Pick<ProjectDetailDto, 'members' | 'departments'> | null | undefined,
+  myKnoxId: string | undefined,
+  isAdmin?: boolean,
+): string[] {
+  if (!project) return [];
+  if (isAdmin) return [...(project.departments ?? [])];
+  return [...(project.members?.find((m) => m.knoxId === myKnoxId)?.departments ?? [])];
+}
+
+/**
+ * 과제 마일스톤(공통 일정) 편집 권한.
+ *
+ * workflow Edit Access와는 **별개 role**이다 — Manager가 아니면 편집할 수 없고, 반대로
+ * Manager라고 해서 workflow가 더 보이지도 않는다(설계서 01장 §2.3).
  */
 export const canEditMilestones = (
-  project?: { managers?: string[] } | null,
+  project?: Pick<ProjectDetailDto, 'managers'> | null,
   isAdmin?: boolean,
   myKnoxId?: string,
 ): boolean => !!isAdmin || (!!myKnoxId && !!project?.managers?.includes(myKnoxId));
+
+/**
+ * 과제 정보·부서·멤버·Manager 관리 권한 — **Admin만**(설계서 01장 §2.3, 가정 P1).
+ * 과제 코드/Revision은 Admin에게도 disabled다(생성 후 수정 불가).
+ */
+export const canManageProject = (isAdmin?: boolean): boolean => !!isAdmin;
+
+/**
+ * 이 권한 한 벌에 내가 걸리는가 — 부서 또는 개인.
+ * 부서 판정은 "내가 이 과제에서 속한 부서" 기준으로 실시간 계산한다.
+ */
+export function matchesGrant(
+  grant: AccessGrant | null | undefined,
+  myKnoxId: string | undefined,
+  myDepts: string[],
+): boolean {
+  if (!grant) return false;
+  if (myKnoxId && grant.users.includes(myKnoxId)) return true;
+  return grant.departments.some((d) => myDepts.includes(d));
+}
+
+/**
+ * workflow 소속 부서의 Edit Access 항목인가 — **삭제할 수 없는 고정 항목**이다.
+ * Admin도 지울 수 없고, 오직 Department 변경으로만 교체된다(설계서 01장 §3.4).
+ * 화면은 이 항목에 삭제 버튼을 그리지 않고 자물쇠 배지를 붙인다.
+ */
+export const isPinnedWorkflowDepartment = (
+  workflow: Pick<WorkflowDto, 'department'> | null | undefined,
+  department: string,
+): boolean => !!workflow && workflow.department === department;

@@ -61,8 +61,8 @@ export function ProjectListPage() {
               sx={{
                 display: 'flex', alignItems: 'center', gap: '7px',
                 background: T.sf, border: `1px solid ${T.ln2}`, borderRadius: '8px',
-                padding: '0 10px', height: 34, minWidth: 250, boxShadow: T.ss,
-                '&:focus-within': { borderColor: T.tl3, boxShadow: `0 0 0 3px ${T.tl2}` },
+                padding: '0 10px', height: 34, minWidth: 250, boxShadow: T.shXs,
+                '&:focus-within': { borderColor: T.prLine, boxShadow: `0 0 0 3px ${T.prSoft}` },
               }}
             >
               <Box component="span" sx={{ color: T.dm2, display: 'flex' }}>
@@ -88,9 +88,9 @@ export function ProjectListPage() {
                   onClick={() => setFilter(f)}
                   sx={{
                     fontSize: 12, padding: '6px 12px', borderRadius: '999px', cursor: CURSOR_POINTER,
-                    border: `1px solid ${filter === f ? T.tl3 : T.ln2}`,
-                    background: filter === f ? T.tl2 : T.sf,
-                    color: filter === f ? T.tl : T.dm,
+                    border: `1px solid ${filter === f ? T.prLine : T.ln2}`,
+                    background: filter === f ? T.prSoft : T.sf,
+                    color: filter === f ? T.pr : T.dm,
                     fontWeight: filter === f ? 600 : 500,
                     '&:hover': { borderColor: T.ln3 },
                   }}
@@ -102,7 +102,7 @@ export function ProjectListPage() {
 
             <Box sx={{ flex: 1 }} />
 
-            <Box sx={{ display: 'flex', background: T.sf, border: `1px solid ${T.ln2}`, borderRadius: '8px', overflow: 'hidden', boxShadow: T.ss }}>
+            <Box sx={{ display: 'flex', background: T.sf, border: `1px solid ${T.ln2}`, borderRadius: '8px', overflow: 'hidden', boxShadow: T.shXs }}>
               {(['grid', 'list'] as View[]).map((v) => (
                 <Box
                   key={v}
@@ -149,7 +149,7 @@ export function ProjectListPage() {
                   minHeight: view === 'grid' ? 190 : 62,
                   color: T.dm2, fontSize: 12.5, gap: '7px',
                   transition: 'border-color .16s, color .16s, background .16s',
-                  '&:hover': { borderColor: T.tl3, color: T.tl, background: T.tl2 },
+                  '&:hover': { borderColor: T.prLine, color: T.pr, background: T.prSoft },
                 }}
               >
                 <Icon name="plus" size={18} />
@@ -170,7 +170,11 @@ function ProjectCard({ project, view }: { project: ProjectDto; view: View }) {
   const { pct, current, done, total } = progressOf(project.milestones);
   const owners = useMemo(() => {
     const seen = new Map<string, DirectoryUser>();
-    (workflows ?? []).flatMap((i) => i.owners).forEach((knoxId) => seen.set(knoxId, resolveUser(knoxId)));
+    // Owner는 workflow마다 정확히 1명이다(설계서 01장 §3.6).
+    (workflows ?? [])
+      .map((w) => w.ownerKnoxId)
+      .filter((knoxId): knoxId is string => Boolean(knoxId))
+      .forEach((knoxId) => seen.set(knoxId, resolveUser(knoxId)));
     return [...seen.values()];
   }, [workflows, resolveUser]);
 
@@ -182,15 +186,15 @@ function ProjectCard({ project, view }: { project: ProjectDto; view: View }) {
       sx={{
         position: 'relative', cursor: CURSOR_POINTER, background: T.sf,
         border: `1px solid ${T.ln}`, borderRadius: '14px', overflow: 'hidden',
-        boxShadow: T.ss, transition: 'transform .18s cubic-bezier(.2,.8,.3,1), box-shadow .18s, border-color .18s',
+        boxShadow: T.shXs, transition: 'transform .18s cubic-bezier(.2,.8,.3,1), box-shadow .18s, border-color .18s',
         padding: row ? '14px 18px' : '18px 18px 16px',
         display: row ? 'flex' : 'block',
         alignItems: row ? 'center' : undefined,
         gap: row ? '18px' : undefined,
-        '&:hover': { transform: 'translateY(-3px)', boxShadow: T.sl, borderColor: T.ln2 },
+        '&:hover': { transform: 'translateY(-3px)', boxShadow: T.shLg, borderColor: T.ln2 },
         '&::before': {
           content: '""', position: 'absolute', left: 0, top: 0, bottom: 0, width: 2,
-          background: T.tl, opacity: 0.7,
+          background: T.pr, opacity: 0.7,
         },
       }}
     >
@@ -222,7 +226,7 @@ function ProjectCard({ project, view }: { project: ProjectDto; view: View }) {
             component="span"
             sx={{
               fontFamily: FONT_MONO, fontSize: 9, letterSpacing: '.1em', padding: '2px 7px',
-              borderRadius: '999px', background: T.tl2, color: T.tl, border: `1px solid ${T.tl3}`,
+              borderRadius: '999px', background: T.prSoft, color: T.pr, border: `1px solid ${T.prLine}`,
             }}
           >
             {project.status}
@@ -242,7 +246,7 @@ function ProjectCard({ project, view }: { project: ProjectDto; view: View }) {
             {current}
           </Box>
           <Box sx={{ flex: 1 }} />
-          <Box sx={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 600, color: T.tl }}>{pct}%</Box>
+          <Box sx={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 600, color: T.pr }}>{pct}%</Box>
           <Box sx={{ fontSize: 10, color: T.dm2 }}>
             {done}/{total} milestones
           </Box>
@@ -251,7 +255,7 @@ function ProjectCard({ project, view }: { project: ProjectDto; view: View }) {
           <Box
             sx={{
               width: `${pct}%`, height: '100%', borderRadius: 999,
-              background: T.tl,
+              background: T.pr,
               transition: 'width .5s cubic-bezier(.2,.8,.3,1)',
             }}
           />
@@ -306,7 +310,7 @@ function ProjectCard({ project, view }: { project: ProjectDto; view: View }) {
         <Box
           sx={{
             display: 'inline-flex', alignItems: 'center', gap: '5px',
-            fontSize: 11.5, fontWeight: 600, color: T.tl,
+            fontSize: 11.5, fontWeight: 600, color: T.pr,
           }}
         >
           View project <Icon name="expand" />

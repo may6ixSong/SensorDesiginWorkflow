@@ -67,7 +67,7 @@ export function WorkflowHeader({
           size="small"
           variant="outlined"
           title="Artifacts whose phase was removed from this workflow's schedule"
-          sx={{ color: T.rd, borderColor: T.rd3, background: T.rd2 }}
+          sx={{ color: T.danger, borderColor: T.dangerLine, background: T.dangerSoft }}
         />
       )}
 

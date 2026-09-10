@@ -33,7 +33,7 @@ export function ConfirmDialog({
         <Box
           sx={{
             display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: 12, lineHeight: 1.6,
-            color: T.rd, background: T.rd2, border: `1px solid ${T.rd3}`, borderRadius: '8px',
+            color: T.danger, background: T.dangerSoft, border: `1px solid ${T.dangerLine}`, borderRadius: '8px',
             padding: '9px 11px', mb: '16px',
           }}
         >
@@ -49,7 +49,7 @@ export function ConfirmDialog({
           variant={danger ? 'default' : 'primary'}
           onClick={onConfirm}
           disabled={busy}
-          sx={danger ? { background: T.rd, color: '#fff', border: '1px solid transparent' } : undefined}
+          sx={danger ? { background: T.danger, color: '#fff', border: '1px solid transparent' } : undefined}
         >
           <Icon name={danger ? 'trash' : 'check'} /> {confirmLabel}
         </SirenButton>

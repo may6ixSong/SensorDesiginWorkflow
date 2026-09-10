@@ -53,7 +53,7 @@ export function ProfileButton() {
 
   const name = (isKo ? user?.Name : user?.EnName) || user?.KnoxID || 'User';
   const dept = (isKo ? user?.Department : user?.EnDepartment) || '';
-  const badgeColor = isSimulating ? T.am : T.tx;
+  const badgeColor = isSimulating ? T.warn : T.tx;
 
   const apply = async (knoxId: string) => {
     setSearchOpen(false);
@@ -93,14 +93,14 @@ export function ProfileButton() {
         <Box
           sx={{
             width: 26, height: 26, borderRadius: '7px', display: 'grid', placeItems: 'center',
-            fontSize: 11, fontWeight: 700, color: '#fff', background: isSimulating ? T.am : T.tl, flex: '0 0 auto',
+            fontSize: 11, fontWeight: 700, color: '#fff', background: isSimulating ? T.warn : T.pr, flex: '0 0 auto',
           }}
         >
           {initials(name)}
         </Box>
         <Box sx={{ textAlign: 'left', display: { xs: 'none', sm: 'block' }, maxWidth: 140, overflow: 'hidden' }}>
           <Typography noWrap sx={{ fontSize: 12, fontWeight: 700, lineHeight: 1.1, color: badgeColor }}>{name}</Typography>
-          <Typography noWrap sx={{ fontSize: 10.5, color: isSimulating ? T.am : T.dm, lineHeight: 1.1 }}>{dept}</Typography>
+          <Typography noWrap sx={{ fontSize: 10.5, color: isSimulating ? T.warn : T.dm, lineHeight: 1.1 }}>{dept}</Typography>
         </Box>
       </Box>
 
@@ -147,10 +147,10 @@ export function ProfileButton() {
                 <Box
                   sx={{
                     mt: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    p: '9px 12px', borderRadius: '7px', border: `1px solid ${T.am2}`, background: T.am3,
+                    p: '9px 12px', borderRadius: '7px', border: `1px solid ${T.warnSoft}`, background: T.warnLine,
                   }}
                 >
-                  <Box sx={{ fontFamily: FONT_MONO, fontSize: 12, color: T.am }}>
+                  <Box sx={{ fontFamily: FONT_MONO, fontSize: 12, color: T.warn }}>
                     Viewing as {user?.KnoxID}
                   </Box>
                   <SirenButton onClick={stop}>Stop</SirenButton>

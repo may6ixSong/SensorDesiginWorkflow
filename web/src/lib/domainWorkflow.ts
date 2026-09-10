@@ -17,7 +17,7 @@ export const UNASSIGNED_DOMAIN = 'UNASSIGNED';
 
 /** IP가 속한 도메인 — BE에 domain 필드가 아직 없는 데이터도 깨지지 않게 폴백을 둔다. */
 export function domainOf(workflow: WorkflowDto): string {
-  const raw = (workflow.domain ?? '').trim();
+  const raw = (workflow.department ?? '').trim();
   return raw ? raw.toUpperCase() : UNASSIGNED_DOMAIN;
 }
 

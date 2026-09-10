@@ -35,22 +35,22 @@ export const SirenButton = forwardRef<HTMLButtonElement, Props>(function SirenBu
       background: T.sf,
       border: `1px solid ${T.ln2}`,
       color: T.tx,
-      boxShadow: T.ss,
+      boxShadow: T.shXs,
       '&:hover:not(:disabled)': { background: T.sf3 },
     },
     on: {
-      background: T.tl2,
-      border: `1px solid ${T.tl3}`,
-      color: T.tl,
-      boxShadow: T.ss,
-      '&:hover:not(:disabled)': { background: T.tl2 },
+      background: T.prSoft,
+      border: `1px solid ${T.prLine}`,
+      color: T.pr,
+      boxShadow: T.shXs,
+      '&:hover:not(:disabled)': { background: T.prSoft },
     },
     primary: {
-      background: T.tl,
+      background: T.pr,
       color: '#fff',
       border: '1px solid transparent',
-      boxShadow: T.ss,
-      '&:hover:not(:disabled)': { background: T.tlHover },
+      boxShadow: T.shXs,
+      '&:hover:not(:disabled)': { background: T.prHover },
     },
     ghost: {
       background: 'transparent',
@@ -82,8 +82,8 @@ export function Chip({
 }) {
   const tones = {
     default: { background: T.sf2, borderColor: T.ln, color: T.dm },
-    s: { background: T.tl2, borderColor: T.tl3, color: T.tl },
-    v: { background: T.vi2, borderColor: T.vi3, color: T.vi },
+    s: { background: T.prSoft, borderColor: T.prLine, color: T.pr },
+    v: { background: T.prSoft, borderColor: T.prLine, color: T.pr },
   }[tone];
   return (
     <Box

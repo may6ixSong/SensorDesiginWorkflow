@@ -540,8 +540,8 @@ export function effectiveTier(d: CanvasNode, tierByServiceKey: Record<string, Ti
 export interface StatusStyle { lb: string; c: string; bg: string; bd: string }
 export function stOf(d: CanvasNode): StatusStyle {
   if (!d.versions.length) return { lb: 'Not submitted', c: T.dm2, bg: T.sf2, bd: T.ln };
-  if (hasW(d)) return { lb: 'In progress', c: T.am, bg: T.am2, bd: T.am3 };
-  return { lb: 'Released', c: T.tl, bg: T.tl2, bd: T.tl3 };
+  if (hasW(d)) return { lb: 'In progress', c: T.warn, bg: T.warnSoft, bd: T.warnLine };
+  return { lb: 'Released', c: T.pr, bg: T.prSoft, bd: T.prLine };
 }
 
 /** "YYYY-MM-DD HH:mm" (목업 at 포맷) */

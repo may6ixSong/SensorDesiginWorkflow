@@ -86,7 +86,7 @@ function GrantList({
       <Box sx={{ fontSize: 11.5, fontWeight: 600, color: T.dm, mb: '7px' }}>{label}</Box>
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: '6px', mb: '9px' }}>
         {registrant && (
-          <Badge color={T.tl} bg={T.tl2} borderColor={T.tl3}>{resolveUser(registrant).name} · registrant</Badge>
+          <Badge color={T.pr} bg={T.prSoft} borderColor={T.prLine}>{resolveUser(registrant).name} · registrant</Badge>
         )}
         {grants.length === 0 && !registrant && (
           <Box sx={{ fontSize: 12, color: T.dm2 }}>Nobody added yet.</Box>

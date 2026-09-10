@@ -23,7 +23,7 @@ export function PhaseInfoDialog({ workflowName, phase: p, nodes, onClose, onOpen
   const state = {
     upcoming: { t: 'Upcoming', c: T.dm, b: T.sf2, d: T.ln },
     past: { t: 'Done', c: T.dm, b: T.sf2, d: T.ln },
-    current: { t: 'In progress', c: T.tl, b: T.tl2, d: T.tl3 },
+    current: { t: 'In progress', c: T.pr, b: T.prSoft, d: T.prLine },
   }[spanState(p)];
   const rel = ds.filter((d) => latR(d)).length;
 
@@ -56,7 +56,7 @@ export function PhaseInfoDialog({ workflowName, phase: p, nodes, onClose, onOpen
         {stat('Start', p.start)}
         {stat('End', p.end)}
         {stat('Duration', `${days}d`)}
-        {stat('Released', `${rel}/${ds.length}`, T.tl)}
+        {stat('Released', `${rel}/${ds.length}`, T.pr)}
       </Row>
       <Card>
         <Ey sx={{ mb: '10px' }}>Key Deliverables</Ey>
@@ -74,7 +74,7 @@ export function PhaseInfoDialog({ workflowName, phase: p, nodes, onClose, onOpen
                   '&:hover': { background: T.sf2 },
                 }}
               >
-                <Box component="span" sx={{ color: d.serviceKey ? T.tl : T.bl }}>
+                <Box component="span" sx={{ color: d.serviceKey ? T.pr : T.info }}>
                   <Icon name={d.serviceKey ? 'link' : 'word'} />
                 </Box>
                 <Box sx={{ flex: 1, fontSize: 13, fontWeight: 500 }}>

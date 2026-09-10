@@ -68,16 +68,16 @@ export function CalypsoArtifactPicker({ projectId, myDepartments, value, onChang
                 sx={{
                   display: 'flex', alignItems: 'center', gap: '8px', cursor: CURSOR_POINTER,
                   padding: '8px 10px', borderRadius: '8px',
-                  background: sel ? T.tl2 : T.sf,
-                  border: `1px solid ${sel ? T.tl3 : T.ln}`,
-                  '&:hover': { borderColor: sel ? T.tl3 : T.ln2 },
+                  background: sel ? T.prSoft : T.sf,
+                  border: `1px solid ${sel ? T.prLine : T.ln}`,
+                  '&:hover': { borderColor: sel ? T.prLine : T.ln2 },
                 }}
               >
                 <Box
                   sx={{
                     width: 14, height: 14, borderRadius: '50%', flex: '0 0 auto',
-                    border: `2px solid ${sel ? T.tl : T.ln3}`,
-                    background: sel ? T.tl : 'transparent',
+                    border: `2px solid ${sel ? T.pr : T.ln3}`,
+                    background: sel ? T.pr : 'transparent',
                   }}
                 />
                 <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -89,9 +89,9 @@ export function CalypsoArtifactPicker({ projectId, myDepartments, value, onChang
                   </Box>
                 </Box>
                 <Badge
-                  color={a.myAccess === 'edit' ? T.tl : T.dm}
-                  bg={a.myAccess === 'edit' ? T.tl2 : T.sf2}
-                  borderColor={a.myAccess === 'edit' ? T.tl3 : T.ln}
+                  color={a.myAccess === 'edit' ? T.pr : T.dm}
+                  bg={a.myAccess === 'edit' ? T.prSoft : T.sf2}
+                  borderColor={a.myAccess === 'edit' ? T.prLine : T.ln}
                 >
                   {a.myAccess === 'edit' ? 'EDIT' : 'VIEW'}
                 </Badge>

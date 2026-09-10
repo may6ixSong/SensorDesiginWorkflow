@@ -34,7 +34,7 @@ export function WorkflowPhasesPanel({
         <Box
           sx={{
             display: 'flex', alignItems: 'center', gap: '8px',
-            fontSize: 11.5, color: T.rd, background: T.rd2, border: `1px solid ${T.rd3}`,
+            fontSize: 11.5, color: T.danger, background: T.dangerSoft, border: `1px solid ${T.dangerLine}`,
             borderRadius: '9px', padding: '9px 11px', mb: '14px',
           }}
         >

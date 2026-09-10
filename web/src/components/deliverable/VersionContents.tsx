@@ -86,14 +86,14 @@ export function VersionContents({ d, version: v }: Props) {
   }
 
   const by = resolveUser(versionBy(v));
-  const accent = v.isReleased ? T.tl : T.am;
+  const accent = v.isReleased ? T.pr : T.warn;
 
   return (
     <Box
       sx={{
         background: T.sf,
         border: `1px solid ${T.ln}`, borderRadius: '12px',
-        boxShadow: T.sl, overflow: 'hidden',
+        boxShadow: T.shLg, overflow: 'hidden',
         display: 'flex', flexDirection: 'column',
       }}
     >
@@ -125,8 +125,8 @@ export function VersionContents({ d, version: v }: Props) {
           </Box>
           <Badge
             color={accent}
-            bg={v.isReleased ? T.tl2 : T.am2}
-            borderColor={v.isReleased ? T.tl3 : T.am3}
+            bg={v.isReleased ? T.prSoft : T.warnSoft}
+            borderColor={v.isReleased ? T.prLine : T.warnLine}
           >
             {v.isReleased ? 'RELEASE' : 'WORKING'}
           </Badge>
@@ -189,7 +189,7 @@ export function VersionContents({ d, version: v }: Props) {
             >
               Built from
             </Box>
-            {v.sourceRefs.map((s) => (
+            {v.sourceRefs.map((s: { artifactKey?: string; serviceKey: string; versionRef: string; versionLabel: string }) => (
               <Box
                 key={`${s.serviceKey}:${s.versionRef}`}
                 sx={{

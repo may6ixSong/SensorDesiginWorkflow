@@ -89,7 +89,7 @@ export function IncomingDeliverableDialog({ d, onClose }: Props) {
       width={520}
       header={
         <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-          <Box component="span" sx={{ color: d.serviceKey ? T.tl : T.bl, mt: '4px' }}>
+          <Box component="span" sx={{ color: d.serviceKey ? T.pr : T.info, mt: '4px' }}>
             <Icon name={d.serviceKey ? 'link' : 'word'} />
           </Box>
           <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -99,7 +99,7 @@ export function IncomingDeliverableDialog({ d, onClose }: Props) {
               <Box sx={{ fontFamily: FONT_MONO, fontSize: 11, color: T.dm2, mt: '2px' }}>{d.artifactKey}</Box>
             )}
           </Box>
-          <Badge color={T.vi} bg={T.vi2} borderColor={T.vi3} sx={{ mt: '6px' }}>Incoming</Badge>
+          <Badge color={T.pr} bg={T.prSoft} borderColor={T.prLine} sx={{ mt: '6px' }}>Incoming</Badge>
         </Box>
       }
     >
@@ -110,7 +110,7 @@ export function IncomingDeliverableDialog({ d, onClose }: Props) {
           <Box sx={{ fontSize: 14, fontWeight: 700, mt: '2px' }}>{d.sourceWorkflow?.name ?? 'Unknown department'}</Box>
         </Box>
         {d.serviceKey ? (
-          <Badge color={T.tl} bg={T.tl2} borderColor={T.tl3}>{d.serviceKey.toUpperCase()}</Badge>
+          <Badge color={T.pr} bg={T.prSoft} borderColor={T.prLine}>{d.serviceKey.toUpperCase()}</Badge>
         ) : (
           <Badge color={T.dm} bg={T.sf2} borderColor={T.ln}>Unlinked</Badge>
         )}
@@ -118,7 +118,7 @@ export function IncomingDeliverableDialog({ d, onClose }: Props) {
 
       <Card sx={{ mb: '12px' }}>
         <Ey>Released version</Ey>
-        <Box sx={{ fontFamily: FONT_MONO, fontSize: 21, fontWeight: 600, color: T.tl, mt: '6px' }}>
+        <Box sx={{ fontFamily: FONT_MONO, fontSize: 21, fontWeight: 600, color: T.pr, mt: '6px' }}>
           {rel ? rel.versionLabel : '—'}
         </Box>
         {rel ? (

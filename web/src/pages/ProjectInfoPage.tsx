@@ -11,7 +11,7 @@ import { SirenButton } from '@/components/common/SirenButton';
 import { Icon } from '@/components/common/Icon';
 import { toast } from '@/store/toastStore';
 import { T } from '@/theme/tokens';
-import { canEditMilestones } from '@/lib/access';
+import { canEditMilestones, myDepartments } from '@/lib/access';
 import { useAuth } from '@/app/providers/AuthProvider';
 
 const errText = (e: any, fallback: string) => e?.response?.data?.message ?? fallback;
@@ -25,6 +25,7 @@ export function ProjectInfoPage() {
           milestones={project.milestones}
           managers={project.managers}
           members={project.members}
+          departments={project.departments}
           workflows={workflows}
         />
       )}
@@ -42,10 +43,13 @@ export function ProjectInfoPage() {
  * workflow를 새로 만드는 진입점이 이 Schedule 섹션 하나로 합쳐졌다.
  */
 function MilestonesSection({
-  projectId, milestones, managers, members, workflows,
+  projectId, milestones, managers, members, departments, workflows,
 }: {
   projectId: string; milestones: Milestone[]; managers: string[];
-  members: ProjectMemberDto[]; workflows: WorkflowDto[];
+  members: ProjectMemberDto[];
+  /** 이 과제가 인정하는 부서 — Admin이 workflow를 만들 때의 후보가 된다. */
+  departments: string[];
+  workflows: WorkflowDto[];
 }) {
   const { user, isAdmin } = useAuth();
   const navigate = useNavigate();
@@ -61,7 +65,12 @@ function MilestonesSection({
    */
   const [mineOnly, setMineOnly] = useState(false);
   const canEditSchedule = canEditMilestones({ managers }, isAdmin, user?.KnoxID);
-  const myDepartments = members.find((m) => m.knoxId === user?.KnoxID)?.departments ?? [];
+  /**
+   * workflow를 만들 때 고를 수 있는 부서 — "내가 이 과제에서 속한 부서"이며, Admin이면
+   * 과제 전체 부서다(설계서 01장 §2.4). 판정 기준은 전사 소속이 아니라 이 과제의 members
+   * 로스터다 — 같은 사람이 과제마다 다른 부서일 수 있기 때문이다.
+   */
+  const myDepts = myDepartments({ members, departments }, user?.KnoxID, isAdmin);
 
   return (
     <>
@@ -98,8 +107,7 @@ function MilestonesSection({
 
       {createOpen && (
         <CreateWorkflowDialog
-          myDepartments={myDepartments}
-          isAdmin={isAdmin}
+          myDepartments={myDepts}
           milestones={milestones}
           saving={createWorkflow.isPending}
           error={createErr}

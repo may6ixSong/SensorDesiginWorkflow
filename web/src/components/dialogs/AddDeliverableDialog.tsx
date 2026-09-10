@@ -137,17 +137,17 @@ export function AddDeliverableDialog({
               sx={{
                 fontFamily: FONT_MONO, fontSize: 11, fontWeight: 600, padding: '5px 10px',
                 borderRadius: '7px', transition: '.14s', cursor: CURSOR_POINTER,
-                background: phaseId === p.id ? T.tl2 : T.sf,
-                border: `1px solid ${phaseId === p.id ? T.tl : T.ln2}`,
-                color: phaseId === p.id ? T.tl : T.dm,
-                '&:hover': { background: phaseId === p.id ? T.tl2 : T.sf3 },
+                background: phaseId === p.id ? T.prSoft : T.sf,
+                border: `1px solid ${phaseId === p.id ? T.pr : T.ln2}`,
+                color: phaseId === p.id ? T.pr : T.dm,
+                '&:hover': { background: phaseId === p.id ? T.prSoft : T.sf3 },
               }}
             >
               {p.name}
             </Box>
           ))}
           {!phases.length && (
-            <Box sx={{ fontSize: 12, color: T.rd }}>
+            <Box sx={{ fontSize: 12, color: T.danger }}>
               This workflow has no phases yet — add a schedule before creating deliverables.
             </Box>
           )}
@@ -168,10 +168,10 @@ export function AddDeliverableDialog({
               sx={{
                 flex: 1, fontSize: 11.5, fontWeight: 600, padding: '7px 8px',
                 borderRadius: '7px', transition: '.14s', cursor: CURSOR_POINTER,
-                background: sourceMode === m ? T.tl2 : T.sf,
-                border: `1px solid ${sourceMode === m ? T.tl : T.ln2}`,
-                color: sourceMode === m ? T.tl : T.dm,
-                '&:hover': { background: sourceMode === m ? T.tl2 : T.sf3 },
+                background: sourceMode === m ? T.prSoft : T.sf,
+                border: `1px solid ${sourceMode === m ? T.pr : T.ln2}`,
+                color: sourceMode === m ? T.pr : T.dm,
+                '&:hover': { background: sourceMode === m ? T.prSoft : T.sf3 },
               }}
             >
               {label}
@@ -212,7 +212,7 @@ export function AddDeliverableDialog({
                 ]}
               />
               {typeErr && (
-                <Box sx={{ fontSize: 11, color: T.rd, mt: '5px' }}>
+                <Box sx={{ fontSize: 11, color: T.danger, mt: '5px' }}>
                   {selectedService?.name} provides more than one artifact type — pick one.
                 </Box>
               )}
@@ -245,7 +245,7 @@ export function AddDeliverableDialog({
           error={!!keyErr}
           placeholder="e.g. PLL_MAIN.DESIGN_REVIEW_PACKAGE"
         />
-        {keyErr && <Box sx={{ fontSize: 11, color: T.rd, mt: '5px' }}>{keyErr}</Box>}
+        {keyErr && <Box sx={{ fontSize: 11, color: T.danger, mt: '5px' }}>{keyErr}</Box>}
       </Field>
       <SirenButton variant="primary" onClick={submit}>
         <Icon name="plus" /> Create

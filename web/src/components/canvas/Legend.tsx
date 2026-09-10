@@ -5,15 +5,15 @@ import { T } from '@/theme/tokens';
 export function Legend() {
   const items = [
     { c: T.dm2, l: 'Not submitted' },
-    { c: T.am, l: 'In progress' },
-    { c: T.tl, l: 'Released' },
+    { c: T.warn, l: 'In progress' },
+    { c: T.pr, l: 'Released' },
   ];
   return (
     <Box
       sx={{
         position: 'absolute', right: 14, bottom: 14, zIndex: 10,
         background: T.sf, border: `1px solid ${T.ln2}`, borderRadius: '9px',
-        padding: '7px 11px', boxShadow: T.sm,
+        padding: '7px 11px', boxShadow: T.shSm,
         display: 'flex', gap: '11px', fontSize: 11, color: T.dm, alignItems: 'center',
       }}
     >

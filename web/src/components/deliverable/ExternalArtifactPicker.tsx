@@ -83,16 +83,16 @@ export function ExternalArtifactPicker({ service, projectCode, projectRevision, 
                 sx={{
                   display: 'flex', alignItems: 'center', gap: '8px', cursor: CURSOR_POINTER,
                   padding: '8px 10px', borderRadius: '8px',
-                  background: sel ? T.tl2 : T.sf,
-                  border: `1px solid ${sel ? T.tl3 : T.ln}`,
-                  '&:hover': { borderColor: sel ? T.tl3 : T.ln2 },
+                  background: sel ? T.prSoft : T.sf,
+                  border: `1px solid ${sel ? T.prLine : T.ln}`,
+                  '&:hover': { borderColor: sel ? T.prLine : T.ln2 },
                 }}
               >
                 <Box
                   sx={{
                     width: 14, height: 14, borderRadius: '50%', flex: '0 0 auto',
-                    border: `2px solid ${sel ? T.tl : T.ln3}`,
-                    background: sel ? T.tl : 'transparent',
+                    border: `2px solid ${sel ? T.pr : T.ln3}`,
+                    background: sel ? T.pr : 'transparent',
                   }}
                 />
                 <Box sx={{ flex: 1, minWidth: 0, fontSize: 12.5 }}>{c.displayName}</Box>
@@ -106,8 +106,8 @@ export function ExternalArtifactPicker({ service, projectCode, projectRevision, 
       {value && !matched && !isLoading && (
         <Box
           sx={{
-            display: 'flex', alignItems: 'flex-start', gap: '7px', fontSize: 11.5, color: T.am,
-            background: T.am2, border: `1px solid ${T.am3}`, borderRadius: '8px',
+            display: 'flex', alignItems: 'flex-start', gap: '7px', fontSize: 11.5, color: T.warn,
+            background: T.warnSoft, border: `1px solid ${T.warnLine}`, borderRadius: '8px',
             padding: '8px 10px', mt: '8px', lineHeight: 1.6,
           }}
         >

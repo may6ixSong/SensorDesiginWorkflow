@@ -35,7 +35,7 @@ export function NoteDialog({ text, onClose, onSave, onDelete }: Props) {
         <SirenButton variant="primary" onClick={() => onSave(v)}>
           <Icon name="check" /> Save
         </SirenButton>
-        <SirenButton onClick={onDelete} sx={{ color: T.rd }}>
+        <SirenButton onClick={onDelete} sx={{ color: T.danger }}>
           <Icon name="trash" /> Delete
         </SirenButton>
       </Box>

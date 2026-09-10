@@ -113,10 +113,10 @@ function ArtifactRow({ artifact: a, onOpen }: { artifact: CalypsoArtifact; onOpe
         padding: '12px 16px', border: `1px solid ${T.ln}`, borderRadius: '10px',
         background: T.sf, cursor: CURSOR_POINTER,
         transition: 'border-color .14s, box-shadow .14s',
-        '&:hover': { borderColor: T.ln2, boxShadow: T.ss },
+        '&:hover': { borderColor: T.ln2, boxShadow: T.shXs },
       }}
     >
-      <Box component="span" sx={{ color: T.tl, flex: '0 0 auto' }}>
+      <Box component="span" sx={{ color: T.pr, flex: '0 0 auto' }}>
         <Icon name="word" size={17} />
       </Box>
 
@@ -138,7 +138,7 @@ function ArtifactRow({ artifact: a, onOpen }: { artifact: CalypsoArtifact; onOpe
         </Box>
       </Box>
 
-      <Box sx={{ fontFamily: FONT_MONO, fontSize: 11.5, color: v?.isReleased ? T.tl : T.dm2, flex: '0 0 90px', textAlign: 'right' }}>
+      <Box sx={{ fontFamily: FONT_MONO, fontSize: 11.5, color: v?.isReleased ? T.pr : T.dm2, flex: '0 0 90px', textAlign: 'right' }}>
         {v ? `v${v.versionLabel}${v.isReleased ? '' : ' (w)'}` : 'No versions'}
       </Box>
 
@@ -216,7 +216,7 @@ function RegisterDialog({
       ) : (
         <Field label="Department">
           <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '3px 0' }}>
-            <Badge color={T.tl} bg={T.tl2} borderColor={T.tl3}>{autoDept}</Badge>
+            <Badge color={T.pr} bg={T.prSoft} borderColor={T.prLine}>{autoDept}</Badge>
             <Box sx={{ fontSize: 11, color: T.dm2 }}>assigned from your project membership</Box>
           </Box>
         </Field>

@@ -55,7 +55,7 @@ const controlSx = {
   width: '100%',
   outline: 'none',
   userSelect: 'text',
-  '&:focus': { borderColor: T.tl, boxShadow: `0 0 0 3px ${T.tl2}` },
+  '&:focus': { borderColor: T.pr, boxShadow: `0 0 0 3px ${T.prSoft}` },
 };
 
 export function TextInput({
@@ -78,7 +78,7 @@ export function TextInput({
       autoFocus={autoFocus}
       onChange={(e) => onChange((e.target as HTMLInputElement).value)}
       onKeyDown={onKeyDown}
-      sx={{ ...controlSx, ...(error ? { borderColor: T.rd } : {}) }}
+      sx={{ ...controlSx, ...(error ? { borderColor: T.danger } : {}) }}
     />
   );
 }
@@ -95,7 +95,7 @@ export function DateInput({
       id={id}
       value={value}
       onChange={(e) => onChange((e.target as HTMLInputElement).value)}
-      sx={{ ...controlSx, ...(error ? { borderColor: T.rd } : {}) }}
+      sx={{ ...controlSx, ...(error ? { borderColor: T.danger } : {}) }}
     />
   );
 }

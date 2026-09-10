@@ -35,7 +35,9 @@ export function ProjectPageShell({ children }: Props) {
   const [editInfoErr, setEditInfoErr] = useState<string | null>(null);
   const updateProject = useUpdateProject(projectId ?? '');
 
-  const own = useMemo(() => canManageProject(workflows, isAdmin), [workflows, isAdmin]);
+  // 과제 정보 편집은 Admin만 한다(설계서 01장 §2.3, 가정 P1) — 예전처럼 "workflow 중
+  // 하나라도 Edit 권한이 있으면"이 아니다.
+  const own = useMemo(() => canManageProject(isAdmin), [isAdmin]);
   // Members tab 자체가 Project Manager 전용이다(사용자 요청) — 탭 링크가 안 보이는 것도
   // 권한의 일부지, 안에 들어가서 편집 버튼만 숨기는 걸로는 부족하다.
   const canManageMembers = canEditMilestones(project, isAdmin, user?.KnoxID);
@@ -108,7 +110,7 @@ export function ProjectPageShell({ children }: Props) {
                   component="span"
                   sx={{
                     fontFamily: FONT_MONO, fontSize: 9.5, letterSpacing: '.1em', padding: '2px 8px',
-                    borderRadius: '999px', background: T.tl2, color: T.tl, border: `1px solid ${T.tl3}`,
+                    borderRadius: '999px', background: T.prSoft, color: T.pr, border: `1px solid ${T.prLine}`,
                   }}
                 >
                   {project.status}
@@ -153,13 +155,13 @@ export function ProjectPageShell({ children }: Props) {
               <Box sx={{ display: 'flex', alignItems: 'baseline', gap: '6px', mb: '6px' }}>
                 <Box sx={{ fontFamily: FONT_MONO, fontSize: 11, color: T.dm2 }}>{current}</Box>
                 <Box sx={{ flex: 1 }} />
-                <Box sx={{ fontFamily: FONT_MONO, fontSize: 13, fontWeight: 600, color: T.tl }}>{pct}%</Box>
+                <Box sx={{ fontFamily: FONT_MONO, fontSize: 13, fontWeight: 600, color: T.pr }}>{pct}%</Box>
               </Box>
               <Box sx={{ height: 6, borderRadius: 999, background: T.sf3, overflow: 'hidden' }}>
                 <Box
                   sx={{
                     width: `${pct}%`, height: '100%', borderRadius: 999,
-                    background: T.tl,
+                    background: T.pr,
                   }}
                 />
               </Box>
@@ -180,8 +182,8 @@ export function ProjectPageShell({ children }: Props) {
                   sx={{
                     display: 'flex', alignItems: 'center', gap: '6px',
                     padding: '9px 14px', fontSize: 13, fontWeight: on ? 600 : 500,
-                    color: on ? T.tl : T.dm, textDecoration: 'none',
-                    borderBottom: `2px solid ${on ? T.tl : 'transparent'}`, mb: '-1px',
+                    color: on ? T.pr : T.dm, textDecoration: 'none',
+                    borderBottom: `2px solid ${on ? T.pr : 'transparent'}`, mb: '-1px',
                     '&:hover': { color: T.tx },
                   }}
                 >

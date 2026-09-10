@@ -51,7 +51,7 @@ const Group = ({ children }: { children: React.ReactNode }) => (
   <Box
     sx={{
       display: 'flex', flexDirection: 'row', gap: '4px', background: T.sf,
-      border: `1px solid ${T.ln2}`, borderRadius: '11px', padding: '6px', boxShadow: T.sl,
+      border: `1px solid ${T.ln2}`, borderRadius: '11px', padding: '6px', boxShadow: T.shLg,
     }}
   >
     {children}
@@ -74,14 +74,14 @@ function TbBtn({
         data-tb={icon}
         sx={{
           width: 36, height: 36, borderRadius: '8px', border: '1px solid transparent',
-          background: on ? T.tl2 : 'transparent',
-          borderColor: on ? T.tl3 : 'transparent',
-          color: on ? T.tl : T.dm,
+          background: on ? T.prSoft : 'transparent',
+          borderColor: on ? T.prLine : 'transparent',
+          color: on ? T.pr : T.dm,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           cursor: CURSOR_POINTER, transition: '.14s', position: 'relative', fontFamily: 'inherit',
           '&:hover': danger
-            ? { background: '#fde8e7', color: T.rd }
-            : { background: on ? T.tl2 : T.sf2, color: on ? T.tl : T.tx },
+            ? { background: '#fde8e7', color: T.danger }
+            : { background: on ? T.prSoft : T.sf2, color: on ? T.pr : T.tx },
         }}
       >
         <Icon name={icon} size={16} />

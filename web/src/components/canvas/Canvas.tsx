@@ -555,7 +555,7 @@ export function Canvas({
         sx={{
           flex: 1, overflow: 'hidden', position: 'relative',
           background: T.sf,
-          ...(edit ? { outline: `2px solid ${T.tl3}`, outlineOffset: '-2px' } : {}),
+          ...(edit ? { outline: `2px solid ${T.prLine}`, outlineOffset: '-2px' } : {}),
         }}
       >
         <Box
@@ -674,7 +674,7 @@ export function Canvas({
           <Box sx={{
             position: 'absolute', top: 0, bottom: 0,
             left: Math.round(tx * z + panX), width: '1.5px',
-            background: T.rd, opacity: 0.55,
+            background: T.danger, opacity: 0.55,
             pointerEvents: 'none', zIndex: 1,
           }} />
         )}
@@ -685,7 +685,7 @@ export function Canvas({
           const g = lanes[p.id];
           const lineX = Math.round((g.x + g.w) * z + panX);
           const isFlash = flashBnd !== null && Math.abs(g.x + g.w - flashBnd) < 4;
-          const col = isFlash ? T.tl : T.ln2;
+          const col = isFlash ? T.pr : T.ln2;
           return (
             <Box
               key={`ph-line-${p.id}`}
@@ -714,7 +714,7 @@ export function Canvas({
                 display: 'inline-flex', alignItems: 'center',
                 fontFamily: FONT_MONO, fontSize: 11, fontWeight: 700, letterSpacing: '.09em',
                 color: T.tx, background: T.sf, border: `1px solid ${T.ln2}`,
-                borderRadius: '5px', padding: '3px 8px', boxShadow: T.ss,
+                borderRadius: '5px', padding: '3px 8px', boxShadow: T.shXs,
                 pointerEvents: 'none', zIndex: 2, whiteSpace: 'nowrap',
               }}
             >
@@ -731,8 +731,8 @@ export function Canvas({
               position: 'absolute', bottom: 14, left: '50%', transform: 'translateX(-50%)',
               zIndex: 8, maxWidth: 460,
               display: 'flex', alignItems: 'flex-start', gap: '9px',
-              background: T.rd2, border: `1px solid ${T.rd3}`, borderRadius: '10px',
-              padding: '10px 12px', boxShadow: T.sm, color: T.rd, fontSize: 11.5, lineHeight: 1.6,
+              background: T.dangerSoft, border: `1px solid ${T.dangerLine}`, borderRadius: '10px',
+              padding: '10px 12px', boxShadow: T.shSm, color: T.danger, fontSize: 11.5, lineHeight: 1.6,
             }}
           >
             <Box component="span" sx={{ mt: '1px', flex: '0 0 auto' }}><Icon name="warn" size={14} /></Box>

@@ -9,14 +9,15 @@ import { shortDate } from '@/lib/schedule';
 import { FONT_MONO, T } from '@/theme/tokens';
 
 interface Props {
-  /** 만드는 사람이 이 과제에서 실제로 속한 부서 — workflow의 domain은 이 중 하나여야 한다. */
+  /**
+   * 고를 수 있는 부서 — "내가 이 과제에서 속한 부서"다(Admin이면 과제 전체 부서).
+   * 호출부가 lib/access.ts의 myDepartments()로 계산해 넘긴다.
+   */
   myDepartments: string[];
-  /** 만드는 사람이 admin인지 — 소속 부서가 없어도 admin이면 unassigned로 만들 수 있다. */
-  isAdmin: boolean;
   /** 새 workflow가 물려받을 과제 공통 일정 — 무엇이 복사되는지 미리 보여 준다. */
   milestones: Milestone[];
   onClose: () => void;
-  onCreate: (p: { name: string; domain: string; creatorIsAdmin: boolean; description: string }) => void;
+  onCreate: (p: { name: string; department: string; description: string }) => void;
   saving?: boolean;
   error?: string | null;
 }
@@ -28,30 +29,27 @@ interface Props {
  * "default로는 과제의 milestone이 들어가고"), 그 뒤에 이 workflow의 "Edit phases"에서
  * 자유롭게 고친다. 그래서 무엇이 복사되는지만 미리 보여 준다.
  *
- * domain(부서)은 예전처럼 자유 선택이 아니다 — 만드는 사람이 이 과제에서 실제로 속한
- * 부서 중 하나로만 정해진다: 부서가 하나면 자동으로 그 값, 여러 개면 그중 하나를 고르는
- * picker, 하나도 없으면(그리고 admin이 아니면) 애초에 workflow를 만들 수 없다 — admin은
- * 예외로 unassigned로 만들 수 있다.
+ * Department는 **필수**이며 'unassigned'는 없다(설계서 README §3.2).
+ *
+ * ★ dropdown은 **부서가 하나뿐이어도 항상 노출한다** — 무엇이 선택되었는지 늘 같은
+ *   자리에서 보여야 하기 때문이다. 값이 하나면 자동 선택된 채로 비활성으로 둔다.
+ * ★ 후보는 "내가 이 과제에서 속한 부서"뿐이다. 하나도 없으면 workflow를 만들 수 없다
+ *   (Admin은 과제 전체 부서를 갖는 것으로 계산되므로 이 경우에 걸리지 않는다).
  */
 export function CreateWorkflowDialog({
-  myDepartments, isAdmin, milestones, onClose, onCreate, saving, error,
+  myDepartments, milestones, onClose, onCreate, saving, error,
 }: Props) {
   const [name, setName] = useState('');
-  const [domain, setDomain] = useState(myDepartments[0] ?? '');
+  const [department, setDepartment] = useState(myDepartments[0] ?? '');
   const [description, setDescription] = useState('');
   const [nameErr, setNameErr] = useState(false);
 
-  const blocked = myDepartments.length === 0 && !isAdmin;
+  const blocked = myDepartments.length === 0;
 
   const submit = () => {
     if (blocked) return;
     if (!name.trim()) { setNameErr(true); return; }
-    onCreate({
-      name: name.trim(),
-      domain: myDepartments.length > 0 ? domain : '',
-      creatorIsAdmin: isAdmin,
-      description: description.trim(),
-    });
+    onCreate({ name: name.trim(), department, description: description.trim() });
   };
 
   return (
@@ -69,7 +67,7 @@ export function CreateWorkflowDialog({
       {blocked ? (
         <Box
           sx={{
-            fontSize: 12, color: T.rd, background: T.rd2, border: `1px solid ${T.rd3}`,
+            fontSize: 12, color: T.danger, background: T.dangerSoft, border: `1px solid ${T.dangerLine}`,
             borderRadius: '9px', padding: '10px 12px', mb: '14px', lineHeight: 1.6,
           }}
         >
@@ -86,17 +84,16 @@ export function CreateWorkflowDialog({
               placeholder="e.g. ADC_RAMP"
             />
           </Field>
-          {myDepartments.length > 1 ? (
-            <Field label="Department">
-              <SelectInput value={domain} onChange={setDomain} options={myDepartments.map((d) => ({ value: d, label: d }))} />
-            </Field>
-          ) : (
-            <Field label="Department">
-              <Box sx={{ fontSize: 13, padding: '8px 0', color: myDepartments.length ? T.tx : T.dm2 }}>
-                {myDepartments.length ? myDepartments[0] : 'Unassigned (you have no department in this project)'}
-              </Box>
-            </Field>
-          )}
+          {/* 부서가 하나뿐이어도 dropdown을 그대로 둔다 — 선택된 값이 늘 같은 자리에
+              보여야 하고, 나중에 부서가 늘어도 화면이 달라지지 않는다. */}
+          <Field label="Department">
+            <SelectInput
+              value={department}
+              onChange={setDepartment}
+              disabled={myDepartments.length === 1}
+              options={myDepartments.map((d) => ({ value: d, label: d }))}
+            />
+          </Field>
           <Field label="Description">
             <TextInput value={description} onChange={setDescription} placeholder="One line about what this workflow covers" />
           </Field>
@@ -140,7 +137,7 @@ export function CreateWorkflowDialog({
       </Box>
       )}
 
-      {error && <Box sx={{ fontSize: 11.5, color: T.rd, mb: '10px' }}>{error}</Box>}
+      {error && <Box sx={{ fontSize: 11.5, color: T.danger, mb: '10px' }}>{error}</Box>}
 
       {!blocked && (
         <SirenButton variant="primary" onClick={submit} disabled={saving}>

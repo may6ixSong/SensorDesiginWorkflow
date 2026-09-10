@@ -29,7 +29,7 @@ export function Toast() {
         px: '15px',
         py: '8px',
         borderRadius: '8px',
-        boxShadow: T.sl,
+        boxShadow: T.shLg,
         zIndex: 1600,
         opacity: visible ? 1 : 0,
         transition: 'opacity .18s, transform .18s',

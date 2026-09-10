@@ -46,14 +46,14 @@ const Z_MAX = 1.9;
 const PERSPECTIVE = 1600;
 
 const STATUS_COLOR = {
-  released: T.tl,
-  inProgress: T.am,
+  released: T.pr,
+  inProgress: T.warn,
   notSubmitted: T.dm2,
 } as const;
 
 /**
  * 산출물 구체를 음영 처리하려면 lighten()/darken()에 넘길 "진짜 hex"가 필요하다 —
- * T.tl 등은 CSS 변수 문자열이라 색상 연산이 안 된다.
+ * T.pr 등은 CSS 변수 문자열이라 색상 연산이 안 된다.
  *
  * 다크 테마의 released/inProgress는 앱 전역 토큰(형광 teal·amber) 그대로 쓰면 구체
  * 특유의 하이라이트+발광이 겹쳐 눈이 부시다 — 이 화면 전용으로만 살짝 눌러 쓴다.
@@ -539,7 +539,7 @@ function TimeAxis({
               sx={{
                 position: 'absolute', display: 'flex', alignItems: 'center', gap: '6px',
                 fontFamily: FONT_MONO, fontSize: 15, fontWeight: 700, letterSpacing: '.08em',
-                color: cur ? T.tl : T.dm, whiteSpace: 'nowrap',
+                color: cur ? T.pr : T.dm, whiteSpace: 'nowrap',
               }}
             >
               {b.name}
@@ -547,7 +547,7 @@ function TimeAxis({
                 <Box
                   component="span"
                   sx={{
-                    fontSize: 9, fontFamily: FONT_MONO, color: '#fff', background: T.tl,
+                    fontSize: 9, fontFamily: FONT_MONO, color: '#fff', background: T.pr,
                     borderRadius: '999px', padding: '1px 6px', fontWeight: 700,
                   }}
                 >
@@ -577,7 +577,7 @@ function TimeAxis({
           />
           <Halo
             style={{ left: world.todayX + 7, top: top + 34 }}
-            sx={{ position: 'absolute', fontFamily: FONT_MONO, fontSize: 12, fontWeight: 700, color: T.rd, whiteSpace: 'nowrap' }}
+            sx={{ position: 'absolute', fontFamily: FONT_MONO, fontSize: 12, fontWeight: 700, color: T.danger, whiteSpace: 'nowrap' }}
           >
             TODAY
           </Halo>
@@ -597,7 +597,7 @@ function TimeAxis({
         style={{ left: LABEL_W + 10, top: top + 10 }}
         sx={{
           position: 'absolute', fontFamily: FONT_MONO, fontSize: 12, fontWeight: 700,
-          letterSpacing: '.08em', color: T.rd, whiteSpace: 'nowrap', lineHeight: 1.5,
+          letterSpacing: '.08em', color: T.danger, whiteSpace: 'nowrap', lineHeight: 1.5,
         }}
       >
         NO SCHEDULE
@@ -631,7 +631,7 @@ function DomainZone({
 }) {
   const label = zone.key === UNASSIGNED_DOMAIN ? 'Unassigned' : zone.label;
   const lineW = world.bounds.w;
-  const hlColor = hlOwner ? (zone.rows.find((r) => r.workflow.id === hlOwner)?.workflow.color ?? T.tl) : null;
+  const hlColor = hlOwner ? (zone.rows.find((r) => r.workflow.id === hlOwner)?.workflow.color ?? T.pr) : null;
 
   return (
     <Box sx={{ position: 'absolute', inset: 0, transformStyle: 'preserve-3d', pointerEvents: 'none' }}>
@@ -666,10 +666,10 @@ function DomainZone({
             const on = !!hlSet && hlSet.has(w.fromId) && hlSet.has(w.toId);
             return (
               <g key={w.id} opacity={(hlSet ? (on ? 1 : 0.06) : 1) * dim} style={{ transition: 'opacity .3s' }}>
-                <path d={w.path} fill="none" stroke={on ? hlColor ?? T.tl : T.dm2} strokeWidth={on ? 1.6 : 1} opacity={on ? 0.9 : 0.32} strokeLinecap="round" />
+                <path d={w.path} fill="none" stroke={on ? hlColor ?? T.pr : T.dm2} strokeWidth={on ? 1.6 : 1} opacity={on ? 0.9 : 0.32} strokeLinecap="round" />
                 {on && (
                   <path
-                    d={w.path} fill="none" stroke={hlColor ?? T.tl} strokeWidth={2.2} strokeLinecap="round"
+                    d={w.path} fill="none" stroke={hlColor ?? T.pr} strokeWidth={2.2} strokeLinecap="round"
                     strokeDasharray="9 10" opacity={0.85} style={{ animation: 'flowdash .65s linear infinite' }}
                   />
                 )}
@@ -694,14 +694,14 @@ function DomainZone({
                 alignItems: 'flex-start', textAlign: 'left', background: 'transparent', border: 'none',
                 padding: 0, cursor: CURSOR_POINTER, fontFamily: 'inherit', color: 'inherit',
                 pointerEvents: 'auto',
-                '&:hover .dw-wf-name': { color: row.workflow.color || T.tl },
+                '&:hover .dw-wf-name': { color: row.workflow.color || T.pr },
               }}
             >
               <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', maxWidth: '100%' }}>
                 <Box
                   sx={{
                     width: 9, height: 9, borderRadius: '50%', flex: '0 0 auto',
-                    background: row.workflow.color || T.tl,
+                    background: row.workflow.color || T.pr,
                     boxShadow: `0 0 8px ${withAlpha(row.workflow.color || '#2f6b4a', 0.75)}`,
                   }}
                 />
@@ -716,7 +716,7 @@ function DomainZone({
                 </Halo>
               </Box>
               {detail && (
-                <Halo sx={{ fontSize: 10.5, color: row.orphans ? T.rd : T.dm2, ml: '17px' }}>
+                <Halo sx={{ fontSize: 10.5, color: row.orphans ? T.danger : T.dm2, ml: '17px' }}>
                   {row.released}/{row.total} released
                   {row.orphans > 0 && ` · ${row.orphans} unscheduled`}
                 </Halo>
@@ -837,7 +837,7 @@ function DeliverableBlock({
       {detail && (
         <Box
           sx={{
-            fontSize: 16, fontWeight: 600, color: b.orphan ? T.rd : T.tx, textAlign: 'left',
+            fontSize: 16, fontWeight: 600, color: b.orphan ? T.danger : T.tx, textAlign: 'left',
             textShadow: `0 1px 3px ${withAlpha('#000000', 0.25)}`,
             maxWidth: BLOCK_LABEL_W, overflow: 'hidden', textOverflow: 'ellipsis',
           }}
@@ -885,8 +885,8 @@ function TopBar({
         <Stat label="DOMAINS" value={domainCount} />
         <Stat label="WORKFLOWS" value={model.domains.reduce((n, d) => n + d.workflows.length, 0)} />
         <Stat label="WIRES" value={totalWires} />
-        {totalOrphans > 0 && <Stat label="UNSCHEDULED" value={totalOrphans} tone={T.rd} />}
-        <Stat label="RELEASED" value={`${model.counts.released}/${model.counts.total}`} tone={T.tl} />
+        {totalOrphans > 0 && <Stat label="UNSCHEDULED" value={totalOrphans} tone={T.danger} />}
+        <Stat label="RELEASED" value={`${model.counts.released}/${model.counts.total}`} tone={T.pr} />
       </Box>
 
       <Box sx={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -998,7 +998,7 @@ function DomainNav({
               </Box>
               <Box sx={{ fontSize: 9.5, color: T.dm2, mt: '3px', ml: '16px' }}>
                 {z.rows.length} workflow · {z.released}/{z.total} released
-                {orphans > 0 && <Box component="span" sx={{ color: T.rd }}> · {orphans} unscheduled</Box>}
+                {orphans > 0 && <Box component="span" sx={{ color: T.danger }}> · {orphans} unscheduled</Box>}
               </Box>
               <Box sx={{ height: 3, borderRadius: 999, background: T.sf3, mt: '5px', ml: '16px', overflow: 'hidden' }}>
                 <Box sx={{ width: `${pct}%`, height: '100%', background: z.color, transition: 'width .3s' }} />
@@ -1015,8 +1015,8 @@ function DomainNav({
             {k === 'released' ? 'Released' : k === 'inProgress' ? 'In progress' : 'Not submitted'}
           </Box>
         ))}
-        <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: 10.5, color: T.rd }}>
-          <Box sx={{ width: 8, height: 8, borderRadius: '50%', border: `2px dashed ${T.rd}` }} />
+        <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: 10.5, color: T.danger }}>
+          <Box sx={{ width: 8, height: 8, borderRadius: '50%', border: `2px dashed ${T.danger}` }} />
           No release schedule
         </Box>
       </Box>

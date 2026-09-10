@@ -88,8 +88,8 @@ export function WorkflowSettingsDialog({
               onClick={() => setTab(key)}
               sx={{
                 padding: '8px 13px', fontSize: 12.5, fontWeight: 500, fontFamily: 'inherit',
-                color: tab === key ? T.tl : T.dm, background: 'none', border: 'none',
-                borderBottom: `2px solid ${tab === key ? T.tl : 'transparent'}`,
+                color: tab === key ? T.pr : T.dm, background: 'none', border: 'none',
+                borderBottom: `2px solid ${tab === key ? T.pr : 'transparent'}`,
                 mb: '-1px', cursor: CURSOR_POINTER,
               }}
             >
@@ -150,7 +150,7 @@ function DetailsTab({
     onSave({ name: name.trim(), description: description.trim() });
   };
 
-  const currentDomain = (workflow.domain ?? '').trim();
+  const currentDomain = (workflow.department ?? '').trim();
   // 지금 배정된 부서가 편집자 본인의 부서 목록에 없을 수 있다(다른 사람이 만들었거나,
   // 그 사람이 그 사이 다른 부서로 옮겨졌거나) — 그 값을 셀렉트에서 지워버리면 화면이
   // "Unassigned"라고 거짓말을 하게 되니 옵션에 그대로 끼워 보여준다.
@@ -171,7 +171,7 @@ function DetailsTab({
         <TextInput value={description} onChange={setDescription} placeholder="One line about what this workflow covers" />
       </Field>
 
-      {error && <Box sx={{ fontSize: 11.5, color: T.rd, mb: '10px' }}>{error}</Box>}
+      {error && <Box sx={{ fontSize: 11.5, color: T.danger, mb: '10px' }}>{error}</Box>}
 
       <SirenButton variant="primary" onClick={submit} disabled={saving}>
         <Icon name="check" /> {saving ? 'Saving…' : t('workflow.saveDetails')}

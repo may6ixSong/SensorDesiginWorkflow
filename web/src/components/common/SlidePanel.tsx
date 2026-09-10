@@ -75,7 +75,7 @@ export function SlidePanel({ open, onClose, width = '62vw', header, children, fo
           width, maxWidth: '96vw', minWidth: 'min(760px, 96vw)',
           background: T.sf2,
           borderLeft: `1px solid ${T.ln}`,
-          boxShadow: T.shadowDialog,
+          boxShadow: T.shXl,
           display: 'flex', flexDirection: 'column',
           transform: entered ? 'translateX(0)' : 'translateX(100%)',
           transition: `transform ${SLIDE_MS}ms cubic-bezier(.22,.9,.3,1)`,

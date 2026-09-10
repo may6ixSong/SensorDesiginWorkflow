@@ -65,7 +65,7 @@ export function EditProjectInfoDialog({ project, onClose, onSave, saving, error 
         Code + revision together must be unique — changing either can collide with another
         project that already uses that exact combination.
       </Box>
-      {error && <Box sx={{ fontSize: 12, color: T.rd, mb: '12px' }}>{error}</Box>}
+      {error && <Box sx={{ fontSize: 12, color: T.danger, mb: '12px' }}>{error}</Box>}
       <SirenButton variant="primary" onClick={submit} disabled={saving}>
         <Icon name="check" /> Save
       </SirenButton>
