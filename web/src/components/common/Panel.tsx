@@ -55,7 +55,7 @@ const controlSx = {
   width: '100%',
   outline: 'none',
   userSelect: 'text',
-  '&:focus': { borderColor: T.tl, boxShadow: `0 0 0 3px ${T.tl2}` },
+  '&:focus': { borderColor: T.pr, boxShadow: `0 0 0 3px ${T.prSoft}` },
 };
 
 export function TextInput({
@@ -78,7 +78,7 @@ export function TextInput({
       autoFocus={autoFocus}
       onChange={(e) => onChange((e.target as HTMLInputElement).value)}
       onKeyDown={onKeyDown}
-      sx={{ ...controlSx, ...(error ? { borderColor: T.rd } : {}) }}
+      sx={{ ...controlSx, ...(error ? { borderColor: T.danger } : {}) }}
     />
   );
 }
@@ -95,7 +95,7 @@ export function DateInput({
       id={id}
       value={value}
       onChange={(e) => onChange((e.target as HTMLInputElement).value)}
-      sx={{ ...controlSx, ...(error ? { borderColor: T.rd } : {}) }}
+      sx={{ ...controlSx, ...(error ? { borderColor: T.danger } : {}) }}
     />
   );
 }
@@ -121,7 +121,11 @@ export function SelectInput({
 }: {
   value: string;
   onChange: (v: string) => void;
-  options: { value: string; label: string }[];
+  /**
+   * option마다 disabled를 줄 수 있다 — 지금 선택된 값이 후보 목록에 없을 때 그 값을
+   * "선택된 채로 고를 수는 없는" 항목으로 끼워 보여주는 데 쓴다(설계서 01장 §3.5).
+   */
+  options: { value: string; label: string; disabled?: boolean }[];
   disabled?: boolean;
 }) {
   return (
@@ -133,6 +137,20 @@ export function SelectInput({
       sx={{
         ...controlSx,
         cursor: disabled ? 'not-allowed' : CURSOR_POINTER,
+        // 네이티브 화살표는 OS마다 굵기/색이 달라 나머지 컨트롤과 따로 논다 —
+        // 지우고 같은 선 색(T.dm2)의 chevron을 배경으로 직접 그린다.
+        appearance: 'none',
+        paddingRight: '30px',
+        // data URI 안에서는 CSS 변수가 풀리지 않으므로 색을 직접 박는다 —
+        // 라이트/다크 어느 쪽 배경에서도 같은 대비로 읽히는 중간 회색을 골랐다.
+        backgroundImage:
+          "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23888e9c' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E\")",
+        backgroundRepeat: 'no-repeat',
+        backgroundPosition: 'right 11px center',
+        backgroundSize: '10px 6px',
+        opacity: disabled ? 0.6 : 1,
+        transition: 'border-color .16s ease, box-shadow .16s ease',
+        '&:hover:not(:disabled)': { borderColor: T.ln3 },
         // See SelectBox — the native popup keeps its default light background even
         // under color-scheme:dark, so options need an explicit background to pair
         // with the inherited text color.
@@ -140,7 +158,7 @@ export function SelectInput({
       }}
     >
       {options.map((o) => (
-        <option key={o.value} value={o.value}>
+        <option key={o.value} value={o.value} disabled={o.disabled}>
           {o.label}
         </option>
       ))}

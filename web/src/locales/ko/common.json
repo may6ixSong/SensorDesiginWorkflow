@@ -48,7 +48,26 @@
     "confirmRemoveViewGrantTitle": "열람 권한 제거",
     "confirmRemoveViewGrantMessage": "{{name}}({{knoxId}})님의 이 workflow 열람 권한을 제거하시겠습니까?",
     "phasesOrphanWarning": "{{count}}개의 artifact에 일정이 없습니다.",
-    "resetToMilestones": "과제 일정으로 되돌리기"
+    "resetToMilestones": "과제 일정으로 되돌리기",
+    "departmentLabel": "부서",
+    "departmentHint": "이 workflow가 소속된 부서입니다.",
+    "departmentChangeWarning": "부서를 변경하면 이 workflow의 접근 권한이 달라질 수 있습니다.",
+    "save": "저장",
+    "saveConfirmTitle": "변경 내용 저장",
+    "saveConfirmMessage": "변경한 내용을 저장하시겠습니까?",
+    "permissionsHint": "Workflow에 대한 편집 및 보기 권한",
+    "owner": "Owner",
+    "ownerNote": "Workflow의 Owner는 이양할 수 없습니다.",
+    "editAccess": "편집 권한",
+    "viewAccess": "보기 권한",
+    "departments": "부서",
+    "users": "개별 사용자",
+    "addDepartment": "부서 추가",
+    "addUser": "사용자 추가",
+    "pinnedDepartment": "이 workflow의 소속 부서입니다 — 제거할 수 없습니다.",
+    "noneYet": "없음",
+    "lockedBy": "{{name}}님이 편집 중 ({{remain}})",
+    "forceUnlock": "강제 해제"
   },
   "schedule": {
     "namePlaceholder": "예: KO",
@@ -85,5 +104,45 @@
     "deleteWarning": "이 작업은 되돌릴 수 없습니다.",
     "delete": "삭제",
     "cancel": "취소"
+  },
+  "canvas": {
+    "editing": "편집 중",
+    "save": "저장",
+    "discard": "변경 취소",
+    "saveConfirmMessage": "변경한 내용을 저장하시겠습니까?",
+    "discardConfirmTitle": "변경 취소",
+    "discardConfirmMessage": "변경한 내용을 모두 취소하시겠습니까? 되돌릴 수 없습니다.",
+    "deleteFlowTitle": "연결 삭제",
+    "deleteFlowMessage": "이 연결을 삭제하시겠습니까?",
+    "addArtifact": "산출물 추가",
+    "recipientFilter": "수신 부서",
+    "allDepartments": "전체 부서",
+    "lockExpired": "편집 세션이 만료되었습니다. 편집 모드로 다시 들어가 주세요."
+  },
+  "artifact": {
+    "published": "발행됨",
+    "notPublished": "미발행",
+    "newSinceRelease": "마지막 release 이후 신규",
+    "noAccess": "이 산출물에 대한 접근 권한이 없습니다.",
+    "noPublishedVersion": "아직 publish된 버전이 없습니다.",
+    "recipients": "수신 대상",
+    "recipientsReadOnly": "누가 받는지 볼 수 있지만 변경할 수는 없습니다."
+  },
+  "release": {
+    "title": "Release",
+    "confirmTitle": "Release",
+    "confirmMessage": "이 내용으로 release하시겠습니까? release는 취소하거나 되돌릴 수 없습니다.",
+    "note": "Release note",
+    "noteRequired": "Release note를 입력해 주세요.",
+    "sourceNone": "없음",
+    "notDelivered": "아직 전달되지 않음",
+    "changed": "변경됨",
+    "history": "Release 이력",
+    "carriedOver": "직전 release의 선택을 그대로 사용합니다"
+  },
+  "project": {
+    "codeImmutable": "과제 코드와 Revision은 생성 후 변경할 수 없습니다.",
+    "noAccess": "이 과제에 대한 접근 권한이 없습니다.",
+    "noWorkflowAccess": "이 workflow에 대한 접근 권한이 없습니다."
   }
 }

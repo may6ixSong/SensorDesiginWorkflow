@@ -1,72 +1,55 @@
 /**
  * 캔버스 작업 모델 + 순수 계산 로직.
- * 목업(analog-dashboard-v15.html)의 laneG/phaseAtX/resolve/wallAdj/
- * connectedSet/orth/stOf/todayX 를 1:1로 이식한 것이다(autoFit은 이후 제거, 부록 A.7).
- * reflowLane(레인 재배치)은 겹침 허용 결정 이후 제거됨.
  *
- * 설계서 1.3·5.5에 따라 이 계산은 전부 FE에서 완결되고, BE는 결과 좌표만 저장한다.
+ * 배치·레인 폭·flow 라우팅 계산은 전부 여기(FE)에서 완결되고, BE는 결과 좌표만 저장한다.
+ *
+ * ★ 캔버스에는 **version 개념이 없다** — 모든 편집은 overwrite이고 스냅샷을 찍지 않는다
+ *   (설계서 03장 §1). 그래서 예전의 스냅샷 변환기(toCanvasNodeFromSnapshot 등)와
+ *   "받는 산출물"(incoming) 배치기가 전부 사라졌다.
+ * ★ 블록에는 **버전 라벨을 쓰지 않는다.** 버전은 상세 slide에서만 보이고, 캔버스는
+ *   publish 3상태 배지만 그린다(설계서 03장 §2).
  */
-import {
-  DeliverableDto, DeliverableVersionDto, EdgeDto, HldItemDto, HldReleaseDto, HldSnapshotDeliverableDto,
-  HldSnapshotEdgeDto, HldSnapshotMemoDto, MemoDto, Tier, WorkflowPhase,
-} from '@/types/domain';
-import { DAY_MS, dayMs, matchPhaseByDate } from './schedule';
+import { BlockDto, EdgeDto, MemoDto, PublishState, Tier, WorkflowPhase, isMaskedArtifact } from '@/types/domain';
+import { DAY_MS, dayMs } from './schedule';
 import {
   DEFAULT_PW, GAP, LANE_PAD, MH, MW, NH, NW, ROW_H, TOP_PAD, WALL_FORCE, snp,
 } from './constants';
-import { T } from '@/theme/tokens';
+import { T, TIER_COLOR } from '@/theme/tokens';
 
-/* ── 작업 모델 (목업의 ITEMS/NOTES/EDGES 원소와 같은 모양) ── */
-/** BE의 버전 엔트리 그대로 — file/major/minor 같은 파일 중심 필드는 없다(Hub 설계서 §1.2). */
-export type VersionView = DeliverableVersionDto;
+/* ── 작업 모델 ── */
 
 export interface CanvasNode {
   id: string;
   workflow: string;
   /**
-   * 이 산출물이 걸려 있는 phase의 id. 소유 workflow의 phase 목록에 없으면 "일정 유실"
-   * 상태다 — 캔버스는 좌표를 그대로 두고 유실 표시만 붙인다(isOrphanPhase 참고).
-   * origin==='incoming'이면 주는 쪽 phase가 아니라, sourcePhase의 날짜로 골라낸
-   * "내 phase" id가 들어간다(placeIncomingNodes).
+   * 이 블록이 걸려 있는 phase의 id. workflow의 phase 목록에 없으면 "일정 유실" 상태다 —
+   * 캔버스는 좌표를 그대로 두고 유실 표시만 붙인다(isOrphanPhase 참고).
    */
   phase: string;
   name: string;
-  /** name과 분리된 안정적 식별자 — 향후 외부 시스템 연동용 매핑 키. 미지정이면 null. */
-  artifactKey: string | null;
+
+  /** 매핑된 산출물. null이면 아직 출처를 정하지 않은 **정상 빈 상태**다. */
+  artifactId: string | null;
+  /** 열람 권한이 없으면 true — 버전·링크가 응답에 아예 담겨 오지 않는다. */
+  artifactMasked: boolean;
+  /** 미매핑이면 null. 마스킹된 경우에도 tier는 온다(존재 자체는 공개). */
+  tier: Tier | null;
+  net: 'OA' | 'HPC' | null;
+
+  /** 캔버스가 그리는 유일한 상태 표시 — 버전 숫자는 쓰지 않는다. */
+  publishState: PublishState;
+
   /**
-   * 'own' = 이 workflow가 만들어 남에게 주는 산출물. 'received' = 이 workflow가 받기를
-   * 기다리는 자리표시자 — Upload와 전달(Handoff) 탭을 숨기는 기준이다(DeliverableDialog).
+   * A Tier에서만 값이 있다 — 같은 artifact라도 workflow마다 recipient가 다를 수 있어
+   * block에 붙는다. B/C/D는 null이고 수신 부서는 artifact 쪽에서 온다.
    */
-  intent: 'own' | 'received';
-  /** 이 산출물의 실물을 소유한 Hub 서비스(artifactServices.key) — null이면 출처 미등록. */
-  serviceKey: string | null;
-  externalArtifactId: string | null;
-  /** 그 서비스가 여러 산출물 종류를 낼 때 어느 종류인지(§19.1) — 단일 종류 서비스면 null. */
-  artifactTypeKey: string | null;
-  /** 레거시 필드 — 더 이상 화면에서 고르지 않는다(항상 서버 기본값). */
-  net: 'OA' | 'HPC';
+  recipientDepartments: string[];
+
   series: string | null;
   seriesIdx: number;
   seriesTotal: number;
-  recvDept: string | null;
-  recvContact: string | null;
-  /** 이 산출물을 받아야 하는 다른 Analog workflow. */
-  recvWorkflowId: string | null;
-  /** 이 시스템에 없는 외부 부서로부터 받았음을 나타내는 자유 텍스트 — own 그대로라 자유 편집 가능. */
-  sourceDept: string | null;
-  /** 받을 때의 개별 연락처 — 자유 텍스트. */
-  sourceContact: string | null;
-  /** 'incoming'이면 다른 IP가 이 IP로 보낸 산출물 — 드래그/리사이즈 불가, 저장 대상 아님. */
-  origin: 'own' | 'incoming';
-  /** origin==='incoming'일 때만 채워진다 — 이 산출물을 준 workflow. */
-  sourceWorkflow: { id: string; name: string; color: string } | null;
-  /** origin==='incoming'일 때만 채워진다 — 주는 쪽 workflow에서의 일정 구간. */
-  sourcePhase: WorkflowPhase | null;
-  versions: VersionView[];
-  /** BE가 이미 계산해 준 최신 released/작업중 버전 — latR/latA는 이 값을 그대로 돌려준다. */
-  releasedVersion: VersionView | null;
-  workingVersion: VersionView | null;
-  canEdit: boolean;
+
+  /* 좌표 */
   x: number;
   y: number;
   w: number;
@@ -88,159 +71,80 @@ export interface CanvasEdge {
   id: string;
   from: string;
   to: string;
+  bi: boolean;
   auto: boolean;
-  /** BE가 명시적 플래그로 저장한 양방향(설계서 4.8). 목업식 역방향 쌍도 함께 지원한다. */
-  bidirectional: boolean;
 }
 
 export interface CanvasData {
   nodes: CanvasNode[];
   memos: CanvasMemo[];
   edges: CanvasEdge[];
+  phaseWidths: Record<string, number>;
 }
 
-/* ── DTO → 작업 모델 ── */
-/**
- * origin='incoming'이면 다른 IP가 준 산출물 — 그 IP의 layout(x,y,w,h)은 이 캔버스와
- * 무관하므로 기본 크기로 시작해 placeIncomingNodes()가 매 hydrate마다 위치를 다시 계산한다.
- */
-export function toCanvasNode(d: DeliverableDto, origin: 'own' | 'incoming' = 'own'): CanvasNode {
+/** 캔버스 배치 계산에 필요한 최소 형태 — 노드와 메모가 함께 쓴다. */
+export interface Blk {
+  id: string;
+  phase: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/* ── 서버 DTO → 작업 모델 ── */
+
+export function toCanvasNode(b: BlockDto): CanvasNode {
+  const artifact = b.artifact;
+  const masked = isMaskedArtifact(artifact);
   return {
-    id: d.id,
-    workflow: d.workflowId,
-    phase: d.phaseId,
-    name: d.name,
-    artifactKey: d.artifactKey ?? null,
-    intent: d.intent,
-    serviceKey: d.serviceKey ?? null,
-    externalArtifactId: d.externalArtifactId ?? null,
-    artifactTypeKey: d.artifactTypeKey ?? null,
-    net: d.network,
-    series: d.series,
-    seriesIdx: d.seriesIdx,
-    seriesTotal: d.seriesTotal,
-    recvDept: d.recvDept,
-    recvContact: d.recvContact,
-    recvWorkflowId: d.recvWorkflowId,
-    sourceDept: d.sourceDept ?? null,
-    sourceContact: d.sourceContact ?? null,
-    origin,
-    sourceWorkflow: d.sourceWorkflow ?? null,
-    sourcePhase: d.sourcePhase ?? null,
-    versions: d.versions ?? [],
-    releasedVersion: d.releasedVersion ?? null,
-    workingVersion: d.workingVersion ?? null,
-    canEdit: d.canEdit,
-    x: origin === 'incoming' ? 0 : d.layout?.x ?? 0,
-    y: origin === 'incoming' ? 0 : d.layout?.y ?? 0,
-    w: origin === 'incoming' ? NW : d.layout?.w || NW,
-    h: origin === 'incoming' ? NH : d.layout?.h || NH,
+    id: b.id,
+    workflow: b.workflowId,
+    phase: b.phaseId,
+    name: b.name,
+    artifactId: b.artifactId,
+    artifactMasked: masked,
+    tier: artifact?.tier ?? null,
+    net: artifact?.network ?? null,
+    publishState: b.publishState,
+    // A Tier는 block에, B/C/D는 artifact에 recipient가 있다 — 캔버스 필터는 둘을 합쳐 본다.
+    recipientDepartments: b.recipients
+      ? [
+          ...new Set([
+            ...b.recipients.editAccess.departments,
+            ...b.recipients.viewAccess.departments,
+          ]),
+        ]
+      : !masked && artifact && artifact.recipients
+        ? [...artifact.recipients.departments]
+        : [],
+    series: b.series,
+    seriesIdx: b.seriesIdx,
+    seriesTotal: b.seriesTotal,
+    x: b.layout.x,
+    y: b.layout.y,
+    w: b.layout.w || NW,
+    h: b.layout.h || NH,
   };
 }
+
 export function toCanvasMemo(m: MemoDto): CanvasMemo {
   return {
     id: m._id,
     workflow: m.workflowId,
     phase: m.phaseId,
     text: m.text,
-    x: m.layout?.x ?? 0,
-    y: m.layout?.y ?? 0,
-    w: m.layout?.w || MW,
-    h: m.layout?.h || MH,
+    x: m.layout.x,
+    y: m.layout.y,
+    w: m.layout.w || MW,
+    h: m.layout.h || MH,
   };
 }
+
 export function toCanvasEdge(e: EdgeDto): CanvasEdge {
-  return { id: e._id, from: e.fromId, to: e.toId, auto: e.auto, bidirectional: e.bidirectional };
+  return { id: e._id, from: e.fromId, to: e.toId, bi: e.bidirectional, auto: e.auto };
 }
 
-/* ── HLD 스냅샷 → 작업 모델 (§19.4, §19.5) ──
- * View 권한은 라이브 캔버스가 아니라 가장 최근 Workflow(HLD) Release 스냅샷 하나로
- * 구조와 버전을 함께 그린다 — flow 연결이 그 뒤로 바뀌었을 수 있어 라이브 구조와
- * 과거 버전을 섞으면 그 시점에 없던 연결이 있었던 것처럼 보이기 때문이다.
- */
-function hldItemToVersionView(item: HldItemDto): VersionView {
-  return {
-    versionLabel: item.versionLabel ?? item.version,
-    isReleased: true,
-    versionRef: item.versionRef,
-    tier: (item.tier as Tier) ?? 'A',
-    giverKnoxId: item.giverKnoxId,
-    giverDept: null,
-    viewUrl: item.viewUrl,
-    hpcPath: null,
-    note: item.comment ?? '',
-    sourceRefs: item.sourceRefs ?? [],
-    confidence: item.confidence === 'asserted' ? 'asserted' : 'verified',
-    assertedBy: null,
-    assertedAt: null,
-    observedAt: item.pinnedAt,
-    at: item.at,
-  };
-}
-
-export function toCanvasNodeFromSnapshot(
-  workflowId: string, sd: HldSnapshotDeliverableDto, item: HldItemDto | undefined,
-): CanvasNode {
-  const versions = item ? [hldItemToVersionView(item)] : [];
-  return {
-    id: sd.id,
-    workflow: workflowId,
-    phase: sd.phaseId,
-    name: sd.name,
-    artifactKey: null,
-    intent: sd.intent,
-    serviceKey: sd.serviceKey,
-    externalArtifactId: sd.externalArtifactId,
-    artifactTypeKey: sd.artifactTypeKey,
-    net: 'OA',
-    series: sd.series,
-    seriesIdx: sd.seriesIdx,
-    seriesTotal: sd.seriesTotal,
-    recvDept: sd.recvDept,
-    recvContact: null,
-    recvWorkflowId: null,
-    sourceDept: null,
-    sourceContact: null,
-    origin: 'own',
-    sourceWorkflow: null,
-    sourcePhase: null,
-    versions,
-    releasedVersion: versions[0] ?? null,
-    // View 권한은 작업중 버전을 절대 보지 않는다(§19.3) — 스냅샷 자체가 release만 담는다.
-    workingVersion: null,
-    canEdit: false,
-    x: sd.layout.x, y: sd.layout.y, w: sd.layout.w || NW, h: sd.layout.h || NH,
-  };
-}
-
-export function toCanvasEdgeFromSnapshot(se: HldSnapshotEdgeDto, i: number): CanvasEdge {
-  return { id: `snap-e${i}`, from: se.fromId, to: se.toId, auto: false, bidirectional: se.bidirectional };
-}
-
-export function toCanvasMemoFromSnapshot(workflowId: string, sm: HldSnapshotMemoDto): CanvasMemo {
-  return {
-    id: sm.id, workflow: workflowId, phase: sm.phaseId, text: sm.text,
-    x: sm.layout.x, y: sm.layout.y, w: sm.layout.w || MW, h: sm.layout.h || MH,
-  };
-}
-
-/**
- * Edit 권한 캔버스는 라이브 구조를 그대로 쓰되, 버전 배지만은 release-only로 제한한다
- * (§19.3) — 연동된(Calypso 포함) 산출물은 상시 동기화가 없어(§19.4) 로컬 versions가
- * 항상 비어 있으므로, 가장 최근 HLD Release가 얼려둔 값으로 배지를 채운다. 연동 없는
- * 수동(C/D) 산출물은 이미 로컬 versions가 진짜 값이라 건드리지 않는다.
- */
-export function applyLatestReleaseBadges(nodes: CanvasNode[], latestHld: HldReleaseDto | null | undefined): CanvasNode[] {
-  if (!latestHld) return nodes;
-  return nodes.map((n) => {
-    if (!n.serviceKey) return n;
-    const item = latestHld.items?.[n.id];
-    if (!item) return { ...n, releasedVersion: null };
-    return { ...n, releasedVersion: hldItemToVersionView(item) };
-  });
-}
-
-/* ── 레인 지오메트리 ── */
 export const getPW = (phasePW: Record<string, number>, id: string) => phasePW[id] || DEFAULT_PW;
 
 /** 목업 laneG(): Phase 순서대로 x를 누적. __tot은 전체 폭. */
@@ -267,7 +171,7 @@ export function isOrphanPhase(phases: WorkflowPhase[], phaseId: string): boolean
 
 /** 유실된 산출물이 몇 개인지 — 툴바/토스트 문구용. */
 export function countOrphans(nodes: CanvasNode[], phases: WorkflowPhase[]): number {
-  return nodes.filter((n) => n.origin !== 'incoming' && isOrphanPhase(phases, n.phase)).length;
+  return nodes.filter((n) => isOrphanPhase(phases, n.phase)).length;
 }
 
 /** x 좌표가 속한 Phase id (목업 phaseAtX) */
@@ -279,8 +183,6 @@ export function phaseAtX(phases: WorkflowPhase[], phasePW: Record<string, number
   }
   return cx < 0 ? phases[0].id : phases[phases.length - 1].id;
 }
-
-type Blk = { id: string; phase: string; x: number; y: number; w: number; h: number };
 
 /**
  * 새로 생성된 블록을 지정된 Phase 레인 안쪽(좌상단)에 배치한다.
@@ -296,59 +198,6 @@ export function placeInLane(
   if (!g) return;
   block.x = snp(g.x + LANE_PAD);
   block.y = snp(TOP_PAD);
-}
-
-/**
- * origin==='incoming' 노드(다른 workflow가 이 workflow에 보낸 산출물)는 이 캔버스의 저장
- * 대상이 아니므로 서버에 위치가 없다 — 매 hydrate마다 이 함수로 다시 계산한다. own 노드의
- * 위치(사용자가 드래그해 저장한 값)는 절대 건드리지 않고, incoming 노드만 레인 안에서
- * own/다른 incoming 노드와 겹치지 않는 첫 빈 자리(위→아래 탐색)에 놓는다. 그래서 own
- * 노드들 사이에 실제로 "섞여" 보이고, edge로 자유롭게 연결할 수 있다.
- *
- * ★ 어느 레인에 놓을지는 날짜로 정한다. incoming 산출물이 들고 오는 phaseId는 "주는 쪽
- *   workflow"의 것이라 내 phase 목록에는 아예 없다(phase가 workflow마다 다르므로).
- *   그래서 함께 받은 sourcePhase의 종료일이 내 어느 phase 구간에 들어오는지로 고르고,
- *   어디에도 안 들어오면 가장 가까운 phase로 붙인다(lib/schedule.ts의 matchPhaseByDate).
- */
-export function placeIncomingNodes(
-  nodes: CanvasNode[],
-  phases: WorkflowPhase[],
-  phasePW: Record<string, number>,
-): void {
-  const { lanes } = laneG(phases, phasePW);
-  const placedByPhase = new Map<string, { x: number; y: number; w: number; h: number }[]>();
-  nodes
-    .filter((n) => n.origin !== 'incoming')
-    .forEach((n) => {
-      const arr = placedByPhase.get(n.phase) ?? [];
-      arr.push({ x: n.x, y: n.y, w: n.w, h: n.h });
-      placedByPhase.set(n.phase, arr);
-    });
-
-  nodes
-    .filter((n) => n.origin === 'incoming')
-    .sort((a, b) => a.id.localeCompare(b.id))
-    .forEach((n) => {
-      const localPhase = matchPhaseByDate(phases, n.sourcePhase);
-      if (!localPhase) return;
-      n.phase = localPhase;
-      const g = lanes[n.phase];
-      if (!g) return;
-      const placed = placedByPhase.get(n.phase) ?? [];
-      const x = snp(g.x + LANE_PAD);
-      let y = TOP_PAD;
-      for (let guard = 0; guard < 200; guard++) {
-        const collides = placed.some(
-          (p) => x < p.x + p.w + GAP && x + n.w + GAP > p.x && y < p.y + p.h + GAP && y + n.h + GAP > p.y,
-        );
-        if (!collides) break;
-        y += ROW_H;
-      }
-      n.x = x;
-      n.y = snp(y);
-      placed.push({ x: n.x, y: n.y, w: n.w, h: n.h });
-      placedByPhase.set(n.phase, placed);
-    });
 }
 
 /**
@@ -515,33 +364,35 @@ export function biIconPos(a: Blk, b: Blk) {
   return { x: ax + 22, y: Math.max(a.y + a.h, b.y + b.h) + 26 };
 }
 
-/* ── 버전 헬퍼 (목업 latA/latR/hasW/vstr/stOf) ──
- * BE가 releasedVersion/workingVersion을 이미 계산해서 내려주므로(Hub 설계서 §6.2),
- * 여기서는 versions 배열을 다시 훑지 않고 그 값을 그대로 돌려준다. */
-export const vstr = (v: VersionView) => v.versionLabel;
-export const latR = (d: CanvasNode) => d.releasedVersion;
-/** 이 산출물의 절대 최신 버전 — 작업중인 게 있으면 그것, 없으면 release된 것. */
-export const latA = (d: CanvasNode) => d.workingVersion ?? d.releasedVersion;
-export const hasW = (d: CanvasNode) => !!d.workingVersion;
-/** 버전을 만들어 준 사람 — giver가 없으면(C/D 티어 등) 수동 기록자로 대신한다. */
-export const versionBy = (v: VersionView) => v.giverKnoxId ?? v.assertedBy ?? '';
+/* ── 표시 헬퍼 ── */
 
 /**
- * 캔버스 블록의 아이콘/LIVE 배지를 결정하는 유효 tier(Hub 설계서 §5.1). 연동된
- * 서비스가 있으면 그 서비스의 defaultTier가 기준이다(실제 라이브 관측은 A 티어에서만
- * 일어나므로, 결국 이 값이 "지금 그 서비스에서 살아있는 데이터인가"를 그대로 보여준다).
- * 연동이 없으면(수동 C/D 기록) 가장 최근 기록의 tier를 쓰고, 그마저 없으면 C로 본다.
+ * publish 3상태의 시각 표현 (설계서 03장 §2.2).
+ *
+ * ★ 숫자(버전 라벨)는 쓰지 않는다 — 버전은 상세 slide에서만 보인다.
+ * ★ 'newlyPublished'는 "마지막 release 이후 major가 올라갔다" = **다음 release에서
+ *   highlight될 대상**이라는 뜻이다. 캔버스에서 미리 눈에 띄어야 한다.
  */
-export function effectiveTier(d: CanvasNode, tierByServiceKey: Record<string, Tier>): Tier {
-  if (d.serviceKey) return tierByServiceKey[d.serviceKey] ?? 'C';
-  return d.versions[0]?.tier ?? 'C';
+export interface StatusStyle { lb: string; c: string; bg: string; bd: string }
+
+export function stOf(n: CanvasNode): StatusStyle {
+  // 열람 권한이 없으면 상태 자체가 정보이므로 배지를 그리지 않는다.
+  if (n.artifactMasked) return { lb: 'No access', c: T.dm2, bg: T.sf2, bd: T.ln };
+  if (!n.artifactId) return { lb: 'No source', c: T.dm2, bg: T.sf2, bd: T.ln };
+  switch (n.publishState) {
+    case 'newlyPublished':
+      return { lb: 'New', c: T.pr, bg: T.prSoft, bd: T.prLine };
+    case 'published':
+      return { lb: 'Published', c: T.ok, bg: T.okSoft, bd: T.okLine };
+    default:
+      return { lb: 'Not published', c: T.dm2, bg: T.sf2, bd: T.ln };
+  }
 }
 
-export interface StatusStyle { lb: string; c: string; bg: string; bd: string }
-export function stOf(d: CanvasNode): StatusStyle {
-  if (!d.versions.length) return { lb: 'Not submitted', c: T.dm2, bg: T.sf2, bd: T.ln };
-  if (hasW(d)) return { lb: 'In progress', c: T.am, bg: T.am2, bd: T.am3 };
-  return { lb: 'Released', c: T.tl, bg: T.tl2, bd: T.tl3 };
+/** 블록의 tier 배지 색 — 미매핑/마스킹이면 중립색으로 둔다. */
+export function tierStyle(n: CanvasNode): { fg: string; bg: string } {
+  if (!n.tier) return { fg: T.dm2, bg: T.sf3 };
+  return TIER_COLOR[n.tier];
 }
 
 /** "YYYY-MM-DD HH:mm" (목업 at 포맷) */

@@ -149,7 +149,7 @@ export function ArtifactDetailPage() {
             <Box sx={{ fontSize: 18, fontWeight: 700, letterSpacing: '-.01em' }}>{a.name}</Box>
             <Badge color={T.dm} bg={T.sf2} borderColor={T.ln}>{a.department}</Badge>
             {a.createdBy === user?.KnoxID && (
-              <Badge color={T.tl} bg={T.tl2} borderColor={T.tl3}>You registered this</Badge>
+              <Badge color={T.pr} bg={T.prSoft} borderColor={T.prLine}>You registered this</Badge>
             )}
             {a.myAccess === 'view' && <Badge color={T.dm} bg={T.sf2} borderColor={T.ln}>View only</Badge>}
           </Box>

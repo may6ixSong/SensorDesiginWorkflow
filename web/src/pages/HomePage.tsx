@@ -71,23 +71,34 @@ interface Palette {
   contactShadow: string;
 }
 
+/**
+ * 이 씬은 세 가지 색으로 역할을 구분한다 — **SIREN 판**, **identity(신원) 빔**,
+ * **observe(관측) 빔**.
+ *
+ * ★ SIREN 판은 앱 강조색(--s-pr, 인디고)과 **같은 색이어야 한다.** 예전에는 청록이었는데,
+ *   앱 전체가 인디고로 통일된 뒤로는 대문의 CTA만 혼자 초록이라 첫 화면부터 다른 제품처럼
+ *   보였다. 그래서 인디고를 SIREN 자리로 올리고, 원래 인디고가 맡던 identity 빔은 청록으로
+ *   내렸다 — 세 색이 여전히 서로 구분되면서 제품의 정체색은 하나가 된다.
+ * ★ 이 파일은 토큰(var(--s-*))을 쓸 수 없다 — 3D 변환과 그림자 계산에 실제 색 값이 필요해서
+ *   리터럴로 둔다. 대신 값은 index.html의 --s-pr 계열과 **같은 값**을 쓴다.
+ */
 const PALETTE: Record<'light' | 'dark', Palette> = {
   dark: {
     stageBg: '#0a0e14',
     aurora:
-      'radial-gradient(120% 78% at 50% 96%, rgba(12,154,131,.10), transparent 62%),' +
-      'radial-gradient(90% 60% at 50% 8%, rgba(123,126,232,.07), transparent 70%)',
+      'radial-gradient(120% 78% at 50% 96%, rgba(143,134,255,.11), transparent 62%),' +
+      'radial-gradient(90% 60% at 50% 8%, rgba(12,154,131,.07), transparent 70%)',
     gridLine:
       'linear-gradient(rgba(27,35,46,1) 1px, transparent 1px),' +
       'linear-gradient(90deg, rgba(27,35,46,1) 1px, transparent 1px)',
     gridMask: 'radial-gradient(58% 62% at 50% 50%, #000 32%, transparent 78%)',
-    planeBorder: 'rgba(12,154,131,.5)',
+    planeBorder: 'rgba(143,134,255,.48)',
     planeBg:
-      'linear-gradient(160deg, rgba(12,154,131,.13), rgba(12,154,131,.04) 55%, rgba(10,14,20,.22))',
-    planeShadow: '0 0 0 1px rgba(12,154,131,.10) inset, 0 26px 60px -30px rgba(12,154,131,.6)',
-    planeLabel: '#7fe8d3',
-    nodeBg: 'linear-gradient(180deg, rgba(19,32,38,.92), rgba(13,20,26,.9))',
-    nodeBorder: 'rgba(12,154,131,.42)',
+      'linear-gradient(160deg, rgba(143,134,255,.14), rgba(143,134,255,.04) 55%, rgba(10,14,20,.22))',
+    planeShadow: '0 0 0 1px rgba(143,134,255,.10) inset, 0 26px 60px -30px rgba(143,134,255,.6)',
+    planeLabel: '#bdb6ff',
+    nodeBg: 'linear-gradient(180deg, rgba(22,26,44,.92), rgba(14,17,30,.9))',
+    nodeBorder: 'rgba(143,134,255,.4)',
     slabBg: 'linear-gradient(178deg, #1d2733, #161e29 60%, #111823)',
     slabBorder: '#26313f',
     slabRim: 'linear-gradient(180deg, #0f151d, #0a0f16)',
@@ -98,36 +109,36 @@ const PALETTE: Record<'light' | 'dark', Palette> = {
     chipBorder: '#26313f',
     observe: '#f0a23c',
     observeSoft: 'rgba(255,204,128,.95)',
-    identity: '#7b7ee8',
-    identitySoft: 'rgba(170,173,250,.85)',
-    ctaBg: '#0c9a83',
-    ctaText: '#ffffff',
+    identity: '#2fb79c',
+    identitySoft: 'rgba(127,232,211,.85)',
+    ctaBg: '#8f86ff',
+    ctaText: '#0a0c14',
     ctaShadow: '0 4px 12px rgba(0,0,0,.35)',
     ctaShadowHover: '0 7px 16px rgba(0,0,0,.42)',
     rowBg: 'rgba(255,255,255,.04)',
-    ringA: 'rgba(12,154,131,.4)',
-    ringB: 'rgba(123,126,232,.36)',
-    moteA: '#7fe8d3',
-    moteB: '#aaadfa',
-    floorGlow: 'radial-gradient(50% 50% at 50% 50%, rgba(12,154,131,.16), transparent 72%)',
+    ringA: 'rgba(143,134,255,.4)',
+    ringB: 'rgba(12,154,131,.34)',
+    moteA: '#bdb6ff',
+    moteB: '#7fe8d3',
+    floorGlow: 'radial-gradient(50% 50% at 50% 50%, rgba(143,134,255,.16), transparent 72%)',
     contactShadow: 'radial-gradient(50% 50% at 50% 50%, rgba(0,0,0,.5), transparent 72%)',
   },
   light: {
     stageBg: '#eef1f5',
     aurora:
-      'radial-gradient(120% 78% at 50% 96%, rgba(12,154,131,.10), transparent 62%),' +
-      'radial-gradient(90% 60% at 50% 8%, rgba(90,94,180,.07), transparent 70%)',
+      'radial-gradient(120% 78% at 50% 96%, rgba(74,63,208,.10), transparent 62%),' +
+      'radial-gradient(90% 60% at 50% 8%, rgba(12,122,104,.07), transparent 70%)',
     gridLine:
       'linear-gradient(rgba(190,199,211,1) 1px, transparent 1px),' +
       'linear-gradient(90deg, rgba(190,199,211,1) 1px, transparent 1px)',
     gridMask: 'radial-gradient(58% 62% at 50% 50%, #000 32%, transparent 78%)',
-    planeBorder: 'rgba(12,120,103,.45)',
+    planeBorder: 'rgba(74,63,208,.42)',
     planeBg:
-      'linear-gradient(160deg, rgba(12,154,131,.12), rgba(12,154,131,.04) 55%, rgba(255,255,255,.5))',
-    planeShadow: '0 0 0 1px rgba(12,154,131,.10) inset, 0 22px 44px -26px rgba(20,60,54,.4)',
-    planeLabel: '#0a6d5e',
-    nodeBg: 'linear-gradient(180deg, #ffffff, #f4f7f8)',
-    nodeBorder: 'rgba(12,154,131,.4)',
+      'linear-gradient(160deg, rgba(74,63,208,.12), rgba(74,63,208,.04) 55%, rgba(255,255,255,.5))',
+    planeShadow: '0 0 0 1px rgba(74,63,208,.10) inset, 0 22px 44px -26px rgba(38,32,110,.4)',
+    planeLabel: '#3d33b4',
+    nodeBg: 'linear-gradient(180deg, #ffffff, #f5f5fa)',
+    nodeBorder: 'rgba(74,63,208,.36)',
     slabBg: 'linear-gradient(178deg, #ffffff, #f2f5f8 60%, #e8edf2)',
     slabBorder: '#ccd5de',
     slabRim: 'linear-gradient(180deg, #d9e0e7, #c3ccd6)',
@@ -138,18 +149,18 @@ const PALETTE: Record<'light' | 'dark', Palette> = {
     chipBorder: '#d6dde5',
     observe: '#c9781a',
     observeSoft: 'rgba(201,120,26,.9)',
-    identity: '#5e61c4',
-    identitySoft: 'rgba(94,97,196,.75)',
-    ctaBg: '#0c7a68',
+    identity: '#0c7a68',
+    identitySoft: 'rgba(12,122,104,.75)',
+    ctaBg: '#4a3fd0',
     ctaText: '#ffffff',
-    ctaShadow: '0 4px 10px rgba(12,122,104,.2)',
-    ctaShadowHover: '0 7px 14px rgba(12,122,104,.26)',
+    ctaShadow: '0 4px 10px rgba(74,63,208,.22)',
+    ctaShadowHover: '0 7px 14px rgba(74,63,208,.3)',
     rowBg: 'rgba(20,30,45,.035)',
-    ringA: 'rgba(12,120,103,.32)',
-    ringB: 'rgba(94,97,196,.28)',
-    moteA: '#0c9a83',
-    moteB: '#7376d6',
-    floorGlow: 'radial-gradient(50% 50% at 50% 50%, rgba(12,154,131,.14), transparent 72%)',
+    ringA: 'rgba(74,63,208,.3)',
+    ringB: 'rgba(12,122,104,.26)',
+    moteA: '#4a3fd0',
+    moteB: '#0c9a83',
+    floorGlow: 'radial-gradient(50% 50% at 50% 50%, rgba(74,63,208,.14), transparent 72%)',
     contactShadow: 'radial-gradient(50% 50% at 50% 50%, rgba(20,30,45,.28), transparent 72%)',
   },
 };

@@ -18,7 +18,7 @@
  *
  * DOM 측정은 하지 않는다 — 전부 해석적으로 나온다.
  */
-import { DeliverableDto, EdgeDto, Milestone, WorkflowDto } from '@/types/domain';
+import { BlockDto, EdgeDto, Milestone, WorkflowDto, isMaskedArtifact } from '@/types/domain';
 import { DAY_MS, DateRange, dayMs, rangeOf, ratioIn } from './schedule';
 import { DomainGroup, statusOf } from './domainWorkflow';
 
@@ -186,13 +186,13 @@ function bandState(start: string, end: string, now: number): MilestoneBand['stat
  * 도메인 그룹 + 마일스톤 + 산출물로 월드 전체 배치를 만든다.
  *
  * @param milestones 과제 공통 일정 — 배경 밴드이자 날짜축 범위의 일부.
- * @param deliverablesByWorkflow workflowId → 그 workflow가 주는 산출물(own).
+ * @param blocksByWorkflow workflowId → 그 workflow의 캔버스 블록.
  * @param edgesByWorkflow workflowId → 그 workflow 안의 산출물↔산출물 flow.
  */
 export function buildWorldLayout(
   domains: DomainGroup[],
   milestones: Milestone[],
-  deliverablesByWorkflow: Map<string, DeliverableDto[]>,
+  blocksByWorkflow: Map<string, BlockDto[]>,
   edgesByWorkflow: Map<string, EdgeDto[]>,
   now = Date.now(),
 ): WorldLayout {
@@ -223,7 +223,7 @@ export function buildWorldLayout(
     let rowCursorY = contentY;
     const rows: WorkflowRowLayout[] = domain.workflows.map((workflow) => {
       const phaseById = new Map((workflow.phases ?? []).map((p) => [p.id, p]));
-      const items = deliverablesByWorkflow.get(workflow.id) ?? [];
+      const items = blocksByWorkflow.get(workflow.id) ?? [];
 
       // x를 먼저 계산한다 — 실제 필요한 만큼만 세로로 갈라 주려면(아래 lane 배정) x가
       // 먼저 있어야 한다. 지터 없이 phase 종료일 그대로 쓴다 — 같은 날짜에 끝나는
@@ -280,8 +280,12 @@ export function buildWorldLayout(
         // 아주 살짝만 섞어 정돈된 느낌을 유지한다(너무 벌리면 크기가 들쭉날쭉해
         // 자유분방하게 보인다).
         const dia = BLOCK_D * (0.94 + rand01(`${d.id}:d`) * 0.12);
+        // serviceKey는 이제 산출물 실체(artifact)의 속성이다 — 미매핑이거나 열람 권한이
+        // 없어 마스킹된 블록은 null로 둔다.
+        const serviceKey =
+          d.artifact && !isMaskedArtifact(d.artifact) ? d.artifact.serviceKey : null;
         const block: BlockNode = {
-          id: d.id, name: d.name, serviceKey: d.serviceKey, status,
+          id: d.id, name: d.name, serviceKey, status,
           x, y, z, d: dia, phaseName: phase?.name ?? null, orphan,
         };
         centerOf.set(d.id, { x, y });

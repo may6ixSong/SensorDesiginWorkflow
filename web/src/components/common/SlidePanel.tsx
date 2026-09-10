@@ -1,11 +1,11 @@
-import { ReactNode, useEffect, useRef, useState } from 'react';
+import { ReactNode, useCallback, useEffect, useState } from 'react';
 import { Box } from '@mui/material';
+import { AnimatePresence, motion } from 'framer-motion';
+import { MOTION } from '@/theme/motion';
+import { useMotion } from '@/theme/useReducedMotion';
 import { T } from '@/theme/tokens';
 import { SirenButton } from './SirenButton';
 import { Icon } from './Icon';
-
-/** 열림 애니메이션 길이 — 너무 길지 않게(사용자 요청) 짧고 또렷하게. */
-const SLIDE_MS = 220;
 
 interface Props {
   open: boolean;
@@ -24,89 +24,97 @@ interface Props {
 /**
  * 우측에서 밀려 나오는 상세 패널. 산출물 상세처럼 "본문(내용)과 메타데이터를 나란히"
  * 봐야 하는 화면은 가운데 모달로 띄우면 폭이 모자라서, 캔버스를 덮지 않고 옆으로
- * 붙는 이 패널을 쓴다 (설계서 7.1의 모달 계열 컴포넌트에 추가).
+ * 붙는 이 패널을 쓴다.
+ *
+ * ★ 닫힘 애니메이션을 **여기서 직접 소유한다**.
+ *   호출부는 전부 `{node && <ArtifactSlide/>}` 꼴이라 onClose가 불리는 즉시 언마운트되고,
+ *   그러면 나가는 모션이 통째로 잘린다. 그래서 여기서 먼저 exit를 재생하고, 그게 끝난
+ *   다음에야 부모의 onClose를 부른다 — 호출부는 아무것도 바꾸지 않아도 된다.
  */
 export function SlidePanel({ open, onClose, width = '62vw', header, children, footer }: Props) {
-  /**
-   * open은 mount 시점부터 이미 true로 들어온다(호출부가 `{node && <Dialog/>}`로
-   * 조건부 렌더하기 때문) — 그래서 open을 그대로 transform에 쓰면 첫 프레임부터
-   * translateX(0)로 그려져 트랜지션이 일어날 시간이 없다(실측 확인된 버그). entered를
-   * 따로 두고 mount 다음 프레임에 true로 올려서, 그 사이에 CSS 트랜지션이 걸리게 한다.
-   */
-  const [entered, setEntered] = useState(false);
-  const raf2Ref = useRef<number>();
-  useEffect(() => {
-    if (!open) { setEntered(false); return undefined; }
-    const raf1 = requestAnimationFrame(() => {
-      raf2Ref.current = requestAnimationFrame(() => setEntered(true));
-    });
-    return () => {
-      cancelAnimationFrame(raf1);
-      if (raf2Ref.current) cancelAnimationFrame(raf2Ref.current);
-    };
-  }, [open]);
+  const m = useMotion();
+  const [shown, setShown] = useState(open);
+
+  useEffect(() => { setShown(open); }, [open]);
+
+  /** 닫기 요청 — 실제 언마운트(부모 onClose)는 exit가 끝난 뒤다. */
+  const requestClose = useCallback(() => setShown(false), []);
 
   useEffect(() => {
-    if (!open) return undefined;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
+    if (!shown) return undefined;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') requestClose(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
+  }, [shown, requestClose]);
 
   return (
-    <Box
-      sx={{
-        position: 'fixed', inset: 0, zIndex: 1300,
-        pointerEvents: entered ? 'auto' : 'none',
-      }}
-    >
-      <Box
-        onClick={onClose}
-        sx={{
-          position: 'absolute', inset: 0, background: T.backdrop,
-          opacity: entered ? 1 : 0, transition: `opacity ${SLIDE_MS}ms ease`,
-        }}
-      />
-      <Box
-        sx={{
-          position: 'absolute', top: 0, right: 0, bottom: 0,
-          width, maxWidth: '96vw', minWidth: 'min(760px, 96vw)',
-          background: T.sf2,
-          borderLeft: `1px solid ${T.ln}`,
-          boxShadow: T.shadowDialog,
-          display: 'flex', flexDirection: 'column',
-          transform: entered ? 'translateX(0)' : 'translateX(100%)',
-          transition: `transform ${SLIDE_MS}ms cubic-bezier(.22,.9,.3,1)`,
-        }}
-      >
-        <Box
-          sx={{
-            flex: '0 0 auto', padding: '15px 20px',
-            background: T.sf, borderBottom: `1px solid ${T.ln}`,
-            display: 'flex', alignItems: 'flex-start', gap: '10px',
-          }}
-        >
-          <Box sx={{ flex: 1, minWidth: 0 }}>{header}</Box>
-          <SirenButton variant="ghost" onClick={onClose} aria-label="Close">
-            <Icon name="x" />
-          </SirenButton>
-        </Box>
-
-        <Box sx={{ flex: 1, minHeight: 0, display: 'flex' }}>{children}</Box>
-
-        {footer && (
+    <AnimatePresence onExitComplete={onClose}>
+      {shown && (
+        <Box sx={{ position: 'fixed', inset: 0, zIndex: 1300 }}>
           <Box
+            component={motion.div}
+            onClick={requestClose}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={m(MOTION.fade)}
+            sx={{ position: 'absolute', inset: 0, background: T.backdrop }}
+          />
+          <Box
+            component={motion.div}
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
+            transition={m(MOTION.panel)}
             sx={{
-              flex: '0 0 auto', padding: '12px 20px',
-              borderTop: `1px solid ${T.ln}`, background: T.sf,
+              position: 'absolute', top: 0, right: 0, bottom: 0,
+              // minWidth가 width보다 크면 호출부가 준 폭이 무시된다 — 하한은 "너무 좁아
+              // 읽을 수 없는" 선(420px)까지만 둔다.
+              width, maxWidth: '96vw', minWidth: 'min(420px, 96vw)',
+              background: T.sf2,
+              borderLeft: `1px solid ${T.ln}`,
+              boxShadow: T.shXl,
+              display: 'flex', flexDirection: 'column',
             }}
           >
-            {footer}
+            <Box
+              sx={{
+                flex: '0 0 auto', padding: '15px 20px',
+                background: T.sf, borderBottom: `1px solid ${T.ln}`,
+                display: 'flex', alignItems: 'flex-start', gap: '10px',
+              }}
+            >
+              <Box sx={{ flex: 1, minWidth: 0 }}>{header}</Box>
+              <SirenButton variant="ghost" onClick={requestClose} aria-label="Close">
+                <Icon name="x" />
+              </SirenButton>
+            </Box>
+
+            {/* 본문은 한 줄로 늘어놓는 곳이 아니라 위에서 아래로 쌓는 곳이다 —
+                호출부가 padding까지 따로 신경 쓰지 않도록 여기서 함께 준다. */}
+            <Box
+              sx={{
+                flex: 1, minHeight: 0, overflowY: 'auto',
+                display: 'flex', flexDirection: 'column',
+                padding: '16px 20px 22px',
+              }}
+            >
+              {children}
+            </Box>
+
+            {footer && (
+              <Box
+                sx={{
+                  flex: '0 0 auto', padding: '12px 20px',
+                  borderTop: `1px solid ${T.ln}`, background: T.sf,
+                }}
+              >
+                {footer}
+              </Box>
+            )}
           </Box>
-        )}
-      </Box>
-    </Box>
+        </Box>
+      )}
+    </AnimatePresence>
   );
 }

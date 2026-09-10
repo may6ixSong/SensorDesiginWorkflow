@@ -45,9 +45,6 @@ interface CanvasState {
    * 유도한다(BoardPage의 addDlg onCreate 핸들러 참고).
    */
   addDlgIntent: 'own' | 'received';
-  hldDlg: boolean;
-  hldSel: string | null;
-  hldBack: boolean;
   phInfo: string | null;
   /**
    * Workflow settings dialog(Details/Schedule/Permissions 탭) 열림 여부 — 열려 있으면 그
@@ -56,7 +53,6 @@ interface CanvasState {
    */
   workflowSettingsTab: WorkflowSettingsTab | null;
   /** Incoming 카드 클릭 시 선택된 산출물 id — 읽기 전용 상세 dialog에 쓰인다. */
-  incomingId: string | null;
   /** 새로 추가된 블록 id — 설정되면 Canvas가 뷰포트를 그 블록으로 이동시키고 비운다. */
   focusReq: string | null;
   /**
@@ -101,12 +97,8 @@ interface CanvasState {
   openDeliverable: (id: string | null) => void;
   setNoteDlg: (id: string | null) => void;
   setAddDlg: (v: boolean, intent?: CanvasState['addDlgIntent']) => void;
-  setHldDlg: (v: boolean, sel?: string | null) => void;
-  setHldSel: (id: string | null) => void;
-  setHldBack: (v: boolean) => void;
   setPhInfo: (id: string | null) => void;
   setWorkflowSettingsTab: (tab: WorkflowSettingsTab | null) => void;
-  setIncomingId: (id: string | null) => void;
   setFocusReq: (id: string | null) => void;
   setIncomingOverride: (id: string, x: number, y: number, phase: string) => void;
   /** 블록 재렌더 트리거용 카운터 (드래그 커밋 후 등) */
@@ -135,12 +127,8 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   noteDlg: null,
   addDlg: false,
   addDlgIntent: 'own',
-  hldDlg: false,
-  hldSel: null,
-  hldBack: false,
   phInfo: null,
   workflowSettingsTab: null,
-  incomingId: null,
   focusReq: null,
   incomingOverrides: {},
   sessionAddedDeliverableIds: [],
@@ -213,12 +201,8 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   openDeliverable: (id) => set({ openId: id }),
   setNoteDlg: (id) => set({ noteDlg: id }),
   setAddDlg: (v, intent) => set({ addDlg: v, addDlgIntent: intent ?? 'own' }),
-  setHldDlg: (v, sel) => set({ hldDlg: v, hldSel: sel === undefined ? null : sel }),
-  setHldSel: (id) => set({ hldSel: id }),
-  setHldBack: (v) => set({ hldBack: v }),
   setPhInfo: (id) => set({ phInfo: id }),
   setWorkflowSettingsTab: (tab) => set({ workflowSettingsTab: tab }),
-  setIncomingId: (id) => set({ incomingId: id }),
   setFocusReq: (id) => set({ focusReq: id }),
   setIncomingOverride: (id, x, y, phase) =>
     set((s) => ({ incomingOverrides: { ...s.incomingOverrides, [id]: { x, y, phase } } })),

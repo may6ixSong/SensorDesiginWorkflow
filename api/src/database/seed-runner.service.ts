@@ -6,10 +6,11 @@ import { isUsingRealDb } from './model-registration';
 import { seedDatabase } from './seed-data';
 import { ProjectDocument } from '../projects/schemas/project.schema';
 import { WorkflowDocument } from '../workflows/schemas/workflow.schema';
-import { DeliverableDocument } from '../deliverables/schemas/deliverable.schema';
+import { ArtifactDocument } from '../artifacts/schemas/artifact.schema';
+import { BlockDocument } from '../blocks/schemas/block.schema';
 import { MemoDocument } from '../memos/schemas/memo.schema';
 import { EdgeDocument } from '../edges/schemas/edge.schema';
-import { HldReleaseDocument } from '../hld/schemas/hld-release.schema';
+import { ReleaseDocument } from '../releases/schemas/release.schema';
 import { ArtifactServiceDocument } from '../hub/schemas/artifact-service.schema';
 
 const MOCK_FILTER = { isMock: true };
@@ -36,10 +37,11 @@ export class SeedRunnerService implements OnModuleInit {
     private readonly config: ConfigService,
     @Inject(getModelToken('Project')) private readonly projectModel: Model<ProjectDocument>,
     @Inject(getModelToken('Workflow')) private readonly workflowModel: Model<WorkflowDocument>,
-    @Inject(getModelToken('Deliverable')) private readonly deliverableModel: Model<DeliverableDocument>,
+    @Inject(getModelToken('Artifact')) private readonly artifactModel: Model<ArtifactDocument>,
+    @Inject(getModelToken('Block')) private readonly blockModel: Model<BlockDocument>,
     @Inject(getModelToken('Memo')) private readonly memoModel: Model<MemoDocument>,
     @Inject(getModelToken('Edge')) private readonly edgeModel: Model<EdgeDocument>,
-    @Inject(getModelToken('HldRelease')) private readonly hldReleaseModel: Model<HldReleaseDocument>,
+    @Inject(getModelToken('Release')) private readonly releaseModel: Model<ReleaseDocument>,
     @Inject(getModelToken('ArtifactService')) private readonly artifactServiceModel: Model<ArtifactServiceDocument>,
   ) {}
 
@@ -48,10 +50,11 @@ export class SeedRunnerService implements OnModuleInit {
     return [
       this.projectModel,
       this.workflowModel,
-      this.deliverableModel,
+      this.artifactModel,
+      this.blockModel,
       this.memoModel,
       this.edgeModel,
-      this.hldReleaseModel,
+      this.releaseModel,
     ];
   }
 
@@ -83,10 +86,11 @@ export class SeedRunnerService implements OnModuleInit {
         ArtifactService: this.artifactServiceModel,
         Project: this.projectModel,
         Workflow: this.workflowModel,
-        Deliverable: this.deliverableModel,
+        Artifact: this.artifactModel,
+        Block: this.blockModel,
         Memo: this.memoModel,
         Edge: this.edgeModel,
-        HldRelease: this.hldReleaseModel,
+        Release: this.releaseModel,
       });
       this.logger.log('목업 시드 완료. (isMock:true로 표시되어 있어 플래그를 false로 바꾸면 일괄 삭제됩니다.)');
     } catch (err) {

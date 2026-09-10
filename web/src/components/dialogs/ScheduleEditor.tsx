@@ -168,9 +168,9 @@ export function ScheduleEditor({ spans, noun, onSubmit, saving, error, extraActi
                 sx={{
                   display: 'inline-flex', alignItems: 'center', gap: '6px',
                   fontFamily: FONT_MONO, fontSize: 11, padding: '4px 9px', borderRadius: '7px',
-                  border: `1px solid ${overlapping.has(s.id) ? T.vi3 : T.ln2}`,
-                  background: overlapping.has(s.id) ? T.vi2 : T.sf2,
-                  color: overlapping.has(s.id) ? T.vi : T.dm,
+                  border: `1px solid ${overlapping.has(s.id) ? T.prLine : T.ln2}`,
+                  background: overlapping.has(s.id) ? T.prSoft : T.sf2,
+                  color: overlapping.has(s.id) ? T.pr : T.dm,
                 }}
               >
                 {s.name}
@@ -183,8 +183,8 @@ export function ScheduleEditor({ spans, noun, onSubmit, saving, error, extraActi
         </Box>
       )}
 
-      {firstErr && <Box sx={{ fontSize: 11.5, color: T.rd, mt: '10px' }}>{firstErr}</Box>}
-      {error && <Box sx={{ fontSize: 11.5, color: T.rd, mt: '10px' }}>{error}</Box>}
+      {firstErr && <Box sx={{ fontSize: 11.5, color: T.danger, mt: '10px' }}>{firstErr}</Box>}
+      {error && <Box sx={{ fontSize: 11.5, color: T.danger, mt: '10px' }}>{error}</Box>}
 
       <SirenButton variant="primary" onClick={submit} disabled={saving} sx={{ mt: '16px' }}>
         <Icon name="check" /> {saving ? t('schedule.saving') : t('schedule.save')}

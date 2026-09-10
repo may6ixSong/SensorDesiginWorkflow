@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient, ApiEnvelope } from '../client';
 import { queryKeys } from '../queryKeys';
-import { WorkflowBriefDto, WorkflowDto, Milestone, ProjectDetailDto, ProjectDto } from '@/types/domain';
+import { WorkflowDto, Milestone, ProjectDetailDto, ProjectDto } from '@/types/domain';
 
 export function useProjects() {
   return useQuery({
@@ -92,29 +92,10 @@ export function useUpdateProjectDepartments(projectId: string) {
   });
 }
 
-/**
- * workflow 하나를 부서에 재배정한다 (빈 문자열이면 배정 해제) — unassigned 상태를 고치거나
- * 다른 부서로 옮길 때 쓴다. 요청하는 사람 본인이 그 부서에 속해 있어야 BE가 받아준다.
- * projectWorkflows를 반드시 무효화해야 한다 — 그 목록이 Design Workflow view의
- * buildDomainModel 입력이라, 여기서 안 갱신하면 우주 지도의 항성계가 예전 부서로 남는다.
- */
-export function useUpdateWorkflowDomain(projectId: string) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ workflowId, domain }: { workflowId: string; domain: string }) => {
-      const res = await apiClient.patch<ApiEnvelope<ProjectDetailDto>>(
-        `/projects/${projectId}/workflows/${workflowId}/domain`,
-        { domain },
-      );
-      return { project: res.data.data, workflowId };
-    },
-    onSuccess: ({ project, workflowId }) => {
-      qc.setQueryData(queryKeys.project(projectId), project);
-      qc.invalidateQueries({ queryKey: queryKeys.projectWorkflows(projectId) });
-      qc.invalidateQueries({ queryKey: queryKeys.workflow(workflowId) });
-    },
-  });
-}
+// workflow 부서 재배정 훅은 사라졌다 — Name/Description/Department가 화면의 Save 버튼
+// 하나로 묶이면서 `PATCH /workflows/:id`(useUpdateWorkflow)로 옮겨갔다. 그쪽이
+// editAccess의 부서 교체까지 한 번에 처리한다(설계서 02장 §7.2).
+
 
 /**
  * 과제 팀원(부서별 로스터)에 인원을 추가한다 — 이 과제의 workflow 중 하나라도 Edit 권한이
@@ -188,7 +169,7 @@ export function useProjectMilestones(projectId: string | undefined) {
 /**
  * 새 workflow를 만든다 — phase는 서버가 이 과제의 마일스톤을 복사해 채워 준다(사용자 요청:
  * "default로는 과제의 milestone이 들어가고"). 만든 사람이 곧 대표 담당자가 되므로 바로
- * 편집할 수 있다. domain은 만드는 사람이 이 과제에서 실제로 속한 부서 중 하나여야 하며
+ * 편집할 수 있다. department는 만드는 사람이 이 과제에서 실제로 속한 부서 중 하나여야 하며
  * (BE가 재검증), creatorIsAdmin은 소속 부서가 하나도 없는 admin이 예외적으로 unassigned
  * workflow를 만들 수 있게 하는 신호다.
  */
@@ -196,7 +177,7 @@ export function useCreateWorkflow(projectId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (payload: {
-      name: string; domain: string; creatorIsAdmin?: boolean; description?: string; color?: string;
+      name: string; department: string; description?: string; color?: string;
     }) => {
       const res = await apiClient.post<ApiEnvelope<WorkflowDto>>(`/projects/${projectId}/workflows`, payload);
       return res.data.data;
@@ -204,13 +185,19 @@ export function useCreateWorkflow(projectId: string) {
     onSuccess: (workflow) => {
       qc.setQueryData(queryKeys.workflow(workflow.id), workflow);
       qc.invalidateQueries({ queryKey: queryKeys.projectWorkflows(projectId) });
-      qc.invalidateQueries({ queryKey: queryKeys.projectWorkflowDirectory(projectId) });
       qc.invalidateQueries({ queryKey: queryKeys.project(projectId) });
     },
   });
 }
 
-/** Edit 또는 View 권한이 있는 workflow만 반환 (설계서 5.1). */
+/**
+ * 이 과제의 workflow **전체**를 반환한다 — 권한 없는 것도 포함된다.
+ *
+ * ★ 목록에서 빼지 않는 이유는 Information page가 "존재는 보여주되 disabled로 잠근다"를
+ *   그려야 하기 때문이다(설계서 01장 §3.7). 각 항목의 `myAccess`가 null이면 그 workflow는
+ *   이름·부서 외에 아무 값도 담고 있지 않다.
+ * ★ app bar의 select는 `myAccess === null`인 항목을 option에서 **뺀다**.
+ */
 export function useProjectWorkflows(projectId: string | undefined) {
   return useQuery({
     queryKey: queryKeys.projectWorkflows(projectId ?? ''),
@@ -222,17 +209,6 @@ export function useProjectWorkflows(projectId: string | undefined) {
   });
 }
 
-/**
- * 과제 소속 workflow 전체를 가볍게(id/name/color) 반환한다 — 개인 접근 권한과 무관하게
- * 산출물의 "수신 workflow"를 지정하는 셀렉트 박스에서 쓴다.
- */
-export function useProjectWorkflowDirectory(projectId: string | undefined) {
-  return useQuery({
-    queryKey: queryKeys.projectWorkflowDirectory(projectId ?? ''),
-    enabled: Boolean(projectId),
-    queryFn: async () => {
-      const res = await apiClient.get<ApiEnvelope<WorkflowBriefDto[]>>(`/projects/${projectId}/workflow-directory`);
-      return res.data.data;
-    },
-  });
-}
+// workflow-directory 훅도 사라졌다 — 산출물의 수신 workflow(recvWorkflowId) 개념이
+// 폐기되고 recipient(부서/사용자)로 대체되었다(설계서 04장 §3).
+

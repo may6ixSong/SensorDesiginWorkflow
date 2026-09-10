@@ -1,4 +1,5 @@
 import { Route, Routes } from 'react-router-dom';
+import { PageTransition } from '@/app/PageTransition';
 import { CircularProgress, Stack } from '@mui/material';
 import { useAuth } from '@/app/providers/AuthProvider';
 import { DetailsRedirect } from '@/pages/DetailsRedirect';
@@ -42,6 +43,7 @@ function LoginGate({ children }: { children: React.ReactNode }) {
 export default function App() {
   return (
     <LoginGate>
+      <PageTransition>
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/projects" element={<ProjectListPage />} />
@@ -56,6 +58,7 @@ export default function App() {
         <Route path="/guide" element={<GuidePage />} />
         <Route path="/no-access" element={<NoAccessPage />} />
       </Routes>
+      </PageTransition>
     </LoginGate>
   );
 }

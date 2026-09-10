@@ -67,8 +67,32 @@ function ArtifactList({ project }: { project: ProjectDetailDto }) {
       </Box>
 
       {isError ? (
-        <Box sx={{ fontSize: 12.5, color: T.dm }}>Could not reach Calypso. Check CALYPSO_API and its CORS_ORIGIN.</Box>
-      ) : isLoading ? null : data.length === 0 ? (
+        <Box
+          sx={{
+            border: `1px solid ${T.dangerLine}`, background: T.dangerSoft, color: T.danger,
+            borderRadius: '12px', padding: '18px 20px', fontSize: 12.5, lineHeight: 1.65,
+          }}
+        >
+          <Box sx={{ fontWeight: 700, mb: '4px' }}>Could not reach Calypso</Box>
+          This list lives in Calypso, not in SIREN. Check <code>CALYPSO_API</code> and its
+          {' '}<code>CORS_ORIGIN</code>, then reload.
+        </Box>
+      ) : isLoading ? (
+        /* 로딩 중에 아무것도 안 그리면 "빈 목록"과 구분이 안 된다 — 특히 Calypso가 응답하지
+           않아 재시도가 도는 동안 화면이 통째로 비어 보였다(실측). 자리만이라도 잡아 둔다. */
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
+          {[0, 1, 2].map((i) => (
+            <Box
+              key={i}
+              sx={{
+                height: 62, borderRadius: '12px', border: `1px solid ${T.ln}`, background: T.sf,
+                animation: 'sirenPulse 1.4s ease-in-out infinite',
+                animationDelay: `${i * 0.16}s`,
+              }}
+            />
+          ))}
+        </Box>
+      ) : data.length === 0 ? (
         <Box
           sx={{
             border: `1px dashed ${T.ln2}`, borderRadius: '12px', background: T.sf,
@@ -113,10 +137,10 @@ function ArtifactRow({ artifact: a, onOpen }: { artifact: CalypsoArtifact; onOpe
         padding: '12px 16px', border: `1px solid ${T.ln}`, borderRadius: '10px',
         background: T.sf, cursor: CURSOR_POINTER,
         transition: 'border-color .14s, box-shadow .14s',
-        '&:hover': { borderColor: T.ln2, boxShadow: T.ss },
+        '&:hover': { borderColor: T.ln2, boxShadow: T.shXs },
       }}
     >
-      <Box component="span" sx={{ color: T.tl, flex: '0 0 auto' }}>
+      <Box component="span" sx={{ color: T.pr, flex: '0 0 auto' }}>
         <Icon name="word" size={17} />
       </Box>
 
@@ -138,7 +162,7 @@ function ArtifactRow({ artifact: a, onOpen }: { artifact: CalypsoArtifact; onOpe
         </Box>
       </Box>
 
-      <Box sx={{ fontFamily: FONT_MONO, fontSize: 11.5, color: v?.isReleased ? T.tl : T.dm2, flex: '0 0 90px', textAlign: 'right' }}>
+      <Box sx={{ fontFamily: FONT_MONO, fontSize: 11.5, color: v?.isReleased ? T.pr : T.dm2, flex: '0 0 90px', textAlign: 'right' }}>
         {v ? `v${v.versionLabel}${v.isReleased ? '' : ' (w)'}` : 'No versions'}
       </Box>
 
@@ -216,7 +240,7 @@ function RegisterDialog({
       ) : (
         <Field label="Department">
           <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '3px 0' }}>
-            <Badge color={T.tl} bg={T.tl2} borderColor={T.tl3}>{autoDept}</Badge>
+            <Badge color={T.pr} bg={T.prSoft} borderColor={T.prLine}>{autoDept}</Badge>
             <Box sx={{ fontSize: 11, color: T.dm2 }}>assigned from your project membership</Box>
           </Box>
         </Field>

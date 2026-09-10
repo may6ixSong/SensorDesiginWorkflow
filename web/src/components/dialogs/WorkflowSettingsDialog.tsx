@@ -1,12 +1,14 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Box } from '@mui/material';
 import { useTranslation } from 'react-i18next';
-import { Milestone, WorkflowDto } from '@/types/domain';
+import { AccessGrant, Milestone, WorkflowDto } from '@/types/domain';
 import { ModalShell } from '@/components/common/ModalShell';
 import { SirenButton } from '@/components/common/SirenButton';
 import { Ey, Field, SelectInput, TextInput } from '@/components/common/Panel';
+import { TabPanel, Tabs } from '@/components/common/Tabs';
 import { Icon } from '@/components/common/Icon';
-import { CURSOR_POINTER, T } from '@/theme/tokens';
+import { ConfirmDialog } from '@/components/dialogs/ConfirmDialog';
+import { R, T } from '@/theme/tokens';
 import { ScheduleDraft } from './ScheduleEditor';
 import { WorkflowPhasesPanel } from './WorkflowPhasesPanel';
 import { WorkflowPermissionPanel } from './WorkflowPermissionPanel';
@@ -15,57 +17,55 @@ export type WorkflowSettingsTab = 'details' | 'schedule' | 'permissions';
 
 interface Props {
   workflow: WorkflowDto;
-  /** Edit 권한자 — Details/Schedule 탭은 이 사람에게만 뜬다. Permissions는 view 권한자도 볼 수 있다. */
+  /** Edit 권한자 — View 권한자에게는 이 dialog로 들어오는 버튼 자체가 없다. */
   own: boolean;
   initialTab: WorkflowSettingsTab;
   milestones: Milestone[];
   orphanCount: number;
   onClose: () => void;
 
-  onSaveDetails: (p: { name: string; description: string }) => void;
-  savingDetails?: boolean;
-  detailsError?: string | null;
+  /**
+   * Name / Description / Department를 **한 번에** 저장한다(설계서 02장 §7.2).
+   * 화면의 Save 버튼이 하나이므로 API도 하나다.
+   */
+  onSave: (p: { name: string; description: string; department: string }) => void;
+  saving?: boolean;
+  saveError?: string | null;
 
-  /** 편집자 본인이 이 과제에서 속한 부서 — Details 탭의 department 재배정 picker가 이 중에서만 고를 수 있게 한다. */
+  /** 부서 후보 — 내가 이 과제에서 속한 부서(Admin이면 과제 전체). */
   myDepartments: string[];
-  onChangeDomain: (domain: string) => void;
-  changingDomain?: boolean;
+  /** 권한 편집용 부서 후보 — 그 과제에 등록된 부서 전체. */
+  departmentOptions: string[];
 
   onSavePhases: (phases: ScheduleDraft[]) => void;
   savingPhases?: boolean;
   phasesError?: string | null;
 
-  onAddOwner: (knoxId: string, department: string) => void;
-  onRemoveOwner: (knoxId: string) => void;
-  onAddViewGrant: (knoxId: string, department: string) => void;
-  onRemoveViewGrant: (knoxId: string) => void;
+  onSaveAccess: (p: { editAccess: AccessGrant; viewAccess: AccessGrant }) => void;
+  savingAccess?: boolean;
 }
 
 /**
- * Workflow 하나의 설정 — Details(이름/설명) / Schedule(일정) / Permissions(담당자·권한)를
- * 탭으로 묶은 단일 진입점. 예전에는 헤더에 "Edit phases"·"Owners & permissions" 아이콘
- * 버튼이 따로 있었지만(사용자 요청으로 통합), 여기서는 workflow명 옆 연필 버튼 하나로
- * 들어와 탭으로 갈아탄다.
+ * Workflow 하나의 설정 — Details / Schedule / Permissions를 탭으로 묶은 단일 진입점.
  *
- * Details/Schedule은 Edit 권한자만 고칠 수 있으므로 그 탭 자체를 own일 때만 보여준다 —
- * Permissions는 view 권한자도 현재 담당자를 볼 수 있어야 하므로 항상 보인다
- * (WorkflowPermissionPanel이 own이 아니면 내부적으로 읽기 전용으로 그린다).
+ * ★ View 권한자에게는 이 dialog를 여는 버튼 자체가 없다(설계서 01장 §3.8). 그래서 예전처럼
+ *   "Permissions 탭만 읽기 전용으로 열어 두는" 분기가 사라졌다.
  */
 export function WorkflowSettingsDialog({
   workflow, own, initialTab, milestones, orphanCount, onClose,
-  onSaveDetails, savingDetails, detailsError,
-  myDepartments, onChangeDomain, changingDomain,
+  onSave, saving, saveError,
+  myDepartments, departmentOptions,
   onSavePhases, savingPhases, phasesError,
-  onAddOwner, onRemoveOwner, onAddViewGrant, onRemoveViewGrant,
+  onSaveAccess, savingAccess,
 }: Props) {
   const { t } = useTranslation();
   const tabs: { key: WorkflowSettingsTab; label: string }[] = [
-    ...(own ? [{ key: 'details' as const, label: t('workflow.tabDetails') }] : []),
-    ...(own ? [{ key: 'schedule' as const, label: t('workflow.tabSchedule') }] : []),
+    { key: 'details', label: t('workflow.tabDetails') },
+    { key: 'schedule', label: t('workflow.tabSchedule') },
     { key: 'permissions', label: t('workflow.tabPermissions') },
   ];
   const [tab, setTab] = useState<WorkflowSettingsTab>(
-    tabs.some((x) => x.key === initialTab) ? initialTab : tabs[0].key,
+    tabs.some((x) => x.key === initialTab) ? initialTab : 'details',
   );
 
   return (
@@ -79,121 +79,197 @@ export function WorkflowSettingsDialog({
           <Box sx={{ fontSize: 17, fontWeight: 700, mt: '2px' }}>{workflow.name}</Box>
         </>
       }
-      belowHeader={
-        <Box sx={{ display: 'flex', gap: '2px', mt: '11px', borderBottom: `1px solid ${T.ln}` }}>
-          {tabs.map(({ key, label }) => (
-            <Box
-              key={key}
-              component="button"
-              onClick={() => setTab(key)}
-              sx={{
-                padding: '8px 13px', fontSize: 12.5, fontWeight: 500, fontFamily: 'inherit',
-                color: tab === key ? T.tl : T.dm, background: 'none', border: 'none',
-                borderBottom: `2px solid ${tab === key ? T.tl : 'transparent'}`,
-                mb: '-1px', cursor: CURSOR_POINTER,
-              }}
-            >
-              {label}
-            </Box>
-          ))}
-        </Box>
-      }
+      belowHeader={<Tabs tabs={tabs} value={tab} onChange={setTab} sx={{ mt: '11px' }} />}
     >
-      {tab === 'details' && (
-        <DetailsTab
-          workflow={workflow}
-          onSave={onSaveDetails}
-          saving={savingDetails}
-          error={detailsError}
-          myDepartments={myDepartments}
-          onChangeDomain={onChangeDomain}
-          changingDomain={changingDomain}
-        />
-      )}
-      {tab === 'schedule' && (
-        <WorkflowPhasesPanel
-          phases={workflow.phases}
-          milestones={milestones}
-          orphanCount={orphanCount}
-          onSave={onSavePhases}
-          saving={savingPhases}
-          error={phasesError}
-        />
-      )}
-      {tab === 'permissions' && (
-        <WorkflowPermissionPanel
-          workflow={workflow}
-          own={own}
-          onAddOwner={onAddOwner}
-          onRemoveOwner={onRemoveOwner}
-          onAddViewGrant={onAddViewGrant}
-          onRemoveViewGrant={onRemoveViewGrant}
-        />
-      )}
+      <TabPanel tabKey={tab}>
+        {tab === 'details' && (
+          <DetailsTab
+            workflow={workflow}
+            myDepartments={myDepartments}
+            onSave={onSave}
+            saving={saving}
+            error={saveError}
+          />
+        )}
+        {tab === 'schedule' && (
+          <WorkflowPhasesPanel
+            phases={workflow.phases}
+            milestones={milestones}
+            orphanCount={orphanCount}
+            onSave={onSavePhases}
+            saving={savingPhases}
+            error={phasesError}
+          />
+        )}
+        {tab === 'permissions' && (
+          <PermissionsTab
+            workflow={workflow}
+            own={own}
+            departmentOptions={departmentOptions}
+            onSaveAccess={onSaveAccess}
+            saving={savingAccess}
+          />
+        )}
+      </TabPanel>
     </ModalShell>
   );
 }
 
+/**
+ * Name → Description → Department 순으로 세우고 그 아래 Save 하나를 둔다
+ * (설계서 README §3.2).
+ *
+ * ★ Save를 누르면 **항상 confirm**을 거친다.
+ * ★ Department가 바뀐 경우에만 confirm 안에 **주황색 경고**를 덧붙인다 — 부서 변경은
+ *   editAccess 교체를 동반해 사실상 권한 이양이기 때문이다(설계서 01장 §3.5).
+ */
 function DetailsTab({
-  workflow, onSave, saving, error, myDepartments, onChangeDomain, changingDomain,
+  workflow, myDepartments, onSave, saving, error,
 }: {
-  workflow: WorkflowDto; onSave: Props['onSaveDetails']; saving?: boolean; error?: string | null;
-  myDepartments: string[]; onChangeDomain: (domain: string) => void; changingDomain?: boolean;
+  workflow: WorkflowDto;
+  myDepartments: string[];
+  onSave: Props['onSave'];
+  saving?: boolean;
+  error?: string | null;
 }) {
   const { t } = useTranslation();
   const [name, setName] = useState(workflow.name);
   const [description, setDescription] = useState(workflow.description);
+  const [department, setDepartment] = useState(workflow.department);
   const [nameErr, setNameErr] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  const departmentChanged = department !== workflow.department;
+
+  /**
+   * 지금 배정된 부서가 내 부서 목록에 없을 수 있다(다른 사람이 만들었거나, 내가 부서를
+   * 옮겼거나). 그 값을 셀렉트에서 지워버리면 화면이 거짓말을 하게 되므로, 선택된 채로
+   * 비활성 항목으로 목록 맨 위에 끼워 보여준다(설계서 01장 §3.5).
+   */
+  const options = useMemo(() => {
+    const current = (workflow.department ?? '').trim();
+    const mine = myDepartments.map((d) => ({ value: d, label: d }));
+    if (current && !myDepartments.includes(current)) {
+      return [{ value: current, label: current, disabled: true }, ...mine];
+    }
+    return mine;
+  }, [workflow.department, myDepartments]);
 
   const submit = () => {
     if (!name.trim()) { setNameErr(true); return; }
-    onSave({ name: name.trim(), description: description.trim() });
+    setConfirmOpen(true);
   };
-
-  const currentDomain = (workflow.domain ?? '').trim();
-  // 지금 배정된 부서가 편집자 본인의 부서 목록에 없을 수 있다(다른 사람이 만들었거나,
-  // 그 사람이 그 사이 다른 부서로 옮겨졌거나) — 그 값을 셀렉트에서 지워버리면 화면이
-  // "Unassigned"라고 거짓말을 하게 되니 옵션에 그대로 끼워 보여준다.
-  const domainOptions = [
-    { value: '', label: 'Unassigned' },
-    ...(currentDomain && !myDepartments.includes(currentDomain)
-      ? [{ value: currentDomain, label: `${currentDomain} (not your department)` }]
-      : []),
-    ...myDepartments.map((d) => ({ value: d, label: d })),
-  ];
 
   return (
     <>
       <Field label={t('workflow.nameLabel')}>
         <TextInput value={name} onChange={(v) => { setName(v); setNameErr(false); }} error={nameErr} />
       </Field>
+
       <Field label={t('workflow.descriptionLabel')}>
-        <TextInput value={description} onChange={setDescription} placeholder="One line about what this workflow covers" />
+        <TextInput
+          value={description}
+          onChange={setDescription}
+          placeholder="One line about what this workflow covers"
+        />
       </Field>
 
-      {error && <Box sx={{ fontSize: 11.5, color: T.rd, mb: '10px' }}>{error}</Box>}
+      <Field label={t('workflow.departmentLabel')}>
+        <SelectInput value={department} onChange={setDepartment} options={options} />
+        {/* dropdown 바로 아래에 이 값이 무엇을 뜻하는지 한 줄로 알려 준다. */}
+        <Box sx={{ fontSize: 11.5, color: T.dm2, mt: '6px' }}>{t('workflow.departmentHint')}</Box>
+      </Field>
+
+      {error && <Box sx={{ fontSize: 11.5, color: T.danger, mb: '10px' }}>{error}</Box>}
 
       <SirenButton variant="primary" onClick={submit} disabled={saving}>
-        <Icon name="check" /> {saving ? 'Saving…' : t('workflow.saveDetails')}
+        <Icon name="check" /> {saving ? 'Saving…' : t('workflow.save')}
       </SirenButton>
 
-      <Box sx={{ mt: '22px', pt: '18px', borderTop: `1px solid ${T.ln}` }}>
-        <Field label="Department">
-          {myDepartments.length === 0 ? (
-            <Box sx={{ fontSize: 12, color: T.dm2 }}>
-              You don't belong to any department in this project, so you can't reassign this workflow.
-              {currentDomain ? ` Currently: ${currentDomain}.` : ' Currently unassigned.'}
+      {confirmOpen && (
+        <ConfirmDialog
+          title={t('workflow.saveConfirmTitle')}
+          message={t('workflow.saveConfirmMessage')}
+          confirmLabel={t('workflow.save')}
+          danger={false}
+          onCancel={() => setConfirmOpen(false)}
+          onConfirm={() => {
+            setConfirmOpen(false);
+            onSave({ name: name.trim(), description: description.trim(), department });
+          }}
+        >
+          {departmentChanged && (
+            <Box
+              sx={{
+                display: 'flex', alignItems: 'flex-start', gap: '8px',
+                background: T.warnSoft, border: `1px solid ${T.warnLine}`,
+                color: T.warn, borderRadius: `${R.sm}px`,
+                padding: '10px 12px', fontSize: 12.5, lineHeight: 1.55, mt: '12px',
+              }}
+            >
+              <Box sx={{ mt: '1px', flexShrink: 0 }}><Icon name="warn" /></Box>
+              <Box>
+                <Box sx={{ fontWeight: 700, mb: '2px' }}>
+                  {workflow.department} → {department}
+                </Box>
+                {t('workflow.departmentChangeWarning')}
+              </Box>
             </Box>
-          ) : (
-            <SelectInput
-              value={currentDomain}
-              disabled={changingDomain}
-              onChange={onChangeDomain}
-              options={domainOptions}
-            />
           )}
-        </Field>
-      </Box>
+        </ConfirmDialog>
+      )}
+    </>
+  );
+}
+
+/**
+ * 권한 탭 — 편집기에서 바뀐 값을 로컬 상태로 들고 있다가 Save 한 번에 통째로 교체한다
+ * (`PUT /workflows/:id/access`).
+ */
+function PermissionsTab({
+  workflow, own, departmentOptions, onSaveAccess, saving,
+}: {
+  workflow: WorkflowDto;
+  own: boolean;
+  departmentOptions: string[];
+  onSaveAccess: Props['onSaveAccess'];
+  saving?: boolean;
+}) {
+  const { t } = useTranslation();
+  const [editAccess, setEditAccess] = useState<AccessGrant>(
+    workflow.editAccess ?? { departments: [], users: [] },
+  );
+  const [viewAccess, setViewAccess] = useState<AccessGrant>(
+    workflow.viewAccess ?? { departments: [], users: [] },
+  );
+
+  const dirty =
+    JSON.stringify(editAccess) !== JSON.stringify(workflow.editAccess ?? { departments: [], users: [] }) ||
+    JSON.stringify(viewAccess) !== JSON.stringify(workflow.viewAccess ?? { departments: [], users: [] });
+
+  return (
+    <>
+      <WorkflowPermissionPanel
+        workflow={workflow}
+        own={own}
+        departmentOptions={departmentOptions}
+        editAccess={editAccess}
+        viewAccess={viewAccess}
+        onChangeEdit={setEditAccess}
+        onChangeView={setViewAccess}
+      />
+
+      {own && (
+        <Box sx={{ mt: '14px' }}>
+          <SirenButton
+            variant="primary"
+            onClick={() => onSaveAccess({ editAccess, viewAccess })}
+            disabled={saving || !dirty}
+          >
+            <Icon name="check" /> {saving ? 'Saving…' : t('workflow.save')}
+          </SirenButton>
+        </Box>
+      )}
     </>
   );
 }

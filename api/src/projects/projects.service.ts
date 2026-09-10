@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Project, ProjectDocument } from './schemas/project.schema';
@@ -6,6 +6,8 @@ import { WorkflowsService } from '../workflows/workflows.service';
 import { AuditService } from '../audit/audit.service';
 import { Actor } from '../common/actor';
 import { DEPARTMENTS } from '../common/constants/departments';
+import { canAccessProject, canEditMilestones, myDepartments } from '../common/access';
+import { REVISION_FORMAT_MESSAGE, isValidRevision, normalizeRevision } from '../common/constants/revision';
 import { normalizeSchedule } from '../common/schedule';
 import { Milestone } from './schemas/project.schema';
 import { CreateWorkflowDto } from '../workflows/dto/workflow-crud.dto';
@@ -18,10 +20,17 @@ export class ProjectsService {
     private readonly audit: AuditService,
   ) {}
 
-  /** 접근 가능한 과제 목록 = 하나 이상의 workflow에 Edit/View 권한이 있는 과제 (설계서 5.1). */
-  async listAccessibleForUser(knoxId: string) {
-    const projectIds = await this.workflows.distinctAccessibleProjectIds(knoxId);
-    return this.model.find({ _id: { $in: projectIds } }).sort({ code: 1 }).exec();
+  /**
+   * 접근 가능한 과제 목록 = **`members`에 등록된 과제**(설계서 01장 §2.1).
+   *
+   * ★ 이 규칙이 최우선이다 — 어떤 workflow의 View Access를 받았더라도 그 과제의 member가
+   *   아니면 목록에 뜨지 않고, 라우팅으로 우회해도 차단된다(§2.2). 반대로 권한 부여 자체는
+   *   member 여부와 무관하게 가능하며, 나중에 members에 추가되는 순간 실제로 열린다.
+   * ★ Admin은 전부 본다.
+   */
+  async listAccessibleForUser(actor: Actor) {
+    const filter = actor.isAdmin ? {} : { 'members.knoxId': actor.knoxId };
+    return this.model.find(filter).sort({ code: 1 }).exec();
   }
 
   async findByIdOrThrow(id: string) {
@@ -40,76 +49,44 @@ export class ProjectsService {
    * 시작한다(WorkflowsService.create) — 그래서 이 라우트가 ProjectsController에 있다:
    * 마일스톤을 아는 곳은 Project 모델을 가진 여기뿐이다.
    *
-   * workflow의 부서(domain)는 예전처럼 후보 목록에서 자유롭게 고르는 게 아니라, 만든
-   * 사람이 이 과제의 팀원 명단(Project.members)에서 실제로 속한 부서 중 하나여야 한다:
-   *  - 소속 부서가 하나도 없는 사람은 workflow를 만들 수 없다. 단, admin은 예외로
-   *    허용하되 그렇게 만든 workflow는 unassigned(빈 문자열)로 남는다 — admin 여부는
-   *    api가 독립적으로 확인할 수 없어(Actor에는 knoxId만 있다, src/common/actor.ts)
-   *    요청이 함께 보낸 creatorIsAdmin을 신뢰한다(addOwner의 department 신뢰와 같은 패턴).
-   *  - 소속 부서가 있는 사람은 그중 하나를 반드시 골라야 한다(자기 부서가 아닌 값은 거부).
+   * ★ department는 **필수**다 — 'unassigned'는 폐지되었다(설계서 README §3.2).
+   * ★ 후보는 "내가 이 과제에서 속한 부서"뿐이다. 판정 기준은 전사 소속이 아니라 이 과제의
+   *   members 로스터다(설계서 01장 §2.4) — 같은 사람이 과제마다 다른 부서일 수 있어서다.
+   *   Admin은 그 과제의 전체 부서 중에서 고를 수 있다.
+   * ★ 소속 부서가 하나도 없는 사람은 workflow를 만들 수 없다(Admin 제외).
    */
   async createWorkflow(id: string, dto: CreateWorkflowDto, actor: Actor) {
-    await this.assertManageAccess(id, actor);
-    const project = await this.findByIdOrThrow(id);
+    const project = await this.assertViewAccess(id, actor);
 
-    const member = project.members.find((m) => m.knoxId === actor.knoxId);
-    const memberDepts = member?.departments ?? [];
-
-    let resolved = '';
-    if (memberDepts.length === 0) {
-      if (!dto.creatorIsAdmin) {
-        throw new BadRequestException(
-          'You must belong to a department in this project to create a workflow.',
-        );
-      }
-      // admin이면서 소속 부서가 없다 — unassigned(빈 문자열)로 남긴다.
-    } else {
-      const wanted = dto.domain.trim();
-      if (!wanted) {
-        throw new BadRequestException("Select one of your departments for this workflow's domain.");
-      }
-      const match = memberDepts.find((d) => d.trim().toUpperCase() === wanted.toUpperCase());
-      if (!match) {
-        throw new BadRequestException(`'${wanted}' is not one of your departments in this project.`);
-      }
-      resolved = match.trim();
+    const candidates = myDepartments(actor, project);
+    if (candidates.length === 0) {
+      throw new BadRequestException(
+        'You must belong to a department in this project to create a workflow.',
+      );
     }
 
-    return this.workflows.create(project._id, project.milestones ?? [], { ...dto, domain: resolved }, actor);
+    const wanted = (dto.department ?? '').trim();
+    if (!wanted) {
+      throw new BadRequestException('Select the department this workflow belongs to.');
+    }
+    // 목록에 등록된 표기를 그대로 저장한다 — 사용자가 'analog'로 보내도 'Analog'로.
+    const match = candidates.find((d) => d.trim().toUpperCase() === wanted.toUpperCase());
+    if (!match) {
+      throw new BadRequestException(`'${wanted}' is not one of your departments in this project.`);
+    }
+
+    return this.workflows.create(
+      project._id,
+      project.milestones ?? [],
+      { ...dto, department: match.trim() },
+      actor,
+    );
   }
 
-  /**
-   * Workflow 하나를 부서에 재배정한다. 빈 문자열이면 배정 해제(unassigned).
-   *
-   * 예전에는 과제의 도메인 후보 목록에서 아무거나 고를 수 있었지만, 이제는 요청한 사람
-   * 본인이 이 과제에서 실제로 속한 부서(Project.members) 중 하나여야 한다 — createWorkflow와
-   * 같은 신뢰 모델. 이 검증에 Project와 Workflow 모델이 둘 다 필요해 그 둘을 함께 가진
-   * 곳(ProjectsController, ProjectsModule이 IpsModule을 import)에 둔다.
-   */
-  async updateWorkflowDomain(id: string, workflowId: string, domain: string, actor: Actor) {
-    await this.assertManageAccess(id, actor);
-    const project = await this.findByIdOrThrow(id);
-    const workflow = await this.workflows.findOrThrow(workflowId);
-    if (workflow.projectId.toString() !== project._id.toString()) {
-      throw new BadRequestException('That Workflow does not belong to this project.');
-    }
-
-    const wanted = domain.trim();
-    let resolved = '';
-    if (wanted) {
-      const member = project.members.find((m) => m.knoxId === actor.knoxId);
-      const memberDepts = member?.departments ?? [];
-      // 목록에 등록된 표기를 그대로 저장한다 - 사용자가 'analog'로 보내도 'Analog'로.
-      const match = memberDepts.find((d) => d.trim().toUpperCase() === wanted.toUpperCase());
-      if (!match) {
-        throw new BadRequestException(`'${wanted}' is not one of your departments in this project.`);
-      }
-      resolved = match.trim();
-    }
-
-    await this.workflows.setDomain(workflowId, resolved, actor);
-    return this.findDetailOrThrow(id, actor.knoxId);
-  }
+  // workflow의 부서 재배정은 더 이상 여기 없다 — Name/Description/Department가 화면의
+  // Save 버튼 하나로 묶이면서 `PATCH /workflows/:id` 단일 라우트로 옮겨갔다
+  // (WorkflowsService.updateMeta, 설계서 02장 §7.2). 그쪽이 editAccess의 부서 교체까지
+  // 한 번에 처리한다.
 
   /**
    * 과제 마일스톤(공통 일정) 목록을 통째로 교체한다 — 추가/삭제/개명/재일정 전부 가능하다.
@@ -124,15 +101,19 @@ export class ProjectsService {
     updates: { id?: string; name: string; start: string; end: string }[],
     actor: Actor,
   ) {
-    await this.assertManageAccess(id, actor);
-    const project = await this.findByIdOrThrow(id);
+    const project = await this.assertViewAccess(id, actor);
+    // 마일스톤은 workflow Edit Access가 아니라 Project Manager role로 판정한다
+    // (설계서 01장 §2.3) — Manager가 아니면 편집할 수 없다.
+    if (!canEditMilestones(actor, project)) {
+      throw new ForbiddenException('Only a project manager can edit milestones.');
+    }
 
     project.milestones = normalizeSchedule(updates, 'Milestone', 'ms', (m) => {
       throw new BadRequestException(m);
     }) as Milestone[];
 
     await project.save();
-    return this.findDetailOrThrow(id, actor.knoxId);
+    return this.findDetailOrThrow(id);
   }
 
   /**
@@ -143,8 +124,7 @@ export class ProjectsService {
    * "Received from" 후보)에만 안 보이면 된다.
    */
   async updateDepartments(id: string, input: string[], actor: Actor) {
-    await this.assertManageAccess(id, actor);
-    const project = await this.findByIdOrThrow(id);
+    const project = await this.assertManageAccess(id, actor);
 
     const next: string[] = [];
     const seen = new Set<string>();
@@ -160,7 +140,7 @@ export class ProjectsService {
     project.departments = next;
     project.departmentsSeeded = true;
     await project.save();
-    return this.findDetailOrThrow(id, actor.knoxId);
+    return this.findDetailOrThrow(id);
   }
 
   /**
@@ -168,32 +148,29 @@ export class ProjectsService {
    * Workflow.addOwner와 같은 패턴이되, 부서 제한은 없다(Manager는 Analog 한정이 아니다).
    */
   async addManager(id: string, knoxId: string, actor: Actor) {
-    await this.assertManageAccess(id, actor);
-    const project = await this.findByIdOrThrow(id);
+    const project = await this.assertManageAccess(id, actor);
     if (!project.managers.includes(knoxId)) {
       project.managers.push(knoxId);
       await project.save();
       await this.audit.log(actor.knoxId, 'PROJECT_MANAGER_ADD', 'project', project._id, { knoxId });
     }
-    return this.findDetailOrThrow(id, actor.knoxId);
+    return this.findDetailOrThrow(id);
   }
 
   async removeManager(id: string, knoxId: string, actor: Actor) {
-    await this.assertManageAccess(id, actor);
-    const project = await this.findByIdOrThrow(id);
+    const project = await this.assertManageAccess(id, actor);
     project.managers = project.managers.filter((m) => m !== knoxId);
     await project.save();
     await this.audit.log(actor.knoxId, 'PROJECT_MANAGER_REMOVE', 'project', project._id, { knoxId });
-    return this.findDetailOrThrow(id, actor.knoxId);
+    return this.findDetailOrThrow(id);
   }
 
   /**
-   * Project Information 페이지 상세 조회. 개인 접근 권한으로 막지 않는다 - 어떤 과제를
-   * 보여줄지는 web이 사용자 Group(Admin이면 super)과 workflow의 owners/viewGrants로 판단한다
-   * (2026-08-25 결정, src/common/guards/workflow-access.guard.ts 참고).
-   * members는 KnoxID만 담으므로 populate 없이 그대로 내려간다.
+   * Project Information 페이지 상세 조회.
+   * members는 KnoxID만 담으므로 populate 없이 그대로 내려간다 — 이름은 web이
+   * SDPCommonAPI로 조회한다(설계서 01장 §6).
    */
-  async findDetailOrThrow(id: string, _knoxId: string) {
+  async findDetailOrThrow(id: string) {
     const project = await this.model.findById(id).exec();
     if (!project) throw new NotFoundException('Project not found.');
     return this.ensureDepartments(project);
@@ -215,44 +192,93 @@ export class ProjectsService {
   }
 
   /**
-   * 과제 열람 게이트 - 현재는 아무것도 막지 않는다. 추후 토큰 인증이 들어오면
-   * 여기와 WorkflowAccessGuard 두 곳만 되살리면 서버 차단이 복구된다.
+   * 과제 열람 게이트 — **members가 아니면 403**이다(설계서 01장 §2.2). 이 게이트가
+   * 시스템 전체의 최종 관문이라 여기서 실제로 막는다.
    */
-  async assertViewAccess(id: string, _knoxId: string) {
-    await this.findByIdOrThrow(id);
+  async assertViewAccess(id: string, actor: Actor): Promise<ProjectDocument> {
+    const project = await this.findDetailOrThrow(id);
+    if (!canAccessProject(actor, project)) {
+      throw new ForbiddenException('You do not have access to this project.');
+    }
+    return project;
   }
 
-  /** 과제 관리 게이트 - 위 assertViewAccess와 동일한 이유로 차단하지 않는다. */
-  private async assertManageAccess(id: string, _actor: Actor) {
-    await this.findByIdOrThrow(id);
+  /**
+   * 과제 관리 게이트 — 과제 메타/부서/멤버/Manager 편집은 **Admin만** 한다
+   * (설계서 01장 §2.3, 가정 P1).
+   */
+  private async assertManageAccess(id: string, actor: Actor): Promise<ProjectDocument> {
+    const project = await this.assertViewAccess(id, actor);
+    if (!actor.isAdmin) {
+      throw new ForbiddenException('Only an admin can manage this project.');
+    }
+    return project;
   }
 
-  /** 과제 메타데이터(이름/코드/상태) 수정 — 마일스톤은 updateMilestones가 따로 다룬다. */
+  /**
+   * 과제 메타데이터 수정 — 마일스톤은 updateMilestones가 따로 다룬다.
+   *
+   * ★ `code`와 `revision`은 **생성 후 수정 절대 불가**다(설계서 README §3.1). 들어오면
+   *   조용히 무시하지 않고 **400으로 명시적으로 거부**한다 — 화면에서 disabled로 막는
+   *   것과 별개로 서버가 다시 막아야 하고, 무시하면 "저장됐다"고 오해할 수 있다.
+   *   바꿔야 하면 Admin이 DB를 직접 고친다.
+   */
   async updateProject(
     id: string,
-    dto: { name?: string; code?: string; revision?: string; status?: string },
+    dto: { name?: string; code?: string; revision?: string; status?: string; meta?: Record<string, string> },
     actor: Actor,
   ) {
-    await this.assertManageAccess(id, actor);
-    const project = await this.findByIdOrThrow(id);
+    const project = await this.assertManageAccess(id, actor);
 
-    // code+revision 조합만 유일하면 된다(Hub 설계서 §19) - 같은 code라도 revision이
-    // 다르면 별개 프로젝트다. 둘 중 하나만 바뀌어도 조합이 바뀌므로 항상 같이 검사한다.
-    const nextCode = dto.code ?? project.code;
-    const nextRevision = dto.revision ?? project.revision ?? '';
-    if (nextCode !== project.code || nextRevision !== (project.revision ?? '')) {
-      const existing = await this.model.findOne({ code: nextCode, revision: nextRevision }).exec();
-      if (existing && existing._id.toString() !== project._id.toString()) {
-        throw new BadRequestException('That project code + revision is already in use.');
-      }
-      project.code = nextCode;
-      project.revision = nextRevision;
+    if (dto.code !== undefined || dto.revision !== undefined) {
+      throw new BadRequestException(
+        'Project code and revision cannot be changed after creation.',
+      );
     }
-    if (dto.name !== undefined) project.name = dto.name;
+
+    if (dto.name !== undefined) project.name = dto.name.trim();
     if (dto.status !== undefined) project.status = dto.status;
+    if (dto.meta !== undefined) project.meta = dto.meta;
 
     await project.save();
-    return this.findDetailOrThrow(id, actor.knoxId);
+    return this.findDetailOrThrow(id);
+  }
+
+  /**
+   * 과제 생성 — **Admin만**(가정 P1). code+revision 조합이 그 과제의 신원이며 이후 수정할 수 없다.
+   */
+  async createProject(
+    dto: { code: string; revision: string; name: string; milestones?: { name: string; start: string; end: string }[] },
+    actor: Actor,
+  ) {
+    if (!actor.isAdmin) throw new ForbiddenException('Only an admin can create a project.');
+
+    const code = dto.code.trim();
+    const revision = normalizeRevision(dto.revision ?? '');
+    if (!isValidRevision(revision)) throw new BadRequestException(REVISION_FORMAT_MESSAGE);
+
+    const existing = await this.model.findOne({ code, revision }).exec();
+    if (existing) throw new BadRequestException('That project code + revision is already in use.');
+
+    const milestones = normalizeSchedule(dto.milestones ?? [], 'Milestone', 'ms', (m) => {
+      throw new BadRequestException(m);
+    }) as Milestone[];
+
+    const project = await this.model.create({
+      code,
+      revision,
+      name: dto.name.trim(),
+      departments: DEPARTMENTS.map((d) => d.name),
+      departmentsSeeded: true,
+      milestones,
+      members: [],
+      managers: [],
+      meta: {},
+      status: 'ACTIVE',
+      isMock: false,
+    });
+    await this.audit.log(actor.knoxId, 'PROJECT_CREATE', 'project', project._id, { code, revision });
+    return project;
   }
 
   /**
@@ -263,8 +289,7 @@ export class ProjectsService {
    * 여러 부서에 속할 수 있다) — 완전히 새 멤버일 때만 새 로스터 항목을 만든다.
    */
   async addMember(id: string, knoxId: string, department: string, actor: Actor) {
-    await this.assertManageAccess(id, actor);
-    const project = await this.findByIdOrThrow(id);
+    const project = await this.assertManageAccess(id, actor);
 
     const wanted = department.trim();
     const match = project.departments.find((d) => d.trim().toUpperCase() === wanted.toUpperCase());
@@ -284,13 +309,12 @@ export class ProjectsService {
       await project.save();
       await this.audit.log(actor.knoxId, 'PROJECT_MEMBER_ADD', 'project', project._id, { knoxId, department: dept });
     }
-    return this.findDetailOrThrow(id, actor.knoxId);
+    return this.findDetailOrThrow(id);
   }
 
   /** 멤버를 지정한 부서 카드에서 뺀다 — 그 부서가 마지막 소속이었으면 명단에서 완전히 사라진다. */
   async removeMember(id: string, knoxId: string, department: string, actor: Actor) {
-    await this.assertManageAccess(id, actor);
-    const project = await this.findByIdOrThrow(id);
+    const project = await this.assertManageAccess(id, actor);
 
     const member = project.members.find((m) => m.knoxId === knoxId);
     if (member) {
@@ -302,6 +326,6 @@ export class ProjectsService {
       await project.save();
       await this.audit.log(actor.knoxId, 'PROJECT_MEMBER_REMOVE', 'project', project._id, { knoxId, department });
     }
-    return this.findDetailOrThrow(id, actor.knoxId);
+    return this.findDetailOrThrow(id);
   }
 }

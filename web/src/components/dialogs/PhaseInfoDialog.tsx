@@ -1,7 +1,7 @@
 import { Box } from '@mui/material';
 import { WorkflowPhase } from '@/types/domain';
 import { spanDays, spanState, shortDate } from '@/lib/schedule';
-import { CanvasNode, latR, stOf } from '@/lib/canvasModel';
+import { CanvasNode, stOf } from '@/lib/canvasModel';
 import { ModalShell } from '@/components/common/ModalShell';
 import { Badge } from '@/components/common/SirenButton';
 import { Card, Ey, Row } from '@/components/common/Panel';
@@ -23,9 +23,10 @@ export function PhaseInfoDialog({ workflowName, phase: p, nodes, onClose, onOpen
   const state = {
     upcoming: { t: 'Upcoming', c: T.dm, b: T.sf2, d: T.ln },
     past: { t: 'Done', c: T.dm, b: T.sf2, d: T.ln },
-    current: { t: 'In progress', c: T.tl, b: T.tl2, d: T.tl3 },
+    current: { t: 'In progress', c: T.pr, b: T.prSoft, d: T.prLine },
   }[spanState(p)];
-  const rel = ds.filter((d) => latR(d)).length;
+  // publish까지 끝난 블록 수 — 캔버스와 같은 3상태 기준을 쓴다(설계서 03장 §2.2).
+  const rel = ds.filter((d) => d.publishState === 'published').length;
 
   const stat = (label: string, value: string, color?: string) => (
     <Card sx={{ flex: 1 }}>
@@ -56,14 +57,13 @@ export function PhaseInfoDialog({ workflowName, phase: p, nodes, onClose, onOpen
         {stat('Start', p.start)}
         {stat('End', p.end)}
         {stat('Duration', `${days}d`)}
-        {stat('Released', `${rel}/${ds.length}`, T.tl)}
+        {stat('Released', `${rel}/${ds.length}`, T.pr)}
       </Row>
       <Card>
-        <Ey sx={{ mb: '10px' }}>Key Deliverables</Ey>
+        <Ey sx={{ mb: "10px" }}>Blocks in this phase</Ey>
         {ds.length ? (
           ds.map((d) => {
             const s = stOf(d);
-            const r = latR(d);
             return (
               <Box
                 key={d.id}
@@ -74,21 +74,19 @@ export function PhaseInfoDialog({ workflowName, phase: p, nodes, onClose, onOpen
                   '&:hover': { background: T.sf2 },
                 }}
               >
-                <Box component="span" sx={{ color: d.serviceKey ? T.tl : T.bl }}>
-                  <Icon name={d.serviceKey ? 'link' : 'word'} />
+                <Box component="span" sx={{ color: d.artifactId ? T.pr : T.dm2 }}>
+                  <Icon name={d.artifactId ? 'link' : 'unlinked'} />
                 </Box>
                 <Box sx={{ flex: 1, fontSize: 13, fontWeight: 500 }}>
                   {d.name}
                 </Box>
-                <Box component="span" sx={{ fontFamily: FONT_MONO, fontSize: 11, color: T.dm2 }}>
-                  {r ? r.versionLabel : ''}
-                </Box>
+                {/* 버전 라벨은 쓰지 않는다 — 상세 slide에서만 보인다(설계서 03장 §2.1). */}
                 <Badge color={s.c} bg={s.bg} borderColor={s.bd}>{s.lb}</Badge>
               </Box>
             );
           })
         ) : (
-          <Box sx={{ fontSize: 12.5, color: T.dm2 }}>No deliverables</Box>
+          <Box sx={{ fontSize: 12.5, color: T.dm2 }}>No blocks</Box>
         )}
       </Card>
     </ModalShell>

@@ -63,7 +63,7 @@ export function AppShell({
           borderBottom: `1px solid ${T.ln}`,
           background: T.sf,
           zIndex: 50,
-          boxShadow: T.ss,
+          boxShadow: T.shXs,
           // 좁은 화면에서 아이템이 잘리는 대신 가로 스크롤되게 — 뷰포트보다 넓어져도
           // 테마 토글·프로필처럼 뒤쪽 컨트롤이 완전히 사라지지 않는다.
           overflowX: 'auto',

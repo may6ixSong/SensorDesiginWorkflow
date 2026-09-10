@@ -1,19 +1,41 @@
 /**
- * api/는 사용자를 KnoxID 문자열로만 표현한다 — 이름/부서/색 등 사용자 정보는
- * 전사 공통 SDP_COMMON_API의 소유이고, web이 knoxId로 해석한다.
+ * api는 사용자를 **KnoxID 문자열로만** 표현한다 — 이름/부서 등 사용자 정보는 전사 공통
+ * SDPCommonAPI가 소유하고 web이 knoxId로 해석한다(설계서 01장 §6).
  * app/providers/DirectoryProvider.tsx의 useDirectory()/resolveUser()를 참고.
  */
 
+/* ------------------------------------------------------------------ *
+ * 공통
+ * ------------------------------------------------------------------ */
+
+/** 이 사람이 그 대상에 대해 갖는 실효 권한. null이면 접근할 수 없다. */
+export type AccessLevel = 'edit' | 'view' | null;
+
+/** 통합 신뢰도 티어 — A→D 신뢰도 내림차순(설계서 04장 §2). */
+export type Tier = 'A' | 'B' | 'C' | 'D';
+
+/** 망 구분. tier와 직교하는 별개 축이다 — HPC면 실물 파일 대신 경로 문자열만 갖는다. */
+export type NetworkKind = 'OA' | 'HPC';
+
+/**
+ * 권한 한 벌 — **부서 다중 + 개별 사용자 다중**(설계서 01장 §3.3).
+ * workflow, artifact(B/C/D), block.recipients(A) 전부 이 모양을 쓴다.
+ */
+export interface AccessGrant {
+  departments: string[];
+  users: string[];
+}
+
+export const emptyGrant = (): AccessGrant => ({ departments: [], users: [] });
+
 /**
  * 일정 한 칸. 과제 마일스톤과 workflow phase가 같은 모양을 쓴다 — 다른 것은 소유자와
- * 의미뿐이다(아래 Milestone / WorkflowPhase 주석 참고).
+ * 의미뿐이다.
  *
- * ★ order 필드가 없다. 순서는 항상 start 오름차순으로 파생한다(lib/schedule.ts의
- *   sortSchedule) — 일정끼리 겹치는 것을 허용하기 때문에, 손으로 매긴 순서를 저장하면
- *   날짜와 어긋난 순서가 굳어 버린다.
- * ★ name은 화면에 그대로 뜨는 짧은 표기다(예: 'KO', 'ML1', 'AR'). full name은 없다 —
- *   workflow마다 일정을 다르게 잡게 되면서 이 약어가 무엇의 약자인지는 과제/조직마다
- *   달라졌고, 시스템이 추측해서 붙이지 않는다.
+ * ★ order 필드가 없다. 순서는 항상 start 오름차순으로 파생한다(lib/schedule.ts) —
+ *   일정끼리 겹치는 것을 허용하므로, 손으로 매긴 순서를 저장하면 날짜와 어긋난 순서가
+ *   굳어 버린다.
+ * ★ name은 화면에 그대로 뜨는 짧은 표기다(예: 'KO', 'ML1'). full name은 없다.
  */
 export interface ScheduleSpan {
   id: string;
@@ -29,24 +51,40 @@ export type Milestone = ScheduleSpan;
 
 /**
  * workflow 하나만의 일정. 생성 시 마일스톤을 복사해 시작하지만 그 뒤로는 완전히 독립이라
- * 칸 수·이름·날짜가 전부 다를 수 있고 서로 겹쳐도 된다. 산출물(DeliverableDto.phaseId)이
- * 가리키는 대상이며, 지워지면 그 산출물은 "일정 유실" 상태로 캔버스에 남는다.
+ * 칸 수·이름·날짜가 전부 다를 수 있고 서로 겹쳐도 된다. 블록(BlockDto.phaseId)이 가리키는
+ * 대상이며, 지워지면 그 블록은 "일정 유실" 상태로 캔버스에 남는다.
  */
 export type WorkflowPhase = ScheduleSpan;
+
+/* ------------------------------------------------------------------ *
+ * Project
+ * ------------------------------------------------------------------ */
 
 export interface ProjectDto {
   _id: string;
   code: string;
-  /** 같은 code라도 다른 프로젝트로 취급하는 리비전(RPM 등에서는 EVT). 없으면 빈 문자열. */
+  /**
+   * `EVT` + 0 이상의 정수(`EVT0`, `EVT1`, …). 같은 code라도 revision이 다르면 완전히
+   * 다른 과제다.
+   *
+   * ★ code와 함께 **생성 후 수정 절대 불가**다. Edit Project Info에서 두 필드는
+   *   disabled이며(Admin도 동일), 서버도 400으로 거부한다(설계서 README §3.1).
+   */
   revision: string;
   name: string;
   milestones: Milestone[];
   status: string;
+  /** 화면 표시 전용 부가 필드. 다른 시스템 연동에 쓰지 않는다. */
+  meta?: Record<string, string>;
 }
 
 /**
- * 과제 단위 부서별 팀원 로스터 항목 — workflow owners/viewGrants(접근 권한)와는 별개의 정보성
- * 명단. departments는 배열이다 — 한 멤버가 여러 부서(팀)에 동시에 속할 수 있다.
+ * 과제 단위 부서별 팀원 로스터.
+ *
+ * ★ 이 명단이 **시스템 전체의 최종 관문**이다 — 여기 없는 사람은 workflow/artifact 권한을
+ *   받았더라도 그 과제의 무엇도 볼 수 없다(설계서 01장 §2.2).
+ * ★ departments가 배열인 이유는 한 사람이 여러 부서에 동시에 속할 수 있어서다. 이 값이
+ *   "내가 이 과제에서 속한 부서"이자 부서 단위 권한의 판정 기준이다.
  */
 export interface ProjectMemberDto {
   knoxId: string;
@@ -54,24 +92,27 @@ export interface ProjectMemberDto {
   addedAt: string;
 }
 
-/** Project Information 페이지용 상세 — 목록용 ProjectDto에 팀원 로스터가 더해진 것. */
 export interface ProjectDetailDto extends ProjectDto {
   members: ProjectMemberDto[];
   /**
-   * 이 과제가 인정하는 부서(팀) 목록 — 과제마다 자유롭게 추가/삭제한다
-   * (PATCH /projects/:id/departments). 새 과제는 기본 6개로 시작한다. 세 곳에 쓰인다:
-   * 산출물 "Received from" 후보, 멤버(ProjectMemberDto.departments)가 속할 수 있는 후보,
-   * 그리고 workflow를 만든 사람의 소속이 곧 그 workflow의 분류(WorkflowDto.domain)가 된다.
+   * 이 과제가 인정하는 부서 목록. 새 과제는 기본 6개로 시작한다.
+   * workflow/artifact의 Edit·View Access에 넣을 수 있는 부서 후보이자,
+   * workflow가 소속될 수 있는 부서 후보다.
    */
   departments: string[];
-  /** 마일스톤(공통 일정)을 수정할 수 있는 Project Manager의 knoxId 목록 — Workflow의 owners(Edit 권한)와는 별개 role. */
+  /** 마일스톤을 수정할 수 있는 Project Manager. workflow Edit Access와는 별개 role. */
   managers: string[];
 }
 
-export interface ViewGrantDto {
-  knoxId: string;
-  department: string;
-  grantedAt: string;
+/* ------------------------------------------------------------------ *
+ * Workflow
+ * ------------------------------------------------------------------ */
+
+/** 캔버스 편집 단독 점유 상태(설계서 03장 §3). 만료된 lock은 서버가 null로 내려준다. */
+export interface CanvasLockDto {
+  holderKnoxId: string;
+  acquiredAt: string;
+  expiresAt: string;
 }
 
 export interface WorkflowDto {
@@ -79,173 +120,119 @@ export interface WorkflowDto {
   projectId: string;
   name: string;
   description: string;
+  /** 이 workflow가 소속된 부서. 반드시 하나이며 'unassigned'는 없다. */
+  department: string;
   color: string;
   /**
-   * workflow가 속한 부서(예: 'Analog', 'Digital'). 이 workflow를 만든 사람이 과제
-   * 팀원 명단(ProjectDetailDto.members)에서 실제로 속한 부서가 생성 시점에 자동으로
-   * 들어가고, workflow 편집 dialog의 Details 탭에서 수동으로 재배정할 수 있다(편집자
-   * 본인이 속한 부서로만 제한). Design Workflow view가 이 값으로 화면을 부서 단위로
-   * 갈라 놓는다. 비어 있으면 UNASSIGNED로 묶인다(web/src/lib/domainWorkflow.ts의 domainOf()).
+   * 이 사람의 실효 권한. **null이어도 목록에는 실린다** — Information page가 "존재는
+   * 보여주되 disabled로 잠근다"를 그려야 하기 때문이다(설계서 01장 §3.7).
+   * app bar의 select는 null인 항목을 option에서 뺀다.
    */
-  domain?: string | null;
-  /** 이 workflow만의 일정 — 항상 start 오름차순으로 내려온다. */
+  myAccess: AccessLevel;
+  /** myAccess가 null이면 아래 값들은 서버가 비워서 내려준다. */
+  ownerKnoxId: string | null;
+  editAccess: AccessGrant | null;
+  viewAccess: AccessGrant | null;
   phases: WorkflowPhase[];
-  /** 캔버스 Phase 레인 폭(phase.id → px) — 지정 안 된 phase는 FE가 기본값을 쓴다. */
   phaseWidths: Record<string, number>;
-  /** Edit 권한자의 knoxId 목록 — [0]이 Primary Owner. */
-  owners: string[];
-  viewGrants: ViewGrantDto[];
-  myAccess: 'edit' | 'view';
+  releaseSeq: number;
+  canvasLock: CanvasLockDto | null;
 }
 
-export interface Layout {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-}
+/* ------------------------------------------------------------------ *
+ * Artifact
+ * ------------------------------------------------------------------ */
 
-/** 통합 신뢰도 티어 (Hub 설계서 §5.1) — 산출물이 아니라 버전 엔트리마다 붙는다. */
-export type Tier = 'A' | 'B' | 'C' | 'D';
-
-export interface SourceRefDto {
-  artifactKey: string;
-  serviceKey: string;
-  versionRef: string;
-  versionLabel: string;
-  capturedAt: string | null;
-}
-
-/**
- * 버전 엔트리 (권한 필터링 완료 — Hub 설계서 §6.2). 실물 파일은 각 산출물 서비스가
- * 소유하고 SIREN은 참조만 갖는다 — major/minor/file 같은 파일 중심 필드는 없다.
- */
-export interface DeliverableVersionDto {
-  versionLabel: string;
-  /** 가시성 판정의 유일한 근거이자, 화면의 Release/작업중 배지 기준. */
-  isReleased: boolean;
-  /** 그 서비스가 준 불변 참조. C/D 티어(수동 기록)는 null일 수 있다. */
-  versionRef: string | null;
+export interface ArtifactVersionDto {
   tier: Tier;
-  /** 이 버전을 만들어 준 쪽 — 있으면 giver 판정(§6.2)의 근거가 된다. */
+  versionLabel: string;
+  /**
+   * 산출물이 자기 서비스 안에서 **공식 버전으로 확정**되었는가(publish).
+   * workflow가 부서에 전달하는 release와는 다른 층위다.
+   */
+  isPublished: boolean;
+  versionRef: string | null;
   giverKnoxId: string | null;
   giverDept: string | null;
-  /** 그 서비스의 산출물 상세 페이지 — SIREN은 이 링크로 내보낸다. */
   viewUrl: string | null;
-  /** HPC망 경로형 산출물의 실물 위치. */
   hpcPath: string | null;
   note: string;
-  sourceRefs: SourceRefDto[];
-  /** C/D 티어는 "검증된 사실"이 아니라 담당자의 주장이다(§6.3, §9.2) — 화면이 이걸로 구분한다. */
-  confidence: 'verified' | 'asserted';
-  assertedBy: string | null;
-  assertedAt: string | null;
+  publishedAt: string | null;
   observedAt: string | null;
-  at: string;
+  createdAt: string;
 }
 
-/**
- * 연동된(Calypso 제외) 서비스로부터 그때그때 직접 물어본 접근 권한(§19.2, §19.5) —
- * fail-closed이므로 서비스가 응답하지 않으면 둘 다 false로 온다.
- */
-export interface LiveAccessDto {
-  canView: boolean;
-  canEdit: boolean;
-}
-
-/**
- * 연동된 서비스가 knoxId 기준으로 이미 필터링해 준 버전 레코드 그대로다(§19.2) —
- * SIREN은 다시 마스킹하지 않는다. editors는 그 서비스가 edit 권한이 있는 호출자에게만
- * 채워 보낸다 — view 권한이면 항상 null이다.
- */
-export interface LiveVersionRecordDto {
-  versionLabel: string;
-  isReleased: boolean;
-  giverKnoxId: string | null;
-  giverDept: string | null;
-  viewUrl: string | null;
-  sourceRefs: SourceRefDto[];
-  editors: string[] | null;
-  observedAt: string | null;
-}
-
-/** 산출물 수신 workflow 셀렉트 박스 및 Incoming 카드용 최소 정보. */
-export interface WorkflowBriefDto {
+/** 열람 권한이 없는 산출물 — 존재만 알리고 버전·링크·경로는 응답에서 빠진다. */
+export interface MaskedArtifactDto {
   id: string;
   name: string;
-  color: string;
+  tier: Tier;
+  network: NetworkKind;
+  myAccess: null;
+  masked: true;
 }
 
-export interface DeliverableDto {
+export interface ArtifactDto {
   id: string;
   projectId: string;
-  workflowId: string;
+  name: string;
+  tier: Tier;
+  network: NetworkKind;
+  serviceKey: string | null;
+  externalArtifactId: string | null;
+  artifactTypeKey: string | null;
+  externalUrl: string | null;
+  myAccess: AccessLevel;
   /**
-   * 이 산출물이 걸려 있는 phase의 id — 소유 workflow(workflowId)의 phase다.
-   * 그 workflow의 phase 목록에 없는 값이면 "일정 유실" 상태로, 캔버스는 좌표를 그대로
-   * 두고 유실 표시만 붙인다 (lib/canvasModel.ts의 isOrphanPhase).
+   * B/C/D만 값이 있다. A는 그 서비스가 권한을 판정하므로 항상 null이다(설계서 04장 §3).
    */
+  editAccess: AccessGrant | null;
+  viewAccess: AccessGrant | null;
+  /**
+   * B/C/D는 viewAccess가 곧 recipient이며 서버가 그 값을 복사해 채워 준다(읽기 전용).
+   * **A Tier의 recipient는 artifact가 아니라 block에 있다** — workflow마다 다르기 때문이다.
+   */
+  recipients: AccessGrant | null;
+  versions: ArtifactVersionDto[];
+  createdBy: string;
+  masked?: false;
+}
+
+export const isMaskedArtifact = (a: ArtifactDto | MaskedArtifactDto | null): a is MaskedArtifactDto =>
+  !!a && (a as MaskedArtifactDto).masked === true;
+
+/* ------------------------------------------------------------------ *
+ * Block (캔버스 위의 자리)
+ * ------------------------------------------------------------------ */
+
+/**
+ * publish 3상태(설계서 03장 §2.2). 블록에는 **버전 숫자를 쓰지 않고** 이 배지만 그린다.
+ *   unpublished    — published 버전이 하나도 없다
+ *   published      — 있고, 마지막 release 이후 major 변화가 없다
+ *   newlyPublished — 있고, 마지막 release 이후 major가 올라갔다(= 다음 release 대상)
+ */
+export type PublishState = 'unpublished' | 'published' | 'newlyPublished';
+
+export interface BlockDto {
+  id: string;
+  workflowId: string;
   phaseId: string;
   name: string;
+  layout: { x: number; y: number; w: number; h: number };
+  /** 지금은 항상 'own'이다 — 받는 산출물 UX는 TODO T2. */
+  intent: 'own' | 'received';
+  artifactId: string | null;
+  /** 열람 권한이 없으면 masked 형태로 온다. 미매핑이면 null. */
+  artifact: ArtifactDto | MaskedArtifactDto | null;
+  publishState: PublishState;
   /**
-   * name과 분리된 안정적 식별자 — 이름은 언제든 바뀔 수 있어서, 향후 외부 시스템과
-   * 연동할 때는 이 값으로 매핑하도록 둔다. 지정하지 않으면 null(설계서 §8.1 로드맵).
+   * **A Tier에서만** 값이 있다 — 같은 artifact라도 workflow마다 recipient 구성이 다를 수
+   * 있어 block에 붙는다(설계서 01장 §4.1). B/C/D는 null이고 artifact.recipients를 본다.
    */
-  artifactKey: string | null;
-  /**
-   * 이 산출물의 실물을 소유한 Hub 서비스 (artifactServices.key) — null이면 아직 출처가
-   * 정해지지 않은 정상 빈 상태다(Hub 설계서 §11). 생성 화면에서 Network/Format 대신
-   * 이 값을 고른다.
-   */
-  serviceKey: string | null;
-  /** 그 서비스 안에서의 산출물 식별자 — serviceKey와 짝을 이룬다. */
-  externalArtifactId: string | null;
-  /** 그 서비스가 여러 산출물 종류를 낼 때 어느 종류인지(§19.1) — 단일 종류 서비스면 null. */
-  artifactTypeKey: string | null;
-  /** 레거시 필드 — 더 이상 생성/편집 화면에서 고르지 않는다(항상 서버 기본값). */
-  network: 'OA' | 'HPC';
+  recipients: { editAccess: AccessGrant; viewAccess: AccessGrant } | null;
   series: string | null;
   seriesIdx: number;
   seriesTotal: number;
-  layout: Layout;
-  /**
-   * 'own' = 이 workflow가 만들어 남에게 주는 산출물(기본값). 'received' = 이 workflow가
-   * 받기를 기다리는 자리표시자 — 실물은 연동된 서비스로 올라올 것이라 이 화면에서
-   * 직접 업로드하거나 전달(Handoff) 정보를 편집할 수 없다. 생성 시점에만 정해진다.
-   */
-  intent: 'own' | 'received';
-  recvDept: string | null;
-  /** 수신 담당자의 knoxId. */
-  recvContact: string | null;
-  /** 이 산출물을 받아야 하는 다른 workflow — 설정되면 그 보드에 Incoming으로 노출된다. */
-  recvWorkflowId: string | null;
-  /**
-   * 이 시스템에 없는 외부 부서(파운드리 등)로부터 받았음을 나타내는 자유 텍스트.
-   * recvWorkflowId와 달리 이 값이 있어도 여전히 own 산출물 그대로다 — 위치·phase를
-   * own처럼 자유롭게(여러 phase 포함) 편집할 수 있다.
-   */
-  sourceDept: string | null;
-  /** 받을 때의 개별 연락처 — 자유 텍스트(이름/이메일/전화 등, 시스템 계정을 전제하지 않음). */
-  sourceContact: string | null;
-  /** 권한에 맞게 이미 필터링된 버전 목록 */
-  versions: DeliverableVersionDto[];
-  releasedVersion: DeliverableVersionDto | null;
-  workingVersion: DeliverableVersionDto | null;
-  canEdit: boolean;
-  /** Incoming 목록에서만 채워진다 — 이 산출물을 준 workflow. */
-  sourceWorkflow: WorkflowBriefDto | null;
-  /**
-   * Incoming 목록에서만 채워진다 — 이 산출물이 "주는 쪽 workflow"에서 걸려 있던 phase.
-   * phase는 이제 workflow마다 다르므로 phaseId만으로는 받는 쪽 캔버스에서 아무것도 찾을 수
-   * 없다. 그래서 날짜 구간을 함께 받아, 받는 쪽 자기 phase 중 날짜가 맞는 칸에 놓는다.
-   */
-  sourcePhase: WorkflowPhase | null;
-}
-
-/** GET /workflows/:workflowId/deliverables 응답 — own은 이 workflow가 주는 산출물, incoming은 받는 산출물. */
-export interface DeliverablesListResponse {
-  data: DeliverableDto[];
-  incoming: DeliverableDto[];
 }
 
 export interface MemoDto {
@@ -253,8 +240,7 @@ export interface MemoDto {
   workflowId: string;
   phaseId: string;
   text: string;
-  layout: Layout;
-  createdBy: string;
+  layout: { x: number; y: number; w: number; h: number };
 }
 
 export interface EdgeDto {
@@ -266,7 +252,14 @@ export interface EdgeDto {
   auto: boolean;
 }
 
-/** GET /hub/services/:key/projects/search 후보 하나(Hub 설계서 §19.3) — 사람이 직접 골라 확정한다. */
+/* ------------------------------------------------------------------ *
+ * Hub (외부 산출물 서비스 연동)
+ * ------------------------------------------------------------------ */
+
+/**
+ * 과제(code+revision)를 외부 서비스의 프로젝트와 이을 때 그 서비스가 돌려주는 후보.
+ * 자동으로 잇지 않고 사람이 확정한다 — 코드 체계가 서비스마다 미묘하게 다르기 때문이다.
+ */
 export interface ProjectSearchCandidateDto {
   externalProjectId: string;
   displayName: string;
@@ -274,73 +267,95 @@ export interface ProjectSearchCandidateDto {
   revision: string | null;
 }
 
-export interface HldItemDto {
-  version: string;
-  versionLabel: string | null;
+/* ------------------------------------------------------------------ *
+ * Release
+ * ------------------------------------------------------------------ */
+
+/** release 기록에 얼려둔 버전 사실. 이후 서비스가 버전을 더 올려도 이 값은 안 바뀐다. */
+export interface ReleasedVersionDto {
+  versionLabel: string;
   versionRef: string | null;
-  tier: string | null;
-  confidence: string | null;
-  pinnedAt: string | null;
-  file: string | null;
-  at: string;
-  comment: string;
-  /** §19.4 — 이 개념이 생기기 전 스냅샷에는 없다(둘 다 비어 있음). */
-  giverKnoxId: string | null;
+  majorKey: string | null;
+  publishedAt: string | null;
   viewUrl: string | null;
-  sourceRefs: SourceRefDto[];
+  hpcPath: string | null;
+  giverKnoxId: string | null;
 }
 
-/** HLD 스냅샷 안의 산출물 배치 하나(§19.4) — 그 시점의 캔버스 구조만 담는다. */
-export interface HldSnapshotDeliverableDto {
-  id: string;
-  name: string;
+export interface ReleaseItemSourceDto {
+  blockId: string;
+  artifactId: string | null;
+  artifactName: string;
+  /** null이면 그 source가 아직 한 번도 publish되지 않았다 — "아직 전달되지 않음". */
+  selected: ReleasedVersionDto | null;
+}
+
+export interface ReleaseItemDto {
+  blockId: string;
+  artifactId: string;
+  artifactName: string;
+  tier: Tier;
+  network: NetworkKind;
   phaseId: string;
-  layout: Layout;
-  serviceKey: string | null;
-  externalArtifactId: string | null;
-  artifactTypeKey: string | null;
-  intent: 'own' | 'received';
-  recvDept: string | null;
-  series: string | null;
-  seriesIdx: number;
-  seriesTotal: number;
+  phaseName: string;
+  /** null이면 한 번도 publish된 적 없음 — 표에 `Not published`로 표기한다. */
+  published: ReleasedVersionDto | null;
+  /** 직전 release 대비 major가 달라졌는가 — 표에서 highlight되는 행이다. */
+  changed: boolean;
+  firstTime: boolean;
+  lookupFailed: boolean;
+  recipients: AccessGrant;
+  sources: ReleaseItemSourceDto[];
+  /** 지금 이 사람이 그 산출물을 볼 수 없으면 true — 버전·링크가 비어서 온다. */
+  masked: boolean;
 }
 
-export interface HldSnapshotEdgeDto {
-  fromId: string;
-  toId: string;
-  bidirectional: boolean;
-}
-
-export interface HldSnapshotMemoDto {
+export interface ReleaseDto {
   id: string;
-  phaseId: string;
-  text: string;
-  layout: Layout;
-}
-
-export interface HldSnapshotPhaseDto {
-  id: string;
-  name: string;
-  start: string;
-  end: string;
-}
-
-export interface HldSnapshotCanvasDto {
-  deliverables: HldSnapshotDeliverableDto[];
-  edges: HldSnapshotEdgeDto[];
-  memos: HldSnapshotMemoDto[];
-  phases: HldSnapshotPhaseDto[];
-}
-
-export interface HldReleaseDto {
-  _id: string;
+  projectId: string;
   workflowId: string;
-  version: string;
-  date: string;
+  seq: number;
+  /** 화면 표기는 항상 `v{seq}` — 단일 정수 시퀀스다(major.minor가 아니다). */
+  label: string;
+  releasedAt: string;
   releasedBy: string;
   note: string;
-  /** §19.4 이전 스냅샷은 네 배열이 전부 비어 있다 — 구조 정보가 소급되지 않는다. */
-  canvas: HldSnapshotCanvasDto;
-  items: Record<string, HldItemDto>;
+  workflowAt: { name: string; department: string };
+  recipientDepartments: string[];
+  items: ReleaseItemDto[];
+}
+
+/** release 다이얼로그가 쓰는 미리보기 한 줄. 실행과 같은 로직으로 계산된다. */
+export interface ReleasePreviewItemDto {
+  blockId: string;
+  artifactId: string;
+  artifactName: string;
+  tier: Tier;
+  network: NetworkKind;
+  phaseId: string;
+  phaseName: string;
+  published: ReleasedVersionDto | null;
+  changed: boolean;
+  firstTime: boolean;
+  lookupFailed: boolean;
+  recipients: AccessGrant;
+  /**
+   * `changed: true`인 항목만 후보가 채워진다 — 그 경우에만 화면에 picker를 띄운다.
+   * 나머지는 직전 release의 선택을 그대로 이어받으므로 다시 묻지 않는다(설계서 05장 §4.2).
+   */
+  sources: {
+    blockId: string;
+    artifactId: string;
+    artifactName: string;
+    candidates: ReleasedVersionDto[];
+    defaultVersionRef: string | null;
+    selected: ReleasedVersionDto | null;
+  }[];
+}
+
+export interface ReleasePreviewDto {
+  workflowId: string;
+  nextSeq: number;
+  items: ReleasePreviewItemDto[];
+  changedCount: number;
 }

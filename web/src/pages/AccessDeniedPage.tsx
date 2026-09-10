@@ -35,8 +35,8 @@ export function AccessDeniedPage() {
       </Typography>
 
       {isSimulating && (
-        <Stack alignItems="center" spacing={1} sx={{ mt: '18px', p: '12px 16px', borderRadius: '9px', border: `1px solid ${T.am2}`, background: T.am3 }}>
-          <Typography sx={{ fontFamily: FONT_MONO, fontSize: 12, color: T.am }}>
+        <Stack alignItems="center" spacing={1} sx={{ mt: '18px', p: '12px 16px', borderRadius: '9px', border: `1px solid ${T.warnSoft}`, background: T.warnLine }}>
+          <Typography sx={{ fontFamily: FONT_MONO, fontSize: 12, color: T.warn }}>
             You're simulating this unregistered user.
           </Typography>
           <SirenButton onClick={stop}>Stop simulation</SirenButton>

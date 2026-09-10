@@ -49,13 +49,13 @@ export function PhaseStepper({
     >
       {!edit && todayLeft !== null && (
         <>
-          <Box sx={{ position: 'absolute', top: 0, bottom: 0, width: '1.5px', background: T.rd, opacity: 0.75, zIndex: 6, pointerEvents: 'none', left: `${todayLeft}px` }} />
+          <Box sx={{ position: 'absolute', top: 0, bottom: 0, width: '1.5px', background: T.danger, opacity: 0.75, zIndex: 6, pointerEvents: 'none', left: `${todayLeft}px` }} />
           <Box
             sx={{
               position: 'absolute', top: 0, left: `${todayLeft}px`, transform: 'translateX(-50%)',
-              background: T.rd, color: '#fff', fontFamily: FONT_MONO, fontSize: 9,
+              background: T.danger, color: '#fff', fontFamily: FONT_MONO, fontSize: 9,
               letterSpacing: '.08em', padding: '2px 7px', borderRadius: '0 0 6px 6px',
-              whiteSpace: 'nowrap', zIndex: 7, pointerEvents: 'none', boxShadow: T.ss,
+              whiteSpace: 'nowrap', zIndex: 7, pointerEvents: 'none', boxShadow: T.shXs,
             }}
           >
             TODAY
@@ -87,7 +87,7 @@ export function PhaseStepper({
                 flexDirection: 'column',
                 justifyContent: 'center',
                 padding: i === 0 ? '8px 22px 8px 18px' : '8px 22px 8px 28px',
-                background: cur ? T.tl2 : past ? T.sf2 : T.sf,
+                background: cur ? T.prSoft : past ? T.sf2 : T.sf,
                 border: `1px solid ${T.ln}`,
                 textAlign: 'left',
                 transition: 'background .15s',
@@ -103,7 +103,7 @@ export function PhaseStepper({
                 ...(cur
                   ? {
                       filter:
-                        `drop-shadow(1.5px 0 0 ${T.tl}) drop-shadow(-1.5px 0 0 ${T.tl}) drop-shadow(0 1.5px 0 ${T.tl}) drop-shadow(0 -1.5px 0 ${T.tl})`,
+                        `drop-shadow(1.5px 0 0 ${T.pr}) drop-shadow(-1.5px 0 0 ${T.pr}) drop-shadow(0 1.5px 0 ${T.pr}) drop-shadow(0 -1.5px 0 ${T.pr})`,
                       zIndex: 3,
                     }
                   : {}),
@@ -111,7 +111,7 @@ export function PhaseStepper({
               }}
             >
               <Box sx={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Box sx={{ fontFamily: FONT_MONO, fontSize: 12, fontWeight: 600, letterSpacing: '.05em', color: cur ? T.tl : past ? T.dm : T.tx }}>
+                <Box sx={{ fontFamily: FONT_MONO, fontSize: 12, fontWeight: 600, letterSpacing: '.05em', color: cur ? T.pr : past ? T.dm : T.tx }}>
                   {p.name}
                 </Box>
                 {overlaps[i] && (
@@ -120,7 +120,7 @@ export function PhaseStepper({
                     title="This phase overlaps the previous one — that's allowed; lanes stay ordered by start date."
                     sx={{
                       fontFamily: FONT_MONO, fontSize: 8, fontWeight: 700, letterSpacing: '.06em',
-                      color: T.vi, background: T.vi2, border: `1px solid ${T.vi3}`,
+                      color: T.pr, background: T.prSoft, border: `1px solid ${T.prLine}`,
                       borderRadius: '999px', padding: '0 5px',
                     }}
                   >
@@ -135,7 +135,7 @@ export function PhaseStepper({
                 {cnt}
               </Box>
               {prog > 0 && (
-                <Box sx={{ position: 'absolute', left: 0, bottom: 0, height: '3px', background: T.tl, opacity: 0.5, width: `${(prog * 100).toFixed(1)}%` }} />
+                <Box sx={{ position: 'absolute', left: 0, bottom: 0, height: '3px', background: T.pr, opacity: 0.5, width: `${(prog * 100).toFixed(1)}%` }} />
               )}
               {edit && (
                 <>

@@ -75,7 +75,7 @@ export function DepartmentsDialog({
         </>
       }
     >
-      {err && <Box sx={{ fontSize: 12, color: T.rd, mb: '10px' }}>{err}</Box>}
+      {err && <Box sx={{ fontSize: 12, color: T.danger, mb: '10px' }}>{err}</Box>}
 
       <Card>
         <Ey sx={{ mb: '9px' }}>Departments · {departments.length}</Ey>

@@ -38,7 +38,7 @@ export function ArtifactVersionContents({
   const { resolveUser } = useDirectory();
   const fileRef = useRef<HTMLInputElement>(null);
   const [note, setNote] = useState('');
-  const accent = v?.isReleased ? T.tl : T.am;
+  const accent = v?.isReleased ? T.pr : T.warn;
 
   return (
     <Box sx={{ flex: 1, minWidth: 0, overflowY: 'auto', background: T.sf3, padding: '22px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -47,7 +47,7 @@ export function ArtifactVersionContents({
           <Box
             sx={{
               background: T.sf, border: `1px solid ${T.ln}`, borderRadius: '12px',
-              boxShadow: T.sl, overflow: 'hidden', display: 'flex', flexDirection: 'column',
+              boxShadow: T.shLg, overflow: 'hidden', display: 'flex', flexDirection: 'column',
             }}
           >
             <Box sx={{ height: 4, background: accent, flex: '0 0 auto' }} />
@@ -63,7 +63,7 @@ export function ArtifactVersionContents({
                 <Box sx={{ fontFamily: FONT_MONO, fontSize: 26, fontWeight: 600, color: accent, lineHeight: 1 }}>
                   v{v.versionLabel}
                 </Box>
-                <Badge color={accent} bg={v.isReleased ? T.tl2 : T.am2} borderColor={v.isReleased ? T.tl3 : T.am3}>
+                <Badge color={accent} bg={v.isReleased ? T.prSoft : T.warnSoft} borderColor={v.isReleased ? T.prLine : T.warnLine}>
                   {v.isReleased ? 'RELEASE' : 'WORKING'}
                 </Badge>
               </Box>
@@ -154,7 +154,7 @@ export function ArtifactVersionContents({
               <SirenButton
                 disabled={!a.latestVersion || a.latestVersion.isReleased || releasing}
                 onClick={() => onRelease(note)}
-                sx={{ color: T.tl, borderColor: T.tl3 }}
+                sx={{ color: T.pr, borderColor: T.prLine }}
               >
                 <Icon name="send" /> Release latest
               </SirenButton>

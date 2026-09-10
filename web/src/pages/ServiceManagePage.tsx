@@ -117,7 +117,7 @@ function ServiceIcon({ name, url, size = 40 }: { name: string; url: string; size
       sx={{
         width: size, height: size, borderRadius: '9px', flex: '0 0 auto',
         display: 'grid', placeItems: 'center', overflow: 'hidden',
-        fontSize: size * 0.33, fontWeight: 700, color: '#fff', background: T.tl,
+        fontSize: size * 0.33, fontWeight: 700, color: '#fff', background: T.pr,
       }}
     >
       {showImg ? (
@@ -415,7 +415,7 @@ function ServiceFormDialog({ service, onClose }: { service?: HubService; onClose
         </Field>
       )}
       <ArtifactTypesField rows={artifactTypeRows} onChange={setArtifactTypeRows} />
-      {typeErr && <Box sx={{ fontSize: 11, color: T.rd, mb: '11px' }}>{typeErr}</Box>}
+      {typeErr && <Box sx={{ fontSize: 11, color: T.danger, mb: '11px' }}>{typeErr}</Box>}
       <SirenButton
         variant="primary"
         disabled={!name.trim() || mutation.isPending}

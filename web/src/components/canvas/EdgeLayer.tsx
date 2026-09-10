@@ -1,6 +1,6 @@
 import { Box } from '@mui/material';
-import { CanvasEdge, CanvasNode, biIconPos, latR, orth, stOf } from '@/lib/canvasModel';
-import { CURSOR_POINTER } from '@/theme/tokens';
+import { CanvasEdge, CanvasNode, biIconPos, orth } from '@/lib/canvasModel';
+import { CURSOR_POINTER, T } from '@/theme/tokens';
 
 interface Props {
   nodes: CanvasNode[];
@@ -33,19 +33,21 @@ export function EdgeLayer({
     const b = byId.get(e.to);
     if (!a || !b) return;
 
-    const bi = e.bidirectional || edges.some((x) => x.from === e.to && x.to === e.from);
+    const bi = e.bi || edges.some((x) => x.from === e.to && x.to === e.from);
     const key = bi ? [e.from, e.to].sort().join('|') : e.id;
     if (bi) {
       if (seen.has(key)) return;
       seen.add(key);
     }
 
-    const blocked = !bi && !latR(a) && stOf(b).lb !== 'Not submitted';
+    // 상류가 아직 publish되지 않았는데 하류는 이미 진행된 상태 — 순서가 뒤집힌 흐름이라
+    // 색으로 경고한다(설계서 03장 §2.2의 publish 3상태를 그대로 쓴다).
+    const blocked = !bi && a.publishState === 'unpublished' && b.publishState !== 'unpublished';
     const on = !!hlSet && hlSet.has(e.from) && hlSet.has(e.to);
     // 선택된 산출물과 무관한 flow — 관련 없는 블록을 흐리게 하는 것과 같은 기준(0.4)으로
     // 같이 낮춘다. <g>로 묶어야 marker(화살촉)까지 함께 흐려진다.
     const unrelated = !!hlSet && !on;
-    const col = on ? '#2f6b4a' : blocked ? '#ac6f08' : '#5c6b7d';
+    const col = on ? T.pr : blocked ? T.warn : T.dm;
     const mk = on ? 'ahl' : blocked ? 'ahb' : 'ah';
     const dpath = orth(a, b);
     const segs: JSX.Element[] = [];

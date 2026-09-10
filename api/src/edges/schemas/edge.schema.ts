@@ -8,23 +8,28 @@ export type EdgeDocument = Edge & Document;
 
 /**
  * 연결선(Edge/Flow). bidirectional: true인 경우 역방향 edge를 별도로 만들지
- * 않고 이 한 문서로 양방향을 표현한다 (설계서 4.8, 8.2-3 - 플래그 방식 채택).
+ * 않고 이 한 문서로 양방향을 표현한다.
+ *
+ * release의 source 계산은 이 edge를 **직전 1홉만** 거슬러 올라간다(설계서 05장 §4.2) —
+ * A → B → C 에서 C의 source는 B뿐이고, A는 B를 release할 때 이미 기록되므로 release
+ * history를 타고 가면 전체 계보가 복원된다.
  */
 @Schema({ timestamps: true })
 export class Edge {
   @Prop({ type: SchemaTypes.ObjectId, ref: 'Workflow', required: true, index: true })
   workflowId: Types.ObjectId;
 
-  @Prop({ type: SchemaTypes.ObjectId, ref: 'Deliverable', required: true })
+  /** 캔버스 블록 id. 구 Deliverable이 Block으로 개명되면서 ref만 바뀌었다. */
+  @Prop({ type: SchemaTypes.ObjectId, ref: 'Block', required: true })
   fromId: Types.ObjectId;
 
-  @Prop({ type: SchemaTypes.ObjectId, ref: 'Deliverable', required: true })
+  @Prop({ type: SchemaTypes.ObjectId, ref: 'Block', required: true })
   toId: Types.ObjectId;
 
   @Prop({ default: false })
   bidirectional: boolean;
 
-  /** series 자동 연결로 생성됨. 사용자가 수동으로 만들거나 수정하면 false로 내린다 (설계서 3.6, 4.8). */
+  /** series 자동 연결로 생성됨. 사용자가 수동으로 만들거나 수정하면 false로 내린다. */
   @Prop({ default: false })
   auto: boolean;
 

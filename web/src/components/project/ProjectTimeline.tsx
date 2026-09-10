@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
 import { Box } from '@mui/material';
 import { Link } from 'react-router-dom';
-import { DeliverableDto, Milestone, ScheduleSpan, WorkflowDto } from '@/types/domain';
-import { useDeliverables } from '@/api/hooks/useDeliverables';
+import { BlockDto, Milestone, ScheduleSpan, WorkflowDto } from '@/types/domain';
+import { useBlocks } from '@/api/hooks/useBlocks';
 import {
   DAY_MS, DateRange, dayMs, monthTicks, rangeOf, ratioIn, shortDate, sortSchedule, spanDays,
 } from '@/lib/schedule';
@@ -18,22 +18,31 @@ const BAR_H = 22;
 const BAR_GAP = 5;
 const ROW_PAD = 9;
 
+/**
+ * 캔버스 범례(components/canvas/Legend.tsx)와 **글자·색이 같아야 한다** — 같은 3상태를
+ * 두 화면에서 다른 이름으로 부르면 그 자체가 오해가 된다(설계서 04장 §8).
+ * 특히 'Released'는 workflow가 부서에 전달하는 다른 층위의 용어라 여기서 쓰지 않는다.
+ */
 const LEGEND = [
-  { key: 'released', label: 'Released', c: T.tl },
-  { key: 'progress', label: 'In progress', c: T.am },
-  { key: 'pending', label: 'Not submitted', c: T.dm2 },
+  { key: 'pending', label: 'Not published', c: T.dm2 },
+  { key: 'progress', label: 'New since last release', c: T.pr },
+  { key: 'released', label: 'Published', c: T.ok },
 ] as const;
 
-function statusCounts(deliverables: DeliverableDto[]) {
+/**
+ * 캔버스와 같은 publish 3상태를 집계한다(설계서 03장 §2.2) — 버전 배열을 다시 훑지
+ * 않고 서버가 계산해 내려준 publishState를 그대로 쓴다.
+ */
+function statusCounts(blocks: BlockDto[]) {
   let notSubmitted = 0;
   let inProgress = 0;
   let released = 0;
-  deliverables.forEach((d) => {
-    if (!d.versions.length) notSubmitted++;
-    else if (d.workingVersion) inProgress++;
-    else released++;
+  blocks.forEach((b) => {
+    if (b.publishState === 'published') released++;
+    else if (b.publishState === 'newlyPublished') inProgress++;
+    else notSubmitted++;
   });
-  return { notSubmitted, inProgress, released, total: deliverables.length };
+  return { notSubmitted, inProgress, released, total: blocks.length };
 }
 
 /**
@@ -81,7 +90,8 @@ export function ProjectTimeline({
    * 같은 화면을 보고 있다는 감각이 깨진다.
    */
   const shown = useMemo(
-    () => (mineOnly && myKnoxId ? workflows.filter((w) => (w.owners ?? []).includes(myKnoxId)) : workflows),
+    // Owner는 workflow마다 정확히 1명이다(설계서 01장 §3.6).
+    () => (mineOnly && myKnoxId ? workflows.filter((w) => w.ownerKnoxId === myKnoxId) : workflows),
     [workflows, mineOnly, myKnoxId],
   );
 
@@ -130,12 +140,12 @@ export function ProjectTimeline({
             {l.label}
           </Box>
         ))}
-        <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: 11, color: T.rd }}>
+        <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: 11, color: T.danger }}>
           <Icon name="warn" size={11} /> No release schedule
         </Box>
       </Box>
 
-      <Box sx={{ border: `1px solid ${T.ln}`, borderRadius: '12px', background: T.sf, overflow: 'hidden', boxShadow: T.ss }}>
+      <Box sx={{ border: `1px solid ${T.ln}`, borderRadius: '12px', background: T.sf, overflow: 'hidden', boxShadow: T.shXs }}>
         <Box sx={{ overflowX: 'auto' }}>
           <Box sx={{ minWidth: LABEL_W + geo.trackW, position: 'relative' }}>
             {/* ── 날짜 눈금 ── */}
@@ -191,9 +201,9 @@ export function ProjectTimeline({
                       style={{ left, width, top: ROW_PAD + lane * (BAR_H + BAR_GAP) }}
                       sx={{
                         position: 'absolute', height: BAR_H, borderRadius: '6px',
-                        background: T.tl2, border: `1px solid ${T.tl3}`,
+                        background: T.prSoft, border: `1px solid ${T.prLine}`,
                         display: 'flex', alignItems: 'center', padding: '0 8px',
-                        fontFamily: FONT_MONO, fontSize: 10.5, fontWeight: 700, color: T.tl,
+                        fontFamily: FONT_MONO, fontSize: 10.5, fontWeight: 700, color: T.pr,
                         overflow: 'hidden', whiteSpace: 'nowrap',
                       }}
                     >
@@ -237,7 +247,7 @@ export function ProjectTimeline({
                 style={{ left: LABEL_W + todayX }}
                 sx={{
                   position: 'absolute', top: 0, bottom: 0, width: '1.5px',
-                  background: T.rd, opacity: 0.6, pointerEvents: 'none', zIndex: 2,
+                  background: T.danger, opacity: 0.6, pointerEvents: 'none', zIndex: 2,
                 }}
               />
             )}
@@ -258,11 +268,11 @@ function WorkflowTimelineRow({
 }: {
   projectId: string; workflow: WorkflowDto; geo: Geometry;
 }) {
-  const { data: deliverablesResp } = useDeliverables(workflow.id);
-  const deliverables = deliverablesResp?.data;
+  const { data: blocks } = useBlocks(workflow.id);
+  const deliverables = blocks;
 
   const byPhase = useMemo(() => {
-    const m = new Map<string, DeliverableDto[]>();
+    const m = new Map<string, BlockDto[]>();
     (deliverables ?? []).forEach((d) => {
       const arr = m.get(d.phaseId) ?? [];
       arr.push(d);
@@ -289,7 +299,7 @@ function WorkflowTimelineRow({
         to={`/details/${projectId}/${workflow.id}`}
         sx={{
           flex: `0 0 ${LABEL_W}px`, position: 'sticky', left: 0, zIndex: 3, background: T.sf,
-          borderRight: `1px solid ${T.ln}`, borderLeft: `3px solid ${workflow.color || T.tl}`,
+          borderRight: `1px solid ${T.ln}`, borderLeft: `3px solid ${workflow.color || T.pr}`,
           padding: '10px 12px', textDecoration: 'none', color: 'inherit',
           display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0,
           '&:hover': { background: T.sf2 },
@@ -301,7 +311,7 @@ function WorkflowTimelineRow({
         <Box sx={{ fontSize: 10, color: T.dm2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {phases.length} phase{phases.length === 1 ? '' : 's'}
           {orphans.length > 0 && (
-            <Box component="span" sx={{ color: T.rd, ml: '6px' }}>· {orphans.length} unscheduled</Box>
+            <Box component="span" sx={{ color: T.danger, ml: '6px' }}>· {orphans.length} unscheduled</Box>
           )}
         </Box>
       </Box>
@@ -318,7 +328,12 @@ function WorkflowTimelineRow({
           const pct = (n: number) => (c.total ? (n / c.total) * 100 : 0);
           const title = items.length
             ? items
-                .map((d) => `${d.name} — ${!d.versions.length ? 'Not submitted' : d.workingVersion ? 'In progress' : 'Released'}`)
+                .map((d) => {
+                  const label = d.publishState === 'published' ? 'Published'
+                    : d.publishState === 'newlyPublished' ? 'New since last release'
+                    : 'Not published';
+                  return `${d.name} — ${label}`;
+                })
                 .join('\n')
             : 'No artifacts in this phase';
 
@@ -333,9 +348,10 @@ function WorkflowTimelineRow({
               }}
             >
               {/* 상태 비율 — 막대 배경을 그대로 채운다(별도 미니 바를 겹치지 않는다). */}
+              {/* 색은 위 LEGEND와 같은 것을 쓴다 — published는 ok, 신규는 pr. */}
               <Box sx={{ position: 'absolute', inset: 0, display: 'flex' }}>
-                <Box sx={{ width: `${pct(c.released)}%`, background: T.tl2 }} />
-                <Box sx={{ width: `${pct(c.inProgress)}%`, background: T.am2 }} />
+                <Box sx={{ width: `${pct(c.released)}%`, background: T.okSoft }} />
+                <Box sx={{ width: `${pct(c.inProgress)}%`, background: T.prSoft }} />
               </Box>
               <Box
                 sx={{
@@ -368,7 +384,7 @@ function WorkflowTimelineRow({
             sx={{
               position: 'absolute', right: 8, height: BAR_H, display: 'inline-flex', alignItems: 'center',
               gap: '5px', padding: '0 8px', borderRadius: '6px',
-              background: T.rd2, border: `1px dashed ${T.rd3}`, color: T.rd,
+              background: T.dangerSoft, border: `1px dashed ${T.dangerLine}`, color: T.danger,
               fontFamily: FONT_MONO, fontSize: 9.5, fontWeight: 700, whiteSpace: 'nowrap',
             }}
           >

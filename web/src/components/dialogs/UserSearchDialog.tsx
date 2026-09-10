@@ -137,7 +137,7 @@ export function UserSearchDialog({
         </SirenButton>
       </Row>
 
-      {error && <Box sx={{ fontSize: 12, color: T.rd, mb: '10px' }}>{error}</Box>}
+      {error && <Box sx={{ fontSize: 12, color: T.danger, mb: '10px' }}>{error}</Box>}
 
       <Card sx={{ padding: 0, overflow: 'hidden' }}>
         {loading ? (

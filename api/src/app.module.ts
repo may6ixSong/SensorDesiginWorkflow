@@ -5,11 +5,13 @@ import configuration from './config/configuration';
 import { DatabaseModule } from './database/database.module';
 import { ProjectsModule } from './projects/projects.module';
 import { WorkflowsModule } from './workflows/workflows.module';
-import { DeliverablesModule } from './deliverables/deliverables.module';
+import { ArtifactsModule } from './artifacts/artifacts.module';
+import { BlocksModule } from './blocks/blocks.module';
 import { MemosModule } from './memos/memos.module';
 import { EdgesModule } from './edges/edges.module';
 import { CanvasModule } from './canvas/canvas.module';
-import { HldModule } from './hld/hld.module';
+import { ReleasesModule } from './releases/releases.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { StorageModule } from './storage/storage.module';
 import { AuditModule } from './audit/audit.module';
 import { HubModule } from './hub/hub.module';
@@ -20,11 +22,13 @@ import { HubModule } from './hub/hub.module';
     DatabaseModule,
     ProjectsModule,
     WorkflowsModule,
-    DeliverablesModule,
+    ArtifactsModule,
+    BlocksModule,
     MemosModule,
     EdgesModule,
     CanvasModule,
-    HldModule,
+    ReleasesModule,
+    NotificationsModule,
     StorageModule,
     AuditModule,
     HubModule,

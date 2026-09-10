@@ -1,9 +1,17 @@
 import { useEffect, useState } from 'react';
 import { Box } from '@mui/material';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useToastStore } from '@/store/toastStore';
-import { T } from '@/theme/tokens';
+import { MOTION, toastVariants } from '@/theme/motion';
+import { useMotion } from '@/theme/useReducedMotion';
+import { R, T } from '@/theme/tokens';
 
-/** 목업 .toast — 하단 중앙, 1.9초 후 사라짐. */
+/**
+ * 하단 중앙 토스트 — 1.9초 후 사라진다.
+ *
+ * 아래에서 올라오며 안착하고(spring), 사라질 때는 짧게 fade한다 — 등장은 눈에 띄어야
+ * 하지만 퇴장은 시선을 끌면 안 된다(설계서 06장 §1.4).
+ */
 export function Toast() {
   const msg = useToastStore((s) => s.msg);
   const seq = useToastStore((s) => s.seq);
@@ -16,27 +24,40 @@ export function Toast() {
     return () => clearTimeout(t);
   }, [msg, seq]);
 
+  const m = useMotion();
+
   return (
-    <Box
-      sx={{
-        position: 'fixed',
-        left: '50%',
-        bottom: 22,
-        transform: visible ? 'translateX(-50%) translateY(-4px)' : 'translateX(-50%)',
-        background: T.inv,
-        color: '#fff',
-        fontSize: 12.5,
-        px: '15px',
-        py: '8px',
-        borderRadius: '8px',
-        boxShadow: T.sl,
-        zIndex: 1600,
-        opacity: visible ? 1 : 0,
-        transition: 'opacity .18s, transform .18s',
-        pointerEvents: 'none',
-      }}
-    >
-      {msg}
-    </Box>
+    <AnimatePresence>
+      {visible && msg && (
+        <Box
+          component={motion.div}
+          key={seq}
+          variants={toastVariants}
+          initial="hidden"
+          animate="visible"
+          exit="exit"
+          transition={m(MOTION.panel)}
+          sx={{
+            position: 'fixed',
+            left: '50%',
+            bottom: 22,
+            // framer-motion이 transform을 관리하므로 가운데 정렬은 x로 준다.
+            x: '-50%',
+            background: T.inv,
+            color: T.invTx,
+            fontSize: 12.5,
+            fontWeight: 500,
+            px: '15px',
+            py: '8px',
+            borderRadius: `${R.sm}px`,
+            boxShadow: T.shLg,
+            zIndex: 1600,
+            pointerEvents: 'none',
+          }}
+        >
+          {msg}
+        </Box>
+      )}
+    </AnimatePresence>
   );
 }
