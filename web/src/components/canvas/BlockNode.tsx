@@ -207,7 +207,7 @@ export function BlockNode({
         {/* 이름 */}
         <Box
           sx={{
-            fontSize: compact ? 14 : 16, fontWeight: 600, lineHeight: 1.3, color: T.tx,
+            fontSize: compact ? 21 : 24, fontWeight: 600, lineHeight: 1.25, color: T.tx,
             display: '-webkit-box', WebkitLineClamp: compact ? 2 : 3, WebkitBoxOrient: 'vertical',
             overflow: 'hidden', wordBreak: 'break-word',
           }}

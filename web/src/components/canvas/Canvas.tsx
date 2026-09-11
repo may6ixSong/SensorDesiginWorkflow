@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Box } from '@mui/material';
+import { useTranslation } from 'react-i18next';
 import { WorkflowDto, WorkflowPhase } from '@/types/domain';
 import { useCanvasStore } from '@/store/canvasStore';
 import { toast } from '@/store/toastStore';
@@ -52,6 +53,7 @@ type Blk = CanvasNode | CanvasMemo;
 export function Canvas({
   workflow, phases, canEdit, recipientFilter, onSaveLayout, onCancelEdit,
 }: Props) {
+  const { t } = useTranslation();
   /**
    * 수신 부서 필터 — 걸린 블록은 흐려질 뿐 사라지지 않는다. 필터가 비어 있으면 아무것도
    * 흐리게 하지 않는다(설계서 03장 §6.1).
@@ -788,10 +790,11 @@ export function Canvas({
 
       {edgeToDelete && (
         <ConfirmDialog
-          title="Remove this flow?"
-          message="This will remove the connection between these two blocks. This cannot be undone."
-          confirmLabel="Remove"
-          cancelLabel="Cancel"
+          title={t('canvas.deleteFlowTitle')}
+          message={t('canvas.deleteFlowMessage')}
+          warning={t('canvas.deleteFlowWarning')}
+          confirmLabel={t('canvas.deleteFlowConfirm')}
+          cancelLabel={t('canvas.deleteFlowCancel')}
           onCancel={clearEdgeToDelete}
           onConfirm={() => {
             const s = st.getState();
