@@ -1,5 +1,5 @@
 import { Box } from '@mui/material';
-import { CanvasNode, stOf, tierStyle } from '@/lib/canvasModel';
+import { CanvasNode, stOf } from '@/lib/canvasModel';
 import { WorkflowPhase } from '@/types/domain';
 import { Icon, IconName } from '@/components/common/Icon';
 import { CURSOR_POINTER, R, T, TNUM } from '@/theme/tokens';
@@ -66,7 +66,6 @@ export function BlockNode({
   onPointerDown, onPointerMove, onPointerUp, onClick,
 }: Props) {
   const st = stOf(d);
-  const tier = tierStyle(d);
   const compact = d.h < 150;
 
   // 클릭으로 flow 하이라이트가 켜져 있는데 이 블록이 그 흐름에 안 걸려 있으면 흐리게 —
@@ -123,20 +122,21 @@ export function BlockNode({
           title="Open details"
           aria-label={`Open ${d.name}`}
           sx={{
+            // 버튼 전체를 20% 키웠다(사용자 요청) — 커진 높이만큼 block 위 여백도 다시 맞춘다.
             position: 'absolute', top: 0, left: '50%',
-            transform: 'translate(-50%, -40px)', zIndex: 15,
-            display: 'inline-flex', alignItems: 'center', gap: '7px', whiteSpace: 'nowrap',
-            background: T.inv, color: T.invTx, fontSize: 14, fontWeight: 600, fontFamily: 'inherit',
-            padding: '7px 14px', borderRadius: '10px', boxShadow: T.shLg, border: 'none',
+            transform: 'translate(-50%, -46px)', zIndex: 15,
+            display: 'inline-flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap',
+            background: T.inv, color: T.invTx, fontSize: 17, fontWeight: 600, fontFamily: 'inherit',
+            padding: '8px 17px', borderRadius: '12px', boxShadow: T.shLg, border: 'none',
             cursor: CURSOR_POINTER,
             '&:hover': { background: T.inv },
             '&::after': {
-              content: '""', position: 'absolute', left: '50%', bottom: -5, width: 10, height: 10,
+              content: '""', position: 'absolute', left: '50%', bottom: -6, width: 12, height: 12,
               background: T.inv, transform: 'translateX(-50%) rotate(45deg)',
             },
           }}
         >
-          <Icon name="eye" /> Details
+          <Icon name="eye" size={17} /> Details
         </Box>
       )}
 
@@ -172,25 +172,16 @@ export function BlockNode({
         />
 
         <Box sx={{ padding: compact ? '9px 11px 8px 13px' : '11px 13px 10px 15px', flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-          {/* 윗줄 — tier 배지 + 상태 점 */}
+          {/* 윗줄 — 네트워크 표식 + 상태 점. Tier는 사용자에게 공개하는 정보가 아니라서
+              (사용자 요청) 여기엔 글자/배지로 안 두고, 아이콘 모양으로만 이름 옆에 놓는다
+              (아래 "이름" 참고). */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: '6px', mb: '7px' }}>
-            <Box
-              sx={{
-                display: 'inline-flex', alignItems: 'center', gap: '4px',
-                background: orphan ? T.dangerSoft : tier.bg, color: orphan ? T.danger : tier.fg,
-                fontSize: 10, fontWeight: 700, letterSpacing: '0.04em',
-                padding: '2px 6px', borderRadius: `${R.xs}px`, flexShrink: 0,
-              }}
-            >
-              <Icon name={iconFor(d)} />
-              {d.tier ?? '—'}
-            </Box>
-
             {/* 네트워크 표식 — A/B Tier는 OA, C/D Tier는 HPC(초기 설계부터 있던 구분). */}
             {netFor(d.tier) && (
               <Box
                 sx={{
-                  fontSize: 9.5, fontWeight: 700, letterSpacing: '0.04em',
+                  // 20% 키웠다(사용자 요청: 9.5 -> 11.5).
+                  fontSize: 11.5, fontWeight: 700, letterSpacing: '0.04em',
                   color: netFor(d.tier) === 'HPC' ? T.warn : T.dm,
                   background: netFor(d.tier) === 'HPC' ? T.warnSoft : T.sf3,
                   padding: '2px 5px', borderRadius: `${R.xs}px`, flexShrink: 0,
@@ -227,15 +218,22 @@ export function BlockNode({
             )}
           </Box>
 
-          {/* 이름 */}
-          <Box
-            sx={{
-              fontSize: compact ? 21 : 24, fontWeight: 600, lineHeight: 1.25, color: T.tx,
-              display: '-webkit-box', WebkitLineClamp: compact ? 2 : 3, WebkitBoxOrient: 'vertical',
-              overflow: 'hidden', wordBreak: 'break-word',
-            }}
-          >
-            {d.name}
+          {/* 이름 — tier 아이콘을 배지/글자 없이 이름 옆에만 둔다(사용자 요청: tier는
+              사용자에게 공개하는 정보가 아니다). 아이콘 모양 자체는 tier마다 다르지만
+              (A=artifact, B=word, C/D=link), 글자·색으로 tier를 드러내지 않도록 중립색만 쓴다. */}
+          <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: '5px' }}>
+            <Box component="span" sx={{ color: T.dm, flexShrink: 0, mt: '3px' }}>
+              <Icon name={iconFor(d)} size={compact ? 16 : 18} />
+            </Box>
+            <Box
+              sx={{
+                fontSize: compact ? 21 : 24, fontWeight: 600, lineHeight: 1.25, color: T.tx,
+                display: '-webkit-box', WebkitLineClamp: compact ? 2 : 3, WebkitBoxOrient: 'vertical',
+                overflow: 'hidden', wordBreak: 'break-word', minWidth: 0, flex: 1,
+              }}
+            >
+              {d.name}
+            </Box>
           </Box>
 
           <Box sx={{ flex: 1 }} />
