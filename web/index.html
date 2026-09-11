@@ -65,6 +65,12 @@
         --siren-tl: var(--s-pr);
         --siren-tl2: var(--s-pr-soft);
 
+        /* 캔버스 선택/flow 하이라이트 전용 — 강조색(--s-pr)과 같은 계열이면 "지금 내가
+           고른 것"과 "늘 인디고인 UI"가 눈으로 구별이 안 된다. 그래서 색환에서 인디고와
+           멀리 떨어진 청록(cyan)을 따로 둔다. */
+        --s-select: #0891b2;
+        --s-select-ring: rgba(8, 145, 178, 0.35);
+
         /* ── Tier ── A→D 신뢰도 내림차순. 이 순서가 색에서 읽혀야 한다 */
         --s-tier-a: #0e8f66;
         --s-tier-a-soft: #e3f5ee;
@@ -139,6 +145,9 @@
 
         --siren-tl: var(--s-pr);
         --siren-tl2: var(--s-pr-soft);
+
+        --s-select: #22d3ee;
+        --s-select-ring: rgba(34, 211, 238, 0.4);
 
         --s-tier-a: #34d399;
         --s-tier-a-soft: #10281f;

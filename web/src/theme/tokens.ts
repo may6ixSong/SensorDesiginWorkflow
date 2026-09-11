@@ -36,6 +36,10 @@ export const T = {
   prLine: 'var(--s-pr-line)',
   prTx: 'var(--s-pr-tx)',
 
+  /** 캔버스 선택/flow 하이라이트 전용 — 인디고(pr)와 색환에서 멀리 둔 청록. */
+  select: 'var(--s-select)',
+  selectRing: 'var(--s-select-ring)',
+
   /* ── 상태 ── */
   ok: 'var(--s-ok)',
   okSoft: 'var(--s-ok-soft)',

@@ -20,7 +20,7 @@ interface Props {
 /**
  * 목업 drawEdges() — 직교 라우팅 SVG 레이어 (설계서 3.9).
  * - 양방향: 역방향 쌍(또는 bidirectional 플래그) → 양쪽 화살촉 + 순환 아이콘(편집모드 숨김)
- * - blocked: 선행 산출물이 미릴리스인데 후행이 진행됨 → 주황 점선
+ * - blocked: 선행 산출물이 미릴리스인데 후행이 진행됨 → tomato 점선
  * - 하이라이트: 실선을 옅게 깔고 그 위에 흐르는 점선 애니메이션
  */
 export function EdgeLayer({
@@ -49,7 +49,10 @@ export function EdgeLayer({
     // 선택된 산출물과 무관한 flow — 관련 없는 블록을 흐리게 하는 것과 같은 기준(0.4)으로
     // 같이 낮춘다. <g>로 묶어야 marker(화살촉)까지 함께 흐려진다.
     const unrelated = !!hlSet && !on;
-    const col = on ? T.pr : blocked ? T.warn : T.dm;
+    // 하이라이트는 강조색(T.pr)이 아니라 별도 청록(T.select)을 쓴다 — 인디고 하나만 쓰면
+    // "지금 고른 flow"와 "항상 인디고인 UI"가 구별되지 않는다. blocked는 경고 색이
+    // 아니라 눈에 확 튀는 tomato로, tier 배지의 갈색(Tier C)과도 헷갈리지 않게 한다.
+    const col = on ? T.select : blocked ? 'tomato' : T.dm;
     const mk = on ? 'ahl' : blocked ? 'ahb' : 'ah';
     const dpath = orth(a, b);
     const segs: JSX.Element[] = [];
@@ -78,7 +81,7 @@ export function EdgeLayer({
         <path
           key={`${e.id}-dash`}
           d={dpath}
-          stroke={T.pr}
+          stroke={T.select}
           strokeWidth={3.8}
           fill="none"
           strokeLinecap="round"
@@ -155,16 +158,16 @@ export function EdgeLayer({
           <path d="M0,0L12,6L0,12Z" fill="#5c6b7d" />
         </marker>
         <marker id="ahb" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
-          <path d="M0,0L12,6L0,12Z" fill="#ac6f08" />
+          <path d="M0,0L12,6L0,12Z" fill="tomato" />
         </marker>
         <marker id="ahl" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
-          <path d="M0,0L12,6L0,12Z" fill={T.pr} />
+          <path d="M0,0L12,6L0,12Z" fill={T.select} />
         </marker>
         <marker id="ah-s" markerWidth="12" markerHeight="12" refX="2" refY="6" orient="auto">
           <path d="M12,0L0,6L12,12Z" fill="#5c6b7d" />
         </marker>
         <marker id="ahl-s" markerWidth="12" markerHeight="12" refX="2" refY="6" orient="auto">
-          <path d="M12,0L0,6L12,12Z" fill={T.pr} />
+          <path d="M12,0L0,6L12,12Z" fill={T.select} />
         </marker>
       </defs>
       {parts}
