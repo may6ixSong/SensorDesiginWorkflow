@@ -74,6 +74,8 @@ export function BoardPage() {
   const [recipientFilter, setRecipientFilter] = useState<string[]>([]);
   const [releaseOpen, setReleaseOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  /** artifact slide의 release 마커를 눌러 들어온 경우 — 그 release를 미리 골라둔다. */
+  const [historyPreselect, setHistoryPreselect] = useState<string | null>(null);
 
   /**
    * preview는 연동 서비스에 라이브로 버전을 물어보므로 평소 조회보다 느리다 —
@@ -228,7 +230,7 @@ export function BoardPage() {
               st.getState().setWorkflowSettingsTab('details');
             }}
             onOpenRelease={() => setReleaseOpen(true)}
-            onOpenHistory={() => setHistoryOpen(true)}
+            onOpenHistory={() => { setHistoryPreselect(null); setHistoryOpen(true); }}
           />
 
           <Canvas
@@ -246,6 +248,12 @@ export function BoardPage() {
               own={canEdit}
               project={project}
               onClose={closeSlide}
+              releases={releases.data ?? []}
+              onOpenRelease={(releaseId) => {
+                closeSlide();
+                setHistoryPreselect(releaseId);
+                setHistoryOpen(true);
+              }}
               saving={replaceRecipients.isPending || replaceArtifactAccess.isPending}
               onSaveBlockRecipients={(p) =>
                 replaceRecipients.mutate(
@@ -408,6 +416,7 @@ export function BoardPage() {
               workflowName={workflow.name}
               releases={releases.data ?? []}
               departmentOptions={project?.departments ?? []}
+              initialSelectedId={historyPreselect}
               onClose={() => setHistoryOpen(false)}
               onOpenArtifact={(blockId) => {
                 setHistoryOpen(false);

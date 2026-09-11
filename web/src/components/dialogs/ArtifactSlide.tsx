@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Box } from '@mui/material';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { AccessGrant, ArtifactVersionDto, BlockDto, ProjectDetailDto, isMaskedArtifact } from '@/types/domain';
+import { AccessGrant, ArtifactVersionDto, BlockDto, ProjectDetailDto, ReleaseDto, isMaskedArtifact } from '@/types/domain';
 import { SlidePanel } from '@/components/common/SlidePanel';
 import { SirenButton, Badge } from '@/components/common/SirenButton';
 import { Card, Ey } from '@/components/common/Panel';
@@ -12,9 +12,12 @@ import { UserAvatar } from '@/components/common/Avatar';
 import { useDirectory } from '@/app/providers/DirectoryProvider';
 import { AccessGrantEditor } from '@/components/dialogs/AccessGrantEditor';
 import { fmtAt } from '@/lib/canvasModel';
-import { FONT_MONO, R, T, TIER_COLOR, TNUM } from '@/theme/tokens';
+import { CURSOR_POINTER, FONT_MONO, R, T, TIER_COLOR, TNUM } from '@/theme/tokens';
 
 type Tab = 'versions' | 'recipients';
+
+/** Published/Working 배지가 기본 Badge 크기(8px)로는 너무 작다는 지적(사용자) — 여기서만 키운다. */
+const STATUS_BADGE_SX = { fontSize: 10.5, padding: '2px 7px', fontWeight: 700 };
 
 /** 패널 머리 — 산출물 이름 한 줄. 부가 배지는 본문 상단에서 따로 그린다. */
 function SlideHeader({ name }: { name: string }) {
@@ -76,6 +79,10 @@ interface Props {
   onSaveArtifactAccess: (p: { editAccess: AccessGrant; viewAccess: AccessGrant }) => void;
   saving?: boolean;
   onDelete?: () => void;
+  /** 이 workflow의 release 이력 — 버전 트리 위 release 마커(설계서 05장 §7.3)에 쓴다. */
+  releases?: ReleaseDto[];
+  /** release 마커를 클릭했을 때 — 그 release의 상세를 연다. */
+  onOpenRelease?: (releaseId: string) => void;
 }
 
 /**
@@ -92,6 +99,7 @@ interface Props {
  */
 export function ArtifactSlide({
   block, own, project, onClose, onSaveBlockRecipients, onSaveArtifactAccess, saving, onDelete,
+  releases, onOpenRelease,
 }: Props) {
   const { t } = useTranslation();
   const [tab, setTab] = useState<Tab>('versions');
@@ -165,9 +173,9 @@ export function ArtifactSlide({
           <Badge color={T.dm} bg={T.sf3} borderColor="transparent">HPC</Badge>
         )}
         {published.length ? (
-          <Badge color={T.ok} bg={T.okSoft} borderColor={T.okLine}>{t('artifact.published')}</Badge>
+          <Badge color={T.ok} bg={T.okSoft} borderColor={T.okLine} sx={STATUS_BADGE_SX}>{t('artifact.published')}</Badge>
         ) : (
-          <Badge color={T.dm2} bg={T.sf2} borderColor={T.ln}>{t('artifact.notPublished')}</Badge>
+          <Badge color={T.dm2} bg={T.sf2} borderColor={T.ln} sx={STATUS_BADGE_SX}>{t('artifact.notPublished')}</Badge>
         )}
         {artifact.serviceKey && (
           <Box sx={{ fontSize: 11, color: T.dm2, fontFamily: FONT_MONO }}>
@@ -213,6 +221,9 @@ export function ArtifactSlide({
           <VersionsTab
             versions={artifact.versions}
             calypsoArtifactId={artifact.serviceKey === 'calypso' ? artifact.externalArtifactId : null}
+            blockId={block.id}
+            releases={releases ?? []}
+            onOpenRelease={onOpenRelease}
           />
         )}
 
@@ -240,15 +251,38 @@ export function ArtifactSlide({
  * ★ 미발행(working) 버전은 giver에게만 응답에 담겨 온다 — FE가 거르는 게 아니다.
  */
 function VersionsTab({
-  versions, calypsoArtifactId,
+  versions, calypsoArtifactId, blockId, releases, onOpenRelease,
 }: {
   versions: ArtifactVersionDto[];
   /** Calypso 산출물이면 값이 있다 — "Open"이 외부 viewUrl(예전 calypso/web, 폐기됨) 대신
    * SIREN 안의 /artifacts/:id로 가야 한다(사용자 지적). */
   calypsoArtifactId: string | null;
+  blockId: string;
+  releases: ReleaseDto[];
+  onOpenRelease?: (releaseId: string) => void;
 }) {
   const { t } = useTranslation();
   const { resolveUser } = useDirectory();
+
+  /**
+   * versionLabel → 이 block이 그 버전으로 나갔던 release들(설계서 05장 §7.3).
+   * "release시 모든 artifact가 나간다"는 사실과는 별개로, 여기서 보여줄 건 **이
+   * 버전이 실제로 그 release에 기록된 published 스냅샷과 일치하는지**다 — 그래서
+   * artifactId가 아니라 이 캔버스의 blockId로, versionLabel까지 맞춰 찾는다.
+   * 같은 버전이 바뀌지 않아 여러 release에 계속 실렸으면 배지가 여러 개 쌓인다.
+   */
+  const releasesByVersion = useMemo(() => {
+    const map = new Map<string, { id: string; label: string; seq: number }[]>();
+    for (const r of releases) {
+      const item = r.items.find((i) => i.blockId === blockId);
+      if (!item || item.masked || !item.published) continue;
+      const arr = map.get(item.published.versionLabel) ?? [];
+      arr.push({ id: r.id, label: r.label, seq: r.seq });
+      map.set(item.published.versionLabel, arr);
+    }
+    for (const arr of map.values()) arr.sort((a, b) => a.seq - b.seq);
+    return map;
+  }, [releases, blockId]);
 
   if (!versions.length) {
     return (
@@ -263,9 +297,10 @@ function VersionsTab({
       {versions.map((v, i) => {
         const by = v.giverKnoxId ? resolveUser(v.giverKnoxId) : null;
         const at = v.publishedAt ?? v.observedAt ?? v.createdAt;
+        const relBadges = releasesByVersion.get(v.versionLabel) ?? [];
         return (
           <Card key={`${v.versionLabel}:${i}`} sx={{ padding: '11px 13px' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               <Box sx={{ fontFamily: FONT_MONO, fontSize: 13, fontWeight: 600, ...TNUM }}>
                 {v.versionLabel}
               </Box>
@@ -274,10 +309,31 @@ function VersionsTab({
                   개"처럼 잘못 읽힌다(사용자 지적). versions는 artifacts.service.ts가
                   항상 새 항목을 배열 맨 앞에 꽂는 식(unshift와 동일)이라 0번이 최신이다. */}
               {v.isPublished ? (
-                <Badge color={T.ok} bg={T.okSoft} borderColor={T.okLine}>{t('artifact.published')}</Badge>
+                <Badge color={T.ok} bg={T.okSoft} borderColor={T.okLine} sx={STATUS_BADGE_SX}>{t('artifact.published')}</Badge>
               ) : i === 0 ? (
-                <Badge color={T.warn} bg={T.warnSoft} borderColor={T.warnLine}>Working</Badge>
+                <Badge color={T.warn} bg={T.warnSoft} borderColor={T.warnLine} sx={STATUS_BADGE_SX}>Working</Badge>
               ) : null}
+              {/* release 마커 — 이 버전이 실제로 release로 나갔던 v{seq}들(설계서 05장 §7.3).
+                  클릭하면 release history를 그 release로 열어 보여준다. */}
+              {relBadges.map((rb) => (
+                <Box
+                  key={rb.id}
+                  component={onOpenRelease ? 'button' : 'span'}
+                  onClick={onOpenRelease ? () => onOpenRelease(rb.id) : undefined}
+                  title="Went out in this release"
+                  sx={{
+                    fontFamily: FONT_MONO, fontSize: 10.5, fontWeight: 700, ...TNUM,
+                    padding: '2px 7px', borderRadius: `${R.xs}px`,
+                    background: T.prSoft, color: T.pr, border: `1px solid ${T.prLine}`,
+                    ...(onOpenRelease && {
+                      cursor: CURSOR_POINTER,
+                      '&:hover': { background: T.prLine },
+                    }),
+                  }}
+                >
+                  {rb.label}
+                </Box>
+              ))}
               <Box sx={{ flex: 1 }} />
               <Box sx={{ fontSize: 11, color: T.dm2, ...TNUM }}>{at ? fmtAt(at) : ''}</Box>
             </Box>
@@ -327,7 +383,6 @@ function VersionsTab({
           </Card>
         );
       })}
-      {/* TODO(T1): 버전 트리 위에 release 마커(v{n})를 얹는다(설계서 05장 §7.3). */}
     </Box>
   );
 }

@@ -16,6 +16,8 @@ interface Props {
   releases: ReleaseDto[];
   /** 부서별 필터 뷰 후보 — 그 과제에 등록된 부서. */
   departmentOptions: string[];
+  /** 산출물 상세의 release 마커를 눌러 들어왔을 때 — 그 release를 처음부터 골라서 연다. */
+  initialSelectedId?: string | null;
   onClose: () => void;
   onOpenArtifact?: (blockId: string) => void;
 }
@@ -32,11 +34,11 @@ interface Props {
  *   판정되어, 볼 수 없는 항목은 버전·링크가 비어서 온다(item.masked).
  */
 export function ReleaseHistoryDialog({
-  workflowName, releases, departmentOptions, onClose, onOpenArtifact,
+  workflowName, releases, departmentOptions, initialSelectedId, onClose, onOpenArtifact,
 }: Props) {
   const { t } = useTranslation();
   const { resolveUser } = useDirectory();
-  const [selectedId, setSelectedId] = useState<string | null>(releases[0]?.id ?? null);
+  const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId ?? releases[0]?.id ?? null);
   /** null이면 전체. 고르면 그 부서가 받은 항목만 남긴다. */
   const [deptFilter, setDeptFilter] = useState<string | null>(null);
 
