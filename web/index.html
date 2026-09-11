@@ -105,9 +105,11 @@
         --s-changed-line: #f0d9a8;
 
         /* ── 캔버스 ── 페이지 배경(--s-bg)과 거의 구별이 안 됐다(사용자 피드백) — 뚜렷하게
-           한 단 더 가라앉힌 톤으로 캔버스 영역 경계가 한눈에 들어오게 한다. */
-        --s-canvas-bg: #d5dae8;
-        --s-canvas-grid: #c0c7db;
+           한 단 더 가라앉힌 톤으로 캔버스 영역 경계가 한눈에 들어오게 한다.
+           ★ --s-ln2(phase 경계 점선 색, #d2d7e5)와 너무 가까우면 view 모드에서 경계선이
+             캔버스 배경에 묻혀 안 보인다(실측 확인) — 그 색과도 뚜렷이 떨어뜨린다. */
+        --s-canvas-bg: #e4e8f3;
+        --s-canvas-grid: #d3d9e8;
         /* 편집 중임이 한눈에 들어와야 한다 — 따뜻한 크림으로 전환한다 */
         --s-canvas-edit-bg: #fffbf2;
         --s-canvas-edit-grid: #efe4ce;
@@ -184,8 +186,11 @@
         --s-changed: #2f2612;
         --s-changed-line: #574620;
 
-        --s-canvas-bg: #12172a;
-        --s-canvas-grid: #232a42;
+        /* view 모드 배경이 edit 모드 배경(#0e1524)과 거의 같은 톤이라 편집 진입해도
+           구별이 안 됐다(실측 확인) — 확실히 더 밝은 톤으로 띄워서 edit(짙은 남색)과
+           view(밝은 슬레이트)가 서로 다르게 읽히게 한다. */
+        --s-canvas-bg: #1e2236;
+        --s-canvas-grid: #2f3650;
         --s-canvas-edit-bg: #0e1524;
         --s-canvas-edit-grid: #1b2740;
         --s-canvas-edit-line: #c78a2a;
