@@ -36,6 +36,21 @@ export class BlocksController {
     return this.canvasView.assemble(workflow, project, me);
   }
 
+  /**
+   * A Tier(Calypso 제외 Hub 등록 서비스)의 라이브 버전 조회(설계서 04장 §19.5/§19.6 복원).
+   * slide를 열었을 때만 그 block 하나에 대해 호출된다 — 캔버스 목록 조회는 절대 이걸
+   * 부르지 않는다(설계서 05장 §8).
+   */
+  @Get('workflows/:workflowId/blocks/:blockId/live-versions')
+  @WorkflowAccess('view')
+  async liveVersions(
+    @Param('blockId') blockId: string,
+    @CurrentProject() project: ProjectDocument,
+    @CurrentActor() me: Actor,
+  ) {
+    return this.canvasView.liveVersions(blockId, project, me);
+  }
+
   @Post('workflows/:workflowId/blocks')
   @WorkflowAccess('edit')
   async create(

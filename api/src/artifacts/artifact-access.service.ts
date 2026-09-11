@@ -10,7 +10,8 @@ import {
   sirenArtifactLevel,
 } from '../common/access';
 import { isServiceGovernedTier } from '../common/constants/tier';
-import { ArtifactDocument } from './schemas/artifact.schema';
+import { ArtifactDocument, ArtifactVersion } from './schemas/artifact.schema';
+import { ArtifactVersionDto, toVersionDtoList } from './dto/artifact.dto';
 import { HubService } from '../hub/hub.service';
 import { ObserverClientService } from '../hub/observer-client.service';
 
@@ -116,5 +117,55 @@ export class ArtifactAccessService {
       );
       return { canView: false, canEdit: false };
     }
+  }
+
+  /**
+   * 라이브 버전 조회 — v3 재설계 전 `DeliverablesService.liveVersions()`가 하던 일의
+   * 복원이다. Hub에 등록된(Calypso 제외) 서비스에 연동된 **A Tier만** 대상이다 — B/C/D는
+   * SIREN이 로컬 기록을 그대로 쓰고, Calypso는 이 레지스트리 대상이 아니며 브라우저가
+   * 이미 직접 호출한다(설계서 04장 §10). 매핑이 없거나 서비스가 응답하지 않으면 빈
+   * 배열이다 — 호출부(slide)는 그걸 "아직 published된 버전이 없음"과 동일하게 그린다.
+   *
+   * level은 호출부가 이미 levelFor()/assertCanOpen()으로 판정해 둔 값을 그대로 받는다 —
+   * 여기서 다시 게이트 1(recipient)을 판정할 근거(block)가 없기 때문이다. level이
+   * null이면(=열람 자체가 막힘) 호출하지 않는다.
+   */
+  async liveVersions(
+    actor: Actor,
+    artifact: { tier: string; serviceKey?: string | null; externalArtifactId?: string | null },
+    level: AccessLevel,
+  ): Promise<ArtifactVersionDto[]> {
+    if (level === null) return [];
+    if (!isServiceGovernedTier((artifact.tier ?? 'D') as 'A' | 'B' | 'C' | 'D')) return [];
+    const { serviceKey, externalArtifactId } = artifact;
+    if (!serviceKey || serviceKey === 'calypso' || !externalArtifactId) return [];
+
+    try {
+      const svc = await this.hub.findByKeyOrThrow(serviceKey);
+      const records = await this.observer.versions(
+        svc,
+        externalArtifactId,
+        actor.knoxId,
+        this.isAdminVisible(actor),
+      );
+      const entries = records.map((r) => this.observer.toVersionEntry(r, 'A') as ArtifactVersion);
+      return toVersionDtoList(entries, level);
+    } catch (e) {
+      this.logger.warn(
+        `A-tier live-versions failed for ${serviceKey}/${externalArtifactId} — ${(e as Error).message}`,
+      );
+      return [];
+    }
+  }
+
+  /**
+   * RPM처럼 서비스가 자발적으로 지원하면, 실제 검증된 Admin(시뮬레이션 중이 아닌)에게
+   * member가 아니어도 편집자 시야(작업중 버전)를 보여줄 수 있다. isAdmin은 realKnoxId
+   * 기준이라 시뮬레이션 중에도 true로 남으므로, isImpersonating도 함께 봐야 한다 —
+   * 시뮬레이션 중엔 Admin의 super 권한이 아니라 대상 사용자 본인의 실제 권한으로
+   * 보여야 하기 때문이다(§13.3 규칙 2와 같은 이유).
+   */
+  private isAdminVisible(actor: Actor): boolean {
+    return actor.isAdmin && !actor.isImpersonating;
   }
 }

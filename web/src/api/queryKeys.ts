@@ -8,6 +8,9 @@ export const queryKeys = {
   workflow: (workflowId: string) => ['workflows', workflowId] as const,
   /** 캔버스 블록 — 각 항목에 artifact와 권한 판정 결과가 함께 담겨 온다. */
   blocks: (workflowId: string) => ['workflows', workflowId, 'blocks'] as const,
+  /** A Tier(Calypso 제외 Hub 등록 서비스)의 라이브 버전 조회 — slide를 열었을 때만 쓴다. */
+  liveVersions: (workflowId: string, blockId: string) =>
+    ['workflows', workflowId, 'blocks', blockId, 'live-versions'] as const,
   memos: (workflowId: string) => ['workflows', workflowId, 'memos'] as const,
   edges: (workflowId: string) => ['workflows', workflowId, 'edges'] as const,
 

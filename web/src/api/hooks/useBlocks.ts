@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
 import { queryKeys } from '../queryKeys';
-import { AccessGrant, BlockDto } from '@/types/domain';
+import { AccessGrant, ArtifactVersionDto, BlockDto } from '@/types/domain';
 
 /**
  * 캔버스 블록 목록.
@@ -17,6 +17,27 @@ export function useBlocks(workflowId: string | undefined) {
     enabled: Boolean(workflowId),
     queryFn: async () => {
       const res = await apiClient.get<BlockDto[]>(`/workflows/${workflowId}/blocks`);
+      return res.data;
+    },
+  });
+}
+
+/**
+ * A Tier(Calypso 제외 Hub 등록 서비스)의 라이브 버전 조회 — v3 재설계 전에 있던
+ * "member/version API를 그 서비스에 실제로 물어보는" 기능의 복원이다.
+ *
+ * ★ 캔버스 목록(useBlocks)의 `artifact.versions`는 이런 산출물에 대해선 매핑 당시의
+ *   스냅샷일 뿐 라이브가 아니다 — 그래서 ArtifactSlide가 열렸을 때만, 그 block에
+ *   대해서만 이 쿼리를 켠다(enabled).
+ */
+export function useLiveVersions(workflowId: string | undefined, blockId: string | undefined, enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.liveVersions(workflowId ?? '', blockId ?? ''),
+    enabled: Boolean(workflowId) && Boolean(blockId) && enabled,
+    queryFn: async () => {
+      const res = await apiClient.get<ArtifactVersionDto[]>(
+        `/workflows/${workflowId}/blocks/${blockId}/live-versions`,
+      );
       return res.data;
     },
   });

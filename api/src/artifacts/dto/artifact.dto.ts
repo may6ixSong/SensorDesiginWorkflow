@@ -55,7 +55,7 @@ export interface ArtifactDto {
   createdBy: string;
 }
 
-function toVersionDto(v: ArtifactVersion): ArtifactVersionDto {
+export function toVersionDto(v: ArtifactVersion): ArtifactVersionDto {
   return {
     tier: v.tier,
     versionLabel: v.versionLabel,
@@ -82,10 +82,15 @@ function toVersionDto(v: ArtifactVersion): ArtifactVersionDto {
  * 그대로 level로 넘겨준다(ArtifactAccessService). 즉 A Tier에서는 recipient에 edit으로
  * 들어 있어도 그 서비스에서 edit 권한이 없으면 working 버전이 보이지 않는다.
  */
-export function visibleVersions(artifact: ArtifactDocument, level: AccessLevel): ArtifactVersionDto[] {
-  const all = (artifact.versions ?? []).map(toVersionDto);
+/** 버전 배열 → 권한에 맞춰 거른 DTO 목록. DB에서 읽은 것이든 라이브 조회 결과든 공용이다. */
+export function toVersionDtoList(versions: ArtifactVersion[], level: AccessLevel): ArtifactVersionDto[] {
+  const all = versions.map(toVersionDto);
   if (level === 'edit') return all;
   return all.filter((v) => v.isPublished);
+}
+
+export function visibleVersions(artifact: ArtifactDocument, level: AccessLevel): ArtifactVersionDto[] {
+  return toVersionDtoList(artifact.versions ?? [], level);
 }
 
 export function toArtifactDto(artifact: ArtifactDocument, level: AccessLevel): ArtifactDto {

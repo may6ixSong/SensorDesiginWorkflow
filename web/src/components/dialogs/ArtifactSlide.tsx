@@ -10,6 +10,7 @@ import { TabPanel, Tabs } from '@/components/common/Tabs';
 import { Icon, IconName } from '@/components/common/Icon';
 import { UserAvatar } from '@/components/common/Avatar';
 import { useDirectory } from '@/app/providers/DirectoryProvider';
+import { useLiveVersions } from '@/api/hooks/useBlocks';
 import { AccessGrantEditor } from '@/components/dialogs/AccessGrantEditor';
 import { fmtAt } from '@/lib/canvasModel';
 import { CURSOR_POINTER, FONT_MONO, R, T, TIER_COLOR, TNUM } from '@/theme/tokens';
@@ -104,6 +105,21 @@ export function ArtifactSlide({
   const { t } = useTranslation();
   const [tab, setTab] = useState<Tab>('versions');
 
+  /* ── A Tier 라이브 버전 조회 (설계서 04장 §19.5/§19.6 복원) ──
+     Calypso 제외 Hub 등록 서비스에 연동된 A Tier만 대상이다 — 이런 산출물의
+     `artifact.versions`(캔버스 목록에 실려 온 값)는 매핑 당시 스냅샷일 뿐이라 믿을 수
+     없다. block이 아직 없거나(early return 전) masked/미매핑이어도 훅은 早期 return 전에
+     불러야 하므로(Hooks 규칙) 안전하게 optional chaining으로 판정한다. */
+  const artifactForHook = block?.artifact;
+  const isHubLive =
+    !!artifactForHook &&
+    !isMaskedArtifact(artifactForHook) &&
+    artifactForHook.tier === 'A' &&
+    !!artifactForHook.serviceKey &&
+    artifactForHook.serviceKey !== 'calypso' &&
+    !!artifactForHook.externalArtifactId;
+  const live = useLiveVersions(block?.workflowId, block?.id, isHubLive);
+
   if (!block) return null;
   const artifact = block.artifact;
 
@@ -141,7 +157,9 @@ export function ArtifactSlide({
 
   const tier = TIER_COLOR[artifact.tier];
   const isATier = artifact.tier === 'A';
-  const published = artifact.versions.filter((v) => v.isPublished);
+  // Hub 라이브 대상이면 artifact.versions(스냅샷) 대신 방금 그 서비스에 물어본 값을 쓴다.
+  const effectiveVersions = isHubLive ? (live.data ?? []) : artifact.versions;
+  const published = effectiveVersions.filter((v) => v.isPublished);
   const canEditRecipients = own;
 
   return (
@@ -208,7 +226,7 @@ export function ArtifactSlide({
       {/* ── 탭 ── */}
       <Tabs
         tabs={[
-          { key: 'versions' as Tab, label: 'Versions', badge: artifact.versions.length || undefined },
+          { key: 'versions' as Tab, label: 'Versions', badge: effectiveVersions.length || undefined },
           { key: 'recipients' as Tab, label: t('artifact.recipients') },
         ]}
         value={tab}
@@ -219,11 +237,13 @@ export function ArtifactSlide({
       <TabPanel tabKey={tab}>
         {tab === 'versions' && (
           <VersionsTab
-            versions={artifact.versions}
+            versions={effectiveVersions}
             calypsoArtifactId={artifact.serviceKey === 'calypso' ? artifact.externalArtifactId : null}
             blockId={block.id}
             releases={releases ?? []}
             onOpenRelease={onOpenRelease}
+            isLive={isHubLive}
+            liveLoading={isHubLive && live.isLoading}
           />
         )}
 
@@ -251,7 +271,7 @@ export function ArtifactSlide({
  * ★ 미발행(working) 버전은 giver에게만 응답에 담겨 온다 — FE가 거르는 게 아니다.
  */
 function VersionsTab({
-  versions, calypsoArtifactId, blockId, releases, onOpenRelease,
+  versions, calypsoArtifactId, blockId, releases, onOpenRelease, isLive, liveLoading,
 }: {
   versions: ArtifactVersionDto[];
   /** Calypso 산출물이면 값이 있다 — "Open"이 외부 viewUrl(예전 calypso/web, 폐기됨) 대신
@@ -260,6 +280,10 @@ function VersionsTab({
   blockId: string;
   releases: ReleaseDto[];
   onOpenRelease?: (releaseId: string) => void;
+  /** Calypso 제외 Hub 등록 서비스에 연동된 A Tier — 이 목록이 그 서비스에 방금 물어본
+   * 라이브 응답이라는 뜻이다(설계서 04장 §19.5/§19.6). */
+  isLive?: boolean;
+  liveLoading?: boolean;
 }) {
   const { t } = useTranslation();
   const { resolveUser } = useDirectory();
@@ -283,6 +307,14 @@ function VersionsTab({
     return map;
   }, [releases, blockId]);
 
+  if (liveLoading) {
+    return (
+      <Box sx={{ padding: '32px 8px', textAlign: 'center', color: T.dm2, fontSize: 12.5 }}>
+        Checking the live version with the owning service…
+      </Box>
+    );
+  }
+
   if (!versions.length) {
     return (
       <Box sx={{ padding: '32px 8px', textAlign: 'center', color: T.dm2, fontSize: 12.5 }}>
@@ -293,6 +325,12 @@ function VersionsTab({
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      {isLive && (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: 11, color: T.dm2, mb: '2px' }}>
+          <Box sx={{ width: 6, height: 6, borderRadius: '50%', background: T.ok, flexShrink: 0 }} />
+          Live from the owning service
+        </Box>
+      )}
       {versions.map((v, i) => {
         const by = v.giverKnoxId ? resolveUser(v.giverKnoxId) : null;
         const at = v.publishedAt ?? v.observedAt ?? v.createdAt;

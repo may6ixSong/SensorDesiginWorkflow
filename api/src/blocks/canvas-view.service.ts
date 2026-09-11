@@ -77,6 +77,25 @@ export class CanvasViewService {
     return publishStateOf(artifact, lastMajor, majorKeyOf);
   }
 
+  /**
+   * A Tier의 라이브 버전 조회(설계서 04장 §19.5/§19.6 복원). 평소 캔버스 조립(assemble)은
+   * 원칙대로 라이브 버전을 절대 묻지 않는다 — 이건 slide를 실제로 열었을 때만, 그 block
+   * 하나에 대해서만 호출되는 별도 경로다.
+   *
+   * 게이트 1(recipient)을 판정할 근거인 block 맥락이 필요해서 artifact 단독 라우트가
+   * 아니라 여기(block 경유)에 둔다 — ArtifactAccessService.assertCanOpen이 이미 하는
+   * 두 게이트 판정을 그대로 재사용한다.
+   */
+  async liveVersions(blockId: string, project: ProjectDocument | null, actor: Actor) {
+    const block = await this.blocks.findOrThrow(blockId);
+    const artifact = block.artifactId
+      ? await this.artifacts.findOrThrow(block.artifactId.toString())
+      : null;
+    if (!artifact) return [];
+    const level = await this.artifactAccess.assertCanOpen(actor, artifact, block, project);
+    return this.artifactAccess.liveVersions(actor, artifact, level);
+  }
+
   /** 블록 하나만 다시 조립한다 — 생성/수정 응답용. */
   async assembleOne(
     block: BlockDocument,
