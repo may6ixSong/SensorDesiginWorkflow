@@ -265,22 +265,21 @@ function VersionsTab({
   const { resolveUser } = useDirectory();
 
   /**
-   * versionLabel → 이 block이 그 버전으로 나갔던 release들(설계서 05장 §7.3).
-   * "release시 모든 artifact가 나간다"는 사실과는 별개로, 여기서 보여줄 건 **이
-   * 버전이 실제로 그 release에 기록된 published 스냅샷과 일치하는지**다 — 그래서
-   * artifactId가 아니라 이 캔버스의 blockId로, versionLabel까지 맞춰 찾는다.
-   * 같은 버전이 바뀌지 않아 여러 release에 계속 실렸으면 배지가 여러 개 쌓인다.
+   * versionLabel → 이 block이 그 버전으로 **처음** 나갔던 release 하나(설계서 05장 §7.3).
+   * release는 매번 모든 artifact의 현재 published 스냅샷을 담으므로, 버전이 안 바뀐 채
+   * 여러 release에 계속 실리면 이후 release에도 같은 versionLabel이 찍혀서 온다 — 하지만
+   * 그건 "그 시점에 새로 감지된" 게 아니라 직전 release와 동일한 값이 반복된 것뿐이므로
+   * 배지도 하나만, 처음 나간 release에만 붙인다(사용자 지적).
    */
   const releasesByVersion = useMemo(() => {
-    const map = new Map<string, { id: string; label: string; seq: number }[]>();
-    for (const r of releases) {
+    const map = new Map<string, { id: string; label: string }>();
+    const sorted = [...releases].sort((a, b) => a.seq - b.seq);
+    for (const r of sorted) {
       const item = r.items.find((i) => i.blockId === blockId);
       if (!item || item.masked || !item.published) continue;
-      const arr = map.get(item.published.versionLabel) ?? [];
-      arr.push({ id: r.id, label: r.label, seq: r.seq });
-      map.set(item.published.versionLabel, arr);
+      if (map.has(item.published.versionLabel)) continue;
+      map.set(item.published.versionLabel, { id: r.id, label: r.label });
     }
-    for (const arr of map.values()) arr.sort((a, b) => a.seq - b.seq);
     return map;
   }, [releases, blockId]);
 
@@ -297,7 +296,7 @@ function VersionsTab({
       {versions.map((v, i) => {
         const by = v.giverKnoxId ? resolveUser(v.giverKnoxId) : null;
         const at = v.publishedAt ?? v.observedAt ?? v.createdAt;
-        const relBadges = releasesByVersion.get(v.versionLabel) ?? [];
+        const relBadge = releasesByVersion.get(v.versionLabel);
         return (
           <Card key={`${v.versionLabel}:${i}`} sx={{ padding: '11px 13px' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
@@ -313,14 +312,14 @@ function VersionsTab({
               ) : i === 0 ? (
                 <Badge color={T.warn} bg={T.warnSoft} borderColor={T.warnLine} sx={STATUS_BADGE_SX}>Working</Badge>
               ) : null}
-              {/* release 마커 — 이 버전이 실제로 release로 나갔던 v{seq}들(설계서 05장 §7.3).
-                  클릭하면 release history를 그 release로 열어 보여준다. */}
-              {relBadges.map((rb) => (
+              {/* release 마커 — 이 버전이 처음 release로 나갔던 그 v{seq} 하나(설계서 05장
+                  §7.3). 이후 바뀌지 않은 채 다른 release에 반복돼도 배지는 늘지 않는다
+                  (사용자 지적) — 클릭하면 release history를 그 release로 열어 보여준다. */}
+              {relBadge && (
                 <Box
-                  key={rb.id}
                   component={onOpenRelease ? 'button' : 'span'}
-                  onClick={onOpenRelease ? () => onOpenRelease(rb.id) : undefined}
-                  title="Went out in this release"
+                  onClick={onOpenRelease ? () => onOpenRelease(relBadge.id) : undefined}
+                  title="First went out in this release"
                   sx={{
                     fontFamily: FONT_MONO, fontSize: 10.5, fontWeight: 700, ...TNUM,
                     padding: '2px 7px', borderRadius: `${R.xs}px`,
@@ -331,9 +330,9 @@ function VersionsTab({
                     }),
                   }}
                 >
-                  {rb.label}
+                  {relBadge.label}
                 </Box>
-              ))}
+              )}
               <Box sx={{ flex: 1 }} />
               <Box sx={{ fontSize: 11, color: T.dm2, ...TNUM }}>{at ? fmtAt(at) : ''}</Box>
             </Box>
