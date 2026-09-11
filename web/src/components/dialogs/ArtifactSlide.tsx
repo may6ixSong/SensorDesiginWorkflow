@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Box } from '@mui/material';
+import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { AccessGrant, ArtifactVersionDto, BlockDto, ProjectDetailDto, isMaskedArtifact } from '@/types/domain';
 import { SlidePanel } from '@/components/common/SlidePanel';
@@ -176,6 +177,26 @@ export function ArtifactSlide({
         )}
       </Box>
 
+      {/* Calypso 원본 — 실제 내용·업로드 화면은 SIREN 안(/artifacts/:id)에 있다. 예전 별도
+          calypso/web(5174)은 이미 폐기됐으니 그쪽으로 새 탭을 열면 안 된다(사용자 지적).
+          SirenButton은 component={motion.button}로 고정돼 있어 Link로 바꿔치기할 수
+          없으므로, 그 primary variant 스타일을 그대로 옮겨 Link에 입힌다. */}
+      {artifact.serviceKey === 'calypso' && artifact.externalArtifactId && (
+        <Box
+          component={Link}
+          to={`/artifacts/${artifact.externalArtifactId}`}
+          sx={{
+            display: 'inline-flex', alignItems: 'center', gap: '5px',
+            fontSize: 12.5, fontWeight: 500, padding: '6px 11px', borderRadius: `${R.sm}px`,
+            background: T.pr, color: '#fff', border: '1px solid transparent', boxShadow: T.shXs,
+            textDecoration: 'none', mb: '14px',
+            '&:hover': { background: T.prHover },
+          }}
+        >
+          <Icon name="expand" /> Open in Artifact page
+        </Box>
+      )}
+
       {/* ── 탭 ── */}
       <Tabs
         tabs={[
@@ -188,7 +209,12 @@ export function ArtifactSlide({
       />
 
       <TabPanel tabKey={tab}>
-        {tab === 'versions' && <VersionsTab versions={artifact.versions} />}
+        {tab === 'versions' && (
+          <VersionsTab
+            versions={artifact.versions}
+            calypsoArtifactId={artifact.serviceKey === 'calypso' ? artifact.externalArtifactId : null}
+          />
+        )}
 
         {tab === 'recipients' && (
           <RecipientsTab
@@ -213,7 +239,14 @@ export function ArtifactSlide({
  *   여기 도달했다는 것은 이미 열람 권한이 있다는 뜻이므로, 비어 있으면 "아직 없음"이다.
  * ★ 미발행(working) 버전은 giver에게만 응답에 담겨 온다 — FE가 거르는 게 아니다.
  */
-function VersionsTab({ versions }: { versions: ArtifactVersionDto[] }) {
+function VersionsTab({
+  versions, calypsoArtifactId,
+}: {
+  versions: ArtifactVersionDto[];
+  /** Calypso 산출물이면 값이 있다 — "Open"이 외부 viewUrl(예전 calypso/web, 폐기됨) 대신
+   * SIREN 안의 /artifacts/:id로 가야 한다(사용자 지적). */
+  calypsoArtifactId: string | null;
+}) {
   const { t } = useTranslation();
   const { resolveUser } = useDirectory();
 
@@ -258,7 +291,21 @@ function VersionsTab({ versions }: { versions: ArtifactVersionDto[] }) {
                   {v.hpcPath}
                 </Box>
               )}
-              {v.viewUrl && (
+              {/* Calypso면 항상 SIREN 내부 artifact 페이지로 — v.viewUrl은 Calypso 백엔드의
+                  PUBLIC_BASE_URL(폐기된 calypso/web, 5174)로 만들어져 그쪽을 가리키므로
+                  쓰지 않는다. 그 외(계약 맺은 진짜 외부 서비스)만 viewUrl을 그대로 연다. */}
+              {calypsoArtifactId ? (
+                <Box
+                  component={Link}
+                  to={`/artifacts/${calypsoArtifactId}`}
+                  sx={{
+                    display: 'inline-flex', alignItems: 'center', gap: '4px',
+                    fontSize: 11, color: T.pr, textDecoration: 'none', fontWeight: 600,
+                  }}
+                >
+                  <Icon name="link" /> Open
+                </Box>
+              ) : v.viewUrl && (
                 <Box
                   component="a"
                   href={v.viewUrl}
