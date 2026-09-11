@@ -65,6 +65,17 @@
         --siren-tl: var(--s-pr);
         --siren-tl2: var(--s-pr-soft);
 
+        /* 커스텀 커서(CustomCursor.tsx) 전용 — "3D 아이콘" 톤의 글래시한 입체감을 내려면
+           --s-pr 하나로는 부족해서(그라데이션 양 끝, 상단면 하이라이트 틴트, 오목한 안쪽
+           그림자까지 셋이 더 필요하다) 이 컴포넌트만을 위한 보조 팔레트를 따로 둔다.
+           커서는 페이지에 인라인으로 그려지므로(외부 SVG 파일이 아니다) var()를 그대로
+           읽는다 — public/cursors/*.svg는 JS가 아직 안 붙었을 때의 짧은 순간에만 보이는
+           대체 이미지라 이 변수들과 무관하게 라이트 톤 한 벌로 고정한다.*/
+        --s-cursor-0: #6a5cf0;
+        --s-cursor-1: #372ea8;
+        --s-cursor-top: #a89bff;
+        --s-cursor-rim: #241d78;
+
         /* ── Tier ── A→D 신뢰도 내림차순. 이 순서가 색에서 읽혀야 한다 */
         --s-tier-a: #0e8f66;
         --s-tier-a-soft: #e3f5ee;
@@ -140,6 +151,11 @@
         --siren-tl: var(--s-pr);
         --siren-tl2: var(--s-pr-soft);
 
+        --s-cursor-0: #a79dff;
+        --s-cursor-1: #5a4fe0;
+        --s-cursor-top: #cfc7ff;
+        --s-cursor-rim: #3a2f9e;
+
         --s-tier-a: #34d399;
         --s-tier-a-soft: #10281f;
         --s-tier-b: #6ea1ff;
@@ -182,10 +198,22 @@
         --s-ring: rgba(143, 134, 255, 0.4);
       }
 
-      /* 커서 hotspot — 각 SVG 자기 모양의 초점(화살촉 끝 / 손끝)을 따로 쓴다.
-         default는 (9 8), pointer는 (12 5)다. pointer 쪽 값은 tokens.ts의
-         CURSOR_POINTER와도 같아야 한다 — 어긋나면 그 상수를 쓰는 요소(캔버스 블록 등)
-         위에서만 클릭점이 손끝이 아닌 다른 자리가 된다. */
+      /* 커서 hotspot — 각 SVG 자기 모양의 초점(화살촉 끝 / 손끝 / 원 중심)을 따로 쓴다.
+         default는 (9 8), pointer는 (12 5), disabled는 (16 16)이다. 이 값들은
+         src/components/common/CustomCursor.tsx의 HOTSPOT 상수, pointer는 그 외에도
+         tokens.ts의 CURSOR_POINTER와 같아야 한다 — 어긋나면 그 자리에서만 클릭점이
+         손끝이 아닌 다른 곳이 된다.
+         ★ 이 네 규칙은 **그대로 유지된다** — CustomCursor가 마운트된 뒤에도 지우거나
+           블록으로 덮지 않는다. CustomCursor는 마우스 아래 요소가 바뀔 때마다 그
+           요소의 이 cursor 선언을 getComputedStyle로 먼저 읽어 어떤 모습을 그릴지
+           정하고, **그 다음에야** 그 요소 하나에만 인라인으로 cursor:none을 건다.
+           읽기(판정)와 가리기(숨김)의 순서가 바뀌면 안 된다 — 먼저 가리면 그 뒤엔
+           무엇이었는지 읽을 수 없다(실측으로 걸린 버그: 전역 규칙으로 한 번에
+           none을 덮었더니 모든 버튼이 화살표로만 보였다). 그래서 여기엔 CustomCursor
+           전용 오버라이드 블록이 따로 없다 — 있으면 안 된다.
+         ★ 이 url(...)들은 CustomCursor가 아직 mount되기 전(JS 로딩 중인 첫 순간)에만
+           실제로 보이는 대체 이미지이기도 하다 — 그래서 라이트 톤 한 벌로 고정해도
+           된다, 체감되는 순간이 아주 짧다. */
       html,
       body {
         background: var(--s-bg);
@@ -197,7 +225,7 @@
         cursor: url('/cursors/pointer.svg') 12 5, pointer;
       }
       button:disabled {
-        cursor: not-allowed;
+        cursor: url('/cursors/disabled.svg') 16 16, not-allowed;
       }
       input,
       textarea,
