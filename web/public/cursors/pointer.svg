@@ -1,31 +1,30 @@
 <!--
   SIREN 포인터 커서(링크·버튼·캔버스 블록 위).
 
-  ★ "클릭 가능"이라는 신호는 모양이 아니라 관습이다 — OS 전반에 걸쳐 그 관습은
-    손가락으로 가리키는 손(hand cursor)이다. 화살표에 장식(링·호)만 더하는 시도로는
-    그 관습을 대신할 수 없어서, 이번엔 실제로 손 모양을 그렸다.
-  · 검지(세로 캡슐) + 주먹(둥근 사각형) + 접힌 손가락 마디(작은 원 3개) + 엄지
-    (기울어진 캡슐), 네 덩이를 겹쳐 쌓았다. 개별 손가락을 사실적으로 그리는 대신
-    "가리키는 손"이라는 실루엣만 작은 크기(브라우저가 흔히 24px 안팎으로 줄여
-    그린다)에서도 즉시 읽히게 단순화했다.
+  ★ 두 요소를 합친다 — 하나는 "여기가 클릭 지점"이라는 원형 표식(직전 리비전에서
+    화살촉 둘레에 그리던 링과 같은 장치), 다른 하나는 "클릭 가능"이라는 보편적 신호인
+    가리키는 손 모양이다. 검지(세로 캡슐) + 주먹(둥근 사각형) + 기울어진 엄지, 세
+    덩이로 손을 표현하고, 그 검지 손끝에 원형 표식을 얹는다.
+  · 원을 손끝 정중앙에 딱 맞춰 겹치면 둥근 손끝 캡과 원이 동심원이 되어 "원 안에 든
+    얼굴"처럼 보인다(실제로 그렸다가 확인 후 버린 시안). 그래서 원의 중심을 손끝보다
+    살짝 아래로 내려, **손끝이 원 위쪽으로 살짝 삐져나오고 손가락 몸통은 원 아래쪽을
+    가로질러 지나가게** 했다 — 원은 "이 지점 근처를 가리킨다"는 표식으로 남고, 손은
+    분명히 손으로 읽힌다.
   · 그라데이션은 gradientUnits="userSpaceOnUse"로 32x32 전체에 한 번만 건다 — 도형별로
     좌표계가 따로 있으면(기본값) 겹치는 경계마다 색이 끊겨 이음매가 보인다.
   · 흰 halo는 각 도형에 fill과 **같은 색의 stroke**를 더해 만든다(default.svg와 동일
     기법). stroke가 경계에 절반씩 걸치며 바깥으로 번지고, 그 위에 stroke 없는 색
     도형을 정확히 같은 크기로 겹쳐 그리면 가장자리에만 흰 테두리가 남는다.
-    ⚠ 이 stroke를 빠뜨리면(1차 시도의 버그) 흰 도형이 색 도형에 완전히 가려져
-      테두리가 통째로 사라진다.
 
-  ★ hotspot은 검지 손끝 (12,5)다 — OS 기본 hand cursor도 항상 손끝을 기준점으로
-    잡는다. **default.svg의 화살촉 hotspot(9,8)과 다른 값이어도 된다** — 두 커서가
-    서로 다른 모양인 이상 기준점이 같아야 할 이유가 없다(화살표와 손이 똑같이 생겼을
-    때만 일치시킬 의미가 있었다). 대신 이 값이 index.html의 전역 규칙, 그리고
-    web/src/theme/tokens.ts의 CURSOR_POINTER와는 반드시 같아야 한다 — 어긋나면 그
-    상수를 쓰는 요소(캔버스 블록 등) 위에서만 손끝이 아닌 다른 지점이 클릭점이 된다.
+  ★ hotspot은 검지 손끝 (12,5)다 — 원의 중심이 아니라 **손끝**이다. index.html의
+    전역 커서 규칙, 그리고 web/src/theme/tokens.ts의 CURSOR_POINTER와 반드시 같은
+    값이어야 한다 — 어긋나면 그 상수를 쓰는 요소(캔버스 블록 등) 위에서만 클릭점이
+    손끝이 아닌 다른 지점이 된다. default.svg의 화살촉 hotspot(9,8)과는 값이
+    달라도 된다 — 서로 다른 모양이라 기준점이 같아야 할 이유가 없다.
 -->
 <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
   <defs>
-    <linearGradient id="siren-hand" gradientUnits="userSpaceOnUse" x1="6" y1="4" x2="20" y2="29">
+    <linearGradient id="siren-hand" gradientUnits="userSpaceOnUse" x1="6" y1="4" x2="20" y2="30">
       <stop offset="0" stop-color="#8a80ff"/>
       <stop offset="1" stop-color="#3f34bd"/>
     </linearGradient>
@@ -34,26 +33,24 @@
     </filter>
   </defs>
 
-  <!-- 흰 halo — 전부 들어올려서 어떤 배경 위에서도 실루엣이 떨어져 보이게 한다 -->
+  <!-- 흰 halo — 손 세 덩이 + 클릭 표식 링을 한 번에 들어올려 어떤 배경 위에서도 떨어져 보이게 한다 -->
   <g filter="url(#siren-lift-hand)">
-    <rect x="8" y="5" width="8" height="13" rx="4" fill="#fff" stroke="#fff" stroke-width="3"/>
-    <rect x="8.5" y="16" width="13" height="11.5" rx="5.6" fill="#fff" stroke="#fff" stroke-width="3"/>
-    <rect x="3.3" y="17" width="7.4" height="5.8" rx="2.9" fill="#fff" stroke="#fff" stroke-width="3"
-          transform="rotate(-14 7 19.9)"/>
-    <circle cx="16.4" cy="16.8" r="2.2" fill="#fff" stroke="#fff" stroke-width="2.1"/>
-    <circle cx="19" cy="18" r="1.8" fill="#fff" stroke="#fff" stroke-width="2.1"/>
-    <circle cx="21" cy="19.9" r="1.35" fill="#fff" stroke="#fff" stroke-width="2.1"/>
+    <rect x="8" y="5" width="8" height="15" rx="4" fill="#fff" stroke="#fff" stroke-width="3"/>
+    <rect x="8.5" y="18.5" width="12.5" height="10" rx="5.2" fill="#fff" stroke="#fff" stroke-width="3"/>
+    <rect x="3.8" y="19.2" width="6.8" height="5.3" rx="2.7" fill="#fff" stroke="#fff" stroke-width="3"
+          transform="rotate(-14 7.2 21.85)"/>
+    <circle cx="12" cy="9.5" r="4.5" fill="none" stroke="#fff" stroke-width="3.4"/>
   </g>
 
-  <!-- 주먹 → 마디 → 엄지 → 검지 순으로, 검지가 제일 위에 온다(가리키는 손가락이 주역) -->
-  <rect x="8.5" y="16" width="13" height="11.5" rx="5.6" fill="url(#siren-hand)"/>
-  <circle cx="16.4" cy="16.8" r="2.2" fill="url(#siren-hand)"/>
-  <circle cx="19" cy="18" r="1.8" fill="url(#siren-hand)"/>
-  <circle cx="21" cy="19.9" r="1.35" fill="url(#siren-hand)"/>
-  <rect x="3.3" y="17" width="7.4" height="5.8" rx="2.9" fill="url(#siren-hand)" transform="rotate(-14 7 19.9)"/>
-  <rect x="8" y="5" width="8" height="13" rx="4" fill="url(#siren-hand)"/>
+  <!-- 주먹 → 엄지 → 검지 순으로 쌓는다(검지가 맨 위, 가리키는 손가락이 주역) -->
+  <rect x="8.5" y="18.5" width="12.5" height="10" rx="5.2" fill="url(#siren-hand)"/>
+  <rect x="3.8" y="19.2" width="6.8" height="5.3" rx="2.7" fill="url(#siren-hand)" transform="rotate(-14 7.2 21.85)"/>
+  <rect x="8" y="5" width="8" height="15" rx="4" fill="url(#siren-hand)"/>
 
-  <!-- 검지-주먹 경계의 관절 선 — 실루엣만으로 부족한 "손"이라는 읽힘을 마지막으로 보탠다 -->
-  <path d="M9 15 Q12 19 15 15" fill="none" stroke="#2e2696" stroke-width="0.9"
+  <!-- 검지-주먹 경계의 관절 선 — 실루엣만으로 부족한 "손"이라는 읽힘을 보탠다 -->
+  <path d="M9 17 Q12 21 15 17" fill="none" stroke="#2e2696" stroke-width="0.9"
         stroke-linecap="round" opacity="0.38"/>
+
+  <!-- 클릭 지점 표식 — 손끝보다 중심을 낮춰, 손끝이 위로 삐져나오게 한다 -->
+  <circle cx="12" cy="9.5" r="4.5" fill="none" stroke="#6f63ff" stroke-width="1.7"/>
 </svg>
