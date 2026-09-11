@@ -9,7 +9,6 @@ import { ThemeModeProvider, useThemeMode } from './theme/ThemeModeContext';
 import { AuthProvider } from './app/providers/AuthProvider';
 import { DirectoryProvider } from './app/providers/DirectoryProvider';
 import { PlatformPreferencesSync } from './components/layout/PlatformPreferencesSync';
-import { CustomCursor } from './components/common/CustomCursor';
 import App from './App';
 import './i18n';
 
@@ -41,7 +40,6 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <DirectoryProvider>
           <MuiThemeBridge>
             <PlatformPreferencesSync />
-            <CustomCursor />
             <QueryClientProvider client={queryClient}>
               <BrowserRouter>
                 <App />

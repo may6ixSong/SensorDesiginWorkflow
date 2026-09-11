@@ -1,46 +1,7 @@
-<!--
-  SIREN 포인터 커서(링크·버튼·캔버스 블록 위) — JS 전용 대체 이미지.
-
-  ★ default.svg와 **같은 화살표**다(사용자 피드백 — 손 모양은 다 이상하다, 일반
-    마우스 포인터 디자인으로). 클릭 가능함은 모양이 아니라 화살촉 위로 퍼지는
-    파동으로만 알린다. 이 파일은 그 파동의 정지 프레임 하나를 흐리게 얹어 둔
-    대체 이미지일 뿐이고, 실제 움직이는 파동은 CustomCursor.tsx가 그린다 — 그
-    컴포넌트가 마운트되는 순간(거의 즉시) 이 파일 대신 그쪽이 보인다.
-  ★ hotspot은 default.svg와 **같은 화살촉 꼭짓점 (9,8)**이다. 둘이 같은 화살표를
-    쓰는 이상 기준점도 같아야 한다 — 이 값은 index.html의 전역 규칙, 그리고
-    web/src/theme/tokens.ts의 CURSOR_POINTER와도 같아야 한다.
--->
-<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
-  <defs>
-    <linearGradient id="p-body" x1="0" y1="0" x2="0.6" y2="1">
-      <stop offset="0" stop-color="#6a5cf0"/>
-      <stop offset="1" stop-color="#372ea8"/>
-    </linearGradient>
-    <radialGradient id="p-gloss" cx="0.35" cy="0.22" r="0.5">
-      <stop offset="0" stop-color="#ffffff" stop-opacity="0.55"/>
-      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
-    </radialGradient>
-    <filter id="p-soft-glow" x="-80%" y="-80%" width="260%" height="260%">
-      <feGaussianBlur stdDeviation="1.5"/>
-    </filter>
-    <filter id="p-drop" x="-80%" y="-80%" width="260%" height="260%">
-      <feDropShadow dx="0" dy="1.3" stdDeviation="1.2" flood-color="#0b0f1c" flood-opacity="0.45"/>
-    </filter>
-    <clipPath id="p-clip"><path d="M9.97 8.86 L9.97 8.86 Q9.00 8.00 9.00 9.30 L9.00 22.94 Q9.00 24.24 9.95 23.35 L12.15 21.27 Q13.10 20.38 13.63 21.57 L15.44 25.67 Q15.97 26.86 17.17 26.35 L17.48 26.22 Q18.68 25.71 18.16 24.52 L16.41 20.51 Q15.89 19.32 17.18 19.20 L19.93 18.94 Q21.22 18.82 20.25 17.96 Z"/></clipPath>
-  </defs>
-
-  <path d="M9.97 8.86 L9.97 8.86 Q9.00 8.00 9.00 9.30 L9.00 22.94 Q9.00 24.24 9.95 23.35 L12.15 21.27 Q13.10 20.38 13.63 21.57 L15.44 25.67 Q15.97 26.86 17.17 26.35 L17.48 26.22 Q18.68 25.71 18.16 24.52 L16.41 20.51 Q15.89 19.32 17.18 19.20 L19.93 18.94 Q21.22 18.82 20.25 17.96 Z" fill="#ffffff" opacity="0.85" filter="url(#p-soft-glow)"/>
-
-  <g filter="url(#p-drop)">
-    <path d="M9.97 8.86 L9.97 8.86 Q9.00 8.00 9.00 9.30 L9.00 22.94 Q9.00 24.24 9.95 23.35 L12.15 21.27 Q13.10 20.38 13.63 21.57 L15.44 25.67 Q15.97 26.86 17.17 26.35 L17.48 26.22 Q18.68 25.71 18.16 24.52 L16.41 20.51 Q15.89 19.32 17.18 19.20 L19.93 18.94 Q21.22 18.82 20.25 17.96 Z" fill="url(#p-body)"/>
-    <g clip-path="url(#p-clip)">
-      <ellipse cx="12.5" cy="12" rx="6" ry="8" fill="#a89bff" opacity="0.35"/>
-      <ellipse cx="11" cy="10.5" rx="3.4" ry="4.6" fill="url(#p-gloss)"/>
-      <path d="M13.1 20.38 L15.97 26.86 L18.68 25.71 L15.89 19.32 Z" fill="#241d78" opacity="0.16"/>
-    </g>
-  </g>
-
-  <!-- 파동 정지 프레임 — 실제 애니메이션은 CustomCursor.tsx가 그린다 -->
-  <path d="M4.4 5.9 A6.2 8 0 0 1 13.6 5.9" fill="none" stroke="#4a3fd0" stroke-width="1.2"
-        stroke-linecap="round" opacity="0.45"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" fill="none">
+  <circle cx="16" cy="16" r="12" fill="#ffffff" opacity="0.92" />
+  <path d="M16 2 L16 6.5M16 25.5 L16 30M2 16 L6.5 16M25.5 16 L30 16"
+    stroke="#4a3fd0" stroke-width="2.4" stroke-linecap="round" />
+  <circle cx="16" cy="16" r="8.5" fill="none" stroke="#4a3fd0" stroke-width="2.4" />
+  <circle cx="16" cy="16" r="3" fill="#4a3fd0" />
 </svg>
