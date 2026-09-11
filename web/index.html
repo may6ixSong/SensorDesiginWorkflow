@@ -198,11 +198,11 @@
         --s-ring: rgba(143, 134, 255, 0.4);
       }
 
-      /* 커서 hotspot — 각 SVG 자기 모양의 초점(화살촉 끝 / 손끝 / 원 중심)을 따로 쓴다.
-         default는 (9 8), pointer는 (12 5), disabled는 (16 16)이다. 이 값들은
-         src/components/common/CustomCursor.tsx의 HOTSPOT 상수, pointer는 그 외에도
-         tokens.ts의 CURSOR_POINTER와 같아야 한다 — 어긋나면 그 자리에서만 클릭점이
-         손끝이 아닌 다른 곳이 된다.
+      /* 커서 hotspot — default와 pointer는 같은 화살표를 쓰므로 hotspot도 같다(9 8,
+         화살촉 꼭짓점). disabled는 (16 16, 원 중심)이다. 이 값들은
+         src/components/common/CustomCursor.tsx의 ARROW_HOTSPOT·DISABLED_HOTSPOT,
+         pointer는 그 외에도 tokens.ts의 CURSOR_POINTER와 같아야 한다 — 어긋나면 그
+         자리에서만 클릭점이 화살촉이 아닌 다른 곳이 된다.
          ★ 이 네 규칙은 **그대로 유지된다** — CustomCursor가 마운트된 뒤에도 지우거나
            블록으로 덮지 않는다. CustomCursor는 마우스 아래 요소가 바뀔 때마다 그
            요소의 이 cursor 선언을 getComputedStyle로 먼저 읽어 어떤 모습을 그릴지
@@ -222,7 +222,7 @@
 
       a,
       button:not(:disabled) {
-        cursor: url('/cursors/pointer.svg') 12 5, pointer;
+        cursor: url('/cursors/pointer.svg') 9 8, pointer;
       }
       button:disabled {
         cursor: url('/cursors/disabled.svg') 16 16, not-allowed;

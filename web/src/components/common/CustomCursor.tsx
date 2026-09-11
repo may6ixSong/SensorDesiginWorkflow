@@ -4,20 +4,34 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { usePrefersReducedMotion } from '@/theme/useReducedMotion';
 
 /**
- * SIREN 전용 커서 — 기본 화살표 / 클릭 가능(손가락 + 파동) / 비활성(not-allowed) 세 모습을
- * 실제로 움직이는 DOM 요소로 그린다.
+ * SIREN 전용 커서 — 기본 화살표 / 클릭 가능(같은 화살표 + 파동) / 비활성(not-allowed) 세
+ * 모습을 실제로 움직이는 DOM 요소로 그린다.
  *
  * ★ 왜 `cursor: url(...)`가 아니라 이런 컴포넌트인가 — 브라우저의 `cursor` 속성은 이미지
  *   한 장만 보여준다. SVG 안에 `<animate>`나 CSS keyframes를 넣어도 커서로 쓰이는 순간
  *   첫 프레임만 찍혀 정지한다(Chrome·Firefox·Safari 전부 동일). "클릭 가능한 지점 위로
  *   음파가 실제로 퍼지는" 요구는 네이티브 커서를 완전히 숨기고 마우스를 따라다니는 이
  *   컴포넌트로만 가능하다.
+ * ★ pointer는 **손 모양이 아니라 default와 같은 화살표**다(사용자 피드백 — 손 디자인이
+ *   전체적으로 이상하다). 클릭 가능함은 화살촉 위로 퍼지는 파동 하나로만 알린다.
+ *   부수 효과로 default⇄pointer 전환이 훨씬 매끈해졌다 — 예전엔 모드가 바뀔 때마다
+ *   `AnimatePresence mode="wait"`가 손 모양을 통째로 내보내고(퇴장 애니메이션 완료 후)
+ *   서야 화살표를 들여보내서, 그 사이 약 0.1~0.2초 동안 **둘 다 안 보이는 빈 틈**이
+ *   있었다("pointer→normal로 바뀌면서 끊기는 느낌"의 원인). 이제 화살표는 default와
+ *   pointer 사이에서 아예 다시 마운트되지 않고, 파동 하나만 여닫힌다.
  * ★ 어디서 판정하는가 — 마우스 아래 요소의 **계산된(computed) cursor 값**을 읽는다.
  *   `a, button:not(:disabled)` 등 62곳 넘게 흩어진 기존 CURSOR_POINTER 사용처를 전부
  *   찾아다니며 클래스를 달지 않아도, index.html의 전역 규칙이 이미 매겨 둔 "이 자리는
  *   pointer.svg다 / disabled.svg다 / text다"라는 판정을 그대로 재사용하는 것이다.
  *   그 계산된 값에 맞춰 커서를 `none`으로 죽이고 이 컴포넌트가 그 자리를 대신 그린다.
- *   text 입력 위에서는 아예 그리지 않는다 — 네이티브 텍스트 빔이 계속 보여야 한다.
+ * ★ 이 컴포넌트가 아예 손을 떼야 하는 자리가 셋 있다 — 전부 'native' 모드로 묶는다:
+ *   1) text 입력 — 네이티브 텍스트 빔이 계속 보여야 한다.
+ *   2) `<select>` — 클릭하면 여는 팝업은 브라우저 네이티브 UI라 이 컴포넌트의 마우스
+ *      추적이 닿지 않는 화면 밖 존재다. 계속 우리 커서를 얹어 두면 팝업이 열리는 순간
+ *      마우스는 그 안에서 움직이는데 우리 커서는 열리기 직전 좌표에 멈춰 남는다
+ *      ("드롭다운에서 커서가 깨진다"의 원인) — 그래서 select는 아예 건드리지 않는다.
+ *   3) `grab`/`grabbing`(캔버스 블록 드래그) — 이미 브라우저가 자기 손 모양 커서를
+ *      보여주는 상태라, 그 위에 우리 화살표까지 겹쳐 그리면 커서가 두 개로 보인다.
  * ★ 터치 기기에는 켜지 않는다(`pointer: coarse`) — 애초에 커서가 없는 환경이다.
  * ★ 창 밖으로 나가면 커서와 파동을 **하나의 visible 상태로 묶어 동시에** 끈다. 프리뷰
  *   데모에서 커서 아이콘만 치우고 파동 wrapper는 그대로 둬서 화면 끝에 파동이 눌어붙는
@@ -27,10 +41,9 @@ import { usePrefersReducedMotion } from '@/theme/useReducedMotion';
 type Mode = 'default' | 'pointer' | 'disabled' | 'native';
 
 const SIZE = 32;
-/** 화살촉 hotspot — public/cursors/default.svg, index.html의 전역 규칙과 같은 값. */
-const DEFAULT_HOTSPOT = { x: 9, y: 8 };
-/** 손끝 hotspot — public/cursors/pointer.svg, tokens.ts의 CURSOR_POINTER와 같은 값. */
-const POINTER_HOTSPOT = { x: 12, y: 5 };
+/** 화살촉 hotspot. default·pointer가 같은 화살표를 쓰므로 값도 하나다 —
+ *  public/cursors/default.svg·pointer.svg, index.html, tokens.ts의 CURSOR_POINTER와 같은 값. */
+const ARROW_HOTSPOT = { x: 9, y: 8 };
 const DISABLED_HOTSPOT = { x: 16, y: 16 };
 
 /** default.svg(index.html의 회전 다각형 arrow)와 동일한 외곽선 — 컴포넌트에서는 이 하나만 쓴다. */
@@ -39,16 +52,16 @@ const ARROW_D =
   'Q13.10 20.38 13.63 21.57 L15.44 25.67 Q15.97 26.86 17.17 26.35 L17.48 26.22 Q18.68 25.71 18.16 24.52 ' +
   'L16.41 20.51 Q15.89 19.32 17.18 19.20 L19.93 18.94 Q21.22 18.82 20.25 17.96 Z';
 
-function classify(el: Element | null): Mode {
-  if (!el) return 'default';
+function classify(el: Element): Mode {
+  if (el.tagName === 'SELECT') return 'native';
   const cs = getComputedStyle(el).cursor;
   if (cs.includes('pointer.svg')) return 'pointer';
   if (cs.includes('disabled.svg') || cs === 'not-allowed') return 'disabled';
-  if (cs === 'text') return 'native';
+  if (cs === 'text' || cs === 'grab' || cs === 'grabbing') return 'native';
   return 'default';
 }
 
-/** 손·화살표·not-allowed 공통 껍데기 — 흰 글로우(배경 분리) + 드롭섀도를 한 번만 정의한다. */
+/** 화살표·not-allowed 공통 껍데기 — 흰 글로우(배경 분리) + 드롭섀도를 한 번만 정의한다. */
 function GlowDefs({ id }: { id: string }) {
   return (
     <defs>
@@ -70,9 +83,14 @@ function GlowDefs({ id }: { id: string }) {
   );
 }
 
-function ArrowGlyph() {
+/**
+ * default이자 pointer의 몸통. 파동은 이 안에 같이 그린다(별도 SVG로 쌓지 않는다) —
+ * 그래야 화살표는 그대로 둔 채 파동만 AnimatePresence로 들고 나게 할 수 있다.
+ */
+function ArrowGlyph({ showRipple, reducedMotion }: { showRipple: boolean; reducedMotion: boolean }) {
+  const { x: tx, y: ty } = ARROW_HOTSPOT;
   return (
-    <svg width={SIZE} height={SIZE} viewBox="0 0 32 32">
+    <svg width={SIZE} height={SIZE} viewBox="0 0 32 32" style={{ overflow: 'visible' }}>
       <GlowDefs id="ar" />
       <path d={ARROW_D} fill="#ffffff" opacity={0.85} filter="url(#ar-glow)" />
       <g filter="url(#ar-drop)">
@@ -85,71 +103,40 @@ function ArrowGlyph() {
       <clipPath id="ar-clip">
         <path d={ARROW_D} />
       </clipPath>
-    </svg>
-  );
-}
 
-/** 손 세 덩이(검지·주먹·엄지) — 예전 시안에서 "검지가 비정상적으로 크다"는 지적을 받고
- *  손가락 폭을 8→6, 그마저 안쪽으로 더 가늘게(rx=3) 잡아 표준적인 "가리키는 손" 비율로 고쳤다. */
-const FINGER = { x: 9, y: 5, w: 6, h: 17, rx: 3 };
-const FIST = { x: 8.5, y: 20.5, w: 12, h: 8.8, rx: 4.6 };
-const THUMB = { x: 4, y: 21.2, w: 6.6, h: 4.9, rx: 2.4 };
-
-function PointerGlyph({ reducedMotion }: { reducedMotion: boolean }) {
-  const thumbCx = THUMB.x + THUMB.w / 2;
-  const thumbCy = THUMB.y + THUMB.h / 2;
-  const waveCx = FINGER.x + FINGER.w / 2;
-
-  return (
-    <svg width={SIZE} height={SIZE} viewBox="0 0 32 32" style={{ overflow: 'visible' }}>
-      <GlowDefs id="pt" />
-      <g fill="#ffffff" opacity={0.85} filter="url(#pt-glow)">
-        <rect x={FINGER.x} y={FINGER.y} width={FINGER.w} height={FINGER.h} rx={FINGER.rx} />
-        <rect x={FIST.x} y={FIST.y} width={FIST.w} height={FIST.h} rx={FIST.rx} />
-        <rect
-          x={THUMB.x} y={THUMB.y} width={THUMB.w} height={THUMB.h} rx={THUMB.rx}
-          transform={`rotate(-14 ${thumbCx} ${thumbCy})`}
-        />
-      </g>
-      <g filter="url(#pt-drop)">
-        <rect x={FIST.x} y={FIST.y} width={FIST.w} height={FIST.h} rx={FIST.rx} fill="url(#pt-body)" />
-        <rect
-          x={THUMB.x} y={THUMB.y} width={THUMB.w} height={THUMB.h} rx={THUMB.rx} fill="url(#pt-body)"
-          transform={`rotate(-14 ${thumbCx} ${thumbCy})`}
-        />
-        <rect x={FINGER.x} y={FINGER.y} width={FINGER.w} height={FINGER.h} rx={FINGER.rx} fill="url(#pt-body)" />
-        <ellipse cx={FINGER.x + FINGER.w * 0.38} cy={FINGER.y + FINGER.h * 0.32} rx={FINGER.w * 0.32} ry={FINGER.h * 0.3} fill="var(--s-cursor-top)" opacity="0.4" />
-        <ellipse cx={FINGER.x + FINGER.w * 0.32} cy={FINGER.y + FINGER.h * 0.2} rx={FINGER.w * 0.22} ry={FINGER.h * 0.17} fill="url(#pt-gloss)" />
-        <path
-          d={`M${FINGER.x + 1} ${FINGER.y + FINGER.h - 3} Q${waveCx} ${FINGER.y + FINGER.h + 1} ${FINGER.x + FINGER.w - 1} ${FINGER.y + FINGER.h - 3}`}
-          fill="none" stroke="var(--s-cursor-rim)" strokeWidth="0.8" strokeLinecap="round" opacity="0.4"
-        />
-      </g>
-
-      {/* 클릭 지점 음파 — 손끝(hotspot) 위로 실제로 커지며 사라지는 링 3겹.
-          reducedMotion이면 애니메이션 없이 옅은 고정 호 하나만 남긴다. */}
-      {reducedMotion ? (
-        <path
-          d={`M${waveCx - 4.6} ${FINGER.y - 2.7} A6.2 8 0 0 1 ${waveCx + 4.6} ${FINGER.y - 2.7}`}
-          fill="none" stroke="var(--s-cursor-0)" strokeWidth="1.2" strokeLinecap="round" opacity="0.5"
-        />
-      ) : (
-        [0, 1, 2].map((i) => (
-          <motion.circle
-            key={i}
-            cx={POINTER_HOTSPOT.x}
-            cy={POINTER_HOTSPOT.y}
-            r={2}
-            fill="none"
-            stroke="var(--s-cursor-0)"
-            strokeWidth="1.3"
-            initial={{ scale: 0.4, opacity: 0 }}
-            animate={{ scale: [0.4, 2.6], opacity: [0, 0.75, 0] }}
-            transition={{ duration: 1.6, repeat: Infinity, delay: i * 0.55, ease: 'easeOut' }}
-            style={{ transformOrigin: `${POINTER_HOTSPOT.x}px ${POINTER_HOTSPOT.y}px` }}
-          />
-        ))
-      )}
+      {/* 클릭 지점 음파 — 화살촉(hotspot) 위로 실제로 커지며 사라지는 링 3겹.
+          모드가 pointer↔default로 바뀔 때 이 그룹만 여닫힌다 — 화살표 자체는 그대로 있다. */}
+      <AnimatePresence>
+        {showRipple && (
+          reducedMotion ? (
+            <motion.path
+              key="hint"
+              d={`M${tx - 4.6} ${ty - 2.9} A6.2 8 0 0 1 ${tx + 4.6} ${ty - 2.9}`}
+              fill="none" stroke="var(--s-cursor-0)" strokeWidth="1.2" strokeLinecap="round"
+              initial={{ opacity: 0 }} animate={{ opacity: 0.5 }} exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+            />
+          ) : (
+            <motion.g key="ripple" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
+              {[0, 1, 2].map((i) => (
+                <motion.circle
+                  key={i}
+                  cx={tx}
+                  cy={ty}
+                  r={2}
+                  fill="none"
+                  stroke="var(--s-cursor-0)"
+                  strokeWidth="1.3"
+                  initial={{ scale: 0.4, opacity: 0 }}
+                  animate={{ scale: [0.4, 2.6], opacity: [0, 0.75, 0] }}
+                  transition={{ duration: 1.6, repeat: Infinity, delay: i * 0.55, ease: 'easeOut' }}
+                  style={{ transformOrigin: `${tx}px ${ty}px` }}
+                />
+              ))}
+            </motion.g>
+          )
+        )}
+      </AnimatePresence>
     </svg>
   );
 }
@@ -178,12 +165,6 @@ function DisabledGlyph() {
     </svg>
   );
 }
-
-const HOTSPOT: Record<Exclude<Mode, 'native'>, { x: number; y: number }> = {
-  default: DEFAULT_HOTSPOT,
-  pointer: POINTER_HOTSPOT,
-  disabled: DISABLED_HOTSPOT,
-};
 
 export function CustomCursor() {
   const reducedMotion = usePrefersReducedMotion();
@@ -216,10 +197,10 @@ export function CustomCursor() {
    *   ② 그 다음에야 **그 요소 하나에만** 인라인 스타일로 cursor:none을 건다.
    *   이러면 index.html이나 62곳 어디도 고칠 필요가 없다 — 이미 선언되어 있는
    *   cursor 값을 훔쳐보기만 하고, 아주 짧은 순간 뒤에 그 자리만 가린다.
+   *   'native'(text/select/grab)로 판정된 요소는 이 단계 자체를 건너뛴다 — 네이티브
+   *   커서를 그대로 살려 둬야 하는 자리이기 때문이다.
    */
-  /** 마지막으로 본 요소 — 같은 요소 위에서 계속 움직이는 동안 재분류를 건너뛴다. */
   const lastElRef = useRef<Element | null>(null);
-  /** 그중 실제로 인라인 cursor:none을 걸어 둔 요소 — 되돌릴 대상은 이쪽만이다. */
   const hoveredRef = useRef<(HTMLElement | SVGElement) | null>(null);
 
   const restoreHovered = () => {
@@ -257,8 +238,8 @@ export function CustomCursor() {
       if (el instanceof HTMLElement || el instanceof SVGElement) {
         const m = classify(el); // ① 아직 건드리기 전 — 원래 값을 그대로 읽는다
         setMode(m);
-        // text 입력 위에서는 손대지 않는다 — 네이티브 빔 커서가 계속 보여야 하고,
-        // 이 컴포넌트도 'native'일 땐 아무것도 그리지 않는다(show 계산 참고).
+        // text/select/grab 위에서는 손대지 않는다 — 네이티브 커서(빔·드롭다운 화살표·
+        // 손 모양)가 계속 보여야 하고, 이 컴포넌트도 'native'일 땐 아무것도 그리지 않는다.
         if (m !== 'native') {
           el.style.setProperty('cursor', 'none', 'important'); // ② 이제야 이 요소만 가린다
           hoveredRef.current = el;
@@ -300,7 +281,8 @@ export function CustomCursor() {
   if (!mounted || coarse) return null;
 
   const show = visible && mode !== 'native';
-  const hotspot = HOTSPOT[mode === 'native' ? 'default' : mode];
+  const isDisabled = mode === 'disabled';
+  const hotspot = isDisabled ? DISABLED_HOTSPOT : ARROW_HOTSPOT;
 
   return createPortal(
     <div
@@ -311,18 +293,19 @@ export function CustomCursor() {
         opacity: show ? 1 : 0, transition: 'opacity .1s ease',
       }}
     >
+      {/* default↔pointer는 여기서 전혀 remount되지 않는다 — key를 "arrow" 하나로 고정하고
+          파동 여닫힘은 ArrowGlyph 내부 AnimatePresence에 맡긴다. disabled만 별도 모양이라
+          그쪽으로 넘어갈 때는 정상적으로 교체 애니메이션을 탄다. */}
       <AnimatePresence mode="wait" initial={false}>
         {show && (
           <motion.div
-            key={mode}
+            key={isDisabled ? 'disabled' : 'arrow'}
             initial={{ scale: 0.85, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.85, opacity: 0 }}
             transition={{ duration: 0.1 }}
           >
-            {mode === 'pointer' && <PointerGlyph reducedMotion={reducedMotion} />}
-            {mode === 'disabled' && <DisabledGlyph />}
-            {mode === 'default' && <ArrowGlyph />}
+            {isDisabled ? <DisabledGlyph /> : <ArrowGlyph showRipple={mode === 'pointer'} reducedMotion={reducedMotion} />}
           </motion.div>
         )}
       </AnimatePresence>
