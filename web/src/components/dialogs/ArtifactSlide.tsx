@@ -136,7 +136,19 @@ export function ArtifactSlide({
   const canEditRecipients = own;
 
   return (
-    <SlidePanel open onClose={onClose} width="560px" header={<SlideHeader name={artifact.name} />}>
+    <SlidePanel
+      open
+      onClose={onClose}
+      width="560px"
+      header={<SlideHeader name={artifact.name} />}
+      footer={own && onDelete && (
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <SirenButton variant="ghost" onClick={onDelete} sx={{ color: T.danger, borderColor: T.dangerLine }}>
+            <Icon name="trash" /> Remove from canvas
+          </SirenButton>
+        </Box>
+      )}
+    >
       {/* ── 머리 — tier / 망 / 상태 ── */}
       <Box sx={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', mb: '14px' }}>
         <Box
@@ -190,14 +202,6 @@ export function ArtifactSlide({
           />
         )}
       </TabPanel>
-
-      {own && onDelete && (
-        <Box sx={{ mt: '20px', pt: '16px', borderTop: `1px solid ${T.ln}` }}>
-          <SirenButton variant="ghost" onClick={onDelete}>
-            <Icon name="trash" /> Remove from canvas
-          </SirenButton>
-        </Box>
-      )}
     </SlidePanel>
   );
 }

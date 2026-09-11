@@ -15,6 +15,15 @@ function iconFor(n: CanvasNode): IconName {
   return 'link';
 }
 
+/**
+ * 네트워크 표식 — 프로젝트 초창기부터 있던 구분으로, A/B Tier는 OA망, C/D Tier는
+ * HPC망에 있다고 본다(사용자 요청). tier가 없는(미매핑) 블록은 표시하지 않는다.
+ */
+function netFor(tier: CanvasNode['tier']): 'OA' | 'HPC' | null {
+  if (!tier) return null;
+  return tier === 'A' || tier === 'B' ? 'OA' : 'HPC';
+}
+
 interface Props {
   d: CanvasNode;
   /** 이 블록이 걸린 phase. 찾을 수 없으면(=일정 유실) undefined다. */
@@ -94,16 +103,15 @@ export function BlockNode({
         touchAction: 'none',
         '&:hover': edit
           ? {}
-          : {
-            '& .blk-card': { transform: 'translateY(-2px)', boxShadow: T.shLg, borderColor: T.ln2 },
-            '& .blk-open': { opacity: 1 },
-          },
+          : { '& .blk-card': { transform: 'translateY(-2px)', boxShadow: T.shLg, borderColor: T.ln2 } },
       }}
     >
-      {/* 상세 열기 — 블록 위쪽 바깥에 떠 있는 버튼(더블클릭으로도 동일하게 연다).
-          zIndex를 블록 자체보다 높게 둬서, 블록이 캔버스 위쪽에 있어 phase 헤더 띠와
-          겹쳐도 그 위에 그려져 가려지지 않는다. */}
-      {!edit && (
+      {/* 상세 열기 — 이 세션 이전부터 있던 원래 모양(짙은 배경 + 흰 "Details" 글자,
+          말풍선 꼭지 포함)으로 복원했다(사용자 요청). 선택됐을 때만 뜨고, 더블클릭으로도
+          동일하게 열린다. T.inv는 테마와 무관하게 항상 어두운 표면이라 dark 모드에서도
+          카드 배경과 구별된다. zIndex를 블록 자체보다 높게 둬서 phase 헤더 띠에 가려지지
+          않는다. */}
+      {!edit && isSel && (
         <Box
           className="blk-open"
           component="button"
@@ -113,23 +121,19 @@ export function BlockNode({
           aria-label={`Open ${d.name}`}
           sx={{
             position: 'absolute', top: 0, left: '50%',
-            transform: 'translate(-50%, -32px)', zIndex: 15,
-            width: 26, height: 26, padding: 0,
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            borderRadius: '50%', fontFamily: 'inherit',
-            background: isSel ? T.select : T.sf, color: isSel ? '#fff' : T.dm,
-            border: `1.5px solid ${isSel ? 'transparent' : T.ln2}`,
-            boxShadow: T.shSm,
+            transform: 'translate(-50%, -40px)', zIndex: 15,
+            display: 'inline-flex', alignItems: 'center', gap: '7px', whiteSpace: 'nowrap',
+            background: T.inv, color: T.invTx, fontSize: 14, fontWeight: 600, fontFamily: 'inherit',
+            padding: '7px 14px', borderRadius: '10px', boxShadow: T.shLg, border: 'none',
             cursor: CURSOR_POINTER,
-            // 선택된 블록에서는 늘 진하게, 그 외에는 옅게라도 항상 보인다 — 완전히
-            // 숨기면(opacity 0) "누를 게 있는지" 자체를 찾을 수 없어진다. hover하면 더
-            // 또렷해진다.
-            opacity: isSel ? 1 : 0.6,
-            transition: 'opacity .14s ease, background .14s ease',
-            '&:hover': { background: T.select, color: '#fff', borderColor: 'transparent', opacity: 1 },
+            '&:hover': { background: T.inv },
+            '&::after': {
+              content: '""', position: 'absolute', left: '50%', bottom: -5, width: 10, height: 10,
+              background: T.inv, transform: 'translateX(-50%) rotate(45deg)',
+            },
           }}
         >
-          <Icon name="eye" />
+          <Icon name="eye" /> Details
         </Box>
       )}
 
@@ -154,11 +158,12 @@ export function BlockNode({
             : 'box-shadow .18s, transform .18s, border-color .16s, opacity .18s',
         }}
       >
-        {/* tier 색 스파인 — 블록의 신뢰도 등급을 색 하나로 계속 상기시킨다. */}
+        {/* publish 상태 스파인 — 우하단 범례(Legend)와 같은 3색(미발행/신규발행/발행됨)을
+            그대로 써서, 범례를 보지 않아도 왼쪽 테두리만으로 상태를 읽을 수 있게 한다. */}
         <Box
           sx={{
             position: 'absolute', left: 0, top: 0, bottom: 0, width: 3,
-            background: orphan ? T.danger : tier.fg,
+            background: orphan ? T.danger : st.c,
             opacity: d.artifactId ? 1 : 0.35,
           }}
         />
@@ -178,14 +183,17 @@ export function BlockNode({
               {d.tier ?? '—'}
             </Box>
 
-            {d.net === 'HPC' && (
+            {/* 네트워크 표식 — A/B Tier는 OA, C/D Tier는 HPC(초기 설계부터 있던 구분). */}
+            {netFor(d.tier) && (
               <Box
                 sx={{
-                  fontSize: 9.5, fontWeight: 700, letterSpacing: '0.04em', color: T.dm,
-                  background: T.sf3, padding: '2px 5px', borderRadius: `${R.xs}px`, flexShrink: 0,
+                  fontSize: 9.5, fontWeight: 700, letterSpacing: '0.04em',
+                  color: netFor(d.tier) === 'HPC' ? T.warn : T.dm,
+                  background: netFor(d.tier) === 'HPC' ? T.warnSoft : T.sf3,
+                  padding: '2px 5px', borderRadius: `${R.xs}px`, flexShrink: 0,
                 }}
               >
-                HPC
+                {netFor(d.tier)}
               </Box>
             )}
 
