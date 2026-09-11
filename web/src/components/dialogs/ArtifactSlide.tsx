@@ -269,11 +269,15 @@ function VersionsTab({
               <Box sx={{ fontFamily: FONT_MONO, fontSize: 13, fontWeight: 600, ...TNUM }}>
                 {v.versionLabel}
               </Box>
+              {/* "Working"은 가장 최신 버전(i===0, versions는 최신순)이 미발행일 때만 —
+                  과거의 미발행 버전까지 전부 Working으로 보이면 "지금 작업 중인 게 여러
+                  개"처럼 잘못 읽힌다(사용자 지적). versions는 artifacts.service.ts가
+                  항상 새 항목을 배열 맨 앞에 꽂는 식(unshift와 동일)이라 0번이 최신이다. */}
               {v.isPublished ? (
                 <Badge color={T.ok} bg={T.okSoft} borderColor={T.okLine}>{t('artifact.published')}</Badge>
-              ) : (
+              ) : i === 0 ? (
                 <Badge color={T.warn} bg={T.warnSoft} borderColor={T.warnLine}>Working</Badge>
-              )}
+              ) : null}
               <Box sx={{ flex: 1 }} />
               <Box sx={{ fontSize: 11, color: T.dm2, ...TNUM }}>{at ? fmtAt(at) : ''}</Box>
             </Box>

@@ -145,7 +145,7 @@ export function WorkflowHeader({
       {onOpenHistory && (
         <Tooltip title={t('release.history')}>
           <SirenButton variant="ghost" onClick={onOpenHistory} aria-label={t('release.history')}>
-            <Icon name="hist" />
+            <Icon name="hist" size={ICON_BUTTON_SIZE} />
           </SirenButton>
         </Tooltip>
       )}

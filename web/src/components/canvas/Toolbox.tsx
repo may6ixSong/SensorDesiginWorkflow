@@ -8,12 +8,11 @@ interface Props {
   onToggleEdit: () => void;
   onCancel: () => void;
   onAdd: () => void;
-  onAddReceived: () => void;
   onNote: () => void;
 }
 
 /** 목업 .toolbox — 캔버스 좌하단 플로팅 툴박스 */
-export function Toolbox({ canEdit, edit, onToggleEdit, onCancel, onAdd, onAddReceived, onNote }: Props) {
+export function Toolbox({ canEdit, edit, onToggleEdit, onCancel, onAdd, onNote }: Props) {
   if (!canEdit) return null;
   return (
     <Box
@@ -36,8 +35,11 @@ export function Toolbox({ canEdit, edit, onToggleEdit, onCancel, onAdd, onAddRec
             <TbBtn title="Cancel changes" icon="undo" danger onClick={onCancel} />
           </Group>
           <Group>
-            <TbBtn title="Add block" icon="plus" onClick={onAdd} />
-            <TbBtn title="Add artifact I need to receive" icon="inbox" onClick={onAddReceived} />
+            {/* 예전엔 "주는 산출물"/"받는 산출물" 버튼이 따로 있었는데, 후자는 실제로
+                받는 산출물을 만드는 기능으로 이어지지 않았다(intent는 서버가 항상
+                'own'으로 고정) — 사용자 요청으로 하나로 합쳤다. 자세한 재설계는 이후
+                별도로 진행한다. */}
+            <TbBtn title="Add block" icon="inbox" onClick={onAdd} />
             <Sep />
             <TbBtn title="Add memo" icon="note" onClick={onNote} />
           </Group>

@@ -784,7 +784,6 @@ export function Canvas({
           onToggleEdit={handleToggleEdit}
           onCancel={handleCancel}
           onAdd={() => st.getState().setAddDlg(true, 'own')}
-          onAddReceived={() => st.getState().setAddDlg(true, 'received')}
           onNote={handleAddNote}
         />
       </Box>

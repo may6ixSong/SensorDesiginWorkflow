@@ -10,34 +10,29 @@ import { T } from '@/theme/tokens';
 interface Props {
   project: ProjectDetailDto;
   onClose: () => void;
-  onSave: (p: { name: string; code: string; revision: string }) => void;
+  onSave: (p: { name: string }) => void;
   saving?: boolean;
   error?: string | null;
 }
 
 /**
- * 과제 메타데이터(이름/code/revision) 편집 — 지금까지 이 화면 자체가 없어서
- * `PATCH /projects/:id`가 아무 화면에서도 호출되지 않았다. revision(RPM 쪽 EVT에 대응,
- * Hub 설계서 §19.3)을 채울 수 있는 유일한 자리이기도 하다.
+ * 과제 메타데이터(이름) 편집.
  *
- * code+revision 조합에만 유니크 제약이 걸려 있다 — 같은 code라도 revision이 다르면
- * 별개 프로젝트로 취급된다. status는 이 화면에서 다루지 않는다.
+ * ★ **code/revision은 생성 후 절대 수정 불가다**(설계서 README §3.1) — Admin이라도 안 된다.
+ *   `projects.service.ts#updateProject`가 이 둘이 요청에 실려 오면 무조건 400으로 거부한다.
+ *   그래서 여기서도 입력칸이 아니라 **읽기 전용 텍스트**로만 보여주고, 애초에 저장 요청에
+ *   실어 보내지 않는다 — 예전엔 입력 가능한 TextInput이었는데, 그러면 안 바꿨어도 항상
+ *   code/revision을 같이 보내서 **모든 저장이 400으로 실패**했다(실측 확인된 버그).
  */
 export function EditProjectInfoDialog({ project, onClose, onSave, saving, error }: Props) {
   const [name, setName] = useState(project.name);
-  const [code, setCode] = useState(project.code);
-  const [revision, setRevision] = useState(project.revision ?? '');
   const [nameErr, setNameErr] = useState(false);
-  const [codeErr, setCodeErr] = useState(false);
 
   const submit = () => {
     const n = name.trim();
-    const c = code.trim();
     if (!n) { setNameErr(true); return; }
-    if (!c) { setCodeErr(true); return; }
     setNameErr(false);
-    setCodeErr(false);
-    onSave({ name: n, code: c, revision: revision.trim() });
+    onSave({ name: n });
   };
 
   return (
@@ -56,14 +51,14 @@ export function EditProjectInfoDialog({ project, onClose, onSave, saving, error 
         <TextInput value={name} onChange={(v) => { setName(v); setNameErr(false); }} error={nameErr} />
       </Field>
       <Field label="Code">
-        <TextInput value={code} onChange={(v) => { setCode(v); setCodeErr(false); }} error={codeErr} />
+        <Box sx={{ fontSize: 13, color: T.dm, padding: '8px 0' }}>{project.code}</Box>
       </Field>
-      <Field label="Revision (EVT) — e.g. EVT0. Leave blank if this project doesn't use one.">
-        <TextInput value={revision} onChange={setRevision} placeholder="EVT0" />
+      <Field label="Revision (EVT)">
+        <Box sx={{ fontSize: 13, color: T.dm, padding: '8px 0' }}>{project.revision || '—'}</Box>
       </Field>
       <Box sx={{ fontSize: 11, color: T.dm2, mt: '-9px', mb: '14px', lineHeight: 1.6 }}>
-        Code + revision together must be unique — changing either can collide with another
-        project that already uses that exact combination.
+        Code and revision together are this project's identity — they cannot be changed after
+        creation, by anyone (design doc README §3.1).
       </Box>
       {error && <Box sx={{ fontSize: 12, color: T.danger, mb: '12px' }}>{error}</Box>}
       <SirenButton variant="primary" onClick={submit} disabled={saving}>
