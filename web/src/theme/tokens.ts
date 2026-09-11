@@ -122,13 +122,13 @@ export const FONT_DISPLAY = "'Syne',sans-serif";
 export const TNUM = { fontVariantNumeric: 'tabular-nums' } as const;
 
 /**
- * 커스텀 포인터 커서 — 기본 화살표는 index.html의 전역 규칙이 처리한다.
+ * 커스텀 포인터(손가락) 커서 — 기본 화살표는 index.html의 전역 규칙이 처리한다.
  *
- * ★ hotspot(9 8)은 pointer.svg의 화살촉 꼭짓점이자 링의 중심이다. index.html의
- *   전역 커서 규칙과 **반드시 같은 값**이어야 한다 — 다르면 이 상수를 쓰는 요소
- *   (캔버스 블록 등) 위에서만 커서가 어긋나 튄다.
+ * ★ hotspot(12 5)은 pointer.svg의 손끝 좌표다. index.html의 전역 커서 규칙과
+ *   **반드시 같은 값**이어야 한다 — 다르면 이 상수를 쓰는 요소(캔버스 블록 등)
+ *   위에서만 클릭점이 손끝이 아닌 다른 자리로 어긋난다.
  */
-export const CURSOR_POINTER = "url('/cursors/pointer.svg') 9 8, pointer";
+export const CURSOR_POINTER = "url('/cursors/pointer.svg') 12 5, pointer";
 
 /** 포커스 링 — 키보드 사용자를 위해 모든 인터랙티브 요소가 같은 모양을 쓴다. */
 export const FOCUS_RING = {
