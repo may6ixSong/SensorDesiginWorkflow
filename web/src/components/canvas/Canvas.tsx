@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Box } from '@mui/material';
 import { WorkflowDto, WorkflowPhase } from '@/types/domain';
 import { useCanvasStore } from '@/store/canvasStore';
 import { toast } from '@/store/toastStore';
 import {
-  CanvasMemo, CanvasNode, connectedSet, countOrphans, isOrphanPhase, laneG, getPW,
+  CanvasEdge, CanvasMemo, CanvasNode, connectedSet, countOrphans, isOrphanPhase, laneG, getPW,
   phaseAtX, resizePhase, wallAdj, todayX,
   resolveNodePhases,
 } from '@/lib/canvasModel';
@@ -13,6 +13,7 @@ import {
 } from '@/lib/constants';
 import { FONT_MONO, T } from '@/theme/tokens';
 import { Icon } from '@/components/common/Icon';
+import { ConfirmDialog } from '@/components/dialogs/ConfirmDialog';
 import { PhaseStepper } from './PhaseStepper';
 import { EdgeLayer } from './EdgeLayer';
 import { BlockNode } from './BlockNode';
@@ -434,6 +435,20 @@ export function Canvas({
     else s.select(id, connectedSet(id, s.edges));
   };
 
+  /* ── 편집 모드 flow 클릭 → 그 flow와 양 끝 block을 먼저 highlight하고, 삭제는
+     confirm을 거친 뒤에만 실제로 일어난다(사용자 요청 — 즉시 삭제되면 되돌릴 수 없다). ── */
+  const [edgeToDelete, setEdgeToDelete] = useState<CanvasEdge | null>(null);
+  const onEdgeClick = (e: CanvasEdge) => {
+    st.getState().select(null, new Set([e.from, e.to]));
+    setEdgeToDelete(e);
+  };
+  const clearEdgeToDelete = () => {
+    setEdgeToDelete(null);
+    st.getState().select(null, null);
+  };
+  // 편집을 저장/취소로 끝내면(edit=false) 뜬 채로 남아 있을 수 있는 confirm도 함께 닫는다.
+  useEffect(() => { if (!edit) setEdgeToDelete(null); }, [edit]);
+
   /* ── GRIP RESIZE ── */
   const gripRef = useRef<{ id: string; ox: number; oy: number; pid: number } | null>(null);
   const onGripDown = (id: string, e: React.PointerEvent) => {
@@ -615,7 +630,7 @@ export function Canvas({
                     sx={{
                       position: 'absolute', right: -5, top: 0, bottom: 0, width: 10,
                       cursor: 'col-resize', zIndex: 6, pointerEvents: 'all',
-                      '&:hover': { background: 'rgba(12,154,131,.15)' },
+                      '&:hover': { background: 'rgba(74,63,208,.15)' },
                     }}
                   />
                 )}
@@ -636,11 +651,7 @@ export function Canvas({
             hlSet={hlSet}
             link={link}
             linkPos={linkPos}
-            onDeleteEdge={(id) => {
-              const s = st.getState();
-              s.setEdges(s.edges.filter((x) => x.id !== id));
-              toast('Link removed');
-            }}
+            onEdgeClick={onEdgeClick}
           />
 
           {/* 메모는 편집 권한자에게만 (설계서 6.3) */}
@@ -774,6 +785,22 @@ export function Canvas({
           onNote={handleAddNote}
         />
       </Box>
+
+      {edgeToDelete && (
+        <ConfirmDialog
+          title="Remove this flow?"
+          message="This will remove the connection between these two blocks. This cannot be undone."
+          confirmLabel="Remove"
+          cancelLabel="Cancel"
+          onCancel={clearEdgeToDelete}
+          onConfirm={() => {
+            const s = st.getState();
+            s.setEdges(s.edges.filter((x) => x.id !== edgeToDelete.id));
+            toast('Link removed');
+            clearEdgeToDelete();
+          }}
+        />
+      )}
     </>
   );
 }

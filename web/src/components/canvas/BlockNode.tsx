@@ -66,7 +66,8 @@ export function BlockNode({
   const unrelated = hasHl && !onHl;
 
   // 유실 표시가 가장 우선한다 — 다른 어떤 상태보다 먼저 눈에 들어와야 한다.
-  const edgeColor = orphan ? T.danger : isSel || connected ? T.pr : T.ln;
+  const emph = isSel || connected;
+  const edgeColor = orphan ? T.danger : emph ? T.pr : T.ln2;
 
   return (
     <Box
@@ -90,8 +91,8 @@ export function BlockNode({
           // 옅은 대각 줄무늬 — "여기 있으면 안 되는 것이 남아 있다"를 배경 자체로 알린다.
           ? `repeating-linear-gradient(135deg, ${T.dangerSoft} 0 8px, ${T.sf} 8px 16px)`
           : T.sf,
-        border: `1px ${orphan ? 'dashed' : 'solid'} ${edgeColor}`,
-        boxShadow: isSel || connected ? `0 0 0 3px ${T.ring}, ${T.shMd}` : T.shSm,
+        border: `${emph ? 2 : 1.5}px ${orphan ? 'dashed' : 'solid'} ${edgeColor}`,
+        boxShadow: emph ? `0 0 0 4px ${T.ring}, ${T.shMd}` : T.shSm,
         overflow: 'hidden',
         opacity: unrelated || filteredOut ? 0.32 : 1,
         cursor: edit && canEdit ? 'grab' : CURSOR_POINTER,
@@ -137,9 +138,10 @@ export function BlockNode({
             background: isSel ? T.pr : T.sf3, color: isSel ? T.prTx : T.dm,
             border: `1px solid ${isSel ? 'transparent' : T.ln2}`,
             cursor: CURSOR_POINTER,
-            // 선택된 블록에서는 늘 보이고, 그 외에는 hover에서만 나타난다 —
-            // 카드 여덟 개가 동시에 버튼을 들고 있으면 캔버스가 시끄러워진다.
-            opacity: isSel ? 1 : 0,
+            // 선택된 블록에서는 늘 진하게, 그 외에는 옅게라도 항상 보인다 — 완전히
+            // 숨기면(opacity 0) "누를 게 있는지" 자체를 찾을 수 없어진다. hover하면 더
+            // 또렷해진다.
+            opacity: isSel ? 1 : 0.55,
             transition: 'opacity .14s ease, background .14s ease',
             '&:hover': { background: T.pr, color: T.prTx, borderColor: 'transparent' },
           }}
@@ -205,7 +207,7 @@ export function BlockNode({
         {/* 이름 */}
         <Box
           sx={{
-            fontSize: compact ? 12.5 : 13.5, fontWeight: 600, lineHeight: 1.35, color: T.tx,
+            fontSize: compact ? 14 : 16, fontWeight: 600, lineHeight: 1.3, color: T.tx,
             display: '-webkit-box', WebkitLineClamp: compact ? 2 : 3, WebkitBoxOrient: 'vertical',
             overflow: 'hidden', wordBreak: 'break-word',
           }}

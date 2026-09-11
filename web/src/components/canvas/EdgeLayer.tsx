@@ -12,7 +12,9 @@ interface Props {
   hlSet: Set<string> | null;
   link: string | null;
   linkPos: { x: number; y: number } | null;
-  onDeleteEdge: (id: string) => void;
+  /** 편집 모드에서 flow를 클릭했다 — 삭제는 여기서 바로 하지 않고, 호출부가 먼저
+   * highlight한 뒤 confirm을 띄운다. */
+  onEdgeClick: (edge: CanvasEdge) => void;
 }
 
 /**
@@ -22,7 +24,7 @@ interface Props {
  * - 하이라이트: 실선을 옅게 깔고 그 위에 흐르는 점선 애니메이션
  */
 export function EdgeLayer({
-  nodes, edges, width, height, edit, canEdit, hlSet, link, linkPos, onDeleteEdge,
+  nodes, edges, width, height, edit, canEdit, hlSet, link, linkPos, onEdgeClick,
 }: Props) {
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const seen = new Set<string>();
@@ -76,7 +78,7 @@ export function EdgeLayer({
         <path
           key={`${e.id}-dash`}
           d={dpath}
-          stroke="#2f6b4a"
+          stroke={T.pr}
           strokeWidth={3.8}
           fill="none"
           strokeLinecap="round"
@@ -110,10 +112,10 @@ export function EdgeLayer({
           style={{ pointerEvents: 'stroke', cursor: CURSOR_POINTER }}
           onClick={(ev) => {
             ev.stopPropagation();
-            onDeleteEdge(e.id);
+            onEdgeClick(e);
           }}
         >
-          <title>Click to remove this link</title>
+          <title>Click to select this flow for removal</title>
         </path>,
       );
     }
@@ -132,7 +134,7 @@ export function EdgeLayer({
       <path
         key="linkline"
         d={`M${a.x + a.w},${Math.round(a.y + a.h / 2)}H${linkPos.x}V${linkPos.y}`}
-        stroke="#2f6b4a"
+        stroke={T.pr}
         strokeWidth={3}
         strokeDasharray="7 6"
         fill="none"
@@ -156,13 +158,13 @@ export function EdgeLayer({
           <path d="M0,0L12,6L0,12Z" fill="#ac6f08" />
         </marker>
         <marker id="ahl" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
-          <path d="M0,0L12,6L0,12Z" fill="#2f6b4a" />
+          <path d="M0,0L12,6L0,12Z" fill={T.pr} />
         </marker>
         <marker id="ah-s" markerWidth="12" markerHeight="12" refX="2" refY="6" orient="auto">
           <path d="M12,0L0,6L12,12Z" fill="#5c6b7d" />
         </marker>
         <marker id="ahl-s" markerWidth="12" markerHeight="12" refX="2" refY="6" orient="auto">
-          <path d="M12,0L0,6L12,12Z" fill="#2f6b4a" />
+          <path d="M12,0L0,6L12,12Z" fill={T.pr} />
         </marker>
       </defs>
       {parts}
