@@ -76,9 +76,12 @@ export function BlockNode({
 
   // 유실 표시가 가장 우선한다 — 다른 어떤 상태보다 먼저 눈에 들어와야 한다.
   const emph = isSel || connected;
+  // "내가 만드는 게 아니라 밖에서 받는 것" — v3 이전에 이렇게 만들어진 block이 DB에
+  // 남아 있다(지금은 새로 만들 수 없지만, 사용자 요청으로 구별은 계속한다).
+  const received = d.intent === 'received';
   // 선택/flow 하이라이트는 강조색(T.pr)과 다른 색을 써야 한다 — 안 그러면 "지금 고른 것"과
   // "항상 인디고인 UI"가 눈으로 구별되지 않는다(사용자 피드백).
-  const edgeColor = orphan ? T.danger : emph ? T.select : T.ln2;
+  const edgeColor = orphan ? T.danger : emph ? T.select : received ? T.recv : T.ln2;
 
   return (
     <Box
@@ -148,8 +151,8 @@ export function BlockNode({
           background: orphan
             // 옅은 대각 줄무늬 — "여기 있으면 안 되는 것이 남아 있다"를 배경 자체로 알린다.
             ? `repeating-linear-gradient(135deg, ${T.dangerSoft} 0 8px, ${T.sf} 8px 16px)`
-            : T.sf,
-          border: `${emph ? 2 : 1.5}px ${orphan ? 'dashed' : 'solid'} ${edgeColor}`,
+            : received ? T.recvSoft : T.sf,
+          border: `${emph ? 2 : 1.5}px ${orphan || received ? 'dashed' : 'solid'} ${edgeColor}`,
           boxShadow: emph ? `0 0 0 4px ${T.selectRing}, ${T.shMd}` : T.shSm,
           overflow: 'hidden',
           opacity: unrelated || filteredOut ? 0.32 : 1,

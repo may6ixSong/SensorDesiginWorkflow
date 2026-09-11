@@ -40,6 +40,10 @@ export const T = {
   select: 'var(--s-select)',
   selectRing: 'var(--s-select-ring)',
 
+  /** block.intent === 'received' 전용 — "밖에서 받는 것" 표시. */
+  recv: 'var(--s-recv)',
+  recvSoft: 'var(--s-recv-soft)',
+
   /* ── 상태 ── */
   ok: 'var(--s-ok)',
   okSoft: 'var(--s-ok-soft)',

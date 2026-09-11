@@ -71,6 +71,11 @@
         --s-select: #0891b2;
         --s-select-ring: rgba(8, 145, 178, 0.35);
 
+        /* block.intent === 'received' — "내가 만든 게 아니라 밖에서 받는 것" 표시. 인디고·
+           청록과도 구별되는 자주(magenta/plum) 계열을 쓴다. */
+        --s-recv: #a23e8c;
+        --s-recv-soft: #f8ecf5;
+
         /* ── Tier ── A→D 신뢰도 내림차순. 이 순서가 색에서 읽혀야 한다 */
         --s-tier-a: #0e8f66;
         --s-tier-a-soft: #e3f5ee;
@@ -99,9 +104,10 @@
         --s-changed: #fff6e3;
         --s-changed-line: #f0d9a8;
 
-        /* ── 캔버스 ── */
-        --s-canvas-bg: #f0f2f8;
-        --s-canvas-grid: #e2e6f0;
+        /* ── 캔버스 ── 페이지 배경(--s-bg)과 거의 구별이 안 됐다(사용자 피드백) — 뚜렷하게
+           한 단 더 가라앉힌 톤으로 캔버스 영역 경계가 한눈에 들어오게 한다. */
+        --s-canvas-bg: #dfe3ee;
+        --s-canvas-grid: #ccd3e2;
         /* 편집 중임이 한눈에 들어와야 한다 — 따뜻한 크림으로 전환한다 */
         --s-canvas-edit-bg: #fffbf2;
         --s-canvas-edit-grid: #efe4ce;
@@ -150,6 +156,9 @@
         --s-select: #22d3ee;
         --s-select-ring: rgba(34, 211, 238, 0.4);
 
+        --s-recv: #e0a3d6;
+        --s-recv-soft: #302030;
+
         --s-tier-a: #34d399;
         --s-tier-a-soft: #10281f;
         --s-tier-b: #6ea1ff;
@@ -175,8 +184,8 @@
         --s-changed: #2f2612;
         --s-changed-line: #574620;
 
-        --s-canvas-bg: #0c0f18;
-        --s-canvas-grid: #1a1f2c;
+        --s-canvas-bg: #10131e;
+        --s-canvas-grid: #202537;
         --s-canvas-edit-bg: #0e1524;
         --s-canvas-edit-grid: #1b2740;
         --s-canvas-edit-line: #c78a2a;

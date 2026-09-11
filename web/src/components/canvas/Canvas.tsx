@@ -589,8 +589,12 @@ export function Canvas({
         onClick={onVpClick}
         sx={{
           flex: 1, overflow: 'hidden', position: 'relative',
-          background: T.sf,
-          ...(edit ? { outline: `2px solid ${T.prLine}`, outlineOffset: '-2px' } : {}),
+          // 캔버스 배경은 page/card와 뚜렷이 구별되어야 한다(사용자 피드백) — --s-canvas-*
+          // 토큰은 이미 있었지만 실제로는 참조되지 않고 있었다. 편집 중에는 별도의 따뜻한
+          // 톤으로 전환해서 "지금 편집 중"이 한눈에 들어오게 한다(설계서 03장 §4.2).
+          background: edit ? T.canvasEditBg : T.canvasBg,
+          transition: 'background-color .3s ease',
+          ...(edit ? { outline: `2px solid ${T.canvasEditLine}`, outlineOffset: '-2px' } : {}),
         }}
       >
         <Box
@@ -602,13 +606,10 @@ export function Canvas({
             transformOrigin: '0 0',
             willChange: 'transform',
             transform: `translate(${panX}px, ${panY}px) scale(${z})`,
-            background: T.sf,
-            ...(edit
-              ? {
-                  backgroundImage: `radial-gradient(circle,${T.ln} 1px,transparent 1px)`,
-                  backgroundSize: '20px 20px',
-                }
-              : {}),
+            background: edit ? T.canvasEditBg : T.canvasBg,
+            backgroundImage: `radial-gradient(circle, ${edit ? T.canvasEditGrid : T.canvasGrid} 1px, transparent 1px)`,
+            backgroundSize: '20px 20px',
+            transition: 'background-color .3s ease',
           }}
         >
           {/* Phase 레인 — 경계선은 canvas 밖 screen-space에서 그린다 */}

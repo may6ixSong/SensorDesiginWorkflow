@@ -35,6 +35,12 @@ export interface CanvasNode {
   /** 미매핑이면 null. 마스킹된 경우에도 tier는 온다(존재 자체는 공개). */
   tier: Tier | null;
   net: 'OA' | 'HPC' | null;
+  /**
+   * 지금은 새 block을 항상 'own'으로만 만들지만(TODO T2), v3 이전에 'received'로
+   * 만들어진 block이 DB에 이미 있다 — 그런 block을 캔버스에서 구별해 보여준다
+   * (사용자 요청).
+   */
+  intent: 'own' | 'received';
 
   /** 캔버스가 그리는 유일한 상태 표시 — 버전 숫자는 쓰지 않는다. */
   publishState: PublishState;
@@ -106,6 +112,7 @@ export function toCanvasNode(b: BlockDto): CanvasNode {
     artifactMasked: masked,
     tier: artifact?.tier ?? null,
     net: artifact?.network ?? null,
+    intent: b.intent,
     publishState: b.publishState,
     // A Tier는 block에, B/C/D는 artifact에 recipient가 있다 — 캔버스 필터는 둘을 합쳐 본다.
     recipientDepartments: b.recipients
