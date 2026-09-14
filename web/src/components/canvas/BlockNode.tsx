@@ -247,23 +247,23 @@ export function BlockNode({
                 <Icon name="warn" /> No schedule
               </Box>
             ) : d.recipientDepartments.length ? (
-              // 확대 안 해도 보이게 2배로 키웠다(사용자 요청: 글자 10 -> 20, 칩 패딩·폭도
-              // 같은 비율로 맞춘다).
+              // 2배로 키웠던 걸 사용자 요청으로 그 2/3로 다시 줄였다(20 -> 13.5, 패딩·폭도
+              // 같은 비율).
               <>
                 {d.recipientDepartments.slice(0, 2).map((dep) => (
                   <Box
                     key={dep}
                     sx={{
-                      fontSize: 20, color: T.dm, background: T.sf3, borderRadius: `${R.xs}px`,
-                      padding: '4px 12px', whiteSpace: 'nowrap', overflow: 'hidden',
-                      textOverflow: 'ellipsis', maxWidth: 168,
+                      fontSize: 13.5, color: T.dm, background: T.sf3, borderRadius: `${R.xs}px`,
+                      padding: '2.5px 8px', whiteSpace: 'nowrap', overflow: 'hidden',
+                      textOverflow: 'ellipsis', maxWidth: 112,
                     }}
                   >
                     {dep}
                   </Box>
                 ))}
                 {d.recipientDepartments.length > 2 && (
-                  <Box sx={{ fontSize: 20, color: T.dm2 }}>+{d.recipientDepartments.length - 2}</Box>
+                  <Box sx={{ fontSize: 13.5, color: T.dm2 }}>+{d.recipientDepartments.length - 2}</Box>
                 )}
               </>
             ) : (
