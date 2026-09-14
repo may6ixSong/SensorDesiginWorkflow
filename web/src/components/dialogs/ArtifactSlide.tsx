@@ -195,12 +195,16 @@ export function ArtifactSlide({
   const effectiveVersions = isHubLive ? (live.data ?? []) : artifact.versions;
   const published = effectiveVersions.filter((v) => v.isPublished);
   const canEditRecipients = own;
+  // File Artifacts(B Tier, Calypso)는 Overview에 독립 Artifact page와 같은 2단 레이아웃
+  // (본문 2 : 버전 트리 1)을 그려야 해서, 그 폭을 담을 수 있게 패널 자체를 넓힌다
+  // (사용자 요청) — 다른 tier/tab은 기존 560px 그대로 둔다.
+  const isCalypsoB = artifact.tier === 'B' && artifact.serviceKey === 'calypso' && !!artifact.externalArtifactId;
 
   return (
     <SlidePanel
       open
       onClose={onClose}
-      width="560px"
+      width={isCalypsoB ? '900px' : '560px'}
       header={<SlideHeader name={artifact.name} />}
       footer={own && onDelete && (
         <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
@@ -298,7 +302,7 @@ export function ArtifactSlide({
             block={block}
             phases={phases ?? []}
             versions={effectiveVersions}
-            isCalypsoB={artifact.tier === 'B' && artifact.serviceKey === 'calypso' && !!artifact.externalArtifactId}
+            isCalypsoB={isCalypsoB}
             calypsoArtifactId={artifact.serviceKey === 'calypso' ? artifact.externalArtifactId : null}
             blockId={block.id}
             releases={releases ?? []}

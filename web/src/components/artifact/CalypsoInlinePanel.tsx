@@ -113,8 +113,10 @@ export function CalypsoInlinePanel({ artifactId, blockId, myDepartments, allDepa
   const canEdit = a.myAccess === 'edit';
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      <Box sx={{ borderRadius: '12px', overflow: 'hidden' }}>
+    // B(본문 — 이름/업로드/다운로드) : A(버전 트리 + 권한) = 2 : 1 — 독립 Artifact
+    // page와 같은 자리 배치를 슬라이드 폭에 맞게 옮겨온다(사용자 요청).
+    <Box sx={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
+      <Box sx={{ flex: 2, minWidth: 0, borderRadius: '12px', overflow: 'hidden' }}>
         <ArtifactVersionContents
           a={a}
           version={shown}
@@ -127,28 +129,30 @@ export function CalypsoInlinePanel({ artifactId, blockId, myDepartments, allDepa
         />
       </Box>
 
-      <Box>
-        <Ey sx={{ mb: '10px' }}>Version history</Ey>
-        <ArtifactVersionTree
-          versions={versions}
-          selected={shown}
-          onSelect={setPicked}
-          releaseBadgeFor={(v) => relBadges.get(v.versionLabel)}
-          onOpenRelease={onOpenRelease}
-        />
-      </Box>
+      <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <Box>
+          <Ey sx={{ mb: '10px' }}>Version history</Ey>
+          <ArtifactVersionTree
+            versions={versions}
+            selected={shown}
+            onSelect={setPicked}
+            releaseBadgeFor={(v) => relBadges.get(v.versionLabel)}
+            onOpenRelease={onOpenRelease}
+          />
+        </Box>
 
-      {canEdit && (
-        <ArtifactAccessPanel
-          artifact={a}
-          myDepartments={myDepartments}
-          allDepartments={allDepartments}
-          onAddEditor={(g) => addEditor.mutate(g)}
-          onRemoveEditor={(g) => removeEditor.mutate(g)}
-          onAddViewGrant={(g) => addViewGrant.mutate(g)}
-          onRemoveViewGrant={(g) => removeViewGrant.mutate(g)}
-        />
-      )}
+        {canEdit && (
+          <ArtifactAccessPanel
+            artifact={a}
+            myDepartments={myDepartments}
+            allDepartments={allDepartments}
+            onAddEditor={(g) => addEditor.mutate(g)}
+            onRemoveEditor={(g) => removeEditor.mutate(g)}
+            onAddViewGrant={(g) => addViewGrant.mutate(g)}
+            onRemoveViewGrant={(g) => removeViewGrant.mutate(g)}
+          />
+        )}
+      </Box>
     </Box>
   );
 }
