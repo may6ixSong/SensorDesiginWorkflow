@@ -214,6 +214,7 @@ CIS(CMOS Image Sensor) 설계 산출물을 workflow 캔버스 위에서 흐름�
 | T6 | A Tier 연동 서비스의 slide 차단 규칙 반영 | SIREN 쪽은 완료(게이트 1·2 모두 동작). 남은 것은 **서비스 쪽 `access` 구현**이다 — `prompts/rpm-access-endpoint.md` 를 그 서비스 세션에 전달 |
 | T8 | 실 DB 마이그레이션 | 인메모리 모드는 시드가 새 스키마로 다시 만들어져 해당 없음. 실 DB 환경에서만 `prompts/db-migration-v3.md` 를 desktop 세션에 전달. **코드 변경 없이 데이터만 바꾸는 작업**이다 |
 | T7 | Release Revoke | **열지 않기로 약속된 시나리오.** 요청이 와도 재논의 대상 |
+| T9 | Hub sync 주기 구체화 | A/B/C 모두 **version 발행 이벤트를 즉시 SIREN에 전송**하고, 유실 대비로 작업 없는 야간 시간대에 **1일 1회 전체 재동기화**를 하기로 잠정 합의. 정확한 실행 시각·윈도우·재시도 정책은 추후 확정 |
 
 ## 5. 리뷰가 필요한 가정
 
