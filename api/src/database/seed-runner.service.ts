@@ -7,6 +7,7 @@ import { seedDatabase } from './seed-data';
 import { ProjectDocument } from '../projects/schemas/project.schema';
 import { WorkflowDocument } from '../workflows/schemas/workflow.schema';
 import { ArtifactDocument } from '../artifacts/schemas/artifact.schema';
+import { HpcPathMockDocument } from '../artifacts/schemas/hpc-path-mock.schema';
 import { BlockDocument } from '../blocks/schemas/block.schema';
 import { MemoDocument } from '../memos/schemas/memo.schema';
 import { EdgeDocument } from '../edges/schemas/edge.schema';
@@ -43,6 +44,7 @@ export class SeedRunnerService implements OnModuleInit {
     @Inject(getModelToken('Edge')) private readonly edgeModel: Model<EdgeDocument>,
     @Inject(getModelToken('Release')) private readonly releaseModel: Model<ReleaseDocument>,
     @Inject(getModelToken('ArtifactService')) private readonly artifactServiceModel: Model<ArtifactServiceDocument>,
+    @Inject(getModelToken('HpcPathMock')) private readonly hpcPathMockModel: Model<HpcPathMockDocument>,
   ) {}
 
   /** 목업 시드가 문서를 만드는 컬렉션 전체. auditlogs는 시드 대상이 아니라 제외한다. */
@@ -55,6 +57,7 @@ export class SeedRunnerService implements OnModuleInit {
       this.memoModel,
       this.edgeModel,
       this.releaseModel,
+      this.hpcPathMockModel,
     ];
   }
 
@@ -91,6 +94,7 @@ export class SeedRunnerService implements OnModuleInit {
         Memo: this.memoModel,
         Edge: this.edgeModel,
         Release: this.releaseModel,
+        HpcPathMock: this.hpcPathMockModel,
       });
       this.logger.log('목업 시드 완료. (isMock:true로 표시되어 있어 플래그를 false로 바꾸면 일괄 삭제됩니다.)');
     } catch (err) {

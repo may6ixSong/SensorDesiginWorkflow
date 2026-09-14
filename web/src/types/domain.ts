@@ -193,6 +193,8 @@ export interface ArtifactDto {
    * **A Tier의 recipient는 artifact가 아니라 block에 있다** — workflow마다 다르기 때문이다.
    */
   recipients: AccessGrant | null;
+  /** Tier D 전용 표시용 메타데이터 — "누가 줄 것으로 기대되는지". 그 외 tier는 항상 null. */
+  expectedGiver: AccessGrant | null;
   versions: ArtifactVersionDto[];
   createdBy: string;
   masked?: false;
@@ -219,7 +221,7 @@ export interface BlockDto {
   phaseId: string;
   name: string;
   layout: { x: number; y: number; w: number; h: number };
-  /** 지금은 항상 'own'이다 — 받는 산출물 UX는 TODO T2. */
+  /** 내가 주는 산출물인지 받는 산출물인지 — 생성 시 확정되며 이후 바뀌지 않는다. */
   intent: 'own' | 'received';
   artifactId: string | null;
   /** 열람 권한이 없으면 masked 형태로 온다. 미매핑이면 null. */
@@ -265,6 +267,38 @@ export interface ProjectSearchCandidateDto {
   displayName: string;
   code: string;
   revision: string | null;
+}
+
+/* ------------------------------------------------------------------ *
+ * Artifact 출처 선택 ("새 Artifact 추가" 다이얼로그, 설계서 04장 §6)
+ * ------------------------------------------------------------------ */
+
+/** intent 관점 — 이 workflow가 그 산출물을 주는지(own) 받는지(received). */
+export type ArtifactIntent = 'own' | 'received';
+
+/** 사용자에게 보이는 이름. Tier 글자는 화면에 절대 노출하지 않는다. */
+export type ArtifactSourceKind = 'live' | 'file' | 'hpc' | 'attested';
+
+export interface LiveServiceOptionDto {
+  serviceKey: string;
+  name: string;
+  icon: string;
+  externalProjectId: string;
+}
+
+export interface ArtifactCandidateDto {
+  externalArtifactId: string;
+  name: string;
+  currentVersionLabel: string | null;
+  level: AccessLevel;
+  pickable: boolean;
+  blockedReason: string | null;
+}
+
+export interface CandidateListDto {
+  supported: boolean;
+  candidates: ArtifactCandidateDto[];
+  note?: string;
 }
 
 /* ------------------------------------------------------------------ *

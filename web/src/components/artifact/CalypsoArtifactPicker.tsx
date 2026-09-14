@@ -14,6 +14,12 @@ interface Props {
   myDepartments: string[];
   value: string;
   onChange: (id: string) => void;
+  onSelectName?: (name: string) => void;
+  /**
+   * 'own'(주는)이면 edit 권한이 있는 것만 고를 수 있다 — view만 있는 항목은 흐리게 표시되고
+   * 선택되지 않는다(설계서 04장 §6). 생략하면 기존처럼 view도 고를 수 있다.
+   */
+  intent?: 'own' | 'received';
 }
 
 /**
@@ -23,7 +29,7 @@ interface Props {
  * (calypso/src/artifacts/artifacts.service.ts#list — computeAccess !== 'none'만 남긴다).
  * 후보가 하나뿐이어도 자동 선택하지 않는다 — ExternalArtifactPicker와 같은 원칙이다.
  */
-export function CalypsoArtifactPicker({ projectId, myDepartments, value, onChange }: Props) {
+export function CalypsoArtifactPicker({ projectId, myDepartments, value, onChange, onSelectName, intent }: Props) {
   const [q, setQ] = useState('');
   const { data, isLoading, isError } = useQuery({
     queryKey: queryKeys.calypsoArtifacts(projectId ?? ''),
@@ -61,16 +67,19 @@ export function CalypsoArtifactPicker({ projectId, myDepartments, value, onChang
         ) : (
           filtered.map((a) => {
             const sel = value === a.id;
+            const pickable = intent !== 'own' || a.myAccess === 'edit';
             return (
               <Box
                 key={a.id}
-                onClick={() => onChange(a.id)}
+                onClick={() => { if (pickable) { onChange(a.id); onSelectName?.(a.name); } }}
                 sx={{
-                  display: 'flex', alignItems: 'center', gap: '8px', cursor: CURSOR_POINTER,
+                  display: 'flex', alignItems: 'center', gap: '8px',
+                  cursor: pickable ? CURSOR_POINTER : 'not-allowed',
+                  opacity: pickable ? 1 : 0.5,
                   padding: '8px 10px', borderRadius: '8px',
                   background: sel ? T.prSoft : T.sf,
                   border: `1px solid ${sel ? T.prLine : T.ln}`,
-                  '&:hover': { borderColor: sel ? T.prLine : T.ln2 },
+                  '&:hover': pickable ? { borderColor: sel ? T.prLine : T.ln2 } : undefined,
                 }}
               >
                 <Box
@@ -86,6 +95,7 @@ export function CalypsoArtifactPicker({ projectId, myDepartments, value, onChang
                   </Box>
                   <Box sx={{ fontFamily: FONT_MONO, fontSize: 10, color: T.dm2, mt: '2px' }}>
                     {departmentName(a.department)}
+                    {!pickable ? ' · view only — needs edit access to give this' : ''}
                   </Box>
                 </Box>
                 <Badge

@@ -162,6 +162,14 @@ export class Artifact {
 
   // A Tier의 recipient는 여기 없다 — workflow마다 달라질 수 있어 Block.recipients에 있다.
 
+  /**
+   * D Tier 전용 — 이 산출물을 "누가 줄 것으로 기대되는지" 설명하는 메타데이터일 뿐이다.
+   * 권한 판정에는 전혀 쓰이지 않는다 — D는 검증할 시스템이 없으므로(설계서 04장 §6) SIREN이
+   * 강제할 방법도 없다. 그저 캔버스에 "OO 부서가 채워줄 예정"이라고 적어 두는 자유 지정.
+   */
+  @Prop({ type: AccessGrantSchema, default: emptyAccessGrant })
+  expectedGiver: AccessGrant;
+
   /** publish 이력. 최신 버전이 배열 앞(index 0)에 오도록 유지한다. */
   @Prop({ type: [ArtifactVersionSchema], default: [] })
   versions: ArtifactVersion[];

@@ -145,7 +145,7 @@ CIS(CMOS Image Sensor) 설계 산출물을 workflow 캔버스 위에서 흐름�
 | 동시 편집 | **lock으로 단독 점유.** TTL 10분, 편집 중 자동 갱신, 만료 후 자유 점유, Admin 강제 해제 |
 | Lock의 범위 | **캔버스(blocks/edges/memos/layout)에만.** `Workflow` 문서의 `canvasLock` 필드만 원자적으로 갱신 |
 | Schedule · Edit Information | **lock 대상 아님.** A가 캔버스를 편집 중이어도 B는 Name/Description/Phase를 동시에 바꿀 수 있다. 항상 latest overwrite |
-| 새 Artifact 추가 | **버튼 1개**로 통합. 내가 주는 산출물 기준으로만 생성 (받는 산출물 UX는 TODO) |
+| 새 Artifact 추가 | **버튼 1개**로 통합. 다이얼로그 첫 질문이 주는/받는(intent)이고, 이어서 Name/Phase/출처(Live Service·File Artifacts·HPC Path·+받는 전용 External/Attested)를 고른다 — 04장 §6 |
 | Flow 클릭 | 연결된 블록을 highlight → **confirm 후 삭제** |
 | 편집 모드 표시 | 캔버스 배경색을 편집용으로 전환 (light/dark 각각) |
 | 편집 중 잠금 | app bar를 제외한 **캔버스 밖 모든 액션 버튼 비활성** (앞으로 추가될 버튼 포함) |
@@ -168,7 +168,8 @@ CIS(CMOS Image Sensor) 설계 산출물을 workflow 캔버스 위에서 흐름�
 | A Tier 버전 보고 | 서비스는 **official한 버전만** SIREN에 전달. minor가 없는 snapshot형(RPM 등)은 release 버전 + `latest(+)` 하나만 |
 | 미매핑 블록 | recipient UI를 감추고, release 대상에서 제외 |
 | slide 내부 콘텐츠 | **TODO** — 이번 범위 밖. 대규모 개편 예정 |
-| 받는 산출물의 선택 범위 | A = 그 서비스의 view 권한 보유 · B/C = 주는 쪽 편집 권한자가 view 권한을 준 것만 · D = 자유 (UI는 TODO T2) |
+| 주는/받는 산출물의 선택 범위 | **대칭 규칙** — 주는 쪽은 그 tier의 edit 게이트, 받는 쪽은 view 게이트. A/B(Live Service/File Artifacts)는 라이브 조회, C(HPC Path)는 항상 잠김, D(External/Attested)는 받는 전용·자유 (04장 §6) |
+| 한 workflow 안 artifact 중복 매핑 | **금지.** 주는/받는 모두 — 같은 workflow의 두 block이 같은 artifact를 가리킬 수 없다(04장 §6.5) |
 
 ### 3.6 Release
 
@@ -206,7 +207,7 @@ CIS(CMOS Image Sensor) 설계 산출물을 workflow 캔버스 위에서 흐름�
 | # | 항목 | 메모 |
 |---|---|---|
 | T1 | Artifact 상세 slide 내부 콘텐츠 개편 | 대규모 수정 예정. 이번엔 권한·recipient 정책만 반영 |
-| T2 | "받는 산출물" 추가 UX | 지금은 버튼 1개(주는 산출물)로 통합. 데이터의 `intent` 필드는 살려둔다. **선택 가능 범위 정책은 이미 확정**되어 있다 — 04장 §6 |
+| ~~T2~~ | ~~"받는 산출물" 추가 UX~~ | **완료.** "새 Artifact 추가" 다이얼로그가 intent(주는/받는) 선택 → 출처별 후보 pickability까지 반영한다 — 04장 §6. 남은 것은 D Tier의 **주는 쪽** 인터페이스(§6.4 TODO)뿐 |
 | T3 | 알림 전송 인프라 | 실제 메일 발송 + SIREN 내 "My workspace"·알림 페이지 신설 |
 | T4 | B/C/D release 알림의 세분화 | view·edit 권한자 모두에게 알림, workflow 소속 부서에는 별도 notice — 규칙 구체화 필요 |
 | T5 | Owner 이양 | 현재 불가. 요청이 오면 열 수 있도록 코드에 TODO 주석 유지 |

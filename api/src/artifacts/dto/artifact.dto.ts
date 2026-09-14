@@ -51,6 +51,8 @@ export interface ArtifactDto {
    * A Tier의 recipient는 artifact가 아니라 block에 있으므로 여기서는 항상 null이다.
    */
   recipients: { departments: string[]; users: string[] } | null;
+  /** D Tier 전용 표시용 메타데이터 — "누가 줄 것으로 기대되는지". 그 외 tier는 항상 null. */
+  expectedGiver: { departments: string[]; users: string[] } | null;
   versions: ArtifactVersionDto[];
   createdBy: string;
 }
@@ -122,6 +124,12 @@ export function toArtifactDto(artifact: ArtifactDocument, level: AccessLevel): A
     viewAccess: view,
     // B/C/D는 view가 곧 recipient. A는 block에 있으므로 null.
     recipients: view ? { departments: [...view.departments], users: [...view.users] } : null,
+    expectedGiver: artifact.tier === 'D'
+      ? {
+          departments: [...(artifact.expectedGiver?.departments ?? [])],
+          users: [...(artifact.expectedGiver?.users ?? [])],
+        }
+      : null,
     versions: visibleVersions(artifact, level),
     createdBy: artifact.createdBy,
   };

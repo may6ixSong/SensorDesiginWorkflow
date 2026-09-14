@@ -28,15 +28,22 @@ project이므로 후보에 나오지 않는다(02장 §1). Admin이 여러 proje
 
 ## 2. Tier 정의
 
-| Tier | 이름 | SIREN이 아는 것 | 전형적 대상 |
-|---|---|---|---|
-| **A** | Live | 버전·giver를 동기 조회. 서비스가 권한까지 판정 | Calypso, 계약을 맞춘 SimHub |
-| **B** | Synced | 버전이 자동 갱신되나 이벤트 시점 기준 | HPC 생성 → 공용 DB 경유 |
-| **C** | Linked | 자동 갱신 없음. 링크만 있고 버전은 사람이 입력 | 시스템은 있으나 미연동 |
-| **D** | Attested | 시스템 자체가 없음. 출처를 자유 텍스트로 기록 | 팀·회사 밖에서 생성 |
+| Tier | 이름 | SIREN이 아는 것 | 화면 표시(04장 §6) | 전형적 대상 |
+|---|---|---|---|---|
+| **A** | Live | 버전·giver를 동기 조회. 서비스가 권한까지 판정 | Live Service | 계약을 맞춘 RPM·SimHub 등 Hub 등록 서비스 |
+| **B** | Synced | 버전이 자동 갱신되나 이벤트 시점 기준 | File Artifacts | **Calypso**(SIREN 내장 파일형 산출물 등록) |
+| **C** | Linked | 자동 갱신 없음. 링크만 있고 버전은 사람이 입력 | HPC Path(항상 잠김) | HPC망 경로형 산출물(미연동) |
+| **D** | Attested | 시스템 자체가 없음. 출처를 자유 텍스트로 기록 | External / Attested(받는 전용) | 팀·회사 밖에서 생성 |
 
-- **망(`network: OA | HPC`)은 tier와 직교하는 별개 축이다.** HPC면 실물 파일 대신 경로 문자열만
-  갖는다는 규칙이 A~D 어디에나 겹쳐 적용된다.
+★ **UI에는 Tier 글자를 노출하지 않는다** — "새 Artifact 추가" 다이얼로그는 항상 위 표의
+"화면 표시" 열 이름으로만 보여준다(04장 §6). Calypso가 A가 아니라 B인 이유, Calypso가
+Live Service 목록에 없는 이유는 §3.1·§6.3 참고 — Calypso는 애초에 Hub 레지스트리 대상이
+아니다.
+
+- **망(`network: OA | HPC`)은 원래 tier와 직교하는 축으로 설계됐지만, 04장 §6의 3버튼 UI에서는
+  실질적으로 소스 선택이 network까지 함께 결정한다** — Live Service/File Artifacts는 OA,
+  HPC Path는 HPC로 만들어진다. 스키마 필드 자체는 그대로 두되(값을 자유롭게 못 바꾸는 것도
+  아니다), 지금 UI가 만드는 조합은 이 둘뿐이다.
 - **tier는 산출물이 아니라 버전 엔트리의 속성이다.** 나중에 실연동이 붙어도 과거 수동 기록을
   고치거나 옮기지 않는다 — 다음 엔트리가 다른 tier로 찍힐 뿐이다. 따라서 tier 승격에
   마이그레이션 로직이 필요 없다.
@@ -205,38 +212,120 @@ artifact 상세 slide 안의 탭 하나로 둔다.
 
 ---
 
-## 6. 받는 산출물의 선택 가능 범위 ★정책 확정, UI는 TODO★
+## 6. "새 Artifact 추가" — 등록·변경 정책 ★T2 반영★
 
-캔버스의 "새 Artifact 추가"는 지금 **주는 산출물만** 만든다(03장 §5.2). 하지만 받는 산출물을
-만들 때의 **선택 가능 범위 규칙은 이미 확정되어 있으므로** 여기에 남긴다. TODO T2에서 UI를 붙일 때
-이 규칙을 그대로 구현한다.
+03장 §5.2의 "새 Artifact 추가" 버튼은 이제 **주는(own) / 받는(received) 양쪽 모두** 만든다.
+이미 만들어진 block의 artifact를 바꾸는 것("변경")도 같은 규칙, 같은 UI를 그대로 재사용한다 —
+Block(자리)과 Artifact(실체)가 분리되어 있으므로(§1) 매핑을 바꾸는 것 자체는 자유롭다.
 
-받는 산출물은 사용자가 **artifact를 직접 고르거나, 서비스에서 골라온다.** 그때 후보로 나올 수 있는
-범위는 tier마다 다르다.
+### 6.1 다이얼로그 흐름
 
-| Tier | 후보에 나오는 조건 |
-|---|---|
-| **A** | 내가 **그 서비스의 view 권한**을 갖고 있는 artifact만 |
-| **B** | 주는 쪽 artifact의 **편집 권한자가 나에게 view 권한을 준 것**만 |
-| **C** | 주는 쪽 artifact의 **편집 권한자가 나에게 view 권한을 준 것**만 |
-| **D** | **자유롭게 추가 가능** (시스템 밖 출처이므로 검증할 대상이 없다) |
+1. **주는지 받는지 고른다** — 이후 모든 pickability 판정이 이 값을 따른다. block 생성 후에는
+   바꾸지 않는다("변경"은 무엇을 매핑할지만 바꾸지, own/received 방향 자체는 안 바꾼다).
+2. Name, Phase — 기존과 동일.
+3. **출처를 고른다.** Tier 글자(A/B/C/D)는 화면 어디에도 노출하지 않는다:
 
-### 6.1 해설
+   | 화면 표시 | 내부 Tier | 주는 쪽에 나오는가 | 받는 쪽에 나오는가 |
+   |---|---|---|---|
+   | **Live Service** | A | O | O |
+   | **File Artifacts** | B | O | O |
+   | **HPC Path** | C | O(항상 잠김) | O(항상 잠김) |
+   | **External / Attested** | D | **X** | O |
 
-- **A** — SIREN은 그 서비스의 권한을 모른다. 후보 목록을 만들 때 observer의 `access` 엔드포인트로
-  `canView` 를 물어보고, true인 것만 노출한다.
-- **B/C** — SIREN이 권한을 들고 있으므로 `artifact.viewAccess` 에 내가 포함되는지로 판정한다.
-  즉 **주는 쪽이 먼저 나에게 view 권한을 열어줘야** 내 캔버스에 그 산출물을 놓을 수 있다.
-  받는 쪽이 임의로 남의 산출물을 끌어다 놓을 수 없다는 뜻이다.
-- **D** — 실체가 SIREN 밖에 있고 검증할 시스템이 없으므로 제한하지 않는다.
+   - **HPC Path(C)는 두 쪽 모두 옵션에는 나오지만 항상 선택 불가로 잠겨 있다** — HPC망
+     서비스와의 실연동이 아직 구체화되지 않았다(§6.4). 왜 이 옵션이 있는지 알 수 있도록
+     project code+revision으로 필터된 mock 데이터를 미리보기로만 보여준다.
+   - **External/Attested(D)는 받는 쪽에서만 나온다.** 줘야 하는 artifact를 D로 등록하는
+     흐름은 아직 구체화되지 않은 미래 인터페이스로 남겨둔다(§6.4).
+4. 고른 출처에 맞는 후보 목록에서 실제 artifact를 고르거나(Live Service/File Artifacts),
+   D면 "누가 줄 것으로 기대되는지"만 입력한다.
 
-### 6.2 API
+### 6.2 Pickability — 대칭 규칙
+
+**주는 쪽 후보는 그 tier의 edit 게이트를, 받는 쪽 후보는 그 tier의 view 게이트를 통과한 artifact만
+고를 수 있다.** A만 SIREN이 아니라 그 서비스가 최종 판정한다는 게 유일한 예외다.
+
+| Tier | 주는(own) 후보 조건 | 받는(received) 후보 조건 |
+|---|---|---|
+| **A**(Live Service) | 그 서비스 `canEdit`(라이브 조회) | 그 서비스 `canView`(라이브 조회) |
+| **B**(File Artifacts) | Calypso `myAccess === 'edit'` | Calypso `myAccess`가 edit 또는 view |
+| **C**(HPC Path) | 불가(잠김) | 불가(잠김) |
+| **D**(External/Attested) | 해당 없음(옵션 자체가 없다) | 자유(검증할 시스템이 없다) |
+
+- 후보 목록에는 고를 수 없는 것도 **보여주되 흐리게 표시하고 이유를 붙인다** — "view only,
+  edit 권한 필요" 처럼. 조용히 숨기면 "내가 왜 저건 못 고르지"라는 질문에 답을 못 준다.
+- 이 판정은 **서버가 후보 목록 조회 시점에 한 번**, **실제 매핑(생성/변경) 시점에 다시 한 번**
+  한다(BE 재검증 원칙, 01장 §5) — FE의 pickable은 UX 게이트일 뿐이다.
+
+### 6.3 후보 목록의 출처
+
+- **Live Service(A)** — 이 project에 이미 연결된(Admin이 미리 `POST /projects/:id/service-links`로
+  연결) Hub 등록 서비스만 드롭다운에 뜬다. 서비스를 고르면 그 서비스의 observer 계약
+  `GET /artifacts?projectId=&knoxId=`(선택 구현, observer-contract-v1.yaml)로 후보를 받고,
+  후보마다 `access` 엔드포인트로 canEdit/canView를 물어본다 — 응답이 느릴 수 있어 서비스별로
+  병렬 조회한다. 그 서비스가 이 엔드포인트를 구현하지 않았으면(예: RPM) `supported:false`로
+  응답하고, 화면은 externalArtifactId를 직접 입력하는 수동 입력으로 폴백한다.
+  - **Calypso는 이 목록에 포함되지 않는다.** Calypso는 Hub 레지스트리 대상이 아니고
+    (§3.1 — SIREN 내장 기능), File Artifacts(B)의 출처이기 때문이다.
+- **File Artifacts(B)** — 출처는 **Calypso다.** Calypso는 SIREN의 projectId를 그대로 쓰므로
+  (§11.4 — workflow 개념을 모른다) 별도 code/revision 링크가 필요 없다. Calypso의
+  `GET /artifacts?projectId=`가 이미 `myAccess`(edit/view, none은 자체적으로 걸러짐)를 계산해
+  주므로 그 값을 그대로 pickability에 쓴다.
+  - **다만 이후의 열람·recipient 관리는 Calypso 권한이 아니라 SIREN 자신의
+    `artifact.editAccess`/`viewAccess`가 단일 진실이다** — B/C/D는 원래 SIREN이 권한을 직접
+    들고 있는 tier이기 때문이다(§3). Calypso 접근은 "고를 수 있는가"를 거르는 문지기일
+    뿐이다. 그래서 처음 등록 시 등록자를 자동으로 `editAccess`에 넣어 두고, 그 뒤로는 기존
+    Recipients 탭(`PUT /artifacts/:id/access`)에서 그대로 넓히면 된다 — 새 UI를 따로 만들지
+    않는다.
+- **HPC Path(C)** — `HpcPathMock` 컬렉션(project code+revision으로 필터)에서 미리보기만 조회한다.
+  실제 서비스 연동이 없으므로 `serviceKey`도, 진짜 후보 pickability도 없다 — 전부
+  `pickable: false`다.
+- **External/Attested(D)** — 후보 목록 자체가 없다. 이름과 "누가 줄 것으로 기대되는지"
+  (`Artifact.expectedGiver` — 부서/사용자 다중, §6.4)만 입력하면 바로 새 D Tier artifact가
+  만들어진다.
+
+### 6.4 D Tier — 받는 전용, 그리고 남겨둔 TODO
+
+- **D는 이번 라운드에서 받는 쪽에서만 만든다.** `expectedGiver`는 권한이 아니라 화면 표시용
+  메타데이터일 뿐이다 — SIREN이 검증할 시스템이 없으므로 강제할 방법도 없다.
+- **줘야 하는 쪽의 D는 아직 구체화되지 않았다.** 장차 어떤 외부 interface를 통해 값이 들어오면
+  SIREN(Hub)이 그 메시지를 받아 그 workflow 안에서 자체적으로 versioning하는 방식을 생각하고
+  있다 — 지금은 그 인터페이스가 없으므로 옵션 자체를 주는 쪽 다이얼로그에서 뺀다.
+  ```ts
+  // TODO: 줘야 하는 쪽 D Tier 인터페이스가 붙으면, 그 메시지를 받는 엔드포인트와
+  //       그 workflow 자체 버전 관리 로직을 여기에 연결한다.
+  ```
+
+### 6.5 한 workflow 안에서 같은 artifact 중복 금지
+
+**같은 workflow 안에서 같은 artifact를 두 개의 block에 매핑할 수 없다 — 주는/받는 모두 마찬가지다**
+(사용자 결정). release의 source 버전 지정이 block 단위이기 때문에, 같은 artifact가 두 block에
+걸리면 어느 block이 진짜 upstream인지 flow edge 판정이 모호해지고, release 표에도 같은 산출물이
+중복으로 찍힌다. block 생성·재매핑 양쪽에서 `(workflowId, artifactId)` 조합의 유일성을 서버가
+검증한다 — **다른 workflow에서 같은 artifact를 재사용하는 것은 여전히 허용된다**(§1의 project 단위
+공유 원칙 그대로).
+
+### 6.6 재매핑("변경")과 recipient
+
+이미 매핑된 block의 artifact를 바꾸면 **`block.recipients`(A Tier)를 초기화한다.** 이전
+recipient 구성이 새 artifact에도 유효하다는 보장이 없기 때문이다 — 조용히 남겨두면 의도치 않은
+부서에 알림이 갈 수 있다. Edit Access 보유자가 재매핑 직후 다시 구성해야 한다.
+
+### 6.7 API
 
 ```
-GET /artifacts/pickable?projectId=&tier=
-→ 위 규칙으로 필터된 목록.  A Tier는 observer access 조회 결과가 포함되므로
-  응답이 느릴 수 있다 — 서비스별로 병렬 조회하고, 실패한 서비스는 목록에서 빼되
-  "일부 서비스를 조회하지 못했습니다" 를 함께 내려준다.
+GET /workflows/:workflowId/artifact-sources/live-services
+→ 이 project에 연결된 A Tier(Live Service) 후보 서비스 목록.
+
+GET /workflows/:workflowId/artifact-candidates?source=live|file|hpc&intent=own|received&serviceKey=
+→ §6.2 규칙으로 pickable까지 판정된 후보 목록. source=live는 serviceKey 필수.
+  A Tier는 서비스별 observer 호출이 있어 응답이 느릴 수 있다.
+
+POST /workflows/:workflowId/blocks       { name, phaseId, layout, intent, artifactId? | newArtifact? }
+PATCH /blocks/:id                        { name?, artifactId? | newArtifact? }
+→ newArtifact = { source: 'live'|'file'|'attested', name, serviceKey?, externalArtifactId?, expectedGiver? }
+  둘 다 §6.2를 서버가 다시 검증하고(§6.5의 중복 금지 포함), find-or-create 또는 신규 생성 후
+  block에 매핑한다.
 ```
 
 ---

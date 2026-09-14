@@ -110,6 +110,73 @@ export class ArtifactsService {
   }
 
   /**
+   * A/B Tier — (projectId, serviceKey, externalArtifactId)로 이미 등록된 artifact가 있으면
+   * 재사용하고, 없으면 새로 만든다(설계서 04장 §1 — 같은 산출물이 여러 workflow의 캔버스에
+   * 놓여도 권한·버전 이력은 하나여야 한다). 이 조합의 unique 인덱스가 경쟁 상황에서도
+   * 중복 생성을 막아준다.
+   */
+  async findOrCreateExternal(
+    projectId: Types.ObjectId,
+    input: { tier: 'A' | 'B'; name: string; serviceKey: string; externalArtifactId: string },
+    actor: Actor,
+  ): Promise<ArtifactDocument> {
+    const existing = await this.model
+      .findOne({ projectId, serviceKey: input.serviceKey, externalArtifactId: input.externalArtifactId })
+      .exec();
+    if (existing) return existing;
+    try {
+      return await this.create(
+        projectId,
+        {
+          name: input.name,
+          tier: input.tier,
+          network: 'OA',
+          serviceKey: input.serviceKey,
+          externalArtifactId: input.externalArtifactId,
+          // B(File Artifacts)는 SIREN이 권한을 직접 들고 있다 — Calypso 접근은 "고를 수
+          // 있는가"를 한 번 거르는 문지기일 뿐, 등록 이후의 열람·recipient 관리는 SIREN의
+          // editAccess/viewAccess가 단일 진실이다(설계서 04장 §3.2). 등록자를 기본 edit으로
+          // 넣지 않으면 아무도(Admin 제외) 못 여는 채로 만들어진다 — 그 뒤로는 기존
+          // Recipients 탭(PUT /artifacts/:id/access)에서 그대로 넓히면 된다.
+          // A Tier는 create()가 이 값을 무조건 무시하므로 여기서 넘겨도 안전하다.
+          editAccess: { users: [actor.knoxId], departments: [] },
+        },
+        actor,
+      );
+    } catch (e: any) {
+      if (e?.code === 11000) {
+        // 동시에 두 요청이 같은 조합을 만들려 한 경우 — 방금 다른 쪽이 만든 것을 재사용한다.
+        const raced = await this.model
+          .findOne({ projectId, serviceKey: input.serviceKey, externalArtifactId: input.externalArtifactId })
+          .exec();
+        if (raced) return raced;
+      }
+      throw e;
+    }
+  }
+
+  /**
+   * D Tier(Attested) — 검증할 시스템이 없으므로 그냥 새로 만든다. `expectedGiver`는 권한이
+   * 아니라 "누가 채워줄 것으로 기대되는지"를 적어두는 화면 표시용 메타데이터일 뿐이다
+   * (설계서 04장 §6.4).
+   */
+  async createAttested(
+    projectId: Types.ObjectId,
+    input: { name: string; expectedGiver?: { departments?: string[]; users?: string[] } },
+    actor: Actor,
+  ): Promise<ArtifactDocument> {
+    // 등록자를 기본 edit으로 — 안 그러면 열람 권한이 아무에게도 없는 채로 만들어진다.
+    const artifact = await this.create(
+      projectId,
+      { name: input.name, tier: 'D', network: 'OA', editAccess: { users: [actor.knoxId], departments: [] } },
+      actor,
+    );
+    artifact.expectedGiver = normalizeGrant(input.expectedGiver);
+    await artifact.save();
+    return artifact;
+  }
+
+  /**
    * B/C/D의 Edit/View 권한 교체. **viewAccess가 곧 recipient**이므로 이 한 번의 쓰기가
    * 열람 권한과 수신 대상을 동시에 바꾼다(설계서 04장 §3.2).
    *

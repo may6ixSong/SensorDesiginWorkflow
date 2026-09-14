@@ -10,8 +10,9 @@ import { TabPanel, Tabs } from '@/components/common/Tabs';
 import { Icon, IconName } from '@/components/common/Icon';
 import { UserAvatar } from '@/components/common/Avatar';
 import { useDirectory } from '@/app/providers/DirectoryProvider';
-import { useLiveVersions } from '@/api/hooks/useBlocks';
+import { NewArtifactSourceInput, useLiveVersions } from '@/api/hooks/useBlocks';
 import { AccessGrantEditor } from '@/components/dialogs/AccessGrantEditor';
+import { ChangeArtifactDialog } from '@/components/dialogs/ChangeArtifactDialog';
 import { fmtAt } from '@/lib/canvasModel';
 import { CURSOR_POINTER, FONT_MONO, R, T, TIER_COLOR, TNUM } from '@/theme/tokens';
 
@@ -73,6 +74,8 @@ interface Props {
   /** 이 workflow의 Edit 권한 — recipient를 편집할 수 있는지의 기준이다. */
   own: boolean;
   project?: ProjectDetailDto;
+  /** ChangeArtifactDialog의 File Artifacts 피커가 Calypso 헤더에 실어 보낼 값. */
+  myDepartments?: string[];
   onClose: () => void;
   /** A Tier — block에 붙은 recipient를 교체한다. */
   onSaveBlockRecipients: (p: { editAccess: AccessGrant; viewAccess: AccessGrant }) => void;
@@ -80,6 +83,9 @@ interface Props {
   onSaveArtifactAccess: (p: { editAccess: AccessGrant; viewAccess: AccessGrant }) => void;
   saving?: boolean;
   onDelete?: () => void;
+  /** 산출물 매핑/재매핑(설계서 04장 §6) — Block과 Artifact가 분리돼 있어 언제든 바꿀 수 있다. */
+  onChangeArtifact?: (newArtifact: NewArtifactSourceInput) => void;
+  changingArtifact?: boolean;
   /** 이 workflow의 release 이력 — 버전 트리 위 release 마커(설계서 05장 §7.3)에 쓴다. */
   releases?: ReleaseDto[];
   /** release 마커를 클릭했을 때 — 그 release의 상세를 연다. */
@@ -99,11 +105,12 @@ interface Props {
  *   (설계서 04장 §4.3). 전자는 패널이 잠긴 상태, 후자는 열린 패널 안의 빈 목록이다.
  */
 export function ArtifactSlide({
-  block, own, project, onClose, onSaveBlockRecipients, onSaveArtifactAccess, saving, onDelete,
-  releases, onOpenRelease,
+  block, own, project, myDepartments, onClose, onSaveBlockRecipients, onSaveArtifactAccess, saving, onDelete,
+  onChangeArtifact, changingArtifact, releases, onOpenRelease,
 }: Props) {
   const { t } = useTranslation();
   const [tab, setTab] = useState<Tab>('versions');
+  const [changeOpen, setChangeOpen] = useState(false);
 
   /* ── A Tier 라이브 버전 조회 (설계서 04장 §19.5/§19.6 복원) ──
      Calypso 제외 Hub 등록 서비스에 연동된 A Tier만 대상이다 — 이런 산출물의
@@ -145,12 +152,29 @@ export function ArtifactSlide({
   if (!artifact) {
     return (
       <SlidePanel open onClose={onClose} width="560px" header={<SlideHeader name={block.name} />}>
-        {/* TODO(T1): 여기에 산출물 매핑 UI가 들어간다. */}
         <EmptyState
           icon="unlinked"
           title="No source yet"
           body="This block holds a place on the canvas. Map it to an artifact to start tracking versions."
         />
+        {own && onChangeArtifact && (
+          <Box sx={{ display: 'flex', justifyContent: 'center', mt: '-16px' }}>
+            <SirenButton variant="primary" onClick={() => setChangeOpen(true)}>
+              <Icon name="link" /> Map to artifact
+            </SirenButton>
+          </Box>
+        )}
+        {changeOpen && onChangeArtifact && (
+          <ChangeArtifactDialog
+            block={block}
+            projectId={project?._id}
+            myDepartments={myDepartments ?? []}
+            departmentOptions={project?.departments ?? []}
+            submitting={changingArtifact}
+            onClose={() => setChangeOpen(false)}
+            onSave={(na) => { onChangeArtifact(na); setChangeOpen(false); }}
+          />
+        )}
       </SlidePanel>
     );
   }
@@ -201,7 +225,27 @@ export function ArtifactSlide({
             {artifact.externalArtifactId ? ` · ${artifact.externalArtifactId}` : ''}
           </Box>
         )}
+        {own && onChangeArtifact && (
+          <>
+            <Box sx={{ flex: 1 }} />
+            <SirenButton variant="ghost" onClick={() => setChangeOpen(true)} sx={{ fontSize: 11.5 }}>
+              <Icon name="link" size={12} /> Change source
+            </SirenButton>
+          </>
+        )}
       </Box>
+
+      {changeOpen && onChangeArtifact && (
+        <ChangeArtifactDialog
+          block={block}
+          projectId={project?._id}
+          myDepartments={myDepartments ?? []}
+          departmentOptions={project?.departments ?? []}
+          submitting={changingArtifact}
+          onClose={() => setChangeOpen(false)}
+          onSave={(na) => { onChangeArtifact(na); setChangeOpen(false); }}
+        />
+      )}
 
       {/* Calypso 원본 — 실제 내용·업로드 화면은 SIREN 안(/artifacts/:id)에 있다. 예전 별도
           calypso/web(5174)은 이미 폐기됐으니 그쪽으로 새 탭을 열면 안 된다(사용자 지적).

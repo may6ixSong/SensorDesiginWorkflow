@@ -41,6 +41,14 @@ export interface ObserverProjectCandidate {
   revision: string | null;
 }
 
+/** 계약의 ArtifactSummary (observer-contract-v1.yaml `/artifacts`) — 선택 구현이다. */
+export interface ObserverArtifactSummary {
+  artifactId: string;
+  name: string;
+  department: string | null;
+  currentVersion: ObserverVersionRecord | null;
+}
+
 const TIMEOUT_MS = 5000;
 
 /**
@@ -158,6 +166,28 @@ export class ObserverClientService {
       publishedAt: record.isReleased && record.observedAt ? new Date(record.observedAt) : null,
       createdAt: new Date(),
     };
+  }
+
+  /**
+   * 계약의 `/artifacts?projectId=&knoxId=` — **선택 구현**이다(observer-contract-v1.yaml).
+   * "새 Artifact 추가" 다이얼로그의 Live Service 후보 목록에 쓴다(설계서 04장 §6.3).
+   *
+   * 구현하지 않은 서비스는 이 호출이 그냥 실패/타임아웃으로 끝난다 — null을 돌려줘서
+   * 호출부가 "이 서비스는 후보 브라우징을 지원하지 않는다 → externalArtifactId 수동 입력"
+   * 으로 폴백하게 한다. 계약상 이 엔드포인트가 없어도 위반이 아니므로 fail-closed(권한 없음)
+   * 이 아니라 fail-open(수동 입력 허용)으로 처리한다 — 후보를 못 보여준다고 해서 그
+   * 산출물을 아예 못 쓰게 막을 이유는 없다.
+   */
+  async listArtifacts(
+    svc: ArtifactServiceDocument,
+    externalProjectId: string,
+    knoxId: string,
+    isAdmin: boolean,
+  ): Promise<ObserverArtifactSummary[] | null> {
+    if (!this.callable(svc)) return null;
+    const url = `${svc.baseUrl}/artifacts?projectId=${encodeURIComponent(externalProjectId)}&knoxId=${encodeURIComponent(knoxId)}${this.adminParam(isAdmin)}`;
+    const data = await this.getJson(url);
+    return Array.isArray(data) ? data : null;
   }
 
   /** project 링크 단계에서만 쓴다 — 후보를 사람이 직접 확정한다. */

@@ -1,7 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
 import { queryKeys } from '../queryKeys';
-import { AccessGrant, ArtifactVersionDto, BlockDto } from '@/types/domain';
+import { AccessGrant, ArtifactIntent, ArtifactVersionDto, BlockDto } from '@/types/domain';
+
+/**
+ * artifactId(재사용) 대신 넘기면 서버가 그 자리에서 출처를 확정한다(find-or-create,
+ * 설계서 04장 §6). Tier C는 아직 잠겨 있어 여기 나오지 않는다.
+ */
+export interface NewArtifactSourceInput {
+  source: 'live' | 'file' | 'attested';
+  name: string;
+  serviceKey?: string;
+  externalArtifactId?: string;
+  expectedGiver?: AccessGrant;
+}
 
 /**
  * 캔버스 블록 목록.
@@ -56,7 +68,9 @@ export function useCreateBlock(workflowId: string) {
       name: string;
       phaseId: string;
       layout: { x: number; y: number; w: number; h: number };
+      intent?: ArtifactIntent;
       artifactId?: string | null;
+      newArtifact?: NewArtifactSourceInput;
     }) => {
       const res = await apiClient.post<BlockDto>(`/workflows/${workflowId}/blocks`, input);
       return res.data;
@@ -65,11 +79,16 @@ export function useCreateBlock(workflowId: string) {
   });
 }
 
-/** 이름 변경 / artifact 매핑 변경. 매핑은 같은 과제의 artifact만 허용된다. */
+/** 이름 변경 / artifact 매핑 변경(재매핑). 매핑은 같은 과제의 artifact만 허용된다. */
 export function useUpdateBlock(workflowId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, ...patch }: { id: string; name?: string; artifactId?: string | null }) => {
+    mutationFn: async ({ id, ...patch }: {
+      id: string;
+      name?: string;
+      artifactId?: string | null;
+      newArtifact?: NewArtifactSourceInput;
+    }) => {
       const res = await apiClient.patch<BlockDto>(`/blocks/${id}`, patch);
       return res.data;
     },

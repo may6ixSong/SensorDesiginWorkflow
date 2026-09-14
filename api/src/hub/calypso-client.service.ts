@@ -23,6 +23,55 @@ export class CalypsoClientService {
     return this.config.get<string>('calypsoApiUrl') ?? '';
   }
 
+  /** Calypso가 이해하는 호출자 헤더 3종 — calypso/src/common/actor.ts 참고. */
+  private actorHeaders(knoxId: string, departments: string[], isAdmin: boolean): Record<string, string> {
+    const headers: Record<string, string> = { 'X-Knox-Id': knoxId };
+    if (departments.length) headers['X-User-Departments'] = departments.join(',');
+    if (isAdmin) headers['X-User-Group'] = 'Admin';
+    return headers;
+  }
+
+  /**
+   * "새 Artifact 추가" 다이얼로그의 File Artifacts(Tier B) 후보 목록(설계서 04장 §6.3).
+   *
+   * Calypso는 SIREN의 projectId를 그대로 쓰므로(§11.4 — workflow 개념을 모른다) RPM류처럼
+   * 별도 project-link/search가 필요 없다. `GET /artifacts?projectId=`는 Calypso 사람 화면이
+   * 쓰는 바로 그 라우트이고, `none` 등급은 이미 그쪽에서 걸러져서 온다 — 여기서는 그
+   * `myAccess`를 그대로 pickable 판정에 쓴다.
+   */
+  async listArtifacts(
+    projectId: string,
+    knoxId: string,
+    departments: string[],
+    isAdmin: boolean,
+  ): Promise<{ artifactId: string; name: string; access: 'edit' | 'view' }[]> {
+    if (!this.baseUrl) return [];
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    try {
+      const res = await fetch(
+        `${this.baseUrl}/artifacts?projectId=${encodeURIComponent(projectId)}`,
+        { signal: controller.signal, headers: this.actorHeaders(knoxId, departments, isAdmin) },
+      );
+      if (!res.ok) {
+        this.logger.warn(`Calypso artifact list failed (${res.status}) for project ${projectId}`);
+        return [];
+      }
+      const body = await res.json();
+      const list = Array.isArray(body?.data) ? body.data : [];
+      return list.map((a: { id: string; name: string; myAccess: 'edit' | 'view' }) => ({
+        artifactId: a.id,
+        name: a.name,
+        access: a.myAccess,
+      }));
+    } catch (e) {
+      this.logger.warn(`Calypso artifact list error for project ${projectId} — ${(e as Error).message}`);
+      return [];
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   async currentVersion(externalArtifactId: string, knoxId: string): Promise<{
     versionLabel: string;
     isReleased: boolean;

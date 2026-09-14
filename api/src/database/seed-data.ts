@@ -24,6 +24,7 @@ import { MemoDocument } from '../memos/schemas/memo.schema';
 import { EdgeDocument } from '../edges/schemas/edge.schema';
 import { ReleaseDocument } from '../releases/schemas/release.schema';
 import { ArtifactServiceDocument } from '../hub/schemas/artifact-service.schema';
+import { HpcPathMockDocument } from '../artifacts/schemas/hpc-path-mock.schema';
 
 export interface SeedModels {
   ArtifactService: Model<ArtifactServiceDocument>;
@@ -34,6 +35,7 @@ export interface SeedModels {
   Memo: Model<MemoDocument>;
   Edge: Model<EdgeDocument>;
   Release: Model<ReleaseDocument>;
+  HpcPathMock: Model<HpcPathMockDocument>;
 }
 
 /* ── 캔버스 좌표 상수 ──
@@ -363,6 +365,7 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
     Memo: MemoModel,
     Edge: EdgeModel,
     Release: ReleaseModel,
+    HpcPathMock: HpcPathMockModel,
   } = models;
 
   /* ── Hub 레지스트리 ──
@@ -708,4 +711,16 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
 
   // releaseSeq를 실제 release 수와 맞춰 둔다 — 다음 release가 v3부터 시작한다.
   await WorkflowModel.updateOne({ _id: workflowIds['wf1'] }, { $set: { releaseSeq: 2 } }).exec();
+
+  /* ── HPC Path(Tier C) 미리보기 mock ──
+   * HPC망 서비스와의 실연동은 아직 구체화되지 않았다(설계서 04장 §6.4) — 그래서 "새
+   * Artifact 추가" 다이얼로그의 HPC Path 소스는 항상 선택 불가로 잠겨 있다. 그래도
+   * "이 옵션이 왜 있는지" 알 수 있도록, project code+revision으로 필터되는 가짜 경로
+   * 몇 개만 미리보기용으로 심어 둔다 — 실제 매핑에는 절대 쓰이지 않는다. */
+  await HpcPathMockModel.deleteMany({ isMock: true });
+  await HpcPathMockModel.insertMany([
+    { projectCode: 'CIS-A7', projectRevision: 'EVT1', name: 'PLL Post-layout netlist', path: '/vwp/cis_a7/pll_main/post_layout/', isMock: true },
+    { projectCode: 'CIS-A7', projectRevision: 'EVT1', name: 'Pixel array DRC run', path: '/vwp/cis_a7/pixel_array/drc/', isMock: true },
+    { projectCode: 'CIS-B3', projectRevision: 'EVT0', name: 'ADC top-level LVS', path: '/vwp/cis_b3/adc_top/lvs/', isMock: true },
+  ]);
 }

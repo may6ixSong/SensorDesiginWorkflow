@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { WorkflowAccessGuard } from '../common/guards/workflow-access.guard';
 import { WorkflowAccess } from '../common/decorators/workflow-access.decorator';
 import { CurrentActor } from '../common/decorators/current-actor.decorator';
@@ -9,6 +9,7 @@ import { ProjectDocument } from '../projects/schemas/project.schema';
 import { BlocksService } from './blocks.service';
 import { CanvasViewService } from './canvas-view.service';
 import { EdgesService } from '../edges/edges.service';
+import { ArtifactSourceService, CandidateIntent, CandidateSource } from '../artifacts/artifact-source.service';
 import { CreateBlockDto, ReplaceRecipientsDto, UpdateBlockDto } from './dto/block-crud.dto';
 
 /**
@@ -24,7 +25,36 @@ export class BlocksController {
     private readonly blocks: BlocksService,
     private readonly canvasView: CanvasViewService,
     private readonly edges: EdgesService,
+    private readonly sources: ArtifactSourceService,
   ) {}
+
+  /** "새 Artifact 추가" 다이얼로그의 Live Service 드롭다운(설계서 04장 §6.3). */
+  @Get('workflows/:workflowId/artifact-sources/live-services')
+  @WorkflowAccess('edit')
+  async liveServices(@CurrentProject() project: ProjectDocument) {
+    return this.sources.listLiveServices(project);
+  }
+
+  /** Tier별 후보 목록 — pickable 판정까지 서버가 끝내서 내려준다(설계서 04장 §6). */
+  @Get('workflows/:workflowId/artifact-candidates')
+  @WorkflowAccess('edit')
+  async artifactCandidates(
+    @Query('source') source: string,
+    @Query('intent') intent: string,
+    @Query('serviceKey') serviceKey: string | undefined,
+    @CurrentProject() project: ProjectDocument,
+    @CurrentActor() me: Actor,
+  ) {
+    if (!['live', 'file', 'hpc'].includes(source)) throw new BadRequestException('Unknown source.');
+    if (!['own', 'received'].includes(intent)) throw new BadRequestException('Unknown intent.');
+    return this.sources.listCandidates(
+      project,
+      me,
+      source as CandidateSource,
+      intent as CandidateIntent,
+      serviceKey,
+    );
+  }
 
   @Get('workflows/:workflowId/blocks')
   @WorkflowAccess('view')
@@ -59,7 +89,7 @@ export class BlocksController {
     @CurrentProject() project: ProjectDocument,
     @CurrentActor() me: Actor,
   ) {
-    const block = await this.blocks.create(workflow, dto, me);
+    const block = await this.blocks.create(workflow, project, dto, me);
     return this.canvasView.assembleOne(block, workflow, project, me);
   }
 
@@ -72,7 +102,7 @@ export class BlocksController {
     @CurrentProject() project: ProjectDocument,
     @CurrentActor() me: Actor,
   ) {
-    const block = await this.blocks.update(id, dto, me);
+    const block = await this.blocks.update(project, id, dto, me);
     return this.canvasView.assembleOne(block, workflow, project, me);
   }
 

@@ -8,14 +8,14 @@ import { Canvas } from '@/components/canvas/Canvas';
 import { ArtifactSlide } from '@/components/dialogs/ArtifactSlide';
 import { PhaseInfoDialog } from '@/components/dialogs/PhaseInfoDialog';
 import { WorkflowSettingsDialog } from '@/components/dialogs/WorkflowSettingsDialog';
-import { AddBlockDialog } from '@/components/dialogs/AddBlockDialog';
+import { AddArtifactDialog } from '@/components/dialogs/AddArtifactDialog';
 import { NoteDialog } from '@/components/dialogs/NoteDialog';
 import { ReleaseDialog } from '@/components/release/ReleaseDialog';
 import { ReleaseHistoryDialog } from '@/components/release/ReleaseHistoryDialog';
 import { Toast } from '@/components/common/Toast';
 import { useProject, useProjectWorkflows, useProjectMilestones, useProjects } from '@/api/hooks/useProjects';
 import { useUpdateWorkflow, useReplaceWorkflowAccess, useWorkflow, useUpdateWorkflowPhases } from '@/api/hooks/useWorkflow';
-import { useBlocks, useCreateBlock, useDeleteBlock, useReplaceBlockRecipients } from '@/api/hooks/useBlocks';
+import { useBlocks, useCreateBlock, useDeleteBlock, useReplaceBlockRecipients, useUpdateBlock } from '@/api/hooks/useBlocks';
 import { useReplaceArtifactAccess } from '@/api/hooks/useArtifacts';
 import { useCreateRelease, useReleasePreview, useReleases } from '@/api/hooks/useReleases';
 import { useMemos } from '@/api/hooks/useMemos';
@@ -64,6 +64,7 @@ export function BoardPage() {
   const replaceAccess = useReplaceWorkflowAccess(workflowId ?? '');
   const updatePhases = useUpdateWorkflowPhases(workflowId ?? '');
   const createBlock = useCreateBlock(workflowId ?? '');
+  const updateBlock = useUpdateBlock(workflowId ?? '');
   const deleteBlock = useDeleteBlock(workflowId ?? '');
   const replaceRecipients = useReplaceBlockRecipients(workflowId ?? '');
   const replaceArtifactAccess = useReplaceArtifactAccess(workflowId ?? '');
@@ -247,7 +248,18 @@ export function BoardPage() {
               block={openBlock}
               own={canEdit}
               project={project}
+              myDepartments={myDepartments}
               onClose={closeSlide}
+              onChangeArtifact={(newArtifact) =>
+                updateBlock.mutate(
+                  { id: openBlock.id, newArtifact },
+                  {
+                    onSuccess: () => toast('Artifact changed'),
+                    onError: (e: any) => toast(e?.response?.data?.message ?? 'Failed to change artifact'),
+                  },
+                )
+              }
+              changingArtifact={updateBlock.isPending}
               releases={releases.data ?? []}
               onOpenRelease={(releaseId) => {
                 closeSlide();
@@ -362,13 +374,18 @@ export function BoardPage() {
           )}
 
           {addDlg && (
-            <AddBlockDialog
+            <AddArtifactDialog
               workflowName={workflow.name}
+              workflowId={workflowId ?? ''}
+              projectId={projectId}
               phases={phaseList}
+              myDepartments={myDepartments}
+              departmentOptions={project?.departments ?? []}
               onClose={() => st.getState().setAddDlg(false)}
-              onCreate={({ name, phaseId }) => {
+              submitting={createBlock.isPending}
+              onCreate={({ name, phaseId, intent, newArtifact }) => {
                 createBlock.mutate(
-                  { name, phaseId, layout: { x: 0, y: 0, w: 295, h: 160 } },
+                  { name, phaseId, intent, newArtifact, layout: { x: 0, y: 0, w: 295, h: 160 } },
                   {
                     onSuccess: (created) => {
                       const s = st.getState();
@@ -380,7 +397,7 @@ export function BoardPage() {
                       // "추가를 취소"한 게 된다.
                       s.trackAddedDeliverable(created.id);
                       s.setFocusReq(fresh.id);
-                      toast('Block added');
+                      toast('Artifact added');
                     },
                     onError: (e: any) => toast(e?.response?.data?.message ?? 'Failed to add'),
                   },

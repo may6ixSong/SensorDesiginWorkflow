@@ -5,17 +5,86 @@ import { Block, BlockDocument } from './schemas/block.schema';
 import { Actor } from '../common/actor';
 import { AuditService } from '../audit/audit.service';
 import { ArtifactsService } from '../artifacts/artifacts.service';
+import { ArtifactSourceService, CandidateIntent } from '../artifacts/artifact-source.service';
+import { ArtifactDocument } from '../artifacts/schemas/artifact.schema';
 import { normalizeGrant } from '../common/access';
 import { isServiceGovernedTier } from '../common/constants/tier';
 import { WorkflowDocument } from '../workflows/schemas/workflow.schema';
+import { ProjectDocument } from '../projects/schemas/project.schema';
+import { NewArtifactSourceDto } from './dto/block-crud.dto';
+
+const EMPTY_RECIPIENTS = () => ({
+  editAccess: { departments: [], users: [] },
+  viewAccess: { departments: [], users: [] },
+});
 
 @Injectable()
 export class BlocksService {
   constructor(
     @InjectModel(Block.name) private readonly model: Model<BlockDocument>,
     private readonly artifacts: ArtifactsService,
+    private readonly sources: ArtifactSourceService,
     private readonly audit: AuditService,
   ) {}
+
+  /**
+   * 한 workflow 안에서 같은 artifact를 두 block에 걸 수 없다 — 주는/받는 모두다
+   * (사용자 결정: source 버전을 지정하는 flow-upstream 판정이 모호해지기 때문).
+   *
+   * ★ `$ne`는 안 쓴다 — 인메모리 목업 드라이버(database/in-memory-driver.ts)가 지원하는
+   *   연산자가 `$in`/`$or`뿐이라, `_id: { $ne: ... }`가 항상 매치 실패로 빠져 재매핑 시
+   *   중복 검증이 조용히 무력화된다. 후보를 그대로 받아 JS에서 자기 자신만 제외한다.
+   */
+  private async assertNotDuplicateInWorkflow(
+    workflowId: Types.ObjectId,
+    artifactId: Types.ObjectId,
+    excludeBlockId?: string,
+  ): Promise<void> {
+    const matches = await this.model.find({ workflowId, artifactId }).exec();
+    const dupe = matches.some((b) => b._id.toString() !== excludeBlockId);
+    if (dupe) {
+      throw new BadRequestException(
+        'This artifact is already mapped to another block in this workflow.',
+      );
+    }
+  }
+
+  /**
+   * artifactId(재사용) 또는 newArtifact(그 자리에서 확정) 중 하나를 실제 ObjectId로 푼다.
+   * 아무것도 안 왔으면 undefined(=건드리지 않음/그대로 빈 상태)를 돌려준다.
+   */
+  private async resolveArtifact(
+    project: ProjectDocument,
+    actor: Actor,
+    intent: CandidateIntent,
+    input: { artifactId?: string | null; newArtifact?: NewArtifactSourceDto },
+  ): Promise<ArtifactDocument | null | undefined> {
+    if (input.newArtifact) {
+      const na = input.newArtifact;
+      if (na.source === 'attested') {
+        return this.sources.resolveAttested(project, actor, intent, {
+          name: na.name,
+          expectedGiver: na.expectedGiver,
+        });
+      }
+      if (!na.externalArtifactId) {
+        throw new BadRequestException('externalArtifactId is required for this source.');
+      }
+      return this.sources.resolveLiveOrFile(project, actor, intent, {
+        source: na.source,
+        serviceKey: na.serviceKey,
+        externalArtifactId: na.externalArtifactId,
+        name: na.name,
+      });
+    }
+    if (input.artifactId === undefined) return undefined;
+    if (input.artifactId === null) return null;
+
+    const artifact = await this.artifacts.findOrThrow(input.artifactId);
+    this.artifacts.assertSameProject(artifact, project._id as Types.ObjectId);
+    await this.sources.assertReusePickable(project, actor, artifact, intent);
+    return artifact;
+  }
 
   listForWorkflow(workflowId: string | Types.ObjectId) {
     return this.model.find({ workflowId }).exec();
@@ -32,19 +101,22 @@ export class BlocksService {
   }
 
   /**
-   * 새 블록. artifactId 없이 만들 수 있다 — 자리는 캔버스에 잡아두고 출처는 나중에
+   * 새 블록. artifact 없이 만들 수 있다 — 자리는 캔버스에 잡아두고 출처는 나중에
    * 지정하는 것이 **정상 빈 상태**다(설계서 03장 §2.3).
    *
-   * intent는 항상 'own'이다 — "새 Artifact 추가" 버튼이 하나로 통합되어 내가 주는
-   * 산출물만 만든다(설계서 03장 §5.2). 받는 산출물 UX는 TODO T2.
+   * intent는 "새 Artifact 추가" 다이얼로그의 첫 질문이다 — 내가 주는 산출물(own)인지
+   * 받는 산출물(received)인지(설계서 03장 §5.2, 04장 §6). 생성 후에는 바뀌지 않는다.
    */
   async create(
     workflow: WorkflowDocument,
+    project: ProjectDocument,
     input: {
       name: string;
       phaseId: string;
       layout: { x: number; y: number; w: number; h: number };
+      intent?: 'own' | 'received';
       artifactId?: string | null;
+      newArtifact?: NewArtifactSourceDto;
     },
     actor: Actor,
   ): Promise<BlockDocument> {
@@ -52,12 +124,12 @@ export class BlocksService {
       throw new BadRequestException(`Unknown phase: ${input.phaseId}`);
     }
 
-    let artifactId: Types.ObjectId | null = null;
-    if (input.artifactId) {
-      const artifact = await this.artifacts.findOrThrow(input.artifactId);
-      // 같은 과제 안에서만 매핑할 수 있다(설계서 04장 §1.1).
-      this.artifacts.assertSameProject(artifact, workflow.projectId);
-      artifactId = artifact._id;
+    const intent = input.intent ?? 'own';
+    const resolved = await this.resolveArtifact(project, actor, intent, input);
+    const artifactId = resolved ? resolved._id : null;
+
+    if (artifactId) {
+      await this.assertNotDuplicateInWorkflow(workflow._id, artifactId);
     }
 
     const block = await this.model.create({
@@ -67,8 +139,8 @@ export class BlocksService {
       artifactId,
       name: input.name.trim(),
       layout: input.layout,
-      intent: 'own',
-      recipients: { editAccess: { departments: [], users: [] }, viewAccess: { departments: [], users: [] } },
+      intent,
+      recipients: EMPTY_RECIPIENTS(),
       series: null,
       seriesIdx: 1,
       seriesTotal: 1,
@@ -77,39 +149,39 @@ export class BlocksService {
     });
     await this.audit.log(actor.knoxId, 'BLOCK_CREATE', 'block', block._id, {
       workflowId: workflow._id.toString(),
+      intent,
       artifactId: artifactId?.toString() ?? null,
     });
     return block;
   }
 
-  /** 블록 이름 변경 / artifact 매핑 변경. */
+  /** 블록 이름 변경 / artifact 매핑 변경(재매핑). intent는 생성 후 바꾸지 않는다. */
   async update(
+    project: ProjectDocument,
     blockId: string,
-    input: { name?: string; artifactId?: string | null },
+    input: { name?: string; artifactId?: string | null; newArtifact?: NewArtifactSourceDto },
     actor: Actor,
   ): Promise<BlockDocument> {
     const block = await this.findOrThrow(blockId);
 
     if (input.name !== undefined) block.name = input.name.trim();
 
-    if (input.artifactId !== undefined) {
+    if (input.artifactId !== undefined || input.newArtifact) {
       const before = block.artifactId?.toString() ?? null;
 
-      if (input.artifactId === null) {
-        block.artifactId = null;
-        // 매핑을 풀면 recipient도 의미가 없다 — 남겨두면 다른 산출물에 잘못 붙는다.
-        block.recipients = {
-          editAccess: { departments: [], users: [] },
-          viewAccess: { departments: [], users: [] },
-        };
-      } else {
-        const artifact = await this.artifacts.findOrThrow(input.artifactId);
-        this.artifacts.assertSameProject(artifact, block.projectId);
-        block.artifactId = artifact._id;
+      const resolved = await this.resolveArtifact(project, actor, block.intent, input);
+      const nextArtifactId = resolved ? resolved._id : null;
+
+      if (nextArtifactId) {
+        await this.assertNotDuplicateInWorkflow(block.workflowId, nextArtifactId, blockId);
       }
+      block.artifactId = nextArtifactId;
 
       const after = block.artifactId?.toString() ?? null;
       if (before !== after) {
+        // 다른 산출물로 바뀌면 recipient도 초기화한다 — 이전 값이 새 산출물에도 유효한
+        // 구성이라는 보장이 없다(사용자 결정: 조용히 남기면 잘못된 부서에 알림이 갈 수 있다).
+        block.recipients = EMPTY_RECIPIENTS();
         // 무엇이 누구에게 전달되는지가 통째로 달라지는 사건이라 반드시 남긴다.
         await this.audit.log(actor.knoxId, 'BLOCK_ARTIFACT_REMAP', 'block', block._id, {
           workflowId: block.workflowId.toString(),

@@ -13,6 +13,7 @@ memos           메모 블록
 edges           flow 연결선
 releases        ★신규★ workflow release 기록 (구 hldReleases 폐기)
 artifactServices  연동 서비스 레지스트리 (기존 유지)
+hpcPathMocks    ★신규★ Tier C(HPC Path) 미리보기 전용 mock (04장 §6.3·§6.4) — 실제 매핑엔 안 쓰인다
 auditLogs       감사 로그
 ```
 
@@ -130,6 +131,11 @@ Artifact {
   // A Tier는 recipient를 여기 두지 않는다. workflow마다 달라질 수 있어서
   // Block.recipients(§4)에 저장한다 — 01장 §4.1 참조.
 
+  // --- D Tier 전용 ★신규★ ---
+  expectedGiver: { departments: string[], users: string[] }
+  // 권한이 아니라 "누가 줄 것으로 기대되는지" 표시용 메타데이터일 뿐이다(04장 §6.4).
+  // D는 검증할 시스템이 없어 SIREN이 강제할 방법도 없다 — 그 외 tier는 항상 비워둔다.
+
   // --- publish 이력 ---
   versions: [ArtifactVersion]         // 최신이 index 0
 
@@ -207,7 +213,7 @@ Block {
                                  // 매핑 시 artifact.projectId === projectId 만 허용(§3)
   name: string                  // artifact 미매핑 상태에서의 임시 표기. 매핑되면 artifact.name 우선
   layout: { x, y, w, h }
-  intent: 'own' | 'received'    // 지금은 항상 'own'. TODO T2 에서 다시 쓴다
+  intent: 'own' | 'received'    // "새 Artifact 추가" 다이얼로그 첫 질문. 생성 후 불변(04장 §6)
 
   // A Tier artifact가 매핑된 block에서만 의미가 있다. B/C/D는 항상 비워둔다
   // (그 경우 recipient는 artifact.viewAccess 에서 파생 — §3).
@@ -228,6 +234,25 @@ Block {
 - `versions` 는 제거하고 `artifactId` 참조로 대체한다.
 - `recipients` 편집 권한은 그 workflow의 **Edit Access**다(04장 §3.3). recipient에 속하는 것과
   recipient를 편집할 수 있는 것은 별개다(01장 §4.2).
+- **`(workflowId, artifactId)` 유일성 제약** ★신규★ — 같은 workflow 안에서 같은 artifact를 두
+  block에 매핑할 수 없다. intent(own/received) 무관하게 적용된다(04장 §6.5). 다른 workflow에서
+  같은 artifact를 재사용하는 것은 그대로 허용된다.
+
+## 4.1 hpcPathMocks ★신규★
+
+Tier C(HPC Path) 미리보기 전용. 실제 매핑에는 전혀 쓰이지 않는다 — HPC망 서비스와의 실연동이
+아직 구체화되지 않아 "새 Artifact 추가" 다이얼로그의 HPC Path 소스는 항상 잠겨 있다(04장 §6.3).
+
+```ts
+HpcPathMock {
+  _id
+  projectCode: string
+  projectRevision: string
+  name: string
+  path: string
+  isMock: boolean   // 항상 true — 실제 데이터를 넣을 계획이 생기면 그때 이 컬렉션 자체를 대체한다
+}
+```
 
 ---
 
@@ -361,7 +386,10 @@ ReleaseItem {
 | `GET` | `/artifacts/:id` | 열람 권한(01장 §4.2) 없으면 403. 버전은 권한에 따라 마스킹 |
 | `PUT` | `/artifacts/:id/access` | B/C/D만. `{ editAccess, viewAccess }` |
 | `PUT` | `/workflows/:wfId/blocks/:blockId/recipients` | **A Tier block만.** `{ editAccess, viewAccess }`. workflow Edit Access 필요 |
-| `GET` | `/artifacts/pickable` | 받는 산출물 선택 후보 목록 (04장 §6). TODO T2에서 사용 |
+| `GET` | `/workflows/:wfId/artifact-sources/live-services` | 이 project에 연결된 Live Service(A) 후보 서비스 목록 (04장 §6.3) |
+| `GET` | `/workflows/:wfId/artifact-candidates` | `?source=live\|file\|hpc&intent=own\|received&serviceKey=` — pickable까지 판정된 후보 목록 (04장 §6.2) |
+| `POST` | `/workflows/:wfId/blocks` | `{ name, phaseId, layout, intent, artifactId? \| newArtifact? }` — newArtifact가 있으면 find-or-create 후 매핑 (04장 §6.7) |
+| `PATCH` | `/blocks/:id` | `{ name?, artifactId? \| newArtifact? }` — 재매핑. 이전 값과 다르면 block.recipients 초기화 (04장 §6.6) |
 
 ### 7.4 Release
 

@@ -1,6 +1,37 @@
 import { Type } from 'class-transformer';
-import { IsNumber, IsOptional, IsString, MaxLength, MinLength, ValidateNested } from 'class-validator';
+import { IsIn, IsNumber, IsOptional, IsString, MaxLength, MinLength, ValidateNested } from 'class-validator';
 import { AccessGrantDto } from '../../workflows/dto/workflow-crud.dto';
+
+/**
+ * "새 Artifact 추가" 다이얼로그가 기존 artifact를 재사용하지 않고 그 자리에서 출처를
+ * 확정할 때 보낸다(설계서 04장 §6). A/B는 서버가 pickable을 재검증한 뒤 find-or-create
+ * 하고, D는 검증 없이 새로 만든다 — Tier C는 아직 잠겨 있어 여기 나오지 않는다.
+ */
+export class NewArtifactSourceDto {
+  @IsIn(['live', 'file', 'attested'])
+  source: 'live' | 'file' | 'attested';
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(160)
+  name: string;
+
+  /** source: 'live'일 때만. */
+  @IsOptional()
+  @IsString()
+  serviceKey?: string;
+
+  /** source: 'live' | 'file'일 때만 — 그 서비스 안에서의 산출물 id. */
+  @IsOptional()
+  @IsString()
+  externalArtifactId?: string;
+
+  /** source: 'attested'(Tier D)일 때만 — 권한이 아니라 화면 표시용 메타데이터다. */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => AccessGrantDto)
+  expectedGiver?: AccessGrantDto;
+}
 
 export class LayoutDto {
   @IsNumber()
@@ -29,10 +60,24 @@ export class CreateBlockDto {
   @Type(() => LayoutDto)
   layout: LayoutDto;
 
-  /** 매핑 없이 만들 수 있다 — 자리만 잡아두는 정상 빈 상태(설계서 03장 §2.3). */
+  /**
+   * 이 block이 내가 **주는(own)** 산출물인지 **받는(received)** 산출물인지(설계서 03장
+   * §5.2, 04장 §6). 생성 후에는 바꾸지 않는다 — 방향을 바꾸고 싶으면 block을 새로 만든다.
+   */
+  @IsOptional()
+  @IsIn(['own', 'received'])
+  intent?: 'own' | 'received';
+
+  /** 이미 있는 artifact를 재사용한다 — 매핑 없이 만들 수도 있다(설계서 03장 §2.3). */
   @IsOptional()
   @IsString()
   artifactId?: string | null;
+
+  /** artifactId 대신 — 그 자리에서 출처를 확정해 find-or-create 한다. */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => NewArtifactSourceDto)
+  newArtifact?: NewArtifactSourceDto;
 }
 
 export class UpdateBlockDto {
@@ -46,6 +91,12 @@ export class UpdateBlockDto {
   @IsOptional()
   @IsString()
   artifactId?: string | null;
+
+  /** artifactId 대신 — 그 자리에서 출처를 다시 확정한다(재매핑). */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => NewArtifactSourceDto)
+  newArtifact?: NewArtifactSourceDto;
 }
 
 /**
