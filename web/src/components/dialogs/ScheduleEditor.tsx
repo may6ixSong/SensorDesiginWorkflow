@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { forwardRef, useImperativeHandle, useMemo, useState } from 'react';
 import { Box } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import { ScheduleSpan } from '@/types/domain';
@@ -21,6 +21,11 @@ interface Row extends ScheduleDraft {
   rowKey: string;
 }
 
+export interface ScheduleEditorHandle {
+  /** 유효성 검사를 거쳐 onSubmit을 부른다 — 부모가 Save 버튼을 따로(예: 다이얼로그 footer) 둘 때 쓴다. */
+  submit: () => void;
+}
+
 export interface ScheduleEditorProps {
   /** 편집 대상 — 과제 마일스톤이든 workflow phase든 모양이 같다. */
   spans: ScheduleSpan[];
@@ -29,8 +34,19 @@ export interface ScheduleEditorProps {
   onSubmit: (rows: ScheduleDraft[]) => void;
   saving?: boolean;
   error?: string | null;
-  /** "과제 일정으로 되돌리기" 같은 부가 액션을 헤더 옆에 얹는다. */
+  /** "과제 일정으로 되돌리기" 같은 부가 액션을 Add 버튼과 같은 줄, 오른쪽에 얹는다. */
   extraAction?: React.ReactNode;
+  /**
+   * true면 Add 버튼을 맨 위(extraAction과 같은 줄, 맨 왼쪽)로 옮기고, 행 목록(+미리보기)을
+   * `listMaxHeight`로 스크롤한다 — 다이얼로그가 탭 등으로 세로 공간이 빠듯할 때 쓴다
+   * (사용자 요청). 지정하지 않으면 기존처럼 Add 버튼이 목록 아래에 온다.
+   */
+  listMaxHeight?: string | number;
+  /**
+   * true면 내부 Save 버튼을 그리지 않는다 — 부모가 ModalShell의 footer 등 별도 자리에
+   * 고정해서 그린다. 이때 부모는 ref로 `submit()`을 불러 저장을 트리거한다.
+   */
+  hideSaveButton?: boolean;
 }
 
 /**
@@ -44,7 +60,9 @@ export interface ScheduleEditorProps {
  *  - 순서는 저장하지 않는다 — 아래 미리보기가 보여 주듯 시작일 오름차순이 곧 캔버스의
  *    좌 → 우 순서다. 그래서 행을 위아래로 옮기는 조작 자체를 두지 않는다.
  */
-export function ScheduleEditor({ spans, noun, onSubmit, saving, error, extraAction }: ScheduleEditorProps) {
+export const ScheduleEditor = forwardRef<ScheduleEditorHandle, ScheduleEditorProps>(function ScheduleEditor({
+  spans, noun, onSubmit, saving, error, extraAction, listMaxHeight, hideSaveButton,
+}, ref) {
   const { t } = useTranslation();
   const [rows, setRows] = useState<Row[]>(() =>
     sortSchedule(spans).map((s) => ({ rowKey: s.id, id: s.id, name: s.name, start: s.start, end: s.end })),
@@ -108,16 +126,18 @@ export function ScheduleEditor({ spans, noun, onSubmit, saving, error, extraActi
     onSubmit(rows.map((r) => ({ id: r.id, name: r.name.trim(), start: r.start, end: r.end })));
   };
 
+  useImperativeHandle(ref, () => ({ submit }));
+
   const firstErr = Object.values(rowErr).find(Boolean);
 
-  return (
-    <>
-      {extraAction && (
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: '12px' }}>
-          {extraAction}
-        </Box>
-      )}
+  const addButton = (
+    <SirenButton onClick={addRow}>
+      <Icon name="plus" /> {t('schedule.addRow', { noun })}
+    </SirenButton>
+  );
 
+  const rowsAndPreview = (
+    <>
       {rows.map((r) => (
         <Box
           key={r.rowKey}
@@ -153,9 +173,9 @@ export function ScheduleEditor({ spans, noun, onSubmit, saving, error, extraActi
         </Box>
       ))}
 
-      <SirenButton onClick={addRow} sx={{ mt: '12px' }}>
-        <Icon name="plus" /> {t('schedule.addRow', { noun })}
-      </SirenButton>
+      {!listMaxHeight && (
+        <Box sx={{ mt: '12px' }}>{addButton}</Box>
+      )}
 
       {preview.length > 0 && (
         <Box sx={{ mt: '18px' }}>
@@ -182,13 +202,32 @@ export function ScheduleEditor({ spans, noun, onSubmit, saving, error, extraActi
           </Box>
         </Box>
       )}
+    </>
+  );
+
+  return (
+    <>
+      {(extraAction || listMaxHeight) && (
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', mb: '12px' }}>
+          {listMaxHeight ? addButton : <Box />}
+          {extraAction}
+        </Box>
+      )}
+
+      {listMaxHeight ? (
+        <Box sx={{ maxHeight: listMaxHeight, overflowY: 'auto' }}>{rowsAndPreview}</Box>
+      ) : (
+        rowsAndPreview
+      )}
 
       {firstErr && <Box sx={{ fontSize: 11.5, color: T.danger, mt: '10px' }}>{firstErr}</Box>}
       {error && <Box sx={{ fontSize: 11.5, color: T.danger, mt: '10px' }}>{error}</Box>}
 
-      <SirenButton variant="primary" onClick={submit} disabled={saving} sx={{ mt: '16px' }}>
-        <Icon name="check" /> {saving ? t('schedule.saving') : t('schedule.save')}
-      </SirenButton>
+      {!hideSaveButton && (
+        <SirenButton variant="primary" onClick={submit} disabled={saving} sx={{ mt: '16px' }}>
+          <Icon name="check" /> {saving ? t('schedule.saving') : t('schedule.save')}
+        </SirenButton>
+      )}
     </>
   );
-}
+});

@@ -731,33 +731,10 @@ export function Canvas({
           );
         })}
 
-        {/* Phase 레인 타이틀 — canvas scale() 밖 screen-space에 렌더해서 줌아웃해도 항상
-            같은 픽셀 크기·대비를 유지한다 (Today 선 / Phase 경계 점선과 같은 방식). 세로 위치는
-            의도적으로 뷰포트 상단에 고정 — 레인을 오래 내려다봐도 이름표가 항상 보인다. */}
-        {phases.map((p) => {
-          const g = lanes[p.id];
-          const left = Math.round(g.x * z + panX);
-          return (
-            <Box
-              key={`ph-label-${p.id}`}
-              sx={{
-                position: 'absolute', top: 10, left: left + 10,
-                display: 'inline-flex', alignItems: 'center',
-                fontFamily: FONT_MONO, fontSize: 11, fontWeight: 700, letterSpacing: '.09em',
-                color: T.tx, background: T.sf, border: `1px solid ${T.ln2}`,
-                borderRadius: '5px', padding: '3px 8px', boxShadow: T.shXs,
-                pointerEvents: 'none', zIndex: 2, whiteSpace: 'nowrap',
-              }}
-            >
-              {p.name}
-            </Box>
-          );
-        })}
-
         {orphanCount > 0 && (
           <Box
             sx={{
-              // 아래 가운데 — 위쪽은 phase 이름표가, 좌우 아래는 툴박스/범례가 쓰고 있어
+              // 아래 가운데 — 좌우 아래는 툴박스/범례가 쓰고 있어
               // 여기가 캔버스 내용을 안 가리는 유일한 자리다.
               position: 'absolute', bottom: 14, left: '50%', transform: 'translateX(-50%)',
               zIndex: 8, maxWidth: 460,

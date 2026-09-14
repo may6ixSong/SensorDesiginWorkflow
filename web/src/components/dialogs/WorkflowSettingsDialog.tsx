@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Box } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import { AccessGrant, Milestone, WorkflowDto } from '@/types/domain';
@@ -9,7 +9,7 @@ import { TabPanel, Tabs } from '@/components/common/Tabs';
 import { Icon } from '@/components/common/Icon';
 import { ConfirmDialog } from '@/components/dialogs/ConfirmDialog';
 import { R, T } from '@/theme/tokens';
-import { ScheduleDraft } from './ScheduleEditor';
+import { ScheduleDraft, ScheduleEditorHandle } from './ScheduleEditor';
 import { WorkflowPhasesPanel } from './WorkflowPhasesPanel';
 import { WorkflowPermissionPanel } from './WorkflowPermissionPanel';
 
@@ -67,6 +67,7 @@ export function WorkflowSettingsDialog({
   const [tab, setTab] = useState<WorkflowSettingsTab>(
     tabs.some((x) => x.key === initialTab) ? initialTab : 'details',
   );
+  const scheduleRef = useRef<ScheduleEditorHandle>(null);
 
   return (
     <ModalShell
@@ -80,6 +81,17 @@ export function WorkflowSettingsDialog({
         </>
       }
       belowHeader={<Tabs tabs={tabs} value={tab} onChange={setTab} sx={{ mt: '11px' }} />}
+      footer={
+        tab === 'schedule' ? (
+          <SirenButton
+            variant="primary"
+            onClick={() => scheduleRef.current?.submit()}
+            disabled={savingPhases}
+          >
+            <Icon name="check" /> {savingPhases ? t('schedule.saving') : t('schedule.save')}
+          </SirenButton>
+        ) : undefined
+      }
     >
       <TabPanel tabKey={tab}>
         {tab === 'details' && (
@@ -93,6 +105,7 @@ export function WorkflowSettingsDialog({
         )}
         {tab === 'schedule' && (
           <WorkflowPhasesPanel
+            ref={scheduleRef}
             phases={workflow.phases}
             milestones={milestones}
             orphanCount={orphanCount}

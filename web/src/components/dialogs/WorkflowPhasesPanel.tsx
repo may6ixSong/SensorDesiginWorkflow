@@ -1,9 +1,10 @@
+import { forwardRef } from 'react';
 import { Box } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import { Milestone, WorkflowPhase } from '@/types/domain';
 import { SirenButton } from '@/components/common/SirenButton';
 import { Icon } from '@/components/common/Icon';
-import { ScheduleDraft, ScheduleEditor } from './ScheduleEditor';
+import { ScheduleDraft, ScheduleEditor, ScheduleEditorHandle } from './ScheduleEditor';
 import { T } from '@/theme/tokens';
 
 interface Props {
@@ -23,10 +24,13 @@ interface Props {
  * 과제 마일스톤과 다른 점을 화면에서 분명히 해야 한다: 여기서 지운 칸을 가리키던
  * 산출물은 **사라지지 않고** 캔버스의 원래 자리에 "릴리즈 일정 없음"으로 남는다.
  * 그래서 저장 전에 그 결과를 미리 경고하고, 이미 그런 산출물이 있으면 개수를 알려 준다.
+ *
+ * Save 버튼은 여기서 그리지 않는다 — 부모(WorkflowSettingsDialog)가 ModalShell의
+ * footer에 고정해서 그리고, ref로 이 컴포넌트를 통해 ScheduleEditor의 submit()을 부른다.
  */
-export function WorkflowPhasesPanel({
+export const WorkflowPhasesPanel = forwardRef<ScheduleEditorHandle, Props>(function WorkflowPhasesPanel({
   phases, milestones, orphanCount, onSave, saving, error,
-}: Props) {
+}, ref) {
   const { t } = useTranslation();
   return (
     <>
@@ -44,11 +48,14 @@ export function WorkflowPhasesPanel({
       )}
 
       <ScheduleEditor
+        ref={ref}
         spans={phases}
         noun="phase"
         onSubmit={onSave}
         saving={saving}
         error={error}
+        listMaxHeight="min(38vh, 320px)"
+        hideSaveButton
         extraAction={
           milestones.length > 0 ? (
             <SirenButton
@@ -62,4 +69,4 @@ export function WorkflowPhasesPanel({
       />
     </>
   );
-}
+});

@@ -375,6 +375,15 @@ function ServiceFormDialog({ service, onClose }: { service?: HubService; onClose
       onClose={onClose}
       width={460}
       header={<Box sx={{ fontSize: 16, fontWeight: 700 }}>{isEdit ? 'Edit service' : 'Add service'}</Box>}
+      footer={
+        <SirenButton
+          variant="primary"
+          disabled={!name.trim() || mutation.isPending}
+          onClick={submit}
+        >
+          <Icon name="check" /> {isEdit ? 'Save' : 'Register'}
+        </SirenButton>
+      }
     >
       {/* key는 이름을 바탕으로 서버가 자동 생성하고, 생성 후엔 바꿀 수 없다 — 편집
           화면에서도 참고용 읽기 전용으로만 보여준다 (§3.2). */}
@@ -416,14 +425,6 @@ function ServiceFormDialog({ service, onClose }: { service?: HubService; onClose
       )}
       <ArtifactTypesField rows={artifactTypeRows} onChange={setArtifactTypeRows} />
       {typeErr && <Box sx={{ fontSize: 11, color: T.danger, mb: '11px' }}>{typeErr}</Box>}
-      <SirenButton
-        variant="primary"
-        disabled={!name.trim() || mutation.isPending}
-        onClick={submit}
-        sx={{ mt: '4px' }}
-      >
-        <Icon name="check" /> {isEdit ? 'Save' : 'Register'}
-      </SirenButton>
     </ModalShell>
   );
 }

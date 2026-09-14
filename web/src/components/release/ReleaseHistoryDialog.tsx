@@ -9,7 +9,7 @@ import { Icon } from '@/components/common/Icon';
 import { UserAvatar } from '@/components/common/Avatar';
 import { useDirectory } from '@/app/providers/DirectoryProvider';
 import { fmtAt } from '@/lib/canvasModel';
-import { CURSOR_POINTER, FONT_MONO, R, T, TIER_COLOR, TNUM } from '@/theme/tokens';
+import { CURSOR_POINTER, FONT_MONO, R, T, TIER_COLOR, TIER_LABEL, TNUM } from '@/theme/tokens';
 
 interface Props {
   workflowName: string;
@@ -71,9 +71,9 @@ export function ReleaseHistoryDialog({
           No release yet.
         </Box>
       ) : (
-        <Box sx={{ display: 'flex', gap: '14px', minHeight: 380 }}>
+        <Box sx={{ display: 'flex', gap: '14px', height: 'min(72vh, 660px)' }}>
           {/* ① 목록 */}
-          <Box sx={{ width: 220, flexShrink: 0, borderRight: `1px solid ${T.ln}`, pr: '12px', overflowY: 'auto', maxHeight: 460 }}>
+          <Box sx={{ width: 220, flexShrink: 0, borderRight: `1px solid ${T.ln}`, pr: '12px', overflowY: 'auto', height: '100%' }}>
             {releases.map((r) => {
               const on = r.id === selectedId;
               const changedCount = r.items.filter((i) => i.changed).length;
@@ -115,11 +115,11 @@ export function ReleaseHistoryDialog({
             })}
           </Box>
 
-          {/* ② 상세 표 */}
-          <Box sx={{ flex: 1, minWidth: 0, overflowY: 'auto', maxHeight: 460 }}>
+          {/* ② 상세 표 — 헤더/노트는 고정하고, 산출물 목록에만 스크롤을 건다. */}
+          <Box sx={{ flex: 1, minWidth: 0, height: '100%', display: 'flex', flexDirection: 'column' }}>
             {selected && (
               <>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: '9px', mb: '10px', flexWrap: 'wrap' }}>
+                <Box sx={{ flex: '0 0 auto', display: 'flex', alignItems: 'center', gap: '9px', mb: '10px', flexWrap: 'wrap' }}>
                   <Box sx={{ fontFamily: FONT_MONO, fontSize: 15, fontWeight: 700, color: T.pr, ...TNUM }}>
                     {selected.label}
                   </Box>
@@ -153,6 +153,7 @@ export function ReleaseHistoryDialog({
                 {selected.note && (
                   <Box
                     sx={{
+                      flex: '0 0 auto',
                       fontSize: 12.5, color: T.tx2, lineHeight: 1.6, background: T.sf2,
                       border: `1px solid ${T.ln}`, borderRadius: `${R.sm}px`, padding: '9px 11px', mb: '12px',
                     }}
@@ -161,15 +162,17 @@ export function ReleaseHistoryDialog({
                   </Box>
                 )}
 
-                {visibleItems.length === 0 ? (
-                  <Box sx={{ padding: '28px', textAlign: 'center', color: T.dm2, fontSize: 12.5 }}>
-                    Nothing went to {deptFilter} in this release.
-                  </Box>
-                ) : (
-                  visibleItems.map((item) => (
-                    <HistoryRow key={item.blockId} item={item} onOpen={onOpenArtifact} />
-                  ))
-                )}
+                <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+                  {visibleItems.length === 0 ? (
+                    <Box sx={{ padding: '28px', textAlign: 'center', color: T.dm2, fontSize: 12.5 }}>
+                      Nothing went to {deptFilter} in this release.
+                    </Box>
+                  ) : (
+                    visibleItems.map((item) => (
+                      <HistoryRow key={item.blockId} item={item} onOpen={onOpenArtifact} />
+                    ))
+                  )}
+                </Box>
               </>
             )}
           </Box>
@@ -196,7 +199,7 @@ function HistoryRow({ item, onOpen }: { item: ReleaseItemDto; onOpen?: (blockId:
     >
       <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
         <Box sx={{ fontSize: 10, fontWeight: 700, color: tier.fg, background: tier.bg, padding: '2px 6px', borderRadius: `${R.xs}px` }}>
-          {item.tier}
+          {TIER_LABEL[item.tier]}
         </Box>
         <Box sx={{ fontSize: 13, fontWeight: 600, flex: 1, minWidth: 0 }}>{item.artifactName}</Box>
         {item.phaseName && <Box sx={{ fontSize: 10.5, color: T.dm2 }}>{item.phaseName}</Box>}
