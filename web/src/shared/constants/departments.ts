@@ -24,3 +24,16 @@ export const RECEIVABLE_DEPARTMENTS = DEPARTMENTS.filter((d) => d.id !== 'analog
 export function departmentName(id: string | null | undefined): string {
   return DEPARTMENTS.find((d) => d.id === id)?.name ?? '-';
 }
+
+/**
+ * recipient 부서 문자열을 정식 표기로 맞춘다 — 데이터가 (대소문자가 섞인) id로
+ * 저장돼 있든 이름으로 저장돼 있든, 6개 고정 부서 중 하나로 알아볼 수 있으면 항상 그
+ * 정식 이름(`DEPARTMENTS[].name`)으로 보여준다(사용자 지적 — "digital"처럼 소문자로
+ * 저장된 옛 데이터가 그대로 소문자로 보이면 안 된다). 그 6개에 없는 project 자유 입력
+ * 부서명은 **원래 설정된 문자열 그대로** 둔다 — 대소문자를 일부러 바꾸지 않는다.
+ */
+export function canonicalDepartmentLabel(raw: string): string {
+  const key = raw.trim().toLowerCase();
+  const hit = DEPARTMENTS.find((d) => d.id === key || d.name.toLowerCase() === key);
+  return hit?.name ?? raw;
+}

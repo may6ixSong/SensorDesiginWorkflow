@@ -7,6 +7,7 @@ import { SirenButton, Badge } from '@/components/common/SirenButton';
 import { Ey } from '@/components/common/Panel';
 import { Icon } from '@/components/common/Icon';
 import { ConfirmDialog } from '@/components/dialogs/ConfirmDialog';
+import { canonicalDepartmentLabel } from '@/shared/constants/departments';
 import { CURSOR_POINTER, FONT_MONO, R, T, TIER_COLOR, TNUM } from '@/theme/tokens';
 
 /** blockId → (sourceBlockId → versionRef | null) */
@@ -213,7 +214,7 @@ function ReleaseRow({
           <>
             {item.recipients.departments.map((d) => (
               <Box key={d} sx={{ fontSize: 10.5, color: T.dm, background: T.sf3, padding: '2px 7px', borderRadius: `${R.pill}px` }}>
-                {d}
+                {canonicalDepartmentLabel(d)}
               </Box>
             ))}
             {item.recipients.users.length > 0 && (

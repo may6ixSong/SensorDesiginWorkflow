@@ -2,6 +2,7 @@ import { Box } from '@mui/material';
 import { CanvasNode, stOf } from '@/lib/canvasModel';
 import { WorkflowPhase } from '@/types/domain';
 import { Icon, IconName } from '@/components/common/Icon';
+import { canonicalDepartmentLabel } from '@/shared/constants/departments';
 import { CURSOR_POINTER, R, T, TNUM } from '@/theme/tokens';
 
 /**
@@ -259,18 +260,22 @@ export function BlockNode({
                       textOverflow: 'ellipsis', maxWidth: 112,
                     }}
                   >
-                    {dep}
+                    {/* 저장된 값이 (옛 데이터 등으로) 소문자 id일 수 있다 — 6개 고정
+                        부서면 항상 정식 이름으로, 그 외 자유 입력 부서명은 원래 그대로
+                        보여준다(사용자 지적: 일부러 소문자로 바꾸면 안 된다). */}
+                    {canonicalDepartmentLabel(dep)}
                   </Box>
                 ))}
                 {d.recipientDepartments.length > 2 && (
                   <Box sx={{ fontSize: 13.5, color: T.dm2 }}>+{d.recipientDepartments.length - 2}</Box>
                 )}
               </>
-            ) : (
-              <Box sx={{ fontSize: 10.5, color: T.dm2 }}>
-                {d.artifactId ? 'No recipient' : 'No source'}
-              </Box>
-            )}
+            ) : !d.artifactId ? (
+              // "No recipient"는 굳이 안 써도 된다(사용자 지적) — artifact는 있는데
+              // 아직 아무도 안 받는 것뿐이라 빈 줄로 둔다. "No source"는 자리 자체가
+              // 아직 아무 산출물에도 안 걸려 있다는 뜻이라 계속 알려준다.
+              <Box sx={{ fontSize: 10.5, color: T.dm2 }}>No source</Box>
+            ) : null}
 
             <Box sx={{ flex: 1 }} />
           </Box>

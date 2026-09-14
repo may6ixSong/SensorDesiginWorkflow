@@ -9,6 +9,7 @@ import { Icon } from '@/components/common/Icon';
 import { UserAvatar } from '@/components/common/Avatar';
 import { useDirectory } from '@/app/providers/DirectoryProvider';
 import { fmtAt } from '@/lib/canvasModel';
+import { canonicalDepartmentLabel } from '@/shared/constants/departments';
 import { CURSOR_POINTER, FONT_MONO, R, T, TIER_COLOR, TIER_LABEL, TNUM } from '@/theme/tokens';
 
 interface Props {
@@ -222,7 +223,7 @@ function HistoryRow({ item, onOpen }: { item: ReleaseItemDto; onOpen?: (blockId:
         <Box sx={{ fontSize: 10.5, color: T.dm2, fontWeight: 700 }}>TO</Box>
         {item.recipients.departments.map((d) => (
           <Box key={d} sx={{ fontSize: 10.5, color: T.dm, background: T.sf3, padding: '2px 7px', borderRadius: `${R.pill}px` }}>
-            {d}
+            {canonicalDepartmentLabel(d)}
           </Box>
         ))}
         {!item.recipients.departments.length && (
