@@ -14,7 +14,7 @@ import { NewArtifactSourceInput, useLiveVersions } from '@/api/hooks/useBlocks';
 import { AccessGrantEditor } from '@/components/dialogs/AccessGrantEditor';
 import { ChangeArtifactDialog } from '@/components/dialogs/ChangeArtifactDialog';
 import { fmtAt } from '@/lib/canvasModel';
-import { CURSOR_POINTER, FONT_MONO, R, T, TIER_COLOR, TNUM } from '@/theme/tokens';
+import { CURSOR_POINTER, FONT_MONO, R, T, TIER_COLOR, TIER_LABEL, TNUM } from '@/theme/tokens';
 
 type Tab = 'versions' | 'recipients';
 
@@ -141,7 +141,7 @@ export function ArtifactSlide({
           tone="locked"
           title={t('artifact.noAccess')}
           body={artifact.tier === 'A'
-            ? 'Tier A access is granted by the owning service and by this workflow’s recipient list.'
+            ? 'Access to this artifact is granted by the owning service and by this workflow’s recipient list.'
             : 'Ask the artifact owner to grant you view access.'}
         />
       </SlidePanel>
@@ -202,7 +202,9 @@ export function ArtifactSlide({
         </Box>
       )}
     >
-      {/* ── 머리 — tier / 망 / 상태 ── */}
+      {/* ── 머리 — 출처 / 망 / 상태 ──
+          Tier 글자(A/B/C/D)는 절대 노출하지 않는다(사용자 지적) — "새 Artifact 추가"
+          다이얼로그와 같은 이름(TIER_LABEL)으로만 보여준다. */}
       <Box sx={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', mb: '14px' }}>
         <Box
           sx={{
@@ -211,7 +213,7 @@ export function ArtifactSlide({
             padding: '3px 8px', borderRadius: `${R.xs}px`, letterSpacing: '0.03em',
           }}
         >
-          Tier {artifact.tier}
+          {TIER_LABEL[artifact.tier]}
         </Box>
         {artifact.network === 'HPC' && (
           <Badge color={T.dm} bg={T.sf3} borderColor="transparent">HPC</Badge>
@@ -529,7 +531,7 @@ function RecipientsTab({
         <Box sx={{ mt: '1px', flexShrink: 0 }}><Icon name="info" /></Box>
         <Box>
           {isATier
-            ? 'Recipients are set per workflow for Tier A. Being a recipient also grants access to this slide — the owning service still decides what is actually visible.'
+            ? 'Recipients are set per workflow for Live Service artifacts. Being a recipient also grants access to this slide — the owning service still decides what is actually visible.'
             : 'View access is the recipient list. It is shared by every workflow that uses this artifact.'}
         </Box>
       </Box>
