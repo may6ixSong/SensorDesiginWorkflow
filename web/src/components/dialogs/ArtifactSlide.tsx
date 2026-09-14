@@ -713,7 +713,7 @@ function RecipientsTab({
         <Box sx={{ mt: '1px', flexShrink: 0 }}><Icon name="info" /></Box>
         <Box>
           {isATier
-            ? 'Recipients are set per workflow for Live Service artifacts. Being a recipient also grants access to this slide — the owning service still decides what is actually visible.'
+            ? 'Recipients are set per workflow for OA Service artifacts. Being a recipient also grants access to this slide — the owning service still decides what is actually visible.'
             : 'View access is the recipient list. It is shared by every workflow that uses this artifact.'}
         </Box>
       </Box>

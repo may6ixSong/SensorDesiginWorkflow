@@ -31,7 +31,7 @@ export class BlocksController {
   /**
    * Tier별 후보 목록 — pickable 판정까지 서버가 끝내서 내려준다(설계서 04장 §6).
    * source=live는 serviceKey와, project 검색으로 사람이 이미 고른 externalProjectId가
-   * 둘 다 필요하다(§6.3) — Live Service 드롭다운 자체는 `GET /hub/services`(Manage
+   * 둘 다 필요하다(§6.3) — OA Service 드롭다운 자체는 `GET /hub/services`(Manage
    * Service 등록 목록)를 그대로 쓰고, project 후보는 기존 `GET /hub/services/:key/
    * projects/search?code=&revision=`을 그대로 쓴다. 여기서 새로 만들지 않는다.
    */

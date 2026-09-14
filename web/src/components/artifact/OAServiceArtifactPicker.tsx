@@ -19,7 +19,7 @@ interface Props {
 }
 
 /**
- * "Live Service" 소스(Tier A) 후보 선택(설계서 04장 §6.3) — 세 단계다.
+ * "OA Service" 소스(Tier A) 후보 선택(설계서 04장 §6.3) — 세 단계다.
  *
  * 1. **Service** — Manage Service(Hub 레지스트리, `GET /hub/services`)에 등록된 서비스 중
  *    Live 연동(transport=http)만. 프로젝트에 미리 연결돼 있어야 할 필요는 없다.
@@ -31,7 +31,7 @@ interface Props {
  *    서비스가 브라우징을 지원하지 않으면(`supported:false`) 후보 없이 안내만 보여준다 —
  *    externalArtifactId를 알아낼 방법이 없으니 그 서비스는 지금 이 다이얼로그로는 못 쓴다.
  */
-export function LiveServiceArtifactPicker({
+export function OAServiceArtifactPicker({
   workflowId, projectCode, projectRevision, intent, serviceKey, onServiceChange,
   externalArtifactId, onChange, onSelectName,
 }: Props) {
@@ -71,7 +71,7 @@ export function LiveServiceArtifactPicker({
           </Box>
         ) : !services.length ? (
           <Box sx={{ fontSize: 11.5, color: T.dm, background: T.sf2, border: `1px solid ${T.ln}`, borderRadius: '8px', padding: '8px 10px', lineHeight: 1.6 }}>
-            No Live Service is registered yet — add one on the Manage Service page first.
+            No OA Service is registered yet — add one on the Manage Service page first.
           </Box>
         ) : (
           <SelectInput

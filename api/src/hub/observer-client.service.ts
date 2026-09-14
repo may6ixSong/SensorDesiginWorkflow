@@ -202,7 +202,7 @@ export class ObserverClientService {
 
   /**
    * 계약의 `/artifacts?projectId=&knoxId=` — **선택 구현**이다(observer-contract-v1.yaml).
-   * "새 Artifact 추가" 다이얼로그의 Live Service 후보 목록에 쓴다(설계서 04장 §6.3).
+   * "새 Artifact 추가" 다이얼로그의 OA Service 후보 목록에 쓴다(설계서 04장 §6.3).
    *
    * 구현하지 않은 서비스는 이 호출이 그냥 실패/타임아웃으로 끝난다 — null을 돌려줘서
    * 호출부가 "이 서비스는 후보 브라우징을 지원하지 않는다 → externalArtifactId 수동 입력"

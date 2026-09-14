@@ -193,9 +193,10 @@ export function BlockNode({
 
             <Box sx={{ flex: 1 }} />
 
-            {/* 같은 산출물이 여러 phase에 걸쳐 놓인 경우의 회차(2/3 …). */}
+            {/* 같은 산출물이 여러 phase에 걸쳐 놓인 경우의 회차(2/3 …). 확대 안 해도
+                보이게 2배로 키웠다(사용자 요청: 10 -> 20). */}
             {d.seriesTotal > 1 && (
-              <Box sx={{ fontSize: 10, color: T.dm2, fontWeight: 600, flexShrink: 0, ...TNUM }}>
+              <Box sx={{ fontSize: 20, color: T.dm2, fontWeight: 600, flexShrink: 0, ...TNUM }}>
                 {d.seriesIdx}/{d.seriesTotal}
               </Box>
             )}
@@ -209,10 +210,11 @@ export function BlockNode({
               <Box
                 title={st.lb}
                 sx={{
-                  width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
+                  // 확대 안 해도 보이게 2배로 키웠다(사용자 요청: 7px -> 14px).
+                  width: 14, height: 14, borderRadius: '50%', flexShrink: 0,
                   background: st.c,
                   // "신규 발행"은 다음 release에서 highlight될 대상이라 계속 눈에 띄어야 한다.
-                  boxShadow: d.publishState === 'newlyPublished' ? `0 0 0 3px ${T.prSoft}` : 'none',
+                  boxShadow: d.publishState === 'newlyPublished' ? `0 0 0 6px ${T.prSoft}` : 'none',
                 }}
               />
             )}
@@ -245,21 +247,23 @@ export function BlockNode({
                 <Icon name="warn" /> No schedule
               </Box>
             ) : d.recipientDepartments.length ? (
+              // 확대 안 해도 보이게 2배로 키웠다(사용자 요청: 글자 10 -> 20, 칩 패딩·폭도
+              // 같은 비율로 맞춘다).
               <>
                 {d.recipientDepartments.slice(0, 2).map((dep) => (
                   <Box
                     key={dep}
                     sx={{
-                      fontSize: 10, color: T.dm, background: T.sf3, borderRadius: `${R.xs}px`,
-                      padding: '2px 6px', whiteSpace: 'nowrap', overflow: 'hidden',
-                      textOverflow: 'ellipsis', maxWidth: 84,
+                      fontSize: 20, color: T.dm, background: T.sf3, borderRadius: `${R.xs}px`,
+                      padding: '4px 12px', whiteSpace: 'nowrap', overflow: 'hidden',
+                      textOverflow: 'ellipsis', maxWidth: 168,
                     }}
                   >
                     {dep}
                   </Box>
                 ))}
                 {d.recipientDepartments.length > 2 && (
-                  <Box sx={{ fontSize: 10, color: T.dm2 }}>+{d.recipientDepartments.length - 2}</Box>
+                  <Box sx={{ fontSize: 20, color: T.dm2 }}>+{d.recipientDepartments.length - 2}</Box>
                 )}
               </>
             ) : (

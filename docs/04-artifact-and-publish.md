@@ -30,19 +30,19 @@ project이므로 후보에 나오지 않는다(02장 §1). Admin이 여러 proje
 
 | Tier | 이름 | SIREN이 아는 것 | 화면 표시(04장 §6) | 전형적 대상 |
 |---|---|---|---|---|
-| **A** | Live | 버전·giver를 동기 조회. 서비스가 권한까지 판정 | Live Service | 계약을 맞춘 RPM·SimHub 등 Hub 등록 서비스 |
+| **A** | Live | 버전·giver를 동기 조회. 서비스가 권한까지 판정 | OA Service | 계약을 맞춘 RPM·SimHub 등 Hub 등록 서비스 |
 | **B** | Synced | 버전이 자동 갱신되나 이벤트 시점 기준 | File Artifacts | **Calypso**(SIREN 내장 파일형 산출물 등록) |
-| **C** | Linked | 자동 갱신 없음. 링크만 있고 버전은 사람이 입력 | HPC Path(항상 잠김) | HPC망 경로형 산출물(미연동) |
+| **C** | Linked | 자동 갱신 없음. 링크만 있고 버전은 사람이 입력 | HPC Service(항상 잠김) | HPC망 경로형 산출물(미연동) |
 | **D** | Attested | 시스템 자체가 없음. 출처를 자유 텍스트로 기록 | External / Attested(받는 전용) | 팀·회사 밖에서 생성 |
 
 ★ **UI에는 Tier 글자를 노출하지 않는다** — "새 Artifact 추가" 다이얼로그는 항상 위 표의
 "화면 표시" 열 이름으로만 보여준다(04장 §6). Calypso가 A가 아니라 B인 이유, Calypso가
-Live Service 목록에 없는 이유는 §3.1·§6.3 참고 — Calypso는 애초에 Hub 레지스트리 대상이
+OA Service 목록에 없는 이유는 §3.1·§6.3 참고 — Calypso는 애초에 Hub 레지스트리 대상이
 아니다.
 
 - **망(`network: OA | HPC`)은 원래 tier와 직교하는 축으로 설계됐지만, 04장 §6의 3버튼 UI에서는
-  실질적으로 소스 선택이 network까지 함께 결정한다** — Live Service/File Artifacts는 OA,
-  HPC Path는 HPC로 만들어진다. 스키마 필드 자체는 그대로 두되(값을 자유롭게 못 바꾸는 것도
+  실질적으로 소스 선택이 network까지 함께 결정한다** — OA Service/File Artifacts는 OA,
+  HPC Service는 HPC로 만들어진다. 스키마 필드 자체는 그대로 두되(값을 자유롭게 못 바꾸는 것도
   아니다), 지금 UI가 만드는 조합은 이 둘뿐이다.
 - **tier는 산출물이 아니라 버전 엔트리의 속성이다.** 나중에 실연동이 붙어도 과거 수동 기록을
   고치거나 옮기지 않는다 — 다음 엔트리가 다른 tier로 찍힐 뿐이다. 따라서 tier 승격에
@@ -227,17 +227,17 @@ Block(자리)과 Artifact(실체)가 분리되어 있으므로(§1) 매핑을 �
 
    | 화면 표시 | 내부 Tier | 주는 쪽에 나오는가 | 받는 쪽에 나오는가 |
    |---|---|---|---|
-   | **Live Service** | A | O | O |
+   | **OA Service** | A | O | O |
    | **File Artifacts** | B | O | O |
-   | **HPC Path** | C | O(항상 잠김) | O(항상 잠김) |
+   | **HPC Service** | C | O(항상 잠김) | O(항상 잠김) |
    | **External / Attested** | D | **X** | O |
 
-   - **HPC Path(C)는 두 쪽 모두 옵션에는 나오지만 항상 선택 불가로 잠겨 있다** — HPC망
+   - **HPC Service(C)는 두 쪽 모두 옵션에는 나오지만 항상 선택 불가로 잠겨 있다** — HPC망
      서비스와의 실연동이 아직 구체화되지 않았다(§6.4). 왜 이 옵션이 있는지 알 수 있도록
      project code+revision으로 필터된 mock 데이터를 미리보기로만 보여준다.
    - **External/Attested(D)는 받는 쪽에서만 나온다.** 줘야 하는 artifact를 D로 등록하는
      흐름은 아직 구체화되지 않은 미래 인터페이스로 남겨둔다(§6.4).
-4. 고른 출처에 맞는 후보 목록에서 실제 artifact를 고르거나(Live Service/File Artifacts),
+4. 고른 출처에 맞는 후보 목록에서 실제 artifact를 고르거나(OA Service/File Artifacts),
    D면 "누가 줄 것으로 기대되는지"만 입력한다.
 
 ### 6.2 Pickability — 대칭 규칙
@@ -247,9 +247,9 @@ Block(자리)과 Artifact(실체)가 분리되어 있으므로(§1) 매핑을 �
 
 | Tier | 주는(own) 후보 조건 | 받는(received) 후보 조건 |
 |---|---|---|
-| **A**(Live Service) | 그 서비스 `canEdit`(라이브 조회) | 그 서비스 `canView`(라이브 조회) |
+| **A**(OA Service) | 그 서비스 `canEdit`(라이브 조회) | 그 서비스 `canView`(라이브 조회) |
 | **B**(File Artifacts) | Calypso `myAccess === 'edit'` | Calypso `myAccess`가 edit 또는 view |
-| **C**(HPC Path) | 불가(잠김) | 불가(잠김) |
+| **C**(HPC Service) | 불가(잠김) | 불가(잠김) |
 | **D**(External/Attested) | 해당 없음(옵션 자체가 없다) | 자유(검증할 시스템이 없다) |
 
 - 후보 목록에는 고를 수 없는 것도 **보여주되 흐리게 표시하고 이유를 붙인다** — "view only,
@@ -259,7 +259,7 @@ Block(자리)과 Artifact(실체)가 분리되어 있으므로(§1) 매핑을 �
 
 ### 6.3 후보 목록의 출처
 
-- **Live Service(A)** — **3단계**다. 사전에 Admin이 project를 그 서비스에 링크해 둘 필요는
+- **OA Service(A)** — **3단계**다. 사전에 Admin이 project를 그 서비스에 링크해 둘 필요는
   없다 — 매번 그 자리에서 검색한다.
   1. **Service** — Manage Service(Hub 레지스트리, `GET /hub/services`)에 등록되고
      `transport: 'http'`인 서비스만 고를 수 있다. Calypso는 여기 없다 — Hub 레지스트리 대상이
@@ -290,7 +290,7 @@ Block(자리)과 Artifact(실체)가 분리되어 있으므로(§1) 매핑을 �
     뿐이다. 그래서 처음 등록 시 등록자를 자동으로 `editAccess`에 넣어 두고, 그 뒤로는 기존
     Recipients 탭(`PUT /artifacts/:id/access`)에서 그대로 넓히면 된다 — 새 UI를 따로 만들지
     않는다.
-- **HPC Path(C)** — `HpcPathMock` 컬렉션(project code+revision으로 필터)에서 미리보기만 조회한다.
+- **HPC Service(C)** — `HpcPathMock` 컬렉션(project code+revision으로 필터)에서 미리보기만 조회한다.
   실제 서비스 연동이 없으므로 `serviceKey`도, 진짜 후보 pickability도 없다 — 전부
   `pickable: false`다.
 - **External/Attested(D)** — 후보 목록 자체가 없다. 이름과 "누가 줄 것으로 기대되는지"
@@ -327,8 +327,8 @@ recipient 구성이 새 artifact에도 유효하다는 보장이 없기 때문�
 ### 6.7 API
 
 ```
-GET /hub/services                        → Manage Service 등록 목록(기존). Live Service 드롭다운이 그대로 쓴다.
-GET /hub/services/:key/projects/search?code=&revision=   → project 후보(기존 §19.3). Live Service 2단계가 그대로 쓴다.
+GET /hub/services                        → Manage Service 등록 목록(기존). OA Service 드롭다운이 그대로 쓴다.
+GET /hub/services/:key/projects/search?code=&revision=   → project 후보(기존 §19.3). OA Service 2단계가 그대로 쓴다.
 
 GET /workflows/:workflowId/artifact-candidates
     ?source=live|file|hpc&intent=own|received&serviceKey=&externalProjectId=

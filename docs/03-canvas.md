@@ -142,7 +142,7 @@
   block(자리)과 artifact(실체)가 분리되어 있어(04장 §1) 매핑을 바꾸는 것 자체는 자유롭다.
   단 intent는 block 생성 시 확정되며 변경 시에도 바뀌지 않는다.
 - **후보 선택 가능 범위·pickability·중복 매핑 금지 정책은 04장 §6에 있다.** Tier 글자는
-  화면에 노출하지 않고 Live Service/File Artifacts/HPC Path(+받는 전용 External/Attested)로만
+  화면에 노출하지 않고 OA Service/File Artifacts/HPC Service(+받는 전용 External/Attested)로만
   보여준다.
 
 ### 5.3 Flow 편집

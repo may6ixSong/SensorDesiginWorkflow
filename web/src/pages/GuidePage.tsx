@@ -38,7 +38,7 @@ const SECTIONS: Section[] = [
     title: 'Publish',
     body: [
       'An artifact is published inside the service that owns it — Calypso, a simulation service, or by hand for the lower tiers. SIREN observes that and shows the state on the block: not published, published, or new since the last release.',
-      'Live Service artifacts are governed entirely by the owning service. SIREN never grants access to them; it only shows what that service says you may see.',
+      'OA Service artifacts are governed entirely by the owning service. SIREN never grants access to them; it only shows what that service says you may see.',
     ],
   },
   {
@@ -57,7 +57,7 @@ const SECTIONS: Section[] = [
       'Access is decided in three layers. The project decides who can see anything at all, the workflow decides Edit or View on the canvas, and each artifact decides who can open it.',
       'Every grant is a set of departments plus a set of individuals, and department grants are evaluated live — someone who joins the department later gets access immediately.',
       'A workflow you have neither Edit nor View access to does not appear in the workflow selector at all.',
-      'For Live Service artifacts, being on the recipient list is only the first gate: the owning service still decides whether the panel actually opens.',
+      'For OA Service artifacts, being on the recipient list is only the first gate: the owning service still decides whether the panel actually opens.',
     ],
   },
 ];

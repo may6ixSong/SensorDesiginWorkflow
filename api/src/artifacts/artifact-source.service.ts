@@ -33,7 +33,7 @@ export interface CandidateListResult {
 const CALYPSO_SERVICE_KEY = 'calypso';
 
 /**
- * "새 Artifact 추가" 다이얼로그의 3개 소스(Live Service·File Artifacts·HPC Path)를
+ * "새 Artifact 추가" 다이얼로그의 3개 소스(OA Service·File Artifacts·HPC Service)를
  * 후보 목록과 pickability로 통일해서 다루는 오케스트레이션 계층(설계서 04장 §6).
  *
  * ★ pickable 판정은 여기서 **한 번만** 한다 — FE도 같은 값을 그대로 그리고, BlocksService의
@@ -63,7 +63,7 @@ export class ArtifactSourceService {
   }
 
   /**
-   * Live Service(A) 후보 목록 — project code/revision 검색은 이 호출 **전에** FE가
+   * OA Service(A) 후보 목록 — project code/revision 검색은 이 호출 **전에** FE가
    * `GET /hub/services/:key/projects/search`(기존 §19.3 엔드포인트)로 이미 끝내고,
    * 사람이 그 후보 중 하나를 직접 골라 `externalProjectId`로 넘겨준다(04장 §6.3). code+
    * revision이 그 서비스 안에서 유일하다는 보장이 없어(RPM처럼) 사람이 확정해야 한다 —
@@ -126,7 +126,7 @@ export class ArtifactSourceService {
     };
   }
 
-  /** HPC Path(C) — 아직 미연동. 항상 선택 불가, 미리보기 전용(설계서 04장 §6.4). */
+  /** HPC Service(C) — 아직 미연동. 항상 선택 불가, 미리보기 전용(설계서 04장 §6.4). */
   async hpcMockCandidates(project: ProjectDocument): Promise<CandidateListResult> {
     const rows = await this.hpcMock
       .find({ projectCode: project.code, projectRevision: project.revision })
@@ -141,7 +141,7 @@ export class ArtifactSourceService {
         pickable: false,
         blockedReason: 'not-integrated',
       })),
-      note: 'HPC Path is not integrated yet — shown for preview only.',
+      note: 'HPC Service is not integrated yet — shown for preview only.',
     };
   }
 
@@ -154,7 +154,7 @@ export class ArtifactSourceService {
     externalProjectId?: string,
   ): Promise<CandidateListResult> {
     if (source === 'live') {
-      if (!serviceKey) throw new BadRequestException('serviceKey is required for the Live Service source.');
+      if (!serviceKey) throw new BadRequestException('serviceKey is required for the OA Service source.');
       if (!externalProjectId) {
         throw new BadRequestException('externalProjectId is required — pick a project candidate first.');
       }
@@ -223,7 +223,7 @@ export class ArtifactSourceService {
     if (actor.isAdmin) return;
 
     if (artifact.tier === 'C') {
-      throw new ForbiddenException('Tier C (HPC Path) is not integrated yet — it cannot be mapped.');
+      throw new ForbiddenException('Tier C (HPC Service) is not integrated yet — it cannot be mapped.');
     }
 
     if (artifact.tier === 'D') {

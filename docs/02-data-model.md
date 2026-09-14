@@ -13,7 +13,7 @@ memos           메모 블록
 edges           flow 연결선
 releases        ★신규★ workflow release 기록 (구 hldReleases 폐기)
 artifactServices  연동 서비스 레지스트리 (기존 유지)
-hpcPathMocks    ★신규★ Tier C(HPC Path) 미리보기 전용 mock (04장 §6.3·§6.4) — 실제 매핑엔 안 쓰인다
+hpcPathMocks    ★신규★ Tier C(HPC Service) 미리보기 전용 mock (04장 §6.3·§6.4) — 실제 매핑엔 안 쓰인다
 auditLogs       감사 로그
 ```
 
@@ -241,8 +241,8 @@ Block {
 
 ## 4.1 hpcPathMocks ★신규★
 
-Tier C(HPC Path) 미리보기 전용. 실제 매핑에는 전혀 쓰이지 않는다 — HPC망 서비스와의 실연동이
-아직 구체화되지 않아 "새 Artifact 추가" 다이얼로그의 HPC Path 소스는 항상 잠겨 있다(04장 §6.3).
+Tier C(HPC Service) 미리보기 전용. 실제 매핑에는 전혀 쓰이지 않는다 — HPC망 서비스와의 실연동이
+아직 구체화되지 않아 "새 Artifact 추가" 다이얼로그의 HPC Service 소스는 항상 잠겨 있다(04장 §6.3).
 
 ```ts
 HpcPathMock {
@@ -387,7 +387,7 @@ ReleaseItem {
 | `GET` | `/artifacts/:id` | 열람 권한(01장 §4.2) 없으면 403. 버전은 권한에 따라 마스킹 |
 | `PUT` | `/artifacts/:id/access` | B/C/D만. `{ editAccess, viewAccess }` |
 | `PUT` | `/workflows/:wfId/blocks/:blockId/recipients` | **A Tier block만.** `{ editAccess, viewAccess }`. workflow Edit Access 필요 |
-| `GET` | `/workflows/:wfId/artifact-candidates` | `?source=live\|file\|hpc&intent=own\|received&serviceKey=&externalProjectId=` — pickable까지 판정된 후보 목록 (04장 §6.2). Live Service 드롭다운은 기존 `GET /hub/services`를, project 후보는 기존 `GET /hub/services/:key/projects/search`를 그대로 쓴다(04장 §6.3) |
+| `GET` | `/workflows/:wfId/artifact-candidates` | `?source=live\|file\|hpc&intent=own\|received&serviceKey=&externalProjectId=` — pickable까지 판정된 후보 목록 (04장 §6.2). OA Service 드롭다운은 기존 `GET /hub/services`를, project 후보는 기존 `GET /hub/services/:key/projects/search`를 그대로 쓴다(04장 §6.3) |
 | `POST` | `/workflows/:wfId/blocks` | `{ name, phaseId, layout, intent, artifactId? \| newArtifact? }` — newArtifact가 있으면 find-or-create 후 매핑 (04장 §6.7) |
 | `PATCH` | `/blocks/:id` | `{ name?, artifactId? \| newArtifact? }` — 재매핑. 이전 값과 다르면 block.recipients 초기화 (04장 §6.6) |
 

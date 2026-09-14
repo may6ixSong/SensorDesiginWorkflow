@@ -4,16 +4,16 @@ import { Field } from '@/components/common/Panel';
 import { Icon } from '@/components/common/Icon';
 import { AccessGrantEditor } from '@/components/dialogs/AccessGrantEditor';
 import { CalypsoArtifactPicker } from '@/components/artifact/CalypsoArtifactPicker';
-import { LiveServiceArtifactPicker } from '@/components/artifact/LiveServiceArtifactPicker';
+import { OAServiceArtifactPicker } from '@/components/artifact/OAServiceArtifactPicker';
 import { useArtifactCandidates } from '@/api/hooks/useHub';
 import { CURSOR_POINTER, FONT_MONO, R, T } from '@/theme/tokens';
 
 export type ArtifactSourceKind = 'live' | 'file' | 'hpc' | 'attested';
 
 const SOURCE_LABEL: Record<ArtifactSourceKind, string> = {
-  live: 'Live Service',
+  live: 'OA Service',
   file: 'File Artifacts',
-  hpc: 'HPC Path',
+  hpc: 'HPC Service',
   attested: 'External / Attested',
 };
 
@@ -49,8 +49,8 @@ interface Props {
 
 /**
  * "새 Artifact 추가"와 "산출물 변경" 양쪽이 공유하는 소스 선택 UI(설계서 04장 §6).
- * Tier 글자는 절대 노출하지 않는다 — Live Service/File Artifacts/HPC Path(+받는 쪽만
- * External/Attested)로만 보여준다. HPC Path는 항상 잠겨 있고 미리보기만 제공한다.
+ * Tier 글자는 절대 노출하지 않는다 — OA Service/File Artifacts/HPC Service(+받는 쪽만
+ * External/Attested)로만 보여준다. HPC Service는 항상 잠겨 있고 미리보기만 제공한다.
  */
 export function ArtifactSourcePicker({
   workflowId, projectId, projectCode, projectRevision, intent, myDepartments, departmentOptions,
@@ -84,7 +84,7 @@ export function ArtifactSourcePicker({
       </Field>
 
       {state.source === 'live' && (
-        <LiveServiceArtifactPicker
+        <OAServiceArtifactPicker
           workflowId={workflowId}
           projectCode={projectCode}
           projectRevision={projectRevision}
@@ -111,7 +111,7 @@ export function ArtifactSourcePicker({
       )}
 
       {state.source === 'hpc' && (
-        <Field label="HPC Path — not integrated yet">
+        <Field label="HPC Service — not integrated yet">
           <Box
             sx={{
               display: 'flex', alignItems: 'flex-start', gap: '8px',
@@ -120,7 +120,7 @@ export function ArtifactSourcePicker({
             }}
           >
             <Box sx={{ mt: '1px', flexShrink: 0 }}><Icon name="warn" /></Box>
-            <Box>HPC Path artifacts can&apos;t be selected yet — shown below for preview only.</Box>
+            <Box>HPC Service artifacts can&apos;t be selected yet — shown below for preview only.</Box>
           </Box>
           {hpcPreview.isLoading ? (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 0', fontSize: 12, color: T.dm2 }}>

@@ -4,7 +4,7 @@ import { Document, Types } from 'mongoose';
 export type HpcPathMockDocument = HpcPathMock & Document;
 
 /**
- * Tier C("HPC Path") 미리보기 전용 mock 데이터 (설계서 04장 §6.4).
+ * Tier C("HPC Service") 미리보기 전용 mock 데이터 (설계서 04장 §6.4).
  *
  * HPC망 서비스와의 실연동은 아직 구체화되지 않았다 — 그래서 이 tier는 캔버스에서
  * **선택 자체가 잠겨 있다.** 그래도 화면이 완전히 빈 채로는 "이 옵션이 왜 있는지" 알 수

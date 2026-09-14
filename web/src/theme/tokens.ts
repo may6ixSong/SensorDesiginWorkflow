@@ -98,9 +98,9 @@ export const TIER_COLOR: Record<'A' | 'B' | 'C' | 'D', { fg: string; bg: string 
  * 소스 이름과 동일하다.
  */
 export const TIER_LABEL: Record<'A' | 'B' | 'C' | 'D', string> = {
-  A: 'Live Service',
+  A: 'OA Service',
   B: 'File Artifacts',
-  C: 'HPC Path',
+  C: 'HPC Service',
   D: 'External / Attested',
 };
 

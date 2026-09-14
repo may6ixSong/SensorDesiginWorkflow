@@ -39,6 +39,10 @@ export function ArtifactVersionContents({
   const fileRef = useRef<HTMLInputElement>(null);
   const [note, setNote] = useState('');
   const accent = v?.isReleased ? T.pr : T.warn;
+  // "WORKING"은 지금 보이는 버전이 실제 latest일 때만 — 사용자가 버전 트리에서 과거의
+  // 미발행 버전을 눌러 봐도 그게 "지금 작업 중인 것"처럼 보이면 안 된다(사용자 지적,
+  // ArtifactVersionTree/ArtifactSlide의 generic 버전 목록과 같은 규칙).
+  const isLatest = !!v && a.latestVersion?.versionRef === v.versionRef;
 
   return (
     <Box sx={{ flex: 1, minWidth: 0, overflowY: 'auto', background: T.sf3, padding: '22px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -63,9 +67,11 @@ export function ArtifactVersionContents({
                 <Box sx={{ fontFamily: FONT_MONO, fontSize: 26, fontWeight: 600, color: accent, lineHeight: 1 }}>
                   v{v.versionLabel}
                 </Box>
-                <Badge color={accent} bg={v.isReleased ? T.prSoft : T.warnSoft} borderColor={v.isReleased ? T.prLine : T.warnLine}>
-                  {v.isReleased ? 'PUBLISHED' : 'WORKING'}
-                </Badge>
+                {(v.isReleased || isLatest) && (
+                  <Badge color={accent} bg={v.isReleased ? T.prSoft : T.warnSoft} borderColor={v.isReleased ? T.prLine : T.warnLine}>
+                    {v.isReleased ? 'PUBLISHED' : 'WORKING'}
+                  </Badge>
+                )}
               </Box>
 
               <Box sx={{ display: 'flex', alignItems: 'center', gap: '9px', mt: '16px', paddingTop: '15px', borderTop: `1px solid ${T.ln}` }}>

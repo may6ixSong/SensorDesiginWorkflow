@@ -712,9 +712,9 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
   // releaseSeq를 실제 release 수와 맞춰 둔다 — 다음 release가 v3부터 시작한다.
   await WorkflowModel.updateOne({ _id: workflowIds['wf1'] }, { $set: { releaseSeq: 2 } }).exec();
 
-  /* ── HPC Path(Tier C) 미리보기 mock ──
+  /* ── HPC Service(Tier C) 미리보기 mock ──
    * HPC망 서비스와의 실연동은 아직 구체화되지 않았다(설계서 04장 §6.4) — 그래서 "새
-   * Artifact 추가" 다이얼로그의 HPC Path 소스는 항상 선택 불가로 잠겨 있다. 그래도
+   * Artifact 추가" 다이얼로그의 HPC Service 소스는 항상 선택 불가로 잠겨 있다. 그래도
    * "이 옵션이 왜 있는지" 알 수 있도록, project code+revision으로 필터되는 가짜 경로
    * 몇 개만 미리보기용으로 심어 둔다 — 실제 매핑에는 절대 쓰이지 않는다. */
   await HpcPathMockModel.deleteMany({ isMock: true });

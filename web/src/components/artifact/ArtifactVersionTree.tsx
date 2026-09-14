@@ -115,13 +115,14 @@ export function ArtifactVersionTree({ versions, selected, onSelect, releaseBadge
                 <Box sx={{ fontFamily: FONT_MONO, fontSize: 13, fontWeight: 600, color: v.isReleased ? T.pr : T.warn }}>
                   v{v.versionLabel}
                 </Box>
-                <Badge
-                  color={v.isReleased ? T.pr : T.warn}
-                  bg={v.isReleased ? T.prSoft : T.warnSoft}
-                  borderColor={v.isReleased ? T.prLine : T.warnLine}
-                >
-                  {v.isReleased ? 'PUBLISHED' : 'WORKING'}
-                </Badge>
+                {/* "WORKING"은 가장 최신 버전(first)이 미발행일 때만 — 과거의 미발행
+                    버전까지 전부 WORKING으로 보이면 "지금 작업 중인 게 여러 개"처럼
+                    잘못 읽힌다(사용자 지적, ArtifactSlide의 generic 버전 목록과 같은 규칙). */}
+                {v.isReleased ? (
+                  <Badge color={T.pr} bg={T.prSoft} borderColor={T.prLine}>PUBLISHED</Badge>
+                ) : first ? (
+                  <Badge color={T.warn} bg={T.warnSoft} borderColor={T.warnLine}>WORKING</Badge>
+                ) : null}
                 {first && <Badge color={T.pr} bg={T.prSoft} borderColor={T.prLine}>LATEST</Badge>}
                 {relBadge && (
                   <Box
