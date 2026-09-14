@@ -2,7 +2,9 @@ import { useMemo, useState } from 'react';
 import { Box } from '@mui/material';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { AccessGrant, ArtifactVersionDto, BlockDto, ProjectDetailDto, ReleaseDto, isMaskedArtifact } from '@/types/domain';
+import {
+  AccessGrant, ArtifactVersionDto, BlockDto, ProjectDetailDto, ReleaseDto, WorkflowPhase, isMaskedArtifact,
+} from '@/types/domain';
 import { SlidePanel } from '@/components/common/SlidePanel';
 import { SirenButton, Badge } from '@/components/common/SirenButton';
 import { Card, Ey } from '@/components/common/Panel';
@@ -13,10 +15,13 @@ import { useDirectory } from '@/app/providers/DirectoryProvider';
 import { NewArtifactSourceInput, useLiveVersions } from '@/api/hooks/useBlocks';
 import { AccessGrantEditor } from '@/components/dialogs/AccessGrantEditor';
 import { ChangeArtifactDialog } from '@/components/dialogs/ChangeArtifactDialog';
-import { fmtAt } from '@/lib/canvasModel';
+import { CalypsoInlinePanel } from '@/components/artifact/CalypsoInlinePanel';
+import { fmtAt, isOrphanPhase } from '@/lib/canvasModel';
+import { shortDate } from '@/lib/schedule';
+import { releaseBadgeMap } from '@/lib/releaseBadge';
 import { CURSOR_POINTER, FONT_MONO, R, T, TIER_COLOR, TIER_LABEL, TNUM } from '@/theme/tokens';
 
-type Tab = 'versions' | 'recipients';
+type Tab = 'overview' | 'recipients';
 
 /** Published/Working 배지가 기본 Badge 크기(8px)로는 너무 작다는 지적(사용자) — 여기서만 키운다. */
 const STATUS_BADGE_SX = { fontSize: 10.5, padding: '2px 7px', fontWeight: 700 };
@@ -74,8 +79,11 @@ interface Props {
   /** 이 workflow의 Edit 권한 — recipient를 편집할 수 있는지의 기준이다. */
   own: boolean;
   project?: ProjectDetailDto;
-  /** ChangeArtifactDialog의 File Artifacts 피커가 Calypso 헤더에 실어 보낼 값. */
+  /** ChangeArtifactDialog의 File Artifacts 피커, 그리고 B Tier 인라인 패널이 Calypso
+   * 헤더에 실어 보낼 값. */
   myDepartments?: string[];
+  /** 이 workflow의 phase 목록 — Overview 탭의 Phase 카드(설계서 04장 §4.4 이전 표기 복원)에 쓴다. */
+  phases?: WorkflowPhase[];
   onClose: () => void;
   /** A Tier — block에 붙은 recipient를 교체한다. */
   onSaveBlockRecipients: (p: { editAccess: AccessGrant; viewAccess: AccessGrant }) => void;
@@ -105,11 +113,11 @@ interface Props {
  *   (설계서 04장 §4.3). 전자는 패널이 잠긴 상태, 후자는 열린 패널 안의 빈 목록이다.
  */
 export function ArtifactSlide({
-  block, own, project, myDepartments, onClose, onSaveBlockRecipients, onSaveArtifactAccess, saving, onDelete,
+  block, own, project, myDepartments, phases, onClose, onSaveBlockRecipients, onSaveArtifactAccess, saving, onDelete,
   onChangeArtifact, changingArtifact, releases, onOpenRelease,
 }: Props) {
   const { t } = useTranslation();
-  const [tab, setTab] = useState<Tab>('versions');
+  const [tab, setTab] = useState<Tab>('overview');
   const [changeOpen, setChangeOpen] = useState(false);
 
   /* ── A Tier 라이브 버전 조회 (설계서 04장 §19.5/§19.6 복원) ──
@@ -276,7 +284,7 @@ export function ArtifactSlide({
       {/* ── 탭 ── */}
       <Tabs
         tabs={[
-          { key: 'versions' as Tab, label: 'Versions', badge: effectiveVersions.length || undefined },
+          { key: 'overview' as Tab, label: 'Overview' },
           { key: 'recipients' as Tab, label: t('artifact.recipients') },
         ]}
         value={tab}
@@ -285,15 +293,20 @@ export function ArtifactSlide({
       />
 
       <TabPanel tabKey={tab}>
-        {tab === 'versions' && (
-          <VersionsTab
+        {tab === 'overview' && (
+          <OverviewTab
+            block={block}
+            phases={phases ?? []}
             versions={effectiveVersions}
+            isCalypsoB={artifact.tier === 'B' && artifact.serviceKey === 'calypso' && !!artifact.externalArtifactId}
             calypsoArtifactId={artifact.serviceKey === 'calypso' ? artifact.externalArtifactId : null}
             blockId={block.id}
             releases={releases ?? []}
             onOpenRelease={onOpenRelease}
             isLive={isHubLive}
             liveLoading={isHubLive && live.isLoading}
+            myDepartments={myDepartments ?? []}
+            departmentOptions={project?.departments ?? []}
           />
         )}
 
@@ -314,16 +327,24 @@ export function ArtifactSlide({
 }
 
 /**
- * 버전 목록.
+ * Overview — 위쪽 배지 줄(tier/발행 상태/service id/Change source, 지금 그대로) 아래로,
+ * 이 workflow의 phase와 버전 트리를 보여준다(사용자 요청 — 개편 전 slide 형태 복원).
  *
  * ★ 권한이 없어서 안 보이는 것과 **아직 publish된 버전이 없는 것**은 완전히 다른 화면이다.
  *   여기 도달했다는 것은 이미 열람 권한이 있다는 뜻이므로, 비어 있으면 "아직 없음"이다.
  * ★ 미발행(working) 버전은 giver에게만 응답에 담겨 온다 — FE가 거르는 게 아니다.
+ * ★ File Artifacts(B Tier, Calypso)는 이 generic 버전 목록 대신 CalypsoInlinePanel을
+ *   그린다 — SIREN 쪽 artifact.versions는 Calypso 산출물에 대해서는 채워지지 않아서
+ *   (라이브 조회 대상이 아니다) 늘 비어 있고, 실제 파일·버전은 Calypso 쪽에 있다.
  */
-function VersionsTab({
-  versions, calypsoArtifactId, blockId, releases, onOpenRelease, isLive, liveLoading,
+function OverviewTab({
+  block, phases, versions, isCalypsoB, calypsoArtifactId, blockId, releases, onOpenRelease, isLive, liveLoading,
+  myDepartments, departmentOptions,
 }: {
+  block: BlockDto;
+  phases: WorkflowPhase[];
   versions: ArtifactVersionDto[];
+  isCalypsoB: boolean;
   /** Calypso 산출물이면 값이 있다 — "Open"이 외부 viewUrl(예전 calypso/web, 폐기됨) 대신
    * SIREN 안의 /artifacts/:id로 가야 한다(사용자 지적). */
   calypsoArtifactId: string | null;
@@ -334,28 +355,92 @@ function VersionsTab({
    * 라이브 응답이라는 뜻이다(설계서 04장 §19.5/§19.6). */
   isLive?: boolean;
   liveLoading?: boolean;
+  myDepartments: string[];
+  departmentOptions: string[];
+}) {
+  const phase = phases.find((p) => p.id === block.phaseId);
+  const orphan = isOrphanPhase(phases, block.phaseId);
+
+  return (
+    <>
+      <PhaseCard phase={phase} orphan={orphan} />
+
+      {isCalypsoB && calypsoArtifactId ? (
+        <CalypsoInlinePanel
+          artifactId={calypsoArtifactId}
+          blockId={blockId}
+          myDepartments={myDepartments}
+          allDepartments={departmentOptions}
+          releases={releases}
+          onOpenRelease={onOpenRelease}
+        />
+      ) : (
+        <VersionList
+          versions={versions}
+          calypsoArtifactId={calypsoArtifactId}
+          blockId={blockId}
+          releases={releases}
+          onOpenRelease={onOpenRelease}
+          isLive={isLive}
+          liveLoading={liveLoading}
+        />
+      )}
+    </>
+  );
+}
+
+/** Phase 카드 — 개편 전 산출물 상세 머리에 있던 "이 산출물이 어느 phase에 있는지"를
+ * Overview 본문으로 옮겨 복원한다. 지금 모델에서 block은 phase 하나에만 걸린다. */
+function PhaseCard({ phase, orphan }: { phase: WorkflowPhase | undefined; orphan: boolean }) {
+  return (
+    <Card sx={{ mb: '12px' }}>
+      <Ey sx={{ mb: '8px' }}>Phase</Ey>
+      {orphan && (
+        <Box
+          sx={{
+            display: 'flex', alignItems: 'flex-start', gap: '7px', fontSize: 11.5, color: T.danger,
+            background: T.dangerSoft, border: `1px solid ${T.dangerLine}`, borderRadius: '8px',
+            padding: '8px 10px', mb: '8px', lineHeight: 1.6,
+          }}
+        >
+          <Box component="span" sx={{ mt: '1px' }}><Icon name="warn" size={12} /></Box>
+          The phase this artifact was on no longer exists in this workflow's schedule.
+        </Box>
+      )}
+      {phase ? (
+        <Box sx={{ display: 'flex', alignItems: 'baseline', gap: '9px', flexWrap: 'wrap' }}>
+          <Box sx={{ fontSize: 13, fontWeight: 600 }}>{phase.name}</Box>
+          <Box sx={{ fontFamily: FONT_MONO, fontSize: 11.5, color: T.dm2, ...TNUM }}>
+            {shortDate(phase.start)} → {shortDate(phase.end)}
+          </Box>
+        </Box>
+      ) : (
+        <Box sx={{ fontSize: 12.5, color: T.dm2 }}>No release schedule</Box>
+      )}
+    </Card>
+  );
+}
+
+/**
+ * 버전 목록 — 개편 전 3D perspective 카드 스타일(설계서 이전 slide 형태)로 복원하되,
+ * 각 카드 안의 데이터(발행/저장 user·날짜, published 여부, 이 workflow에서의 release 여부)는
+ * 지금 그대로 유지한다(사용자 요청).
+ */
+function VersionList({
+  versions, calypsoArtifactId, blockId, releases, onOpenRelease, isLive, liveLoading,
+}: {
+  versions: ArtifactVersionDto[];
+  calypsoArtifactId: string | null;
+  blockId: string;
+  releases: ReleaseDto[];
+  onOpenRelease?: (releaseId: string) => void;
+  isLive?: boolean;
+  liveLoading?: boolean;
 }) {
   const { t } = useTranslation();
   const { resolveUser } = useDirectory();
 
-  /**
-   * versionLabel → 이 block이 그 버전으로 **처음** 나갔던 release 하나(설계서 05장 §7.3).
-   * release는 매번 모든 artifact의 현재 published 스냅샷을 담으므로, 버전이 안 바뀐 채
-   * 여러 release에 계속 실리면 이후 release에도 같은 versionLabel이 찍혀서 온다 — 하지만
-   * 그건 "그 시점에 새로 감지된" 게 아니라 직전 release와 동일한 값이 반복된 것뿐이므로
-   * 배지도 하나만, 처음 나간 release에만 붙인다(사용자 지적).
-   */
-  const releasesByVersion = useMemo(() => {
-    const map = new Map<string, { id: string; label: string }>();
-    const sorted = [...releases].sort((a, b) => a.seq - b.seq);
-    for (const r of sorted) {
-      const item = r.items.find((i) => i.blockId === blockId);
-      if (!item || item.masked || !item.published) continue;
-      if (map.has(item.published.versionLabel)) continue;
-      map.set(item.published.versionLabel, { id: r.id, label: r.label });
-    }
-    return map;
-  }, [releases, blockId]);
+  const releasesByVersion = useMemo(() => releaseBadgeMap(releases, blockId), [releases, blockId]);
 
   if (liveLoading) {
     return (
@@ -374,9 +459,9 @@ function VersionsTab({
   }
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+    <Box sx={{ perspective: '1000px' }}>
       {isLive && (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: 11, color: T.dm2, mb: '2px' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: 11, color: T.dm2, mb: '8px' }}>
           <Box sx={{ width: 6, height: 6, borderRadius: '50%', background: T.ok, flexShrink: 0 }} />
           Live from the owning service
         </Box>
@@ -386,7 +471,14 @@ function VersionsTab({
         const at = v.publishedAt ?? v.observedAt ?? v.createdAt;
         const relBadge = releasesByVersion.get(v.versionLabel);
         return (
-          <Card key={`${v.versionLabel}:${i}`} sx={{ padding: '11px 13px' }}>
+          <Card
+            key={`${v.versionLabel}:${i}`}
+            sx={{
+              padding: '11px 13px', mb: '8px', transformStyle: 'preserve-3d',
+              transition: 'transform .2s, box-shadow .2s',
+              '&:hover': { transform: 'translateZ(20px) rotateX(3deg)', boxShadow: T.shMd, zIndex: 2 },
+            }}
+          >
             <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               <Box sx={{ fontFamily: FONT_MONO, fontSize: 13, fontWeight: 600, ...TNUM }}>
                 {v.versionLabel}

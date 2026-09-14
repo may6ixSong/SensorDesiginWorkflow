@@ -64,7 +64,7 @@ export function ArtifactVersionContents({
                   v{v.versionLabel}
                 </Box>
                 <Badge color={accent} bg={v.isReleased ? T.prSoft : T.warnSoft} borderColor={v.isReleased ? T.prLine : T.warnLine}>
-                  {v.isReleased ? 'RELEASE' : 'WORKING'}
+                  {v.isReleased ? 'PUBLISHED' : 'WORKING'}
                 </Badge>
               </Box>
 
@@ -156,7 +156,7 @@ export function ArtifactVersionContents({
                 onClick={() => onRelease(note)}
                 sx={{ color: T.pr, borderColor: T.prLine }}
               >
-                <Icon name="send" /> Release latest
+                <Icon name="send" /> Publish latest
               </SirenButton>
             </Box>
           </Box>

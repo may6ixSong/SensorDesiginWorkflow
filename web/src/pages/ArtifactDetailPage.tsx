@@ -64,8 +64,8 @@ export function ArtifactDetailPage() {
   });
   const release = useMutation({
     mutationFn: (note: string) => releaseCalypsoArtifact(id, note),
-    onSuccess: () => { invalidate(); toast('Released'); },
-    onError: (e: any) => toast(e?.response?.data?.message ?? 'Release failed'),
+    onSuccess: () => { invalidate(); toast('Published'); },
+    onError: (e: any) => toast(e?.response?.data?.message ?? 'Publish failed'),
   });
   const addEditor = useMutation({
     mutationFn: (g: CalypsoGrantInput) => addCalypsoEditor(id, g),

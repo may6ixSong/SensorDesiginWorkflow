@@ -249,6 +249,7 @@ export function BoardPage() {
               own={canEdit}
               project={project}
               myDepartments={myDepartments}
+              phases={phaseList}
               onClose={closeSlide}
               onChangeArtifact={(newArtifact) =>
                 updateBlock.mutate(

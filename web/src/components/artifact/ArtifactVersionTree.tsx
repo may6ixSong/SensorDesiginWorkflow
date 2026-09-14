@@ -2,7 +2,8 @@ import { Box } from '@mui/material';
 import { CalypsoVersionView } from '@/api/calypsoClient';
 import { useDirectory } from '@/app/providers/DirectoryProvider';
 import { Badge } from '@/components/common/SirenButton';
-import { CURSOR_POINTER, FONT_MONO, T } from '@/theme/tokens';
+import { CURSOR_POINTER, FONT_MONO, R, T } from '@/theme/tokens';
+import { ReleaseBadge } from '@/lib/releaseBadge';
 
 const RAIL_W = 44;
 const TRUNK_X = 11;
@@ -13,6 +14,14 @@ interface Props {
   versions: CalypsoVersionView[];
   selected?: CalypsoVersionView | null;
   onSelect?: (v: CalypsoVersionView) => void;
+  /**
+   * 이 버전이 어느 workflow release로 처음 나갔는지 — 산출물 상세 슬라이드가 자기가
+   * 열려 있는 그 workflow 기준으로 붙여준다(설계서 05장 §7.3와 같은 규칙,
+   * lib/releaseBadge 공유). 독립 Artifact 상세 페이지는 특정 workflow에 매인 화면이
+   * 아니라 이 값을 안 줄 수 있다 — 그러면 배지를 그리지 않는다.
+   */
+  releaseBadgeFor?: (v: CalypsoVersionView) => ReleaseBadge | undefined;
+  onOpenRelease?: (releaseId: string) => void;
 }
 
 function fmtAt(iso: string): string {
@@ -28,7 +37,7 @@ function fmtAt(iso: string): string {
  * 같은 줄기/가지 언어를 쓴다(release=줄기, working=가지). 버전 모양이 달라서
  * (major.minor + 실제 파일 vs tier/giver) 컴포넌트 자체는 분리했다.
  */
-export function ArtifactVersionTree({ versions, selected, onSelect }: Props) {
+export function ArtifactVersionTree({ versions, selected, onSelect, releaseBadgeFor, onOpenRelease }: Props) {
   const { resolveUser } = useDirectory();
 
   if (!versions.length) {
@@ -51,6 +60,7 @@ export function ArtifactVersionTree({ versions, selected, onSelect }: Props) {
         const last = i === versions.length - 1;
         const isSel = selected?.versionRef === v.versionRef;
         const by = resolveUser(v.createdBy);
+        const relBadge = releaseBadgeFor?.(v);
 
         return (
           <Box key={v.versionRef} sx={{ display: 'flex', gap: '10px' }}>
@@ -110,9 +120,24 @@ export function ArtifactVersionTree({ versions, selected, onSelect }: Props) {
                   bg={v.isReleased ? T.prSoft : T.warnSoft}
                   borderColor={v.isReleased ? T.prLine : T.warnLine}
                 >
-                  {v.isReleased ? 'RELEASE' : 'WORKING'}
+                  {v.isReleased ? 'PUBLISHED' : 'WORKING'}
                 </Badge>
                 {first && <Badge color={T.pr} bg={T.prSoft} borderColor={T.prLine}>LATEST</Badge>}
+                {relBadge && (
+                  <Box
+                    component={onOpenRelease ? 'button' : 'span'}
+                    onClick={onOpenRelease ? () => onOpenRelease(relBadge.id) : undefined}
+                    title="First went out in this workflow's release"
+                    sx={{
+                      fontFamily: FONT_MONO, fontSize: 10, fontWeight: 700,
+                      padding: '2px 6px', borderRadius: `${R.xs}px`,
+                      background: T.prSoft, color: T.pr, border: `1px solid ${T.prLine}`,
+                      ...(onOpenRelease && { cursor: CURSOR_POINTER, '&:hover': { background: T.prLine } }),
+                    }}
+                  >
+                    {relBadge.label}
+                  </Box>
+                )}
               </Box>
               {v.note && <Box sx={{ fontSize: 12, color: T.tx, mt: '5px', lineHeight: 1.5 }}>{v.note}</Box>}
               <Box sx={{ fontFamily: FONT_MONO, fontSize: 10, color: T.dm2, mt: '5px' }}>
