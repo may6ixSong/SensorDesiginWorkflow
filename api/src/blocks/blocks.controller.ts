@@ -82,6 +82,23 @@ export class BlocksController {
     return this.canvasView.liveVersions(blockId, project, me);
   }
 
+  /**
+   * 한 버전의 html preview(설계서 04장 §19 확장). B Tier의 upload/download 자리를 A/C
+   * Tier에서는 이걸로 대신한다 — slide가 latest version으로 최초 1번, 이후 사용자가 다른
+   * (hasHtmlView인) 버전을 고를 때마다 호출한다.
+   */
+  @Get('workflows/:workflowId/blocks/:blockId/html-view')
+  @WorkflowAccess('view')
+  async htmlView(
+    @Param('blockId') blockId: string,
+    @Query('versionLabel') versionLabel: string,
+    @CurrentProject() project: ProjectDocument,
+    @CurrentActor() me: Actor,
+  ) {
+    if (!versionLabel) throw new BadRequestException('versionLabel is required.');
+    return this.canvasView.htmlView(blockId, versionLabel, project, me);
+  }
+
   @Post('workflows/:workflowId/blocks')
   @WorkflowAccess('edit')
   async create(

@@ -97,6 +97,15 @@ export class ArtifactVersion {
   @Prop({ type: Date, default: null })
   observedAt: Date | null;
 
+  /**
+   * 이 버전을 실제로 그 서비스에 물어보면 html preview를 내려주는가 — observer 계약의
+   * `/artifacts/:id/html-view`가 이 버전에 대해 뭔가 있다고 알려온 것을 그대로 캐리한다
+   * (설계서 04장 §19 확장). A/C Tier 슬라이드가 이 값으로 "이 버전은 클릭 가능/하이라이트
+   * 대상인가"를 판정한다 — 값이 없으면(false) 그냥 예전처럼 아무것도 안 보여준다.
+   */
+  @Prop({ default: false })
+  hasHtmlView: boolean;
+
   @Prop({ type: Date, default: null })
   publishedAt: Date | null;
 

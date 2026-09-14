@@ -41,6 +41,22 @@ function fakeVersionRecord() {
     viewUrl: null,
     sourceRefs: [] as unknown[],
     observedAt: '2026-08-14T09:00:00Z',
+    hasHtmlView: true,
+  };
+}
+
+/** html-view 계약을 구현하는 가짜 서비스라면 이런 걸 돌려줄 거라는 자리표시자. */
+function fakeHtmlView(artifactName: string, versionLabel: string) {
+  return {
+    html: `<!doctype html><html><body style="margin:0;height:100vh;display:flex;align-items:center;justify-content:center;background:#0f172a;color:#e2e8f0;font-family:-apple-system,Segoe UI,sans-serif;">
+<div style="text-align:center;">
+<div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;opacity:.55;">${artifactName}</div>
+<div style="font-size:30px;font-weight:700;margin-top:10px;">${versionLabel}</div>
+<div style="font-size:12px;opacity:.45;margin-top:8px;">mock html preview — observer contract §19</div>
+</div>
+</body></html>`,
+    width: 960,
+    height: 540,
   };
 }
 
@@ -106,7 +122,11 @@ export class MockObserverController {
     }));
   }
 
-  /** 외부 계약 모양으로 되돌린다 — 계약의 필드명은 `isReleased`다(설계서 04장 §8). */
+  /**
+   * 외부 계약 모양으로 되돌린다 — 계약의 필드명은 `isReleased`다(설계서 04장 §8).
+   * hasHtmlView는 실제 서비스 판정 자리표시자로, publish된 버전에만 있다고 가정한다
+   * (아직 작업중인 버전엔 official한 html이 없다는 게 자연스러운 규칙이라).
+   */
   private toRecord(v: {
     versionLabel: string;
     isPublished: boolean;
@@ -123,6 +143,7 @@ export class MockObserverController {
       viewUrl: v.viewUrl,
       sourceRefs: [],
       observedAt: v.observedAt ? new Date(v.observedAt).toISOString() : null,
+      hasHtmlView: v.isPublished,
     };
   }
 
@@ -163,5 +184,29 @@ export class MockObserverController {
     return (artifact.versions ?? [])
       .filter((v) => canEdit || v.isPublished)
       .map((v) => this.toRecord(v));
+  }
+
+  /**
+   * 계약 §/artifacts/:id/html-view — 선택 구현(설계서 04장 §19 확장). 실제 서비스라면
+   * 자기 렌더러가 만든 html+canvas 크기를 주겠지만, 여기선 published 버전에 한해 자리표시자
+   * 하나를 만들어 준다 — toRecord의 hasHtmlView 규칙과 반드시 같은 조건이어야 한다.
+   */
+  @Get('artifacts/:id/html-view')
+  async htmlView(
+    @Param('id') id: string,
+    @Query('versionLabel') versionLabel: string,
+    @Query('knoxId') knoxId: string,
+  ) {
+    const artifact = await this.find(id);
+    if (!artifact) {
+      if (!this.isFakeId(id)) return null;
+      return this.fakeAccess(id, knoxId).canView && versionLabel === fakeVersionRecord().versionLabel
+        ? fakeHtmlView('Fake candidate', versionLabel)
+        : null;
+    }
+    const canEdit = artifact.createdBy === knoxId;
+    const v = (artifact.versions ?? []).find((x) => x.versionLabel === versionLabel && (canEdit || x.isPublished));
+    if (!v || !v.isPublished) return null;
+    return fakeHtmlView(artifact.name, v.versionLabel);
   }
 }

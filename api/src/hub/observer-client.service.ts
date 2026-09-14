@@ -22,6 +22,15 @@ export interface ObserverVersionRecord {
     capturedAt?: string;
   }>;
   observedAt: string | null;
+  /** 선택 필드 — 이 버전을 html-view로도 열람할 수 있으면 true. 안 주면 false로 다룬다. */
+  hasHtmlView?: boolean;
+}
+
+/** 계약의 `/artifacts/:id/html-view` 응답. */
+export interface ObserverHtmlView {
+  html: string;
+  width: number;
+  height: number;
 }
 
 /**
@@ -165,7 +174,30 @@ export class ObserverClientService {
       observedAt: record.observedAt ? new Date(record.observedAt) : new Date(),
       publishedAt: record.isReleased && record.observedAt ? new Date(record.observedAt) : null,
       createdAt: new Date(),
+      hasHtmlView: record.hasHtmlView === true,
     };
+  }
+
+  /**
+   * 계약의 `/artifacts/:id/html-view?versionLabel=` (선택 구현) — A/C Tier 슬라이드가 B
+   * Tier의 upload/download 자리 대신 그리는 html preview. 서비스가 이 라우트를 몰라도
+   * (404/에러) 계약 위반이 아니다 — 그냥 null로 돌아가고 슬라이드는 아무것도 안 그린다.
+   */
+  async htmlView(
+    svc: ArtifactServiceDocument,
+    externalArtifactId: string,
+    versionLabel: string,
+    knoxId: string,
+    isAdmin: boolean,
+  ): Promise<ObserverHtmlView | null> {
+    if (!this.callable(svc)) return null;
+    const url = `${svc.baseUrl}/artifacts/${encodeURIComponent(externalArtifactId)}/html-view?versionLabel=${encodeURIComponent(versionLabel)}&knoxId=${encodeURIComponent(knoxId)}${this.adminParam(isAdmin)}`;
+    const data = await this.getJson(url);
+    if (!data || typeof data.html !== 'string' || !data.html) return null;
+    const width = Number(data.width);
+    const height = Number(data.height);
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return null;
+    return { html: data.html, width, height };
   }
 
   /**

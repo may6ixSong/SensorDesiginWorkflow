@@ -13,7 +13,7 @@ import { isServiceGovernedTier } from '../common/constants/tier';
 import { ArtifactDocument, ArtifactVersion } from './schemas/artifact.schema';
 import { ArtifactVersionDto, toVersionDtoList } from './dto/artifact.dto';
 import { HubService } from '../hub/hub.service';
-import { ObserverClientService } from '../hub/observer-client.service';
+import { ObserverClientService, ObserverHtmlView } from '../hub/observer-client.service';
 
 /**
  * 산출물 상세(slide) 열람 판정 (설계서 01장 §4.2, 04장 §4).
@@ -155,6 +155,34 @@ export class ArtifactAccessService {
         `A-tier live-versions failed for ${serviceKey}/${externalArtifactId} — ${(e as Error).message}`,
       );
       return [];
+    }
+  }
+
+  /**
+   * 이 버전의 html preview(설계서 04장 §19 확장 — B Tier의 upload/download 자리를 A/C
+   * Tier에서는 이걸로 대신한다). **tier로 게이트하지 않는다** — `isServiceGovernedTier`는
+   * 권한을 누가 판정하느냐의 축이고, html-view는 "이 산출물에 물어볼 서비스가 있느냐"라는
+   * 별개 축이다. 그래서 serviceKey/externalArtifactId만 있으면 어떤 tier든 시도한다 — 지금은
+   * A만 그 값을 채우지만, C가 나중에 실제 서비스와 연동되면 코드 변경 없이 그대로 동작한다.
+   * 서비스가 이 라우트를 모르거나 실패하면 null — 호출부는 "이전처럼 아무것도 안 보여준다."
+   */
+  async htmlView(
+    actor: Actor,
+    artifact: { serviceKey?: string | null; externalArtifactId?: string | null },
+    level: AccessLevel,
+    versionLabel: string,
+  ): Promise<ObserverHtmlView | null> {
+    if (level === null) return null;
+    const { serviceKey, externalArtifactId } = artifact;
+    if (!serviceKey || !externalArtifactId) return null;
+    try {
+      const svc = await this.hub.findByKeyOrThrow(serviceKey);
+      return await this.observer.htmlView(svc, externalArtifactId, versionLabel, actor.knoxId, this.isAdminVisible(actor));
+    } catch (e) {
+      this.logger.warn(
+        `html-view failed for ${serviceKey}/${externalArtifactId}@${versionLabel} — ${(e as Error).message}`,
+      );
+      return null;
     }
   }
 

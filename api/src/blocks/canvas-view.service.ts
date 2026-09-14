@@ -96,6 +96,21 @@ export class CanvasViewService {
     return this.artifactAccess.liveVersions(actor, artifact, level);
   }
 
+  /**
+   * html preview 하나(설계서 04장 §19 확장) — slide가 열려 있는 동안, 지금 보고 있는(또는
+   * 방금 고른) 버전 하나에 대해서만 호출된다. liveVersions와 같은 이유로 캔버스 조립에는
+   * 절대 섞이지 않는다.
+   */
+  async htmlView(blockId: string, versionLabel: string, project: ProjectDocument | null, actor: Actor) {
+    const block = await this.blocks.findOrThrow(blockId);
+    const artifact = block.artifactId
+      ? await this.artifacts.findOrThrow(block.artifactId.toString())
+      : null;
+    if (!artifact) return null;
+    const level = await this.artifactAccess.assertCanOpen(actor, artifact, block, project);
+    return this.artifactAccess.htmlView(actor, artifact, level, versionLabel);
+  }
+
   /** 블록 하나만 다시 조립한다 — 생성/수정 응답용. */
   async assembleOne(
     block: BlockDocument,

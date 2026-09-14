@@ -160,6 +160,14 @@ export interface ArtifactVersionDto {
   publishedAt: string | null;
   observedAt: string | null;
   createdAt: string;
+  /** 이 버전에 html preview가 있는가 — Overview의 버전 히스토리에서 클릭 가능/하이라이트 판정. */
+  hasHtmlView: boolean;
+}
+
+export interface ArtifactHtmlView {
+  html: string;
+  width: number;
+  height: number;
 }
 
 /** 열람 권한이 없는 산출물 — 존재만 알리고 버전·링크·경로는 응답에서 빠진다. */

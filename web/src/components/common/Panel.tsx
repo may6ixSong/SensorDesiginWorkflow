@@ -3,9 +3,12 @@ import { Box } from '@mui/material';
 import { CURSOR_POINTER, FONT_MONO, T } from '@/theme/tokens';
 
 /** 목업 .card */
-export function Card({ children, sx }: { children: ReactNode; sx?: object }) {
+export function Card({ children, sx, onClick }: { children: ReactNode; sx?: object; onClick?: () => void }) {
   return (
-    <Box sx={{ background: T.sf, border: `1px solid ${T.ln}`, borderRadius: '10px', padding: '13px', ...sx }}>
+    <Box
+      onClick={onClick}
+      sx={{ background: T.sf, border: `1px solid ${T.ln}`, borderRadius: '10px', padding: '13px', ...sx }}
+    >
       {children}
     </Box>
   );

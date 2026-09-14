@@ -11,6 +11,9 @@ export const queryKeys = {
   /** A Tier(Calypso 제외 Hub 등록 서비스)의 라이브 버전 조회 — slide를 열었을 때만 쓴다. */
   liveVersions: (workflowId: string, blockId: string) =>
     ['workflows', workflowId, 'blocks', blockId, 'live-versions'] as const,
+  /** 한 버전의 html preview(A/C Tier, B의 upload/download 자리를 대신한다). */
+  htmlView: (workflowId: string, blockId: string, versionLabel: string) =>
+    ['workflows', workflowId, 'blocks', blockId, 'html-view', versionLabel] as const,
   memos: (workflowId: string) => ['workflows', workflowId, 'memos'] as const,
   edges: (workflowId: string) => ['workflows', workflowId, 'edges'] as const,
 

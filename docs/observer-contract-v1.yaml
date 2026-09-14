@@ -85,6 +85,48 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /artifacts/{artifactId}/html-view:
+    get:
+      tags: [artifacts]
+      summary: 한 버전의 html preview (선택 구현)
+      description: |
+        SIREN이 B Tier(File Artifacts)의 upload/download 화면 자리에, A/C Tier에서는
+        이걸로 대신 보여준다. 슬라이드를 열면 latest version에 대해 한 번, 이후 사용자가
+        `hasHtmlView: true`로 표시된 다른 버전을 고를 때마다 호출한다.
+
+        구현하지 않아도 계약 위반은 아니다 - 이 라우트가 없거나(404) `versionLabel`에 해당하는
+        preview가 없으면 SIREN은 그 버전을 그냥 클릭 불가/하이라이트 대상에서 뺀다(html도
+        전혀 그리지 않는다).
+
+        **SIREN은 이 응답을 항상 sandbox iframe(`srcdoc`, `allow-scripts`만, `allow-same-origin`
+        없음)에 렌더한다** - 반환하는 html에 서비스 자신의 세션 쿠키나 SIREN의 인증 정보가
+        섞여 들어가지 않게 할 것. 같은 이유로 SIREN도 이 html을 자기 origin에 직접 주입하지
+        않는다.
+      operationId: getHtmlView
+      parameters:
+        - $ref: '#/components/parameters/ArtifactId'
+        - name: versionLabel
+          in: query
+          required: true
+          description: VersionRecord.versionLabel과 같은 값.
+          schema: { type: string }
+      responses:
+        '200':
+          description: html + 그 html이 설계된 캔버스 크기. SIREN은 width를 상한선 안에서만 쓰고 비율을 유지해 줄인다.
+          headers:
+            X-Observer-Contract:
+              $ref: '#/components/headers/ContractVersion'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HtmlView'
+        '404':
+          description: 그 버전엔 preview가 없다 (또는 이 엔드포인트 자체를 구현하지 않음)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /artifacts:
     get:
       tags: [artifacts]
@@ -226,6 +268,13 @@ components:
           type: string
           nullable: true
           description: 그 서비스의 산출물 상세 페이지. SIREN은 이 링크로 내보낸다.
+        hasHtmlView:
+          type: boolean
+          default: false
+          description: |
+            이 버전을 `/artifacts/{artifactId}/html-view`로 열람할 수 있는가(선택 필드,
+            안 주면 false). SIREN 슬라이드가 이 값으로 그 버전 카드를 클릭 가능/하이라이트
+            대상으로 표시할지 정한다 - 실제 html은 그 버전을 고른 시점에 따로 요청한다.
 
     SourceRef:
       type: object
@@ -310,6 +359,23 @@ components:
         name: { type: string, example: 'ML3' }
         start: { type: string, format: date }
         end: { type: string, format: date }
+
+    HtmlView:
+      type: object
+      required: [html, width, height]
+      properties:
+        html:
+          type: string
+          description: |
+            완결된 html 문서(또는 문서로 취급해도 되는 조각). SIREN은 이걸 sandbox iframe에
+            `srcdoc`으로 그대로 꽂는다 - script는 돌아가지만 부모 페이지(SIREN)의 쿠키·DOM에는
+            닿지 않는다.
+        width:
+          type: integer
+          description: 이 html이 설계된 캔버스 폭(px). SIREN은 자기 쪽 상한선 안에서 이 값과 height의 비율을 유지해 줄인다.
+        height:
+          type: integer
+          description: 이 html이 설계된 캔버스 높이(px).
 
     Error:
       type: object

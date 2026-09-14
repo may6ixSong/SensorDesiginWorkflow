@@ -25,6 +25,8 @@ export interface ArtifactVersionDto {
   publishedAt: Date | null;
   observedAt: Date | null;
   createdAt: Date;
+  /** 이 버전에 html preview가 있는가 — 슬라이드의 클릭 가능/하이라이트 판정에 쓴다. */
+  hasHtmlView: boolean;
 }
 
 export interface ArtifactDto {
@@ -72,6 +74,7 @@ export function toVersionDto(v: ArtifactVersion): ArtifactVersionDto {
     publishedAt: v.publishedAt ?? null,
     observedAt: v.observedAt ?? null,
     createdAt: v.createdAt,
+    hasHtmlView: v.hasHtmlView === true,
   };
 }
 

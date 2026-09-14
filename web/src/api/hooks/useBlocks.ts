@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
 import { queryKeys } from '../queryKeys';
-import { AccessGrant, ArtifactIntent, ArtifactVersionDto, BlockDto } from '@/types/domain';
+import { AccessGrant, ArtifactHtmlView, ArtifactIntent, ArtifactVersionDto, BlockDto } from '@/types/domain';
 
 /**
  * artifactId(재사용) 대신 넘기면 서버가 그 자리에서 출처를 확정한다(find-or-create,
@@ -49,6 +49,33 @@ export function useLiveVersions(workflowId: string | undefined, blockId: string 
     queryFn: async () => {
       const res = await apiClient.get<ArtifactVersionDto[]>(
         `/workflows/${workflowId}/blocks/${blockId}/live-versions`,
+      );
+      return res.data;
+    },
+  });
+}
+
+/**
+ * 한 버전의 html preview(설계서 04장 §19 확장) — B Tier의 upload/download 화면 자리를
+ * A/C Tier에서는 이걸로 대신한다. `enabled`는 그 버전이 `hasHtmlView`일 때만 켠다 —
+ * 그렇지 않은 버전은 애초에 클릭도 안 되므로 이 훅에 닿지 않는다.
+ *
+ * ★ 서비스가 이 라우트를 구현하지 않았거나 실패하면 SIREN 백엔드가 null을 준다 — 그러면
+ *   훅도 null을 그대로 돌려주고, 호출부는 "이전처럼 아무것도 안 그린다"로 처리한다.
+ */
+export function useHtmlView(
+  workflowId: string | undefined,
+  blockId: string | undefined,
+  versionLabel: string | undefined,
+  enabled: boolean,
+) {
+  return useQuery({
+    queryKey: queryKeys.htmlView(workflowId ?? '', blockId ?? '', versionLabel ?? ''),
+    enabled: Boolean(workflowId) && Boolean(blockId) && Boolean(versionLabel) && enabled,
+    queryFn: async () => {
+      const res = await apiClient.get<ArtifactHtmlView | null>(
+        `/workflows/${workflowId}/blocks/${blockId}/html-view`,
+        { params: { versionLabel } },
       );
       return res.data;
     },

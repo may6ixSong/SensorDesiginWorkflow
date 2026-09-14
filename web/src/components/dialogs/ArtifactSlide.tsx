@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Box } from '@mui/material';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
-  AccessGrant, ArtifactVersionDto, BlockDto, ProjectDetailDto, ReleaseDto, WorkflowPhase, isMaskedArtifact,
+  AccessGrant, ArtifactHtmlView, ArtifactVersionDto, BlockDto, ProjectDetailDto, ReleaseDto, WorkflowPhase,
+  isMaskedArtifact,
 } from '@/types/domain';
 import { SlidePanel } from '@/components/common/SlidePanel';
 import { SirenButton, Badge } from '@/components/common/SirenButton';
@@ -12,14 +13,20 @@ import { TabPanel, Tabs } from '@/components/common/Tabs';
 import { Icon, IconName } from '@/components/common/Icon';
 import { UserAvatar } from '@/components/common/Avatar';
 import { useDirectory } from '@/app/providers/DirectoryProvider';
-import { NewArtifactSourceInput, useLiveVersions } from '@/api/hooks/useBlocks';
+import { NewArtifactSourceInput, useHtmlView, useLiveVersions } from '@/api/hooks/useBlocks';
 import { AccessGrantEditor } from '@/components/dialogs/AccessGrantEditor';
 import { ChangeArtifactDialog } from '@/components/dialogs/ChangeArtifactDialog';
 import { CalypsoInlinePanel } from '@/components/artifact/CalypsoInlinePanel';
+import { HtmlViewPanel } from '@/components/artifact/HtmlViewPanel';
 import { fmtAt, isOrphanPhase } from '@/lib/canvasModel';
 import { shortDate } from '@/lib/schedule';
 import { releaseBadgeMap } from '@/lib/releaseBadge';
+import { toast } from '@/store/toastStore';
 import { CURSOR_POINTER, FONT_MONO, R, T, TIER_COLOR, TIER_LABEL, TNUM } from '@/theme/tokens';
+
+/** Overview에서 html preview를 함께 그릴 때 왼쪽(B) 칸의 실제 폭 — 900px 패널 - 좌우 여백
+ * - 두 칸 사이 gap을 뺀 2/3. CalypsoInlinePanel의 왼쪽 칸과 같은 폭으로 맞춘다. */
+const HTML_VIEW_MAX_WIDTH = 560;
 
 type Tab = 'overview' | 'recipients';
 
@@ -119,6 +126,10 @@ export function ArtifactSlide({
   const { t } = useTranslation();
   const [tab, setTab] = useState<Tab>('overview');
   const [changeOpen, setChangeOpen] = useState(false);
+  /** 사용자가 Version history에서 다른 (hasHtmlView인) 버전을 직접 골랐으면 그 라벨 —
+   * 안 골랐으면 undefined이고, 그러면 latest 버전을 요청한다(사용자 요청: 최초 open시
+   * latest로 html 요청). */
+  const [selectedVersionLabel, setSelectedVersionLabel] = useState<string | undefined>(undefined);
 
   /* ── A Tier 라이브 버전 조회 (설계서 04장 §19.5/§19.6 복원) ──
      Calypso 제외 Hub 등록 서비스에 연동된 A Tier만 대상이다 — 이런 산출물의
@@ -126,14 +137,26 @@ export function ArtifactSlide({
      없다. block이 아직 없거나(early return 전) masked/미매핑이어도 훅은 早期 return 전에
      불러야 하므로(Hooks 규칙) 안전하게 optional chaining으로 판정한다. */
   const artifactForHook = block?.artifact;
+  const safeArtifactForHook = artifactForHook && !isMaskedArtifact(artifactForHook) ? artifactForHook : null;
   const isHubLive =
-    !!artifactForHook &&
-    !isMaskedArtifact(artifactForHook) &&
-    artifactForHook.tier === 'A' &&
-    !!artifactForHook.serviceKey &&
-    artifactForHook.serviceKey !== 'calypso' &&
-    !!artifactForHook.externalArtifactId;
+    !!safeArtifactForHook &&
+    safeArtifactForHook.tier === 'A' &&
+    !!safeArtifactForHook.serviceKey &&
+    safeArtifactForHook.serviceKey !== 'calypso' &&
+    !!safeArtifactForHook.externalArtifactId;
   const live = useLiveVersions(block?.workflowId, block?.id, isHubLive);
+
+  /* ── html preview (설계서 04장 §19 확장) ──
+     latest(또는 사용자가 고른) 버전에 hasHtmlView가 있을 때만 켠다 — 이것도 Hooks 규칙 때문에
+     early return 전에 안전한 optional chaining으로 판정해야 한다. */
+  const versionsForHtmlHook = isHubLive ? (live.data ?? []) : (safeArtifactForHook?.versions ?? []);
+  const requestedVersionLabel = selectedVersionLabel ?? versionsForHtmlHook[0]?.versionLabel;
+  const requestedVersion = versionsForHtmlHook.find((v) => v.versionLabel === requestedVersionLabel);
+  const htmlView = useHtmlView(block?.workflowId, block?.id, requestedVersionLabel, !!requestedVersion?.hasHtmlView);
+
+  useEffect(() => {
+    setSelectedVersionLabel(undefined);
+  }, [block?.id]);
 
   if (!block) return null;
   const artifact = block.artifact;
@@ -199,12 +222,17 @@ export function ArtifactSlide({
   // (본문 2 : 버전 트리 1)을 그려야 해서, 그 폭을 담을 수 있게 패널 자체를 넓힌다
   // (사용자 요청) — 다른 tier/tab은 기존 560px 그대로 둔다.
   const isCalypsoB = artifact.tier === 'B' && artifact.serviceKey === 'calypso' && !!artifact.externalArtifactId;
+  // A/C Tier의 html preview — B Tier의 upload/download 자리를 이걸로 대신한다(사용자 요청).
+  // latest 버전에 preview가 없으면(hasHtmlView:false) 이전처럼 아무것도 안 그린다 — 그래서
+  // 이 gate는 "지금 요청 중인 버전"이 아니라 **항상 맨 위(latest) 버전** 기준이다.
+  const showHtmlPanel = !isCalypsoB && !!effectiveVersions[0]?.hasHtmlView;
+  const useWideLayout = isCalypsoB || showHtmlPanel;
 
   return (
     <SlidePanel
       open
       onClose={onClose}
-      width={isCalypsoB ? '900px' : '560px'}
+      width={useWideLayout ? '900px' : '560px'}
       header={<SlideHeader name={artifact.name} />}
       footer={own && onDelete && (
         <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
@@ -303,6 +331,11 @@ export function ArtifactSlide({
             phases={phases ?? []}
             versions={effectiveVersions}
             isCalypsoB={isCalypsoB}
+            showHtmlPanel={showHtmlPanel}
+            htmlViewData={htmlView.data}
+            htmlViewLoading={htmlView.isLoading}
+            selectedVersionLabel={requestedVersionLabel}
+            onSelectVersion={(v) => setSelectedVersionLabel(v.versionLabel)}
             calypsoArtifactId={artifact.serviceKey === 'calypso' ? artifact.externalArtifactId : null}
             blockId={block.id}
             releases={releases ?? []}
@@ -341,13 +374,21 @@ export function ArtifactSlide({
  *   (라이브 조회 대상이 아니다) 늘 비어 있고, 실제 파일·버전은 Calypso 쪽에 있다.
  */
 function OverviewTab({
-  block, phases, versions, isCalypsoB, calypsoArtifactId, blockId, releases, onOpenRelease, isLive, liveLoading,
+  block, phases, versions, isCalypsoB, showHtmlPanel, htmlViewData, htmlViewLoading,
+  selectedVersionLabel, onSelectVersion, calypsoArtifactId, blockId, releases, onOpenRelease, isLive, liveLoading,
   myDepartments,
 }: {
   block: BlockDto;
   phases: WorkflowPhase[];
   versions: ArtifactVersionDto[];
   isCalypsoB: boolean;
+  /** A/C Tier — latest(또는 지금 고른) 버전에 html preview가 있다. B Tier의
+   * upload/download 자리를 대신해서 왼쪽에 그 preview를, 오른쪽에 Version history를 그린다. */
+  showHtmlPanel: boolean;
+  htmlViewData: ArtifactHtmlView | null | undefined;
+  htmlViewLoading: boolean;
+  selectedVersionLabel: string | undefined;
+  onSelectVersion: (v: ArtifactVersionDto) => void;
   /** Calypso 산출물이면 값이 있다 — "Open"이 외부 viewUrl(예전 calypso/web, 폐기됨) 대신
    * SIREN 안의 /artifacts/:id로 가야 한다(사용자 지적). */
   calypsoArtifactId: string | null;
@@ -375,6 +416,28 @@ function OverviewTab({
           releases={releases}
           onOpenRelease={onOpenRelease}
         />
+      ) : showHtmlPanel ? (
+        // B(본문 — html preview) : A(버전 트리) = 2 : 1 — Calypso 인라인 패널과 같은
+        // 자리 배치를 쓴다(사용자 요청).
+        <Box sx={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
+          <Box sx={{ flex: 2, minWidth: 0 }}>
+            <HtmlViewPanel data={htmlViewData} loading={htmlViewLoading} maxWidth={HTML_VIEW_MAX_WIDTH} />
+          </Box>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Ey sx={{ mb: '10px' }}>Version history</Ey>
+            <VersionList
+              versions={versions}
+              calypsoArtifactId={calypsoArtifactId}
+              blockId={blockId}
+              releases={releases}
+              onOpenRelease={onOpenRelease}
+              isLive={isLive}
+              liveLoading={liveLoading}
+              selectedVersionLabel={selectedVersionLabel}
+              onSelectVersion={onSelectVersion}
+            />
+          </Box>
+        </Box>
       ) : (
         <VersionList
           versions={versions}
@@ -429,6 +492,7 @@ function PhaseCard({ phase, orphan }: { phase: WorkflowPhase | undefined; orphan
  */
 function VersionList({
   versions, calypsoArtifactId, blockId, releases, onOpenRelease, isLive, liveLoading,
+  selectedVersionLabel, onSelectVersion,
 }: {
   versions: ArtifactVersionDto[];
   calypsoArtifactId: string | null;
@@ -437,6 +501,11 @@ function VersionList({
   onOpenRelease?: (releaseId: string) => void;
   isLive?: boolean;
   liveLoading?: boolean;
+  /** html preview가 있는 버전(v.hasHtmlView)만 클릭 가능/하이라이트 대상이 된다(사용자
+   * 요청) — 없는 버전은 지금처럼 클릭 이벤트도, 하이라이트도 없다. 둘 다 없으면(기본 단일
+   * 칸 레이아웃) 이 기능 자체가 꺼진다. */
+  selectedVersionLabel?: string;
+  onSelectVersion?: (v: ArtifactVersionDto) => void;
 }) {
   const { t } = useTranslation();
   const { resolveUser } = useDirectory();
@@ -471,12 +540,19 @@ function VersionList({
         const by = v.giverKnoxId ? resolveUser(v.giverKnoxId) : null;
         const at = v.publishedAt ?? v.observedAt ?? v.createdAt;
         const relBadge = releasesByVersion.get(v.versionLabel);
+        // html preview가 있는 버전만 클릭 가능/하이라이트 대상 — 없는 버전은 지금처럼
+        // 아무 상호작용도 없다(사용자 요청).
+        const clickable = !!onSelectVersion && v.hasHtmlView;
+        const selected = clickable && v.versionLabel === selectedVersionLabel;
         return (
           <Card
             key={`${v.versionLabel}:${i}`}
+            onClick={clickable ? () => onSelectVersion(v) : undefined}
             sx={{
               padding: '11px 13px', mb: '8px', transformStyle: 'preserve-3d',
-              transition: 'transform .2s, box-shadow .2s',
+              transition: 'transform .2s, box-shadow .2s, background .15s, border-color .15s',
+              ...(clickable && { cursor: CURSOR_POINTER }),
+              ...(selected && { background: T.prSoft, borderColor: T.prLine }),
               '&:hover': { transform: 'translateZ(20px) rotateX(3deg)', boxShadow: T.shMd, zIndex: 2 },
             }}
           >
@@ -527,8 +603,21 @@ function VersionList({
               <Box sx={{ fontSize: 11, color: T.dm2 }}>{by?.name ?? v.giverKnoxId ?? ''}</Box>
               <Box sx={{ flex: 1 }} />
               {v.hpcPath && (
-                <Box sx={{ fontFamily: FONT_MONO, fontSize: 10.5, color: T.dm2 }} title={v.hpcPath}>
-                  {v.hpcPath}
+                <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                  <Box sx={{ fontFamily: FONT_MONO, fontSize: 10.5, color: T.dm2 }} title={v.hpcPath}>
+                    {v.hpcPath}
+                  </Box>
+                  <SirenButton
+                    variant="ghost"
+                    title="Copy path"
+                    onClick={() => {
+                      navigator.clipboard?.writeText(v.hpcPath as string);
+                      toast('Path copied');
+                    }}
+                    sx={{ minWidth: 0, padding: '2px' }}
+                  >
+                    <Icon name="copy" size={12} />
+                  </SirenButton>
                 </Box>
               )}
               {/* Calypso면 항상 SIREN 내부 artifact 페이지로 — v.viewUrl은 Calypso 백엔드의
