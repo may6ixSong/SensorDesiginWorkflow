@@ -2,9 +2,8 @@ import { useEffect, useState } from 'react';
 import { Box } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  CalypsoGrantInput, CalypsoVersionView, addCalypsoEditor, addCalypsoViewGrant,
-  downloadCalypsoVersion, getCalypsoArtifact, releaseCalypsoArtifact,
-  removeCalypsoEditor, removeCalypsoViewGrant, setCalypsoUserDepartments, uploadCalypsoVersion,
+  CalypsoVersionView, downloadCalypsoVersion, getCalypsoArtifact, releaseCalypsoArtifact,
+  setCalypsoUserDepartments, uploadCalypsoVersion,
 } from '@/api/calypsoClient';
 import { queryKeys } from '@/api/queryKeys';
 import { ReleaseDto } from '@/types/domain';
@@ -13,7 +12,6 @@ import { toast } from '@/store/toastStore';
 import { Ey } from '@/components/common/Panel';
 import { ArtifactVersionContents } from './ArtifactVersionContents';
 import { ArtifactVersionTree } from './ArtifactVersionTree';
-import { ArtifactAccessPanel } from './ArtifactAccessPanel';
 import { T } from '@/theme/tokens';
 
 interface Props {
@@ -21,7 +19,6 @@ interface Props {
   artifactId: string;
   blockId: string;
   myDepartments: string[];
-  allDepartments: string[];
   releases: ReleaseDto[];
   onOpenRelease?: (releaseId: string) => void;
 }
@@ -29,13 +26,18 @@ interface Props {
 /**
  * File Artifacts(B Tier)의 입출력을 슬라이드 안에서 직접 — 예전에는 Calypso 화면(현재는
  * SIREN의 독립 Artifact page, /artifacts/:id)까지 나가야만 업로드·다운로드·release가
- * 됐지만, 그 화면과 똑같은 컴포넌트(ArtifactVersionContents/Tree/AccessPanel)를 그대로
- * 여기 꽂아서 캔버스를 벗어나지 않고도 되게 한다(사용자 요청).
+ * 됐지만, 그 화면과 똑같은 컴포넌트(ArtifactVersionContents/Tree)를 그대로 여기 꽂아서
+ * 캔버스를 벗어나지 않고도 되게 한다(사용자 요청).
+ *
+ * ★ Calypso 자체 editors/viewGrants 관리(ArtifactAccessPanel)는 여기서는 안 그린다 —
+ *   슬라이드에는 이미 Recipients 탭이 같은 일(B Tier의 edit/view 권한)을 하므로 둘을
+ *   같이 보여주면 겹친다(사용자 지적). 독립 Artifact page에는 Recipients 탭이 없으니
+ *   거기서는 그대로 남는다.
  *
  * 버전 트리의 "이 workflow에서 release 여부" 배지만 이 컴포넌트가 얹는다 — 독립
  * Artifact page는 특정 workflow에 매인 화면이 아니라 그 배지를 모른다.
  */
-export function CalypsoInlinePanel({ artifactId, blockId, myDepartments, allDepartments, releases, onOpenRelease }: Props) {
+export function CalypsoInlinePanel({ artifactId, blockId, myDepartments, releases, onOpenRelease }: Props) {
   const qc = useQueryClient();
   const [picked, setPicked] = useState<CalypsoVersionView | null>(null);
 
@@ -63,27 +65,6 @@ export function CalypsoInlinePanel({ artifactId, blockId, myDepartments, allDepa
     onSuccess: () => { invalidate(); toast('Published'); },
     onError: (e: any) => toast(e?.response?.data?.message ?? 'Publish failed'),
   });
-  const addEditor = useMutation({
-    mutationFn: (g: CalypsoGrantInput) => addCalypsoEditor(artifactId, g),
-    onSuccess: invalidate,
-    onError: (e: any) => toast(e?.response?.data?.message ?? 'Could not grant edit access'),
-  });
-  const removeEditor = useMutation({
-    mutationFn: (g: CalypsoGrantInput) => removeCalypsoEditor(artifactId, g),
-    onSuccess: invalidate,
-    onError: (e: any) => toast(e?.response?.data?.message ?? 'Could not remove editor'),
-  });
-  const addViewGrant = useMutation({
-    mutationFn: (g: CalypsoGrantInput) => addCalypsoViewGrant(artifactId, g),
-    onSuccess: invalidate,
-    onError: (e: any) => toast(e?.response?.data?.message ?? 'Could not grant view access'),
-  });
-  const removeViewGrant = useMutation({
-    mutationFn: (g: CalypsoGrantInput) => removeCalypsoViewGrant(artifactId, g),
-    onSuccess: invalidate,
-    onError: (e: any) => toast(e?.response?.data?.message ?? 'Could not remove viewer'),
-  });
-
   const handleDownload = async (v: CalypsoVersionView) => {
     try {
       const blob = await downloadCalypsoVersion(artifactId, v.versionRef);
@@ -129,29 +110,15 @@ export function CalypsoInlinePanel({ artifactId, blockId, myDepartments, allDepa
         />
       </Box>
 
-      <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        <Box>
-          <Ey sx={{ mb: '10px' }}>Version history</Ey>
-          <ArtifactVersionTree
-            versions={versions}
-            selected={shown}
-            onSelect={setPicked}
-            releaseBadgeFor={(v) => relBadges.get(v.versionLabel)}
-            onOpenRelease={onOpenRelease}
-          />
-        </Box>
-
-        {canEdit && (
-          <ArtifactAccessPanel
-            artifact={a}
-            myDepartments={myDepartments}
-            allDepartments={allDepartments}
-            onAddEditor={(g) => addEditor.mutate(g)}
-            onRemoveEditor={(g) => removeEditor.mutate(g)}
-            onAddViewGrant={(g) => addViewGrant.mutate(g)}
-            onRemoveViewGrant={(g) => removeViewGrant.mutate(g)}
-          />
-        )}
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Ey sx={{ mb: '10px' }}>Version history</Ey>
+        <ArtifactVersionTree
+          versions={versions}
+          selected={shown}
+          onSelect={setPicked}
+          releaseBadgeFor={(v) => relBadges.get(v.versionLabel)}
+          onOpenRelease={onOpenRelease}
+        />
       </Box>
     </Box>
   );

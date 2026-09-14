@@ -310,7 +310,6 @@ export function ArtifactSlide({
             isLive={isHubLive}
             liveLoading={isHubLive && live.isLoading}
             myDepartments={myDepartments ?? []}
-            departmentOptions={project?.departments ?? []}
           />
         )}
 
@@ -343,7 +342,7 @@ export function ArtifactSlide({
  */
 function OverviewTab({
   block, phases, versions, isCalypsoB, calypsoArtifactId, blockId, releases, onOpenRelease, isLive, liveLoading,
-  myDepartments, departmentOptions,
+  myDepartments,
 }: {
   block: BlockDto;
   phases: WorkflowPhase[];
@@ -360,7 +359,6 @@ function OverviewTab({
   isLive?: boolean;
   liveLoading?: boolean;
   myDepartments: string[];
-  departmentOptions: string[];
 }) {
   const phase = phases.find((p) => p.id === block.phaseId);
   const orphan = isOrphanPhase(phases, block.phaseId);
@@ -374,7 +372,6 @@ function OverviewTab({
           artifactId={calypsoArtifactId}
           blockId={blockId}
           myDepartments={myDepartments}
-          allDepartments={departmentOptions}
           releases={releases}
           onOpenRelease={onOpenRelease}
         />
