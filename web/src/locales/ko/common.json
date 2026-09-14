@@ -123,7 +123,7 @@
     "lockExpired": "편집 세션이 만료되었습니다. 편집 모드로 다시 들어가 주세요."
   },
   "artifact": {
-    "published": "발행됨",
+    "published": "Published",
     "notPublished": "미발행",
     "newSinceRelease": "마지막 release 이후 신규",
     "noAccess": "이 산출물에 대한 접근 권한이 없습니다.",

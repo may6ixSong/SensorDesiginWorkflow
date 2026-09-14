@@ -57,7 +57,7 @@ export function PhaseInfoDialog({ workflowName, phase: p, nodes, onClose, onOpen
         {stat('Start', p.start)}
         {stat('End', p.end)}
         {stat('Duration', `${days}d`)}
-        {stat('Released', `${rel}/${ds.length}`, T.pr)}
+        {stat('Published', `${rel}/${ds.length}`, T.pr)}
       </Row>
       <Card>
         <Ey sx={{ mb: "10px" }}>Blocks in this phase</Ey>
