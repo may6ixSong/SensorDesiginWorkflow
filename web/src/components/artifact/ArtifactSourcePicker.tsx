@@ -90,7 +90,9 @@ export function ArtifactSourcePicker({
           projectRevision={projectRevision}
           intent={intent}
           serviceKey={state.serviceKey}
-          onServiceChange={(v) => onChange({ ...state, serviceKey: v })}
+          // serviceKey와 liveArtifactId 초기화를 **한 번의 setState**로 묶는다 — 따로
+          // 나눠 부르면 같은 이벤트 틱 안에서 두 번째 호출이 첫 번째 변경을 덮어쓴다.
+          onServiceChange={(v) => onChange({ ...state, serviceKey: v, liveArtifactId: '' })}
           externalArtifactId={state.liveArtifactId}
           onChange={(v) => onChange({ ...state, liveArtifactId: v })}
           onSelectName={onSelectName}

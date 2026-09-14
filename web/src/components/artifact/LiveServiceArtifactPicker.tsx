@@ -48,10 +48,14 @@ export function LiveServiceArtifactPicker({
     workflowId, 'live', intent, serviceKey, !!serviceKey && !!externalProjectId, externalProjectId,
   );
 
+  // ★ onServiceChange 하나만 부른다 — 예전엔 여기서 onChange('')도 같이 불렀는데, 부모
+  // (ArtifactSourcePicker)의 두 콜백이 전부 setSrc(...state...)로 이어져 있어서 같은
+  // 이벤트 틱 안에서 setState를 두 번 부르면 두 번째 호출이 "그 렌더 시점의 옛 state"를
+  // 스프레드해 첫 번째 변경을 덮어써 버렸다 — service를 골라도 화면이 그대로였던 원인
+  // (사용자 리포트). externalArtifactId 초기화는 onServiceChange 쪽에서 한 번에 한다.
   const chooseService = (key: string) => {
     onServiceChange(key);
     setExternalProjectId('');
-    onChange('');
   };
   const chooseProject = (id: string) => {
     setExternalProjectId(id);
