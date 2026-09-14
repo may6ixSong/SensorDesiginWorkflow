@@ -36,6 +36,8 @@ export const emptySourceState = (): ArtifactSourceState => ({
 interface Props {
   workflowId: string;
   projectId: string | undefined;
+  projectCode: string | undefined;
+  projectRevision: string | undefined;
   intent: ArtifactIntent;
   myDepartments: string[];
   departmentOptions: string[];
@@ -51,7 +53,8 @@ interface Props {
  * External/Attested)로만 보여준다. HPC Path는 항상 잠겨 있고 미리보기만 제공한다.
  */
 export function ArtifactSourcePicker({
-  workflowId, projectId, intent, myDepartments, departmentOptions, state, onChange, onSelectName,
+  workflowId, projectId, projectCode, projectRevision, intent, myDepartments, departmentOptions,
+  state, onChange, onSelectName,
 }: Props) {
   const options: ArtifactSourceKind[] = intent === 'own' ? ['live', 'file', 'hpc'] : ['live', 'file', 'hpc', 'attested'];
   const hpcPreview = useArtifactCandidates(workflowId, 'hpc', intent, undefined, state.source === 'hpc');
@@ -83,6 +86,8 @@ export function ArtifactSourcePicker({
       {state.source === 'live' && (
         <LiveServiceArtifactPicker
           workflowId={workflowId}
+          projectCode={projectCode}
+          projectRevision={projectRevision}
           intent={intent}
           serviceKey={state.serviceKey}
           onServiceChange={(v) => onChange({ ...state, serviceKey: v })}

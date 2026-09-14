@@ -69,7 +69,9 @@ export function toBlockDto(
     id: block._id.toString(),
     workflowId: block.workflowId.toString(),
     phaseId: block.phaseId,
-    name: artifact?.name ?? block.name,
+    // 캔버스에는 block 자신의 Name을 쓴다 — artifact 이름은 상세(slide)에서만 보여준다
+    // (사용자 지적). 매핑 이후에도 block.name은 등록/변경 시 입력한 값 그대로 유지된다.
+    name: block.name,
     layout: { x: block.layout.x, y: block.layout.y, w: block.layout.w, h: block.layout.h },
     intent: block.intent,
     artifactId: block.artifactId?.toString() ?? null,

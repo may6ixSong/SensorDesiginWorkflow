@@ -279,13 +279,6 @@ export type ArtifactIntent = 'own' | 'received';
 /** 사용자에게 보이는 이름. Tier 글자는 화면에 절대 노출하지 않는다. */
 export type ArtifactSourceKind = 'live' | 'file' | 'hpc' | 'attested';
 
-export interface LiveServiceOptionDto {
-  serviceKey: string;
-  name: string;
-  icon: string;
-  externalProjectId: string;
-}
-
 export interface ArtifactCandidateDto {
   externalArtifactId: string;
   name: string;

@@ -259,14 +259,27 @@ Block(자리)과 Artifact(실체)가 분리되어 있으므로(§1) 매핑을 �
 
 ### 6.3 후보 목록의 출처
 
-- **Live Service(A)** — 이 project에 이미 연결된(Admin이 미리 `POST /projects/:id/service-links`로
-  연결) Hub 등록 서비스만 드롭다운에 뜬다. 서비스를 고르면 그 서비스의 observer 계약
-  `GET /artifacts?projectId=&knoxId=`(선택 구현, observer-contract-v1.yaml)로 후보를 받고,
-  후보마다 `access` 엔드포인트로 canEdit/canView를 물어본다 — 응답이 느릴 수 있어 서비스별로
-  병렬 조회한다. 그 서비스가 이 엔드포인트를 구현하지 않았으면(예: RPM) `supported:false`로
-  응답하고, 화면은 externalArtifactId를 직접 입력하는 수동 입력으로 폴백한다.
-  - **Calypso는 이 목록에 포함되지 않는다.** Calypso는 Hub 레지스트리 대상이 아니고
-    (§3.1 — SIREN 내장 기능), File Artifacts(B)의 출처이기 때문이다.
+- **Live Service(A)** — **3단계**다. 사전에 Admin이 project를 그 서비스에 링크해 둘 필요는
+  없다 — 매번 그 자리에서 검색한다.
+  1. **Service** — Manage Service(Hub 레지스트리, `GET /hub/services`)에 등록되고
+     `transport: 'http'`인 서비스만 고를 수 있다. Calypso는 여기 없다 — Hub 레지스트리 대상이
+     아니고(§3.1 — SIREN 내장 기능), File Artifacts(B)의 출처이기 때문이다.
+  2. **Project** — 고른 서비스에 이 SIREN project의 code+revision으로
+     `GET /hub/services/:key/projects/search`(기존 §19.3 엔드포인트)를 물어봐 후보를 받는다.
+     **code+revision이 그 서비스 안에서 유일하다는 보장이 없으므로**(RPM처럼 production
+     run·internal test가 같은 code/revision을 쓸 수 있다) 후보가 하나뿐이어도 사람이 직접
+     확정한다 — SIREN이 자동으로 고르지 않는다.
+  3. **Artifact** — 확정된 `externalProjectId`로 그 서비스의 observer 계약
+     `GET /artifacts?projectId=&knoxId=`(선택 구현, observer-contract-v1.yaml)를 불러 후보를
+     받고, 후보마다 `access` 엔드포인트로 canEdit/canView를 물어본다 — 응답이 느릴 수 있어
+     서비스별로 병렬 조회한다. 그 서비스가 이 엔드포인트를 구현하지 않았으면 `supported:false`
+     로 응답하고, 화면은 "이 서비스는 지금 이 다이얼로그로 못 쓴다"는 안내만 보여준다 —
+     project 후보까지는 있어도 그 안의 개별 artifact를 알아낼 방법이 없기 때문이다.
+  - **RPM은 개발 mock으로 위 3단계를 실제로 끝까지 눌러볼 수 있게 해 둔다** —
+    `MockObserverController`가 `/projects/search`(code+revision당 production run·internal
+    test 두 후보)와 `/artifacts`(project당 fake Readout Pattern 3개, 일부러 edit·view·차단을
+    섞어 둔다)를 구현한다. 실제로 매핑을 확정하면 그 순간 진짜 SIREN Artifact로 등록되고,
+    그 뒤로는 등록된 산출물 규칙(§7)을 그대로 따른다.
 - **File Artifacts(B)** — 출처는 **Calypso다.** Calypso는 SIREN의 projectId를 그대로 쓰므로
   (§11.4 — workflow 개념을 모른다) 별도 code/revision 링크가 필요 없다. Calypso의
   `GET /artifacts?projectId=`가 이미 `myAccess`(edit/view, none은 자체적으로 걸러짐)를 계산해
@@ -314,18 +327,21 @@ recipient 구성이 새 artifact에도 유효하다는 보장이 없기 때문�
 ### 6.7 API
 
 ```
-GET /workflows/:workflowId/artifact-sources/live-services
-→ 이 project에 연결된 A Tier(Live Service) 후보 서비스 목록.
+GET /hub/services                        → Manage Service 등록 목록(기존). Live Service 드롭다운이 그대로 쓴다.
+GET /hub/services/:key/projects/search?code=&revision=   → project 후보(기존 §19.3). Live Service 2단계가 그대로 쓴다.
 
-GET /workflows/:workflowId/artifact-candidates?source=live|file|hpc&intent=own|received&serviceKey=
-→ §6.2 규칙으로 pickable까지 판정된 후보 목록. source=live는 serviceKey 필수.
-  A Tier는 서비스별 observer 호출이 있어 응답이 느릴 수 있다.
+GET /workflows/:workflowId/artifact-candidates
+    ?source=live|file|hpc&intent=own|received&serviceKey=&externalProjectId=
+→ §6.2 규칙으로 pickable까지 판정된 후보 목록. source=live는 serviceKey **와**
+  externalProjectId(2단계에서 사람이 확정한 값) 둘 다 필수. A Tier는 서비스별 observer
+  호출이 있어 응답이 느릴 수 있다.
 
 POST /workflows/:workflowId/blocks       { name, phaseId, layout, intent, artifactId? | newArtifact? }
 PATCH /blocks/:id                        { name?, artifactId? | newArtifact? }
 → newArtifact = { source: 'live'|'file'|'attested', name, serviceKey?, externalArtifactId?, expectedGiver? }
   둘 다 §6.2를 서버가 다시 검증하고(§6.5의 중복 금지 포함), find-or-create 또는 신규 생성 후
-  block에 매핑한다.
+  block에 매핑한다. externalProjectId는 후보를 좁히는 데만 쓰이고 Artifact에 저장되지 않는다
+  — 최종 식별은 (serviceKey, externalArtifactId) 조합이다.
 ```
 
 ---

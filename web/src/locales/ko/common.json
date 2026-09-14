@@ -129,7 +129,11 @@
     "noAccess": "이 산출물에 대한 접근 권한이 없습니다.",
     "noPublishedVersion": "아직 publish된 버전이 없습니다.",
     "recipients": "수신 대상",
-    "recipientsReadOnly": "누가 받는지 볼 수 있지만 변경할 수는 없습니다."
+    "recipientsReadOnly": "누가 받는지 볼 수 있지만 변경할 수는 없습니다.",
+    "intentDeliverable": "Deliverable",
+    "intentDeliverableTooltip": "Deliverable(산출물 제공): 이 workflow가 다른 곳에 전달하는 산출물입니다.",
+    "intentPrerequisite": "Prerequisite",
+    "intentPrerequisiteTooltip": "Prerequisite(선행 산출물): 이 workflow가 진행하기 전에 다른 곳으로부터 받아야 하는 산출물입니다."
   },
   "release": {
     "title": "Release",

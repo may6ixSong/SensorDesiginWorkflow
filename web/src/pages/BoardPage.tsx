@@ -378,6 +378,8 @@ export function BoardPage() {
               workflowName={workflow.name}
               workflowId={workflowId ?? ''}
               projectId={projectId}
+              projectCode={project?.code}
+              projectRevision={project?.revision}
               phases={phaseList}
               myDepartments={myDepartments}
               departmentOptions={project?.departments ?? []}

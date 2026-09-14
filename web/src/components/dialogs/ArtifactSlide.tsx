@@ -168,6 +168,8 @@ export function ArtifactSlide({
           <ChangeArtifactDialog
             block={block}
             projectId={project?._id}
+            projectCode={project?.code}
+            projectRevision={project?.revision}
             myDepartments={myDepartments ?? []}
             departmentOptions={project?.departments ?? []}
             submitting={changingArtifact}
@@ -239,6 +241,8 @@ export function ArtifactSlide({
         <ChangeArtifactDialog
           block={block}
           projectId={project?._id}
+          projectCode={project?.code}
+          projectRevision={project?.revision}
           myDepartments={myDepartments ?? []}
           departmentOptions={project?.departments ?? []}
           submitting={changingArtifact}

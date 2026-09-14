@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Box } from '@mui/material';
+import { Box, Tooltip } from '@mui/material';
+import { useTranslation } from 'react-i18next';
 import { WorkflowPhase } from '@/types/domain';
 import { shortDate } from '@/lib/schedule';
 import { ModalShell } from '@/components/common/ModalShell';
@@ -15,6 +16,8 @@ interface Props {
   workflowName: string;
   workflowId: string;
   projectId: string | undefined;
+  projectCode: string | undefined;
+  projectRevision: string | undefined;
   phases: WorkflowPhase[];
   myDepartments: string[];
   departmentOptions: string[];
@@ -38,9 +41,10 @@ interface Props {
  *   artifact를 바꿀 때(ChangeArtifactDialog) 둘 다에서 재사용한다.
  */
 export function AddArtifactDialog({
-  workflowName, workflowId, projectId, phases, myDepartments, departmentOptions,
+  workflowName, workflowId, projectId, projectCode, projectRevision, phases, myDepartments, departmentOptions,
   onClose, onCreate, submitting,
 }: Props) {
+  const { t } = useTranslation();
   const [intent, setIntent] = useState<ArtifactIntent>('own');
   const [name, setName] = useState('');
   const [phaseId, setPhaseId] = useState<string>(phases[0]?.id ?? '');
@@ -77,21 +81,27 @@ export function AddArtifactDialog({
       <Field label="Is this workflow giving it, or receiving it?">
         <Box sx={{ display: 'flex', gap: '8px' }}>
           {(['own', 'received'] as ArtifactIntent[]).map((v) => (
-            <Box
+            <Tooltip
               key={v}
-              component="button"
-              type="button"
-              onClick={() => changeIntent(v)}
-              sx={{
-                flex: 1, fontSize: 13, fontWeight: 600, padding: '10px', borderRadius: `${R.sm}px`,
-                cursor: CURSOR_POINTER, transition: '.14s',
-                background: intent === v ? T.prSoft : T.sf,
-                border: `1px solid ${intent === v ? T.pr : T.ln2}`,
-                color: intent === v ? T.pr : T.dm,
-              }}
+              title={v === 'own' ? t('artifact.intentDeliverableTooltip') : t('artifact.intentPrerequisiteTooltip')}
+              placement="top"
+              arrow
             >
-              {v === 'own' ? 'We give this' : 'We receive this'}
-            </Box>
+              <Box
+                component="button"
+                type="button"
+                onClick={() => changeIntent(v)}
+                sx={{
+                  flex: 1, fontSize: 13, fontWeight: 600, padding: '10px', borderRadius: `${R.sm}px`,
+                  cursor: CURSOR_POINTER, transition: '.14s',
+                  background: intent === v ? T.prSoft : T.sf,
+                  border: `1px solid ${intent === v ? T.pr : T.ln2}`,
+                  color: intent === v ? T.pr : T.dm,
+                }}
+              >
+                {v === 'own' ? t('artifact.intentDeliverable') : t('artifact.intentPrerequisite')}
+              </Box>
+            </Tooltip>
           ))}
         </Box>
       </Field>
@@ -136,6 +146,8 @@ export function AddArtifactDialog({
       <ArtifactSourcePicker
         workflowId={workflowId}
         projectId={projectId}
+        projectCode={projectCode}
+        projectRevision={projectRevision}
         intent={intent}
         myDepartments={myDepartments}
         departmentOptions={departmentOptions}

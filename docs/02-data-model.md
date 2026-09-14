@@ -211,7 +211,8 @@ Block {
   phaseId: string
   artifactId: ObjectId | null   // null = 아직 출처가 정해지지 않은 정상 빈 상태(= release 제외)
                                  // 매핑 시 artifact.projectId === projectId 만 허용(§3)
-  name: string                  // artifact 미매핑 상태에서의 임시 표기. 매핑되면 artifact.name 우선
+  name: string                  // 캔버스에 표시되는 이름. artifact가 매핑돼도 이 값을 그대로 쓴다 —
+                                 // artifact 자신의 이름은 상세 slide에서만 보여준다(사용자 지적)
   layout: { x, y, w, h }
   intent: 'own' | 'received'    // "새 Artifact 추가" 다이얼로그 첫 질문. 생성 후 불변(04장 §6)
 
@@ -386,8 +387,7 @@ ReleaseItem {
 | `GET` | `/artifacts/:id` | 열람 권한(01장 §4.2) 없으면 403. 버전은 권한에 따라 마스킹 |
 | `PUT` | `/artifacts/:id/access` | B/C/D만. `{ editAccess, viewAccess }` |
 | `PUT` | `/workflows/:wfId/blocks/:blockId/recipients` | **A Tier block만.** `{ editAccess, viewAccess }`. workflow Edit Access 필요 |
-| `GET` | `/workflows/:wfId/artifact-sources/live-services` | 이 project에 연결된 Live Service(A) 후보 서비스 목록 (04장 §6.3) |
-| `GET` | `/workflows/:wfId/artifact-candidates` | `?source=live\|file\|hpc&intent=own\|received&serviceKey=` — pickable까지 판정된 후보 목록 (04장 §6.2) |
+| `GET` | `/workflows/:wfId/artifact-candidates` | `?source=live\|file\|hpc&intent=own\|received&serviceKey=&externalProjectId=` — pickable까지 판정된 후보 목록 (04장 §6.2). Live Service 드롭다운은 기존 `GET /hub/services`를, project 후보는 기존 `GET /hub/services/:key/projects/search`를 그대로 쓴다(04장 §6.3) |
 | `POST` | `/workflows/:wfId/blocks` | `{ name, phaseId, layout, intent, artifactId? \| newArtifact? }` — newArtifact가 있으면 find-or-create 후 매핑 (04장 §6.7) |
 | `PATCH` | `/blocks/:id` | `{ name?, artifactId? \| newArtifact? }` — 재매핑. 이전 값과 다르면 block.recipients 초기화 (04장 §6.6) |
 

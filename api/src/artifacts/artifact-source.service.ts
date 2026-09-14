@@ -7,7 +7,6 @@ import { ProjectDocument } from '../projects/schemas/project.schema';
 import { HubService } from '../hub/hub.service';
 import { ObserverClientService } from '../hub/observer-client.service';
 import { CalypsoClientService } from '../hub/calypso-client.service';
-import { ProjectLinksService } from '../hub/project-links.service';
 import { ArtifactsService } from './artifacts.service';
 import { ArtifactDocument } from './schemas/artifact.schema';
 import { HpcPathMock, HpcPathMockDocument } from './schemas/hpc-path-mock.schema';
@@ -50,7 +49,6 @@ export class ArtifactSourceService {
     private readonly hub: HubService,
     private readonly observer: ObserverClientService,
     private readonly calypso: CalypsoClientService,
-    private readonly links: ProjectLinksService,
     private readonly artifacts: ArtifactsService,
   ) {}
 
@@ -64,37 +62,23 @@ export class ArtifactSourceService {
     return 'view-only'; // level==='view'인데 own을 요구하는 경우만 여기 온다
   }
 
-  /** Live Service(A) 드롭다운 — 이 project에 이미 연결된 A Tier 서비스만 후보다. */
-  async listLiveServices(project: ProjectDocument) {
-    const [links, services] = await Promise.all([
-      this.links.list(project._id.toString()),
-      this.hub.list(),
-    ]);
-    const byKey = new Map(services.map((s) => [s.key, s]));
-    return links
-      .map((l) => ({ link: l, svc: byKey.get(l.serviceKey) }))
-      .filter((x) => x.svc && x.svc.defaultTier === 'A' && x.svc.transport === 'http')
-      .map((x) => ({
-        serviceKey: x.svc!.key,
-        name: x.svc!.name,
-        icon: x.svc!.icon,
-        externalProjectId: x.link.externalProjectId,
-      }));
-  }
-
-  /** Live Service(A) 후보 목록 — project code/revision 기반 1차 필터링은 service-link가 이미 해준다. */
+  /**
+   * Live Service(A) 후보 목록 — project code/revision 검색은 이 호출 **전에** FE가
+   * `GET /hub/services/:key/projects/search`(기존 §19.3 엔드포인트)로 이미 끝내고,
+   * 사람이 그 후보 중 하나를 직접 골라 `externalProjectId`로 넘겨준다(04장 §6.3). code+
+   * revision이 그 서비스 안에서 유일하다는 보장이 없어(RPM처럼) 사람이 확정해야 한다 —
+   * SIREN이 이 값을 미리 저장해 둔 링크에서 자동으로 찾지 않는다.
+   */
   async liveServiceCandidates(
     project: ProjectDocument,
     actor: Actor,
     serviceKey: string,
+    externalProjectId: string,
     intent: CandidateIntent,
   ): Promise<CandidateListResult> {
-    const link = (await this.links.list(project._id.toString())).find((l) => l.serviceKey === serviceKey);
-    if (!link) return { supported: false, candidates: [], note: 'This project is not linked to that service yet.' };
-
     const svc = await this.hub.findByKeyOrThrow(serviceKey);
     const isAdmin = actor.isAdmin && !actor.isImpersonating;
-    const summaries = await this.observer.listArtifacts(svc, link.externalProjectId, actor.knoxId, isAdmin);
+    const summaries = await this.observer.listArtifacts(svc, externalProjectId, actor.knoxId, isAdmin);
     if (summaries === null) {
       return { supported: false, candidates: [], note: 'This service does not support browsing — enter the artifact id directly.' };
     }
@@ -167,10 +151,14 @@ export class ArtifactSourceService {
     source: CandidateSource,
     intent: CandidateIntent,
     serviceKey?: string,
+    externalProjectId?: string,
   ): Promise<CandidateListResult> {
     if (source === 'live') {
       if (!serviceKey) throw new BadRequestException('serviceKey is required for the Live Service source.');
-      return this.liveServiceCandidates(project, actor, serviceKey, intent);
+      if (!externalProjectId) {
+        throw new BadRequestException('externalProjectId is required — pick a project candidate first.');
+      }
+      return this.liveServiceCandidates(project, actor, serviceKey, externalProjectId, intent);
     }
     if (source === 'file') return this.fileArtifactCandidates(project, actor, intent);
     return this.hpcMockCandidates(project);
@@ -195,8 +183,6 @@ export class ArtifactSourceService {
     let level: AccessLevel = 'edit';
     if (!actor.isAdmin) {
       if (input.source === 'live') {
-        const link = (await this.links.list(project._id.toString())).find((l) => l.serviceKey === serviceKey);
-        if (!link) throw new BadRequestException('This project is not linked to that service.');
         const svc = await this.hub.findByKeyOrThrow(serviceKey as string);
         const access = await this.observer.access(svc, input.externalArtifactId, actor.knoxId, false);
         level = access.canEdit ? 'edit' : access.canView ? 'view' : null;

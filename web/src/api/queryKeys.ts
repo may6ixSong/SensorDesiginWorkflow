@@ -25,10 +25,9 @@ export const queryKeys = {
   hubProjectSearch: (serviceKey: string, code: string, revision: string) =>
     ['hub', 'services', serviceKey, 'projects', 'search', code, revision] as const,
 
-  /** "새 Artifact 추가" 다이얼로그(설계서 04장 §6) — Live Service 드롭다운과 후보 목록. */
-  liveServices: (workflowId: string) => ['workflows', workflowId, 'artifact-sources', 'live-services'] as const,
-  artifactCandidates: (workflowId: string, source: string, intent: string, serviceKey?: string) =>
-    ['workflows', workflowId, 'artifact-candidates', source, intent, serviceKey ?? ''] as const,
+  /** "새 Artifact 추가" 다이얼로그(설계서 04장 §6) — Tier별 후보 목록. */
+  artifactCandidates: (workflowId: string, source: string, intent: string, serviceKey?: string, externalProjectId?: string) =>
+    ['workflows', workflowId, 'artifact-candidates', source, intent, serviceKey ?? '', externalProjectId ?? ''] as const,
   /** Calypso api를 직접 호출한다 — SIREN이 소유한 캐시가 아니라 원격 데이터 캐시다. */
   calypsoArtifacts: (projectId: string) => ['calypso', 'artifacts', projectId] as const,
   calypsoArtifact: (id: string) => ['calypso', 'artifacts', 'detail', id] as const,

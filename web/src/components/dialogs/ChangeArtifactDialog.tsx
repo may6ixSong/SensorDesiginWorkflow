@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Box } from '@mui/material';
-import { BlockDto, isMaskedArtifact } from '@/types/domain';
+import { BlockDto } from '@/types/domain';
 import { ModalShell } from '@/components/common/ModalShell';
 import { SirenButton } from '@/components/common/SirenButton';
 import { Ey, Field, TextInput } from '@/components/common/Panel';
@@ -12,6 +12,8 @@ import { R, T } from '@/theme/tokens';
 interface Props {
   block: BlockDto;
   projectId: string | undefined;
+  projectCode: string | undefined;
+  projectRevision: string | undefined;
   myDepartments: string[];
   departmentOptions: string[];
   onClose: () => void;
@@ -29,10 +31,9 @@ interface Props {
  *   그대로 유효하다는 보장이 없기 때문이다. 그 사실을 여기서 미리 알려 준다.
  */
 export function ChangeArtifactDialog({
-  block, projectId, myDepartments, departmentOptions, onClose, onSave, submitting,
+  block, projectId, projectCode, projectRevision, myDepartments, departmentOptions, onClose, onSave, submitting,
 }: Props) {
-  const currentName = !isMaskedArtifact(block.artifact) ? (block.artifact?.name ?? block.name) : block.name;
-  const [name, setName] = useState(currentName);
+  const [name, setName] = useState(block.name);
   const [src, setSrc] = useState<ArtifactSourceState>(emptySourceState());
   const [err, setErr] = useState<string | null>(null);
 
@@ -77,6 +78,8 @@ export function ChangeArtifactDialog({
       <ArtifactSourcePicker
         workflowId={block.workflowId}
         projectId={projectId}
+        projectCode={projectCode}
+        projectRevision={projectRevision}
         intent={block.intent}
         myDepartments={myDepartments}
         departmentOptions={departmentOptions}

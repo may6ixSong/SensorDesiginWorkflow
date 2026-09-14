@@ -129,7 +129,11 @@
     "noAccess": "You do not have access to this artifact.",
     "noPublishedVersion": "No published version yet.",
     "recipients": "Recipients",
-    "recipientsReadOnly": "You can see who receives this artifact, but not change it."
+    "recipientsReadOnly": "You can see who receives this artifact, but not change it.",
+    "intentDeliverable": "Deliverable",
+    "intentDeliverableTooltip": "Deliverable: this workflow provides this artifact to others downstream.",
+    "intentPrerequisite": "Prerequisite",
+    "intentPrerequisiteTooltip": "Prerequisite: this workflow receives this artifact from elsewhere before it can proceed."
   },
   "release": {
     "title": "Release",
