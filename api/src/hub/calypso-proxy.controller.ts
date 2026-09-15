@@ -8,6 +8,7 @@ import {
   HttpException,
   NotFoundException,
   Param,
+  Patch,
   Post,
   Query,
   StreamableFile,
@@ -23,7 +24,7 @@ import { canAccessProject, myDepartments } from '../common/access';
 import { Project, ProjectDocument } from '../projects/schemas/project.schema';
 import { CalypsoClientService } from './calypso-client.service';
 import {
-  CalypsoAddVersionDto, CalypsoGrantDto, CalypsoReleaseDto, CreateCalypsoArtifactDto,
+  CalypsoAddVersionDto, CalypsoGrantDto, CalypsoReleaseDto, CreateCalypsoArtifactDto, SetCalypsoRestrictViewDto,
 } from './dto/calypso-proxy.dto';
 
 /**
@@ -208,6 +209,18 @@ export class CalypsoProxyController {
   ) {
     const { departments, isAdmin } = await this.resolveContext(projectId, me);
     const result = await this.calypso.removeGrant(id, 'view-grants', toGrantInput(dto), me.knoxId, departments, isAdmin);
+    return this.relay(result);
+  }
+
+  @Patch(':id/restrict-view')
+  async setRestrictView(
+    @Param('id') id: string,
+    @Query('projectId') projectId: string,
+    @Body() dto: SetCalypsoRestrictViewDto,
+    @CurrentActor() me: Actor,
+  ) {
+    const { departments, isAdmin } = await this.resolveContext(projectId, me);
+    const result = await this.calypso.setRestrictView(id, dto.restrictView, me.knoxId, departments, isAdmin);
     return this.relay(result);
   }
 }

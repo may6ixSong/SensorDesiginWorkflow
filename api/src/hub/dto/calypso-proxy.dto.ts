@@ -1,5 +1,5 @@
 import {
-  IsIn, IsOptional, IsString, MaxLength, MinLength, ValidateIf,
+  IsBoolean, IsIn, IsOptional, IsString, MaxLength, MinLength, ValidateIf,
 } from 'class-validator';
 
 /**
@@ -27,6 +27,16 @@ export class CreateCalypsoArtifactDto {
   @IsString()
   @MaxLength(500)
   description?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  restrictView?: boolean;
+}
+
+/** PATCH /calypso-artifacts/:id/restrict-view 몸체. */
+export class SetCalypsoRestrictViewDto {
+  @IsBoolean()
+  restrictView: boolean;
 }
 
 export class CalypsoAddVersionDto {

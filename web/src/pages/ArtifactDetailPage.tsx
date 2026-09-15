@@ -13,7 +13,7 @@ import { queryKeys } from '@/api/queryKeys';
 import {
   CalypsoGrantInput, CalypsoVersionView, addCalypsoEditor, addCalypsoViewGrant,
   downloadCalypsoVersion, getCalypsoArtifact, releaseCalypsoArtifact,
-  removeCalypsoEditor, removeCalypsoViewGrant, uploadCalypsoVersion,
+  removeCalypsoEditor, removeCalypsoViewGrant, setCalypsoRestrictView, uploadCalypsoVersion,
 } from '@/api/calypsoClient';
 import { toast } from '@/store/toastStore';
 import { T } from '@/theme/tokens';
@@ -83,6 +83,11 @@ export function ArtifactDetailPage() {
     mutationFn: (g: CalypsoGrantInput) => removeCalypsoViewGrant(id, projectId, g),
     onSuccess: invalidate,
     onError: (e: any) => toast(e?.response?.data?.message ?? 'Could not remove viewer'),
+  });
+  const restrictView = useMutation({
+    mutationFn: (v: boolean) => setCalypsoRestrictView(id, projectId, v),
+    onSuccess: invalidate,
+    onError: (e: any) => toast(e?.response?.data?.message ?? 'Could not change view access'),
   });
 
   const handleDownload = async (v: CalypsoVersionView) => {
@@ -179,6 +184,7 @@ export function ArtifactDetailPage() {
                 onRemoveEditor={(g) => removeEditor.mutate(g)}
                 onAddViewGrant={(g) => addViewGrant.mutate(g)}
                 onRemoveViewGrant={(g) => removeViewGrant.mutate(g)}
+                onSetRestrictView={(v) => restrictView.mutate(v)}
               />
             )}
           </Box>

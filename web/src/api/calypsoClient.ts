@@ -49,6 +49,8 @@ export interface CalypsoArtifact {
   versions?: CalypsoVersionView[];
   editors: CalypsoGrant[];
   viewGrants: CalypsoGrant[];
+  /** false(기본) — project member 누구나 view 가능. true면 viewGrants로만 제한. */
+  restrictView: boolean;
 }
 
 export async function listCalypsoArtifacts(query: {
@@ -124,6 +126,13 @@ export async function addCalypsoViewGrant(id: string, projectId: string, grant: 
 export async function removeCalypsoViewGrant(id: string, projectId: string, grant: CalypsoGrantInput): Promise<CalypsoArtifact> {
   const { data } = await apiClient.delete<ApiEnvelope<CalypsoArtifact>>(
     `/calypso-artifacts/${id}/view-grants`, { params: { projectId }, data: grant },
+  );
+  return data.data;
+}
+
+export async function setCalypsoRestrictView(id: string, projectId: string, restrictView: boolean): Promise<CalypsoArtifact> {
+  const { data } = await apiClient.patch<ApiEnvelope<CalypsoArtifact>>(
+    `/calypso-artifacts/${id}/restrict-view`, { restrictView }, { params: { projectId } },
   );
   return data.data;
 }

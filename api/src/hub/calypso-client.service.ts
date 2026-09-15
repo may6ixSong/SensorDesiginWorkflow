@@ -308,7 +308,7 @@ export class CalypsoClientService {
   }
 
   async createArtifact(
-    input: { projectId: string; department: string; name: string; description?: string },
+    input: { projectId: string; department: string; name: string; description?: string; restrictView?: boolean },
     knoxId: string,
     departments: string[],
     isAdmin: boolean,
@@ -442,6 +442,34 @@ export class CalypsoClientService {
       return { status: res.status, body };
     } catch (e) {
       this.logger.warn(`Calypso release error for ${externalArtifactId} — ${(e as Error).message}`);
+      return null;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  /** view 기본 개방(false) ↔ viewGrants로만 제한(true) 전환. */
+  async setRestrictView(
+    externalArtifactId: string,
+    restrictView: boolean,
+    knoxId: string,
+    departments: string[],
+    isAdmin: boolean,
+  ): Promise<{ status: number; body: any } | null> {
+    if (!this.baseUrl) return null;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    try {
+      const res = await fetch(`${this.baseUrl}/artifacts/${encodeURIComponent(externalArtifactId)}/restrict-view`, {
+        method: 'PATCH',
+        signal: controller.signal,
+        headers: { ...this.actorHeaders(knoxId, departments, isAdmin), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ restrictView }),
+      });
+      const body = await res.json().catch(() => null);
+      return { status: res.status, body };
+    } catch (e) {
+      this.logger.warn(`Calypso setRestrictView error for ${externalArtifactId} — ${(e as Error).message}`);
       return null;
     } finally {
       clearTimeout(timer);

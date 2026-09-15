@@ -116,6 +116,17 @@ export class Artifact {
   @Prop({ type: [ArtifactGrantSchema], default: [] })
   viewGrants: ArtifactGrant[];
 
+  /**
+   * false(기본) — view는 project member 누구에게나 열려 있다(edit은 그대로 editors만).
+   * true — view도 등록자/editors/viewGrants로만 좁힌다(예전 동작 그대로, 사용자 요청).
+   * "project member"는 이 서비스에 도달하는 모든 호출이 이미 그 뜻이다 — SIREN BE가
+   * 프록시(calypso-proxy.controller.ts)에서 project 멤버십을 먼저 확인한 뒤에만 여기로
+   * 넘어오고, `ArtifactsController` 전체가 SIREN BE 전용(`SirenCallerGuard`)이라 그 외
+   * 경로로는 여기 도달하지 않는다.
+   */
+  @Prop({ default: false })
+  restrictView: boolean;
+
   _id: Types.ObjectId;
 }
 

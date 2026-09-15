@@ -8,6 +8,7 @@ import {
   Header,
   NotFoundException,
   Param,
+  Patch,
   Post,
   Query,
   StreamableFile,
@@ -28,6 +29,7 @@ import {
   GrantDto,
   ListArtifactsQuery,
   ReleaseDto,
+  SetRestrictViewDto,
   toArtifactDto,
   toVersionView,
 } from './dto/artifact-crud.dto';
@@ -122,6 +124,13 @@ export class ArtifactsController {
   @Delete(':id/view-grants')
   async removeViewGrant(@Param('id') id: string, @Body() dto: GrantDto, @CurrentActor() me: Actor) {
     const a = await this.artifacts.removeGrant(id, 'viewGrants', toGrantInput(dto), me);
+    return { data: toArtifactDto(a, 'edit') };
+  }
+
+  /** view 기본 개방(false, 프로젝트 멤버 누구나) ↔ viewGrants로만 제한(true) 전환. edit 권한자만. */
+  @Patch(':id/restrict-view')
+  async setRestrictView(@Param('id') id: string, @Body() dto: SetRestrictViewDto, @CurrentActor() me: Actor) {
+    const a = await this.artifacts.setRestrictView(id, dto.restrictView, me);
     return { data: toArtifactDto(a, 'edit') };
   }
 

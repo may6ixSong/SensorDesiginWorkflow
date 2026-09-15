@@ -21,6 +21,7 @@ interface Props {
   onRemoveEditor: (g: CalypsoGrantInput) => void;
   onAddViewGrant: (g: CalypsoGrantInput) => void;
   onRemoveViewGrant: (g: CalypsoGrantInput) => void;
+  onSetRestrictView: (restrictView: boolean) => void;
 }
 
 function grantKey(g: { type: string; knoxId: string | null; department: string | null }): string {
@@ -37,9 +38,14 @@ function grantInput(g: CalypsoGrant): CalypsoGrantInput {
  *
  * 워크플로우 상세 패널(DeliverableDialog)과 독립 Artifact detail page 양쪽에서 그대로
  * 재사용한다 — 권한 데이터는 Calypso 하나뿐이고 진입점만 두 개다(사용자 요청).
+ *
+ * ★ view는 기본적으로 이 project의 누구나 가능하다(사용자 요청) — "Can view" 목록은
+ *   `restrictView`를 켰을 때만 실제로 걸러내는 역할을 한다. 꺼져 있을 땐 미리 목록을
+ *   만들어 둘 수는 있지만 아직 아무도 걸러지지 않는다는 걸 배너로 알려준다.
  */
 export function ArtifactAccessPanel({
   artifact, myDepartments, allDepartments, onAddEditor, onRemoveEditor, onAddViewGrant, onRemoveViewGrant,
+  onSetRestrictView,
 }: Props) {
   return (
     <Card>
@@ -54,6 +60,37 @@ export function ArtifactAccessPanel({
         onRemove={onRemoveEditor}
       />
       <Box sx={{ height: '14px' }} />
+
+      <Box
+        sx={{
+          display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '9px 10px',
+          borderRadius: '8px', border: `1px solid ${T.ln}`, background: T.sf2, mb: '9px',
+        }}
+      >
+        <Box
+          component="button"
+          type="button"
+          role="switch"
+          aria-checked={artifact.restrictView}
+          onClick={() => onSetRestrictView(!artifact.restrictView)}
+          sx={{
+            flex: '0 0 auto', width: 30, height: 17, borderRadius: '999px', padding: '2px',
+            border: `1px solid ${artifact.restrictView ? T.pr : T.ln2}`,
+            background: artifact.restrictView ? T.pr : T.sf,
+            display: 'flex', justifyContent: artifact.restrictView ? 'flex-end' : 'flex-start',
+            cursor: 'pointer', transition: '.14s',
+          }}
+        >
+          <Box sx={{ width: 11, height: 11, borderRadius: '50%', background: artifact.restrictView ? '#fff' : T.dm2 }} />
+        </Box>
+        <Box sx={{ fontSize: 11.5, lineHeight: 1.5, color: T.dm }}>
+          <Box sx={{ fontWeight: 600, color: T.tx, mb: '2px' }}>Restrict view access</Box>
+          {artifact.restrictView
+            ? 'Only the registrant, editors, and people/departments listed below can view this file.'
+            : 'Off — anyone in this project can view this file by default. Turn this on to limit view access to the list below instead.'}
+        </Box>
+      </Box>
+
       <GrantList
         label="Can view"
         grants={artifact.viewGrants}

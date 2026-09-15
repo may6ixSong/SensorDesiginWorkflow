@@ -1,5 +1,5 @@
 import {
-  IsIn, IsOptional, IsString, MaxLength, MinLength, ValidateIf,
+  IsBoolean, IsIn, IsOptional, IsString, MaxLength, MinLength, ValidateIf,
 } from 'class-validator';
 import { ArtifactDocument, ArtifactGrant, ArtifactVersion } from '../schemas/artifact.schema';
 import { AccessLevel } from '../artifacts.service';
@@ -28,6 +28,17 @@ export class CreateArtifactDto {
   @IsString()
   @MaxLength(500)
   description?: string;
+
+  /** 생략하면 false(view 기본 개방) — 사용자 요청. */
+  @IsOptional()
+  @IsBoolean()
+  restrictView?: boolean;
+}
+
+/** PATCH /artifacts/:id/restrict-view 몸체. */
+export class SetRestrictViewDto {
+  @IsBoolean()
+  restrictView: boolean;
 }
 
 export class ListArtifactsQuery {
@@ -112,6 +123,7 @@ export function toArtifactDto(a: ArtifactDocument, access: Exclude<AccessLevel, 
     releasedVersion: released ? toVersionView(released) : null,
     editors: a.editors.map(toGrantView),
     viewGrants: a.viewGrants.map(toGrantView),
+    restrictView: a.restrictView === true,
   };
 }
 

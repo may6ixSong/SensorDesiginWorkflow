@@ -99,6 +99,14 @@ A와 같은 모델로 통일**했다. External/Attested(D)만 이번 범위에�
 — 그건 항상 그 서비스가 최종 판정한다. File Artifacts(Calypso)도 예외가 아니다 — Calypso
 자체 데이터(`editors`/`viewGrants`)가 유일한 진실이고, SIREN은 그걸 그대로 물어볼 뿐이다.
 
+★ **File Artifacts(B)는 view가 기본적으로 열려 있다(사용자 요청).** edit은 여전히
+`editors`(등록자·Admin 포함)로만 좁혀지지만, view는 `restrictView`가 꺼져 있으면(기본값)
+그 project의 누구나 가능하다 — Calypso 자체 게이트(§2 SIREN BE만 부를 수 있음, 프록시가
+project 멤버십을 먼저 확인)를 통과한 요청이면 그대로 view가 나온다. 특정 artifact만 예전처럼
+`viewGrants`로 좁히고 싶으면 그 artifact의 `restrictView`를 켠다 — 그러면 등록자/editors/
+viewGrants에 없는 사람은 다시 `none`(list에서 빠지고 detail은 403)이 된다. A/C(OA/HPC
+Service)는 이 변경과 무관하다 — 그 서비스 자체의 view 게이트를 그대로 쓴다.
+
 recipient는 **release 알림 대상**이면서 동시에 **SIREN 쪽 slide 열람의 첫 번째 게이트**로도
 쓰인다(§4.1). "recipient = 알림 대상"과 "recipient = 그 서비스의 실제 권한"은 여전히 무관하다 —
 recipient에 들어 있어도 그 서비스에서 view 권한이 없으면 결국 slide는 막힌다.
@@ -256,7 +264,7 @@ artifact만 고를 수 있다.** SIREN이 아니라 항상 그 서비스가 최�
 | Tier | 주는(own) 후보 조건 | 받는(received) 후보 조건 |
 |---|---|---|
 | **A**(OA Service) | 그 서비스 `canEdit`(라이브 조회) | 그 서비스 `canView`(라이브 조회) |
-| **B**(File Artifacts) | Calypso `myAccess === 'edit'`(SIREN BE가 대신 물어봄, 07장 §2) | Calypso `myAccess`가 edit 또는 view |
+| **B**(File Artifacts) | Calypso `myAccess === 'edit'`(SIREN BE가 대신 물어봄, 07장 §2) | Calypso `myAccess`가 edit 또는 view — `restrictView`가 꺼진(기본) artifact는 project 멤버 전원이 view라 사실상 전부 후보에 뜬다 |
 | **C**(HPC Service) | 그 서비스 `canEdit`(라이브 조회) — **더 이상 항상 잠겨 있지 않다** | 그 서비스 `canView`(라이브 조회) |
 | **D**(External/Attested) | 해당 없음(옵션 자체가 없다) | 자유(검증할 시스템이 없다) |
 
@@ -299,7 +307,9 @@ code/revision을 쓸 수 있는 경우)는 이제 **그 서비스 쪽이 필터�
   (§11.4 — workflow 개념을 모른다) code/revision 필터가 필요 없다. **SIREN BE가 Calypso BE를
   대신 호출한다** — FE는 Calypso를 직접 부르지 않는다(07장 §2). Calypso의
   `GET /artifacts?projectId=`가 이미 `myAccess`(edit/view, none은 자체적으로 걸러짐)를 계산해
-  주므로 그 값을 그대로 pickability에 쓴다.
+  주므로 그 값을 그대로 pickability에 쓴다. §3.1의 view 기본 개방 때문에, **받는(received)
+  후보 목록은 사실상 그 project의 Calypso artifact 전체**가 된다 — 검색(이름/부서) 필터를
+  화면에 둔다(사용자 요청 — CalypsoArtifactPicker의 기존 검색창을 그대로 쓴다).
   - **열람·recipient 관리도 Calypso 자체 권한(`editors`/`viewGrants`)이 유일한 진실이다** —
     §3에서 정리했듯 SIREN은 B의 권한을 따로 보관하지 않는다. 매핑 확정 직후 같은 방식으로
     Calypso의 전체 버전 이력을 한 번 pull해 온다.

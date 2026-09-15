@@ -17,12 +17,14 @@ export class ArtifactsService {
    * (지금 project 안에서의) 소속 부서가 들어있는지로 본다.
    *
    *   edit: createdBy === me || editors에 내 knoxId/department 매치 || isAdmin
-   *   view: edit이거나 || viewGrants에 내 knoxId/department 매치
+   *   view: edit이거나 || restrictView가 false(기본, project member 누구나) || viewGrants
+   *         에 내 knoxId/department 매치
    *   none: 나머지 — list()에서 제외되고 detail()은 403
    */
   computeAccess(a: ArtifactDocument, actor: Actor): AccessLevel {
     if (actor.isAdmin || a.createdBy === actor.knoxId) return 'edit';
     if (this.grantMatches(a.editors, actor)) return 'edit';
+    if (!a.restrictView) return 'view';
     if (this.grantMatches(a.viewGrants, actor)) return 'view';
     return 'none';
   }
@@ -81,7 +83,17 @@ export class ArtifactsService {
       isMock: false,
       editors: [],
       viewGrants: [],
+      restrictView: dto.restrictView ?? false,
     });
+  }
+
+  /** view 제한 on/off — 등록자/editors/Admin만(다른 edit 동작과 동일한 기준). */
+  async setRestrictView(id: string, restrictView: boolean, actor: Actor) {
+    const a = await this.findOrThrow(id);
+    this.assertCanEdit(a, actor);
+    a.restrictView = restrictView;
+    await a.save();
+    return a;
   }
 
   private assertCanEdit(a: ArtifactDocument, actor: Actor): void {
