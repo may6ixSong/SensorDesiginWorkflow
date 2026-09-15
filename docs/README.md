@@ -222,7 +222,7 @@ CIS(CMOS Image Sensor) 설계 산출물을 workflow 캔버스 위에서 흐름�
 | T8 | 실 DB 마이그레이션 | 인메모리 모드는 시드가 새 스키마로 다시 만들어져 해당 없음. 실 DB 환경에서만 `prompts/db-migration-v3.md` 를 desktop 세션에 전달. **코드 변경 없이 데이터만 바꾸는 작업**이다 |
 | T7 | Release Revoke | **열지 않기로 약속된 시나리오.** 요청이 와도 재논의 대상 |
 | T9 | Hub sync 주기 구체화 | A/B/C 모두 **version 발행 이벤트를 즉시 SIREN에 전송**하고, 유실 대비로 작업 없는 야간 시간대에 **1일 1회 전체 재동기화**를 하기로 잠정 합의. 정확한 실행 시각·윈도우·재시도 정책은 추후 확정 |
-| T10 | Tier B 자동 view 권한 부여 실패 시 재시도 | release 시 Calypso edit 권한자의 File Artifact를 recipient 부서에 view로 upsert하는 호출이 실패했을 때, 자동 재시도를 둘지 로그만 남길지 추후 결정(05장 §4.6) |
+| ~~T10~~ | ~~Tier B 자동 view 권한 부여 실패 시 재시도~~ | **폐기.** Calypso의 view가 기본적으로 project member 전원에게 열리도록 바뀌면서(`restrictView`, 04장 §3.1) release 시 자동 view 부여 규칙 자체를 없앴다(05장 §4.6) |
 | T11 | 기존 코드 주석의 Tier 명칭 일괄 치환 | 이 문서 묶음과 새로 쓰는 내용은 전부 OA Service/File Artifacts/HPC Service를 쓰지만, 기존 소스코드 주석(`api/src/**`, `web/src/**`)에 남아 있는 "Tier A/B/C" 표현과 04장 재구성으로 번호가 바뀐 `§3.x` 류 cross-reference는 이번 반영에서 건드리지 않았다 — 별도의 일괄 치환 작업으로 진행한다. 내부 enum 값(`'A'│'B'│'C'│'D'`)은 그대로 유지 |
 | ~~T12~~ | ~~RPM 연동 prompt 문서 재발급~~ | **완료.** `prompts/rpm-and-mockdb-hub-v4-prompt.md`가 새 계약(code+revision 후보 조회, `externalArtifactId` 전역 유일성, version push 이벤트)과 mock/dev DB 정리를 함께 담아 대체한다. 구 `prompts/rpm-integration-prompt.md`·`prompts/siren-rpm-mapping-ui-prompt.md`는 폐기한 `ProjectServiceLink` 흐름 전제라 더 이상 안 맞으니 새 프롬프트를 쓴다 |
 

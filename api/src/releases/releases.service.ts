@@ -8,7 +8,6 @@ import { ArtifactDocument, ArtifactVersion } from '../artifacts/schemas/artifact
 import { BlocksService } from '../blocks/blocks.service';
 import { ArtifactsService, majorKeyOf } from '../artifacts/artifacts.service';
 import { EdgesService } from '../edges/edges.service';
-import { CalypsoClientService } from '../hub/calypso-client.service';
 import { NotificationService } from '../notifications/notification.service';
 import { AuditService } from '../audit/audit.service';
 import { Actor } from '../common/actor';
@@ -69,7 +68,6 @@ export class ReleasesService {
     private readonly blocks: BlocksService,
     private readonly artifacts: ArtifactsService,
     private readonly edges: EdgesService,
-    private readonly calypso: CalypsoClientService,
     private readonly notifications: NotificationService,
     private readonly audit: AuditService,
   ) {}
@@ -385,37 +383,7 @@ export class ReleasesService {
       this.logger.error(`Release notification failed for v${seq} — ${(e as Error).message}`);
     });
 
-    await this.autoGrantFileArtifactViewAccess(items, actor);
-
     return release;
-  }
-
-  /**
-   * Tier B(File Artifacts) 자동 view 권한 부여(설계서 05장 §4.6) — release를 실행하는
-   * 사용자가 Calypso edit 권한을 가진 File Artifact마다, 그 block의 recipient 부서 각각에
-   * view grant를 upsert한다. release 자체는 절대 막지 않는다(best-effort, §6.4와 같은 원칙).
-   */
-  private async autoGrantFileArtifactViewAccess(items: ReleaseItem[], actor: Actor): Promise<void> {
-    const fileItems = items.filter((i) => i.tier === 'B');
-    if (fileItems.length === 0) return;
-
-    const artifactIds = fileItems.map((i) => i.artifactId);
-    const artifactMap = await this.artifacts.findMany(artifactIds);
-
-    for (const item of fileItems) {
-      const artifact = artifactMap.get(item.artifactId);
-      if (!artifact?.externalArtifactId) continue;
-      for (const department of item.recipients.departments) {
-        // eslint-disable-next-line no-await-in-loop
-        await this.calypso
-          .addViewGrant(artifact.externalArtifactId, department, actor.knoxId, [], actor.isAdmin)
-          .catch((e) => {
-            this.logger.warn(
-              `Auto view-grant failed for ${artifact.externalArtifactId}/${department} — ${(e as Error).message}`,
-            );
-          });
-      }
-    }
   }
 
   private pickSource(

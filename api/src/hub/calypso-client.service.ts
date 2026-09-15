@@ -132,42 +132,6 @@ export class CalypsoClientService {
     }
   }
 
-  /**
-   * release 시 recipient 부서에 view grant를 upsert한다(설계서 05장 §4.6). Calypso의
-   * `POST /:id/view-grants`는 부여자(actor) 본인이 edit 권한을 가져야 하고 — 없으면 Calypso가
-   * 알아서 거부한다, 그래서 여기서 별도로 canEdit를 먼저 확인하지 않는다 — 이미 있는 grant는
-   * Calypso가 스스로 idempotent하게 처리한다(중복 추가/에러 없음). 실패해도 release 자체를
-   * 막지 않는다 — 호출부가 best-effort로 다룬다.
-   */
-  async addViewGrant(
-    externalArtifactId: string,
-    department: string,
-    knoxId: string,
-    departments: string[],
-    isAdmin: boolean,
-  ): Promise<boolean> {
-    if (!this.baseUrl) return false;
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
-    try {
-      const res = await fetch(`${this.baseUrl}/artifacts/${encodeURIComponent(externalArtifactId)}/view-grants`, {
-        method: 'POST',
-        signal: controller.signal,
-        headers: { ...this.actorHeaders(knoxId, departments, isAdmin), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'department', department }),
-      });
-      if (!res.ok) {
-        this.logger.warn(`Calypso view-grant upsert failed (${res.status}) for ${externalArtifactId}/${department}`);
-      }
-      return res.ok;
-    } catch (e) {
-      this.logger.warn(`Calypso view-grant upsert error for ${externalArtifactId}/${department} — ${(e as Error).message}`);
-      return false;
-    } finally {
-      clearTimeout(timer);
-    }
-  }
-
   async currentVersion(externalArtifactId: string, knoxId: string): Promise<{
     versionLabel: string;
     isReleased: boolean;
@@ -476,7 +440,7 @@ export class CalypsoClientService {
     }
   }
 
-  /** editors 또는 viewGrants에 한 건 추가 — addViewGrant(release 전용, 위)와 달리 user/department 둘 다 받는다. */
+  /** editors 또는 viewGrants에 한 건 추가 — user/department 둘 다 받는다. */
   async addGrant(
     externalArtifactId: string,
     kind: 'editors' | 'view-grants',
