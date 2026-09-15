@@ -12,9 +12,7 @@ import { useAuth } from '@/app/providers/AuthProvider';
 import { useDirectory } from '@/app/providers/DirectoryProvider';
 import { UserAvatar } from '@/components/common/Avatar';
 import { queryKeys } from '@/api/queryKeys';
-import {
-  CalypsoArtifact, createCalypsoArtifact, listCalypsoArtifacts, setCalypsoUserDepartments,
-} from '@/api/calypsoClient';
+import { CalypsoArtifact, createCalypsoArtifact, listCalypsoArtifacts } from '@/api/calypsoClient';
 import { toast } from '@/store/toastStore';
 import { CURSOR_POINTER, FONT_MONO, T } from '@/theme/tokens';
 
@@ -43,10 +41,7 @@ function ArtifactList({ project }: { project: ProjectDetailDto }) {
 
   const { data = [], isLoading, isError } = useQuery({
     queryKey: queryKeys.calypsoArtifacts(project._id),
-    queryFn: () => {
-      setCalypsoUserDepartments(myDepartments);
-      return listCalypsoArtifacts({ projectId: project._id });
-    },
+    queryFn: () => listCalypsoArtifacts({ projectId: project._id }),
   });
 
   return (
@@ -73,9 +68,9 @@ function ArtifactList({ project }: { project: ProjectDetailDto }) {
             borderRadius: '12px', padding: '18px 20px', fontSize: 12.5, lineHeight: 1.65,
           }}
         >
-          <Box sx={{ fontWeight: 700, mb: '4px' }}>Could not reach Calypso</Box>
-          This list lives in Calypso, not in SIREN. Check <code>CALYPSO_API</code> and its
-          {' '}<code>CORS_ORIGIN</code>, then reload.
+          <Box sx={{ fontWeight: 700, mb: '4px' }}>Could not reach the file service</Box>
+          This list lives in Calypso, fetched through SIREN&apos;s backend. Check that Calypso is
+          running and reachable from the SIREN API, then reload.
         </Box>
       ) : isLoading ? (
         /* 로딩 중에 아무것도 안 그리면 "빈 목록"과 구분이 안 된다 — 특히 Calypso가 응답하지
@@ -107,7 +102,7 @@ function ArtifactList({ project }: { project: ProjectDetailDto }) {
       ) : (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
           {data.map((a) => (
-            <ArtifactRow key={a.id} artifact={a} onOpen={() => navigate(`/artifacts/${a.id}`)} />
+            <ArtifactRow key={a.id} artifact={a} onOpen={() => navigate(`/projects/${project._id}/artifacts/${a.id}`)} />
           ))}
         </Box>
       )}

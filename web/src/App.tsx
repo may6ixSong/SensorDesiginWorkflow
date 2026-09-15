@@ -50,7 +50,7 @@ export default function App() {
         <Route path="/projects/:projectId" element={<ProjectInfoPage />} />
         <Route path="/projects/:projectId/members" element={<ProjectMembersPage />} />
         <Route path="/projects/:projectId/artifacts" element={<ArtifactListPage />} />
-        <Route path="/artifacts/:id" element={<ArtifactDetailPage />} />
+        <Route path="/projects/:projectId/artifacts/:id" element={<ArtifactDetailPage />} />
         <Route path="/details" element={<DetailsRedirect />} />
         <Route path="/details/:projectId" element={<DetailsRedirect />} />
         <Route path="/details/:projectId/:workflowId" element={<BoardPage />} />

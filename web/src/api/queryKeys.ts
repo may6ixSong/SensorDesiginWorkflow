@@ -25,12 +25,14 @@ export const queryKeys = {
   releasesByArtifact: (artifactId: string) => ['artifacts', artifactId, 'releases'] as const,
 
   hubServices: ['hub', 'services'] as const,
-  hubProjectSearch: (serviceKey: string, code: string, revision: string) =>
-    ['hub', 'services', serviceKey, 'projects', 'search', code, revision] as const,
 
-  /** "새 Artifact 추가" 다이얼로그(설계서 04장 §6) — Tier별 후보 목록. */
-  artifactCandidates: (workflowId: string, source: string, intent: string, serviceKey?: string, externalProjectId?: string) =>
-    ['workflows', workflowId, 'artifact-candidates', source, intent, serviceKey ?? '', externalProjectId ?? ''] as const,
+  /**
+   * "새 Artifact 추가" 다이얼로그(설계서 04장 §6) — Tier별 후보 목록. project 사전 링크
+   * 단계는 폐지됐다(07장 §7) — code/revision은 그 workflow가 속한 project에서 서버가
+   * 그대로 채우므로 FE는 externalProjectId를 더 이상 들고 있지 않는다.
+   */
+  artifactCandidates: (workflowId: string, source: string, intent: string, serviceKey?: string) =>
+    ['workflows', workflowId, 'artifact-candidates', source, intent, serviceKey ?? ''] as const,
   /** Calypso api를 직접 호출한다 — SIREN이 소유한 캐시가 아니라 원격 데이터 캐시다. */
   calypsoArtifacts: (projectId: string) => ['calypso', 'artifacts', projectId] as const,
   calypsoArtifact: (id: string) => ['calypso', 'artifacts', 'detail', id] as const,

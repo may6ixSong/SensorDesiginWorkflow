@@ -1,12 +1,10 @@
-import { Box, CircularProgress } from '@mui/material';
+import { Box } from '@mui/material';
 import { AccessGrant, ArtifactIntent } from '@/types/domain';
 import { Field } from '@/components/common/Panel';
-import { Icon } from '@/components/common/Icon';
 import { AccessGrantEditor } from '@/components/dialogs/AccessGrantEditor';
 import { CalypsoArtifactPicker } from '@/components/artifact/CalypsoArtifactPicker';
 import { OAServiceArtifactPicker } from '@/components/artifact/OAServiceArtifactPicker';
-import { useArtifactCandidates } from '@/api/hooks/useHub';
-import { CURSOR_POINTER, FONT_MONO, R, T } from '@/theme/tokens';
+import { CURSOR_POINTER, R, T } from '@/theme/tokens';
 
 export type ArtifactSourceKind = 'live' | 'file' | 'hpc' | 'attested';
 
@@ -36,8 +34,6 @@ export const emptySourceState = (): ArtifactSourceState => ({
 interface Props {
   workflowId: string;
   projectId: string | undefined;
-  projectCode: string | undefined;
-  projectRevision: string | undefined;
   intent: ArtifactIntent;
   myDepartments: string[];
   departmentOptions: string[];
@@ -50,14 +46,18 @@ interface Props {
 /**
  * "새 Artifact 추가"와 "산출물 변경" 양쪽이 공유하는 소스 선택 UI(설계서 04장 §6).
  * Tier 글자는 절대 노출하지 않는다 — OA Service/File Artifacts/HPC Service(+받는 쪽만
- * External/Attested)로만 보여준다. HPC Service는 항상 잠겨 있고 미리보기만 제공한다.
+ * External/Attested)로만 보여준다.
+ *
+ * ★ HPC Service(C)는 더 이상 "항상 잠김"이 아니다 — HPC망과의 양방향 API 연동이
+ *   확정되면서 OA Service(A)와 완전히 같은 흐름(서비스 선택 → 실시간 후보 조회 →
+ *   pickable 판정)을 쓴다(설계서 04장 §2, §6.2, §6.3). 그래서 OAServiceArtifactPicker를
+ *   `source` prop만 바꿔 그대로 재사용한다.
  */
 export function ArtifactSourcePicker({
-  workflowId, projectId, projectCode, projectRevision, intent, myDepartments, departmentOptions,
+  workflowId, projectId, intent, departmentOptions,
   state, onChange, onSelectName,
 }: Props) {
   const options: ArtifactSourceKind[] = intent === 'own' ? ['live', 'file', 'hpc'] : ['live', 'file', 'hpc', 'attested'];
-  const hpcPreview = useArtifactCandidates(workflowId, 'hpc', intent, undefined, state.source === 'hpc');
 
   return (
     <>
@@ -83,11 +83,10 @@ export function ArtifactSourcePicker({
         </Box>
       </Field>
 
-      {state.source === 'live' && (
+      {(state.source === 'live' || state.source === 'hpc') && (
         <OAServiceArtifactPicker
           workflowId={workflowId}
-          projectCode={projectCode}
-          projectRevision={projectRevision}
+          source={state.source}
           intent={intent}
           serviceKey={state.serviceKey}
           // serviceKey와 liveArtifactId 초기화를 **한 번의 setState**로 묶는다 — 따로
@@ -102,52 +101,11 @@ export function ArtifactSourcePicker({
       {state.source === 'file' && (
         <CalypsoArtifactPicker
           projectId={projectId}
-          myDepartments={myDepartments}
           value={state.calypsoArtifactId}
           onChange={(v) => onChange({ ...state, calypsoArtifactId: v })}
           onSelectName={onSelectName}
           intent={intent}
         />
-      )}
-
-      {state.source === 'hpc' && (
-        <Field label="HPC Service — not integrated yet">
-          <Box
-            sx={{
-              display: 'flex', alignItems: 'flex-start', gap: '8px',
-              background: T.warnSoft, border: `1px solid ${T.warnLine}`, color: T.warn,
-              borderRadius: `${R.sm}px`, padding: '9px 12px', fontSize: 12, lineHeight: 1.55, mb: '10px',
-            }}
-          >
-            <Box sx={{ mt: '1px', flexShrink: 0 }}><Icon name="warn" /></Box>
-            <Box>HPC Service artifacts can&apos;t be selected yet — shown below for preview only.</Box>
-          </Box>
-          {hpcPreview.isLoading ? (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 0', fontSize: 12, color: T.dm2 }}>
-              <CircularProgress size={13} /> Loading…
-            </Box>
-          ) : (
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-              {(hpcPreview.data?.candidates ?? []).map((c) => (
-                <Box
-                  key={c.externalArtifactId}
-                  sx={{
-                    fontSize: 12.5, padding: '8px 10px', borderRadius: '8px', opacity: 0.6,
-                    background: T.sf, border: `1px solid ${T.ln}`,
-                  }}
-                >
-                  <Box sx={{ fontWeight: 600 }}>{c.name}</Box>
-                  <Box sx={{ fontFamily: FONT_MONO, fontSize: 10.5, color: T.dm2, mt: '2px' }}>
-                    {c.currentVersionLabel}
-                  </Box>
-                </Box>
-              ))}
-              {!hpcPreview.data?.candidates.length && (
-                <Box sx={{ fontSize: 11.5, color: T.dm2 }}>No preview data for this project.</Box>
-              )}
-            </Box>
-          )}
-        </Field>
       )}
 
       {state.source === 'attested' && (
@@ -167,9 +125,9 @@ export function ArtifactSourcePicker({
 export function resolveNewArtifact(
   state: ArtifactSourceState,
   name: string,
-): { source: 'live' | 'file' | 'attested'; name: string; serviceKey?: string; externalArtifactId?: string; expectedGiver?: AccessGrant } | null {
-  if (state.source === 'live' && state.serviceKey && state.liveArtifactId) {
-    return { source: 'live', name, serviceKey: state.serviceKey, externalArtifactId: state.liveArtifactId };
+): { source: 'live' | 'file' | 'hpc' | 'attested'; name: string; serviceKey?: string; externalArtifactId?: string; expectedGiver?: AccessGrant } | null {
+  if ((state.source === 'live' || state.source === 'hpc') && state.serviceKey && state.liveArtifactId) {
+    return { source: state.source, name, serviceKey: state.serviceKey, externalArtifactId: state.liveArtifactId };
   }
   if (state.source === 'file' && state.calypsoArtifactId) {
     return { source: 'file', name, externalArtifactId: state.calypsoArtifactId };

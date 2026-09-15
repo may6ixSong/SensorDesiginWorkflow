@@ -4,7 +4,6 @@ import axios from 'axios';
 import { addEventLog } from '../../service/event-log-service';
 import { useTranslation } from 'react-i18next';
 import { setApiActingAs, setApiKnoxId, setApiUserGroup } from '../../api/client';
-import { setCalypsoActingAsGroup } from '../../api/calypsoClient';
 import { getEmployeesByIDs } from '../../service/user-service';
 import { useThemeMode } from '../../theme/ThemeModeContext';
 
@@ -250,11 +249,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
 
     setApiActingAs(knoxId);
-    // Calypso의 admin bypass는 그 사람 자신의 Group으로 판정해야 한다(사용자 요청: 시뮬레이션
-    // 중엔 Admin의 super 권한이 아니라 그 사람 실제 권한으로 보여야 함) — X-User-Group은
-    // 실제 호출자(Admin) 것으로 그대로 두고(시뮬레이션 자체를 켤 수 있는 자격 검증용),
-    // 대상의 Group은 별도 헤더(X-Acting-As-Group)로 전달한다.
-    setCalypsoActingAsGroup(target.Group);
+    // Calypso를 포함해 그 어떤 서비스도 이제 브라우저가 직접 호출하지 않는다 — SIREN BE가
+    // actor(knoxId/isAdmin/isImpersonating)만으로 department/admin 여부를 대신 계산해서
+    // 싣는다(설계서 07장 §2). 그래서 여기서 그 서비스 몫의 헤더를 따로 계산해 둘 필요가
+    // 없다 — 예전엔 Calypso의 admin bypass를 위해 대상 본인의 Group을 별도로 실어 보냈지만,
+    // SIREN Actor 모델 자체에 "시뮬레이션 대상 본인의 Group"이라는 축이 없어 그 세부까지
+    // 재현하지는 않는다(A/C Tier의 게이트 2 라이브 조회와 같은 단순화).
     setSimulatedAccountDenied(denied);
     setSimulatedUser(target);
     i18n.changeLanguage(target.Language);
@@ -263,7 +263,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const stopSimulation = () => {
     setApiActingAs(null);
-    setCalypsoActingAsGroup(null);
     setSimulatedUser(null);
     setSimulatedAccountDenied(false);
     i18n.changeLanguage(realUser.Language);

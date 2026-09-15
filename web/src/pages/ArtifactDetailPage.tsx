@@ -13,22 +13,22 @@ import { queryKeys } from '@/api/queryKeys';
 import {
   CalypsoGrantInput, CalypsoVersionView, addCalypsoEditor, addCalypsoViewGrant,
   downloadCalypsoVersion, getCalypsoArtifact, releaseCalypsoArtifact,
-  removeCalypsoEditor, removeCalypsoViewGrant, setCalypsoUserDepartments, uploadCalypsoVersion,
+  removeCalypsoEditor, removeCalypsoViewGrant, uploadCalypsoVersion,
 } from '@/api/calypsoClient';
 import { toast } from '@/store/toastStore';
 import { T } from '@/theme/tokens';
 
 /** A(내용+업로드):B(버전 트리) = 3:1 — workflow 쪽 상세 패널과 같은 비율(사용자 요청). */
 export function ArtifactDetailPage() {
-  const { id = '' } = useParams();
+  const { id = '', projectId = '' } = useParams();
   const { user } = useAuth();
   const qc = useQueryClient();
   const [picked, setPicked] = useState<CalypsoVersionView | null>(null);
 
   const { data: a, isLoading, isError, error } = useQuery({
     queryKey: queryKeys.calypsoArtifact(id),
-    queryFn: () => getCalypsoArtifact(id),
-    enabled: Boolean(id),
+    queryFn: () => getCalypsoArtifact(id, projectId),
+    enabled: Boolean(id) && Boolean(projectId),
     retry: false,
   });
   const forbidden = (error as any)?.response?.status === 403;
@@ -39,58 +39,55 @@ export function ArtifactDetailPage() {
     if (forbidden) toast('You do not have view access to this artifact.');
   }, [forbidden]);
 
-  // Artifact ACL의 부서 단위 부여는 "이 project 안에서의 내 부서"를 알아야 판정된다 —
-  // artifact를 먼저 읽어야 projectId를 알 수 있으므로 project 조회는 그 뒤에 붙는다.
-  const { data: project } = useProject(a?.projectId);
+  // department는 더 이상 여기서 직접 계산해 싣지 않는다 — SIREN BE가 projectId로
+  // 대신 계산한다(설계서 07장 §2). project는 화면 표시(부서 후보 등)에만 쓴다.
+  const { data: project } = useProject(projectId);
   const myDepartments = useMemo(
     () => project?.members.find((m) => m.knoxId === user?.KnoxID)?.departments ?? [],
     [project?.members, user?.KnoxID],
   );
-  useEffect(() => {
-    if (project) setCalypsoUserDepartments(myDepartments);
-  }, [project, myDepartments]);
 
   useEffect(() => setPicked(null), [id]);
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: queryKeys.calypsoArtifact(id) });
-    if (a) qc.invalidateQueries({ queryKey: queryKeys.calypsoArtifacts(a.projectId) });
+    if (projectId) qc.invalidateQueries({ queryKey: queryKeys.calypsoArtifacts(projectId) });
   };
 
   const upload = useMutation({
-    mutationFn: ({ file, note }: { file: File; note: string }) => uploadCalypsoVersion(id, file, note),
+    mutationFn: ({ file, note }: { file: File; note: string }) => uploadCalypsoVersion(id, projectId, file, note),
     onSuccess: () => { invalidate(); toast('Working copy uploaded'); },
     onError: (e: any) => toast(e?.response?.data?.message ?? 'Upload failed'),
   });
   const release = useMutation({
-    mutationFn: (note: string) => releaseCalypsoArtifact(id, note),
+    mutationFn: (note: string) => releaseCalypsoArtifact(id, projectId, note),
     onSuccess: () => { invalidate(); toast('Published'); },
     onError: (e: any) => toast(e?.response?.data?.message ?? 'Publish failed'),
   });
   const addEditor = useMutation({
-    mutationFn: (g: CalypsoGrantInput) => addCalypsoEditor(id, g),
+    mutationFn: (g: CalypsoGrantInput) => addCalypsoEditor(id, projectId, g),
     onSuccess: invalidate,
     onError: (e: any) => toast(e?.response?.data?.message ?? 'Could not grant edit access'),
   });
   const removeEditor = useMutation({
-    mutationFn: (g: CalypsoGrantInput) => removeCalypsoEditor(id, g),
+    mutationFn: (g: CalypsoGrantInput) => removeCalypsoEditor(id, projectId, g),
     onSuccess: invalidate,
     onError: (e: any) => toast(e?.response?.data?.message ?? 'Could not remove editor'),
   });
   const addViewGrant = useMutation({
-    mutationFn: (g: CalypsoGrantInput) => addCalypsoViewGrant(id, g),
+    mutationFn: (g: CalypsoGrantInput) => addCalypsoViewGrant(id, projectId, g),
     onSuccess: invalidate,
     onError: (e: any) => toast(e?.response?.data?.message ?? 'Could not grant view access'),
   });
   const removeViewGrant = useMutation({
-    mutationFn: (g: CalypsoGrantInput) => removeCalypsoViewGrant(id, g),
+    mutationFn: (g: CalypsoGrantInput) => removeCalypsoViewGrant(id, projectId, g),
     onSuccess: invalidate,
     onError: (e: any) => toast(e?.response?.data?.message ?? 'Could not remove viewer'),
   });
 
   const handleDownload = async (v: CalypsoVersionView) => {
     try {
-      const blob = await downloadCalypsoVersion(id, v.versionRef);
+      const blob = await downloadCalypsoVersion(id, projectId, v.versionRef);
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -140,7 +137,7 @@ export function ArtifactDetailPage() {
         <Box sx={{ flex: '0 0 auto', padding: '15px 22px', borderBottom: `1px solid ${T.ln}`, background: T.sf }}>
           <Box
             component={Link}
-            to={`/projects/${a.projectId}/artifacts`}
+            to={`/projects/${projectId}/artifacts`}
             sx={{ fontSize: 11.5, color: T.dm, textDecoration: 'none', '&:hover': { color: T.tx } }}
           >
             ← Artifacts

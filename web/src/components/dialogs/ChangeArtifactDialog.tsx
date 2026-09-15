@@ -31,7 +31,7 @@ interface Props {
  *   그대로 유효하다는 보장이 없기 때문이다. 그 사실을 여기서 미리 알려 준다.
  */
 export function ChangeArtifactDialog({
-  block, projectId, projectCode, projectRevision, myDepartments, departmentOptions, onClose, onSave, submitting,
+  block, projectId, myDepartments, departmentOptions, onClose, onSave, submitting,
 }: Props) {
   const [name, setName] = useState(block.name);
   const [src, setSrc] = useState<ArtifactSourceState>(emptySourceState());
@@ -78,8 +78,6 @@ export function ChangeArtifactDialog({
       <ArtifactSourcePicker
         workflowId={block.workflowId}
         projectId={projectId}
-        projectCode={projectCode}
-        projectRevision={projectRevision}
         intent={block.intent}
         myDepartments={myDepartments}
         departmentOptions={departmentOptions}

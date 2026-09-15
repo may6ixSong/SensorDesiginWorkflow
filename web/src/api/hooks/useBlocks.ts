@@ -5,10 +5,11 @@ import { AccessGrant, ArtifactHtmlView, ArtifactIntent, ArtifactVersionDto, Bloc
 
 /**
  * artifactId(재사용) 대신 넘기면 서버가 그 자리에서 출처를 확정한다(find-or-create,
- * 설계서 04장 §6). Tier C는 아직 잠겨 있어 여기 나오지 않는다.
+ * 설계서 04장 §6). HPC Service(C)는 더 이상 잠겨 있지 않다 — OA Service(A)와 동일한
+ * 라이브 흐름이다(설계서 04장 §2, §6.2, §6.3).
  */
 export interface NewArtifactSourceInput {
-  source: 'live' | 'file' | 'attested';
+  source: 'live' | 'file' | 'hpc' | 'attested';
   name: string;
   serviceKey?: string;
   externalArtifactId?: string;
@@ -138,10 +139,9 @@ export function useDeleteBlock(workflowId: string) {
 }
 
 /**
- * **A Tier block의 recipient 교체** (설계서 04장 §3.3).
- *
- * B/C/D는 이 라우트를 쓰지 않는다 — 그쪽은 artifact.viewAccess가 곧 recipient이고
- * artifact 단위로 중앙 관리된다(useArtifacts의 useReplaceArtifactAccess).
+ * **A/B/C(OA Service/File Artifacts/HPC Service) block의 recipient 교체** (설계서
+ * 04장 §3.2, §3.3). 셋 다 공통이다 — D만 이 라우트를 쓰지 않는다(그쪽은 옛 모델인
+ * artifact.editAccess/viewAccess를 쓴다, useArtifacts의 useReplaceArtifactAccess).
  *
  * ★ 편집 권한은 그 workflow의 Edit Access다. recipient에 **속하는 것**과 recipient를
  *   **편집하는 것**은 별개라, 자기를 넣지 않으면 고쳐놓고도 그 slide를 못 열 수 있다.
