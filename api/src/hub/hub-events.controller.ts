@@ -58,7 +58,10 @@ export class HubEventsController {
       .exec();
     if (!artifact) return { recorded: false };
 
-    artifact.name = dto.artifactName.trim();
+    // ★ artifact.name은 안 건드린다 — SIREN 쪽에서 생성 시 admin/사용자가 정한 이름을
+    //   그대로 유지한다(block.name과 같은 이유, 사용자 지적). 예전에는 이 이벤트의
+    //   artifactName으로 매번 덮어썼는데, 그러면 그 admin이 정한 이름이 첫 이벤트가
+    //   오는 순간 영구히 그 서비스가 부르는 이름으로 바뀌어버려 의미가 없었다.
     this.hubSync.upsertVersionEntry(artifact, sender.tier, {
       versionLabel: dto.versionLabel,
       isPublished: dto.isPublished,

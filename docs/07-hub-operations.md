@@ -123,9 +123,6 @@ interface VersionPublishedEvent {
   /** 그 서비스 안에서 이 산출물 인스턴스를 가리키는 값 — 서비스 전체에서 유일해야 한다(§4.3) */
   externalArtifactId: string;
 
-  /** 화면 표시용 이름. 올 때마다 SIREN의 캐시된 이름을 이 값으로 갱신한다 */
-  artifactName: string;
-
   /** 이 버전 엔트리를 마지막으로 갱신한 사람의 knox id */
   updatedUserId: string;
 
@@ -165,9 +162,6 @@ export class VersionPublishedEventDto {
   externalArtifactId: string;
 
   @IsString() @MinLength(1)
-  artifactName: string;
-
-  @IsString() @MinLength(1)
   updatedUserId: string;
 
   @IsISO8601()
@@ -205,6 +199,12 @@ export class VersionPublishedEventDto {
   아무것도 그리지 않는다(observer 계약의 기존 동작 그대로, §5).
 - **`code`/`revision`/`externalProjectId`** — 안 둔다. `externalArtifactId`가 서비스
   전체에서 유일하므로 project 식별을 따로 실을 필요가 없다(§4.3).
+- **`artifactName`** — 처음엔 있었는데 뺐다. `Artifact.name`은 "새 Artifact 추가" 다이얼로그
+  에서 SIREN 쪽 사용자가 처음 지정한 이름으로 고정된다(`block.name`과 같은 이유 — 화면에
+  보이는 이름은 SIREN 쪽이 관리한다). 이 필드를 이벤트에 실어서 매번 SIREN의 캐시 이름을
+  갱신하게 했더니, 서비스가 처음 event를 보내는 순간 그 사용자가 지정한 이름이 그 서비스가
+  부르는 이름으로 영구히 덮어써져서 의미가 없어졌다 — 그래서 아예 뺐다. `Artifact.name`을
+  바꾸는 유일한 경로는 이제 SIREN 관리자의 수동 rename뿐이다.
 
 ### 4.2 매칭·저장 규칙
 

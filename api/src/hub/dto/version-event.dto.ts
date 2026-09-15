@@ -20,11 +20,6 @@ export class VersionPublishedEventDto {
   @MinLength(1)
   externalArtifactId: string;
 
-  /** 화면 표시용 이름. 올 때마다 SIREN의 캐시된 이름을 이 값으로 갱신한다 */
-  @IsString()
-  @MinLength(1)
-  artifactName: string;
-
   /** 이 버전 엔트리를 마지막으로 갱신한 사람의 knox id */
   @IsString()
   @MinLength(1)

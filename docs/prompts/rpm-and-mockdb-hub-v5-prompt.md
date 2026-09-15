@@ -99,6 +99,13 @@ Content-Type: application/json
 벗어나면(필수 필드 누락, 타입 불일치, 정의 안 된 필드 포함) SIREN이 요청 전체를 400으로
 거부한다. 일부만 기록되는 부분 반영은 없다.
 
+★ **RPM 코드를 이전에(이 문서의 예전 버전으로) 이미 고쳤다면 다시 확인해라 — `artifactName`
+필드가 빠졌다.** 예전엔 있었는데, 그 필드가 있으면 SIREN 쪽 admin이 "새 Artifact 추가"
+다이얼로그에서 직접 지정한 이름이 RPM이 보내는 이름으로 매 이벤트마다 영구히 덮어써지는
+문제가 있어서 아예 뺐다(07장 §4.1). **RPM이 아직도 요청 바디에 `artifactName`을 실어 보내고
+있다면, SIREN이 이제 그 요청을 400으로 거부한다** — `whitelist:true`라 정의 안 된 필드가
+섞이면 통째로 거부되기 때문이다. RPM 코드에서 이 필드를 완전히 빼야 한다.
+
 ```ts
 interface VersionPublishedEvent {
   /** Service Manage에서 SIREN이 발급한 값 — 어떤 종류의 산출물인지 */
@@ -106,9 +113,6 @@ interface VersionPublishedEvent {
 
   /** RPM 안에서 이 산출물 인스턴스를 가리키는 값 — RPM 전체에서 유일해야 한다(A-2 참고) */
   externalArtifactId: string;
-
-  /** 화면 표시용 이름. 보낼 때마다 SIREN의 캐시된 이름을 이 값으로 갱신한다 */
-  artifactName: string;
 
   /** 이 버전 엔트리를 마지막으로 갱신한 사람의 knox id */
   updatedUserId: string;
