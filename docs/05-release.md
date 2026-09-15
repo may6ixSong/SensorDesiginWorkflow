@@ -124,6 +124,39 @@ Source 버전을 다시 고르는 것은 **이번 release에서 `changed: true` 
 **불가능하다.** Revoke 기능을 만들지 않는다. update/delete API도 두지 않는다.
 이건 약속된 시나리오이며, 요청이 와도 재논의 대상이다(README §4 T7).
 
+### 4.6 Tier B 자동 view 권한 부여
+
+release 실행 시, 이 release에 포함된 **Tier B(File Artifacts, Calypso) 항목마다** 아래를 확인해
+자동으로 처리한다.
+
+```
+release를 실행하는 사용자가 그 File Artifact에 대해 Calypso edit 권한을 갖고 있는가?
+  아니다 → 아무것도 하지 않는다.
+  맞다   → 그 block의 recipient 부서 각각에 대해, 그 File Artifact의 view 권한을 upsert한다.
+```
+
+- **대상**: 이 release에 포함된 모든 Tier B 항목. `changed` 여부와 무관하다 — §2.1의 "artifact가
+  매핑된 것 전부 자동 포함"과 같은 범위를 그대로 따른다.
+- **edit 권한 판정**은 SIREN이 아니라 **그 순간 Calypso에 라이브로 물어봐서** 확인한다 — B tier
+  권한은 이제 SIREN이 보관/판정하지 않는다(권한을 전 tier에서 각 서비스가 canView/canEdit로만
+  응답하고 SIREN은 관여하지 않기로 한 결정에 따른다). SIREN BE가 release 실행 시점에 Calypso BE를
+  호출해서 확인하며, FE가 직접 Calypso를 부르지 않는다.
+- **받는 부서**는 그 block의 recipient 부서다 — B tier도 이제 A와 같은 방식으로 workflow(block)
+  단위로 recipient를 구성하기로 했으므로, 그 recipient 목록을 그대로 쓴다.
+  > 이 문서의 §6.2 "수신자 계산" 표는 아직 구 모델(artifact 단위 `viewAccess`)로 남아 있다 —
+  > 허브 운영 방식 정리가 끝나면 04장·05장 §6.2를 한 번에 새 모델로 정리한다. 이 규칙은 새 모델
+  > (block 단위 recipient) 기준으로 적어둔 것이다.
+- **부서 단위 grant만** 대상이다. 개별 사용자 grant는 이 규칙으로 자동 추가하지 않는다.
+- **upsert다.** 그 File Artifact에 그 부서의 view grant가 이미 등록돼 있으면 그대로 두고 건드리지
+  않는다 — 중복 추가도, 에러도 없다.
+- 자동으로 추가되는 건 **view뿐**이다. edit 권한은 이 규칙으로 부여되지 않는다.
+- Calypso 자체 데이터(그 artifact의 viewGrants)에 쓰는 것이므로, 한 번 추가되면 **이 release가
+  끝난 뒤에도, 다른 workflow에서 같은 artifact를 참조할 때도 그대로 유지**된다 — B tier 권한은
+  artifact 단위로 중앙 관리되기 때문이다.
+- **실패 처리**: Calypso 호출이 실패해도 release 자체를 막지 않는다 — §6.4의 알림 전송 실패와
+  같은 원칙이다. 로그를 남기고 release는 그대로 확정한다. 재시도를 자동으로 할지는 추후 결정
+  (README §4 TODO로 별도 추가 예정).
+
 ---
 
 ## 5. 저장 내용
