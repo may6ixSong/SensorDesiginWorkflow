@@ -34,11 +34,21 @@ export class CalypsoClientService {
     return this.config.get<string>('calypsoApiUrl') ?? '';
   }
 
-  /** Calypso가 이해하는 호출자 헤더 3종 — calypso/src/common/actor.ts 참고. */
+  /**
+   * Calypso가 이해하는 호출자 헤더 3종(calypso/src/common/actor.ts) + 서비스 토큰 하나.
+   *
+   * `X-Knox-Id` 등은 신원 **주장**일 뿐 Calypso가 검증하지 않는다 — 그래서 최소한
+   * "이 호출이 SIREN BE에서 온 게 맞는가"는 별도 공유 비밀(`X-Siren-Token`)로 증명한다.
+   * Calypso 쪽이 이 토큰을 검증한다(calypso/src/common/siren-caller.guard.ts). 이 방향은
+   * 반대 방향(Calypso → SIREN의 version 이벤트, DB에 저장된 ArtifactService.token — §3.4)과는
+   * 다른 토큰이다 — 서로 다른 방향의 호출을 서로 다른 비밀로 증명한다.
+   */
   private actorHeaders(knoxId: string, departments: string[], isAdmin: boolean): Record<string, string> {
     const headers: Record<string, string> = { 'X-Knox-Id': knoxId };
     if (departments.length) headers['X-User-Departments'] = departments.join(',');
     if (isAdmin) headers['X-User-Group'] = 'Admin';
+    const token = this.config.get<string>('calypsoApiToken');
+    if (token) headers['X-Siren-Token'] = token;
     return headers;
   }
 
@@ -170,7 +180,7 @@ export class CalypsoClientService {
     try {
       const res = await fetch(`${this.baseUrl}/artifacts/${encodeURIComponent(externalArtifactId)}/current-version`, {
         signal: controller.signal,
-        headers: { 'X-Knox-Id': knoxId },
+        headers: this.actorHeaders(knoxId, [], false),
       });
       if (!res.ok) {
         this.logger.warn(`Calypso current-version failed (${res.status}) for ${externalArtifactId}`);
@@ -208,7 +218,7 @@ export class CalypsoClientService {
     try {
       const res = await fetch(`${this.baseUrl}/artifacts/${encodeURIComponent(externalArtifactId)}/versions`, {
         signal: controller.signal,
-        headers: { 'X-Knox-Id': knoxId },
+        headers: this.actorHeaders(knoxId, [], false),
       });
       if (!res.ok) {
         this.logger.warn(`Calypso versions failed (${res.status}) for ${externalArtifactId}`);

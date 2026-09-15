@@ -25,6 +25,25 @@
 OA Service/HPC Service는 원래도 SIREN BE(`ObserverClientService`)를 통해서만 불렸으므로 이
 변경의 영향이 없다.
 
+### 2.1 SIREN BE → Calypso BE 호출 인증
+
+Calypso는 `X-Knox-Id` 등(actor.ts)을 **검증 없이 신원 주장으로만** 받는다 — 원래 브라우저가
+직접 호출하던 시절부터 그랬다. FE→BE 단일 경로로 바뀌면서 "적어도 이 호출이 SIREN BE에서
+온 게 맞는가"는 증명할 수 있어야 해서, 공유 비밀 토큰을 하나 더 얹는다.
+
+- SIREN BE가 매 호출마다 `X-Siren-Token` 헤더를 싣는다(`CALYPSO_API_TOKEN` 환경변수).
+- Calypso가 `SirenCallerGuard`로 그 값을 `SIREN_CALLER_TOKEN`과 대조한다
+  (`calypso/src/common/siren-caller.guard.ts`, `ArtifactsController` 전체에 적용).
+- 이건 event 수신 방향(Calypso → SIREN, §3.4의 DB 토큰 조회 경로)과는 **반대 방향의 별개
+  토큰**이다 — 두 방향을 서로 다른 비밀로 증명한다.
+- 둘 중 하나라도 값을 비워두면(로컬 개발 기본값) 그쪽 검증은 건너뛴다 — 운영 배포 시
+  양쪽에 반드시 같은 값을 심어야 한다.
+- ★ 지금은 `ArtifactsController` 전체(사람이 쓰는 화면 + observer 계약 라우트 전부)를
+  이 가드로 묶어도 안전하다 — Calypso 자체 프론트엔드를 당분간 안 쓰기로 했기 때문에
+  (§11.5) 이 컨트롤러를 부르는 건 SIREN BE뿐이다. **Calypso가 나중에 자기 프론트엔드를
+  새로 가지면 이 전제가 깨진다** — 그때는 "사람이 로그인해서 쓰는 라우트"와 "SIREN만
+  불러야 하는 라우트"를 갈라 가드 적용 범위를 다시 나눠야 한다.
+
 ---
 
 ## 3. Service Manage — OA Service / HPC Service 등록
@@ -32,6 +51,12 @@ OA Service/HPC Service는 원래도 SIREN BE(`ObserverClientService`)를 통해�
 App Bar → Admin 사용자 배지 → Service Manage. 화면을 **OA Service / HPC Service 두 공간으로
 나눈다.** File Artifacts(Calypso)는 여기 등록하지 않는다 — SIREN 내장 기능이라 목록에 없다
 (04장 §3.1).
+
+★ 그래도 Calypso의 event 토큰은 §3.4의 인증 경로를 **그대로** 탄다 — `ArtifactService`
+컬렉션에 `isBuiltIn:true`인 Calypso 문서 하나를 시드해 두고(`database/seed-data.ts`), 다른
+서비스와 같은 `HubTokenGuard`의 DB 토큰 조회 한 경로로 검증한다. 등록 UI에 노출되지 않는다는
+점만 다르다 — 별도 환경변수 비교 분기는 두지 않는다. (구 `CALYPSO_EVENT_TOKEN` 환경변수
+비교 방식은 폐기했다.)
 
 ### 3.1 등록 폼
 

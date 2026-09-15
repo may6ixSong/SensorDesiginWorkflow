@@ -44,13 +44,14 @@ export default () => ({
    */
   calypsoApiUrl: process.env.CALYPSO_API || 'http://localhost:3010/api/v1',
   /**
-   * File Artifacts(B, Calypso)가 version 발행 이벤트를 보낼 때 쓰는 Bearer token(설계서
-   * 07장 §3.4, §4.2) — Calypso는 Service Manage 등록 대상이 아니라서(§3.1) 다른 서비스처럼
-   * baseURL당 토큰을 자동 발급받지 못한다. 임시로 환경변수 하나로 고정한다 — 실제 배포
-   * 시 이 값을 SIREN과 Calypso 양쪽에 같이 심어야 한다. 비어 있으면 Calypso의 event
-   * 수신 자체가 항상 401이다.
+   * 반대 방향 — SIREN BE가 Calypso BE를 호출할 때(listArtifacts/access/upload/download/
+   * release/editors/view-grants 등, 설계서 07장 §2) 실어 보내는 공유 비밀 토큰.
+   * `X-Knox-Id` 등 actor 헤더는 신원 "주장"일 뿐 검증되지 않으므로(calypso/src/common/
+   * actor.ts), 최소한 "이 호출이 SIREN BE에서 온 게 맞는가"는 이 토큰으로 증명한다.
+   * Calypso 쪽 SIREN_CALLER_TOKEN과 같은 값을 심어야 한다. 비어 있으면(로컬 개발 기본값)
+   * Calypso 쪽도 검증을 건너뛴다 — 운영 배포 시 반드시 설정할 것.
    */
-  calypsoEventToken: process.env.CALYPSO_EVENT_TOKEN || '',
+  calypsoApiToken: process.env.CALYPSO_API_TOKEN || '',
   /** S3 호환 오브젝트 스토리지 (SFM_API files.service.ts와 동일한 키 구성). */
   storage: {
     uri: process.env.S3_URI ?? '',

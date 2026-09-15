@@ -12,12 +12,14 @@ import {
   Query,
   StreamableFile,
   UploadedFile,
+  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ConfigService } from '@nestjs/config';
 import { CurrentActor } from '../common/current-actor.decorator';
 import { Actor } from '../common/actor';
+import { SirenCallerGuard } from '../common/siren-caller.guard';
 import { ArtifactsService } from './artifacts.service';
 import { StorageService } from '../storage/storage.service';
 import {
@@ -43,8 +45,15 @@ function toGrantInput(dto: GrantDto): { type: 'user'; knoxId: string } | { type:
  *  - 사람이 쓰는 것: 목록·등록·업로드·릴리스·다운로드
  *  - SIREN이 호출하는 것: /artifacts/:id/current-version, /artifacts/:id/versions, /artifacts
  *    (docs/observer-contract-v1.yaml)
+ *
+ * ★ 지금은 이 컨트롤러의 라우트 전부를 SIREN BE만 부른다 — Calypso 자체 프론트엔드를
+ *   당분간 안 쓰기로 했다(§11.5). 그래서 `SirenCallerGuard`(공유 비밀 토큰 검증)를 클래스
+ *   전체에 건다. **Calypso가 나중에 자기 프론트엔드를 새로 가지면 이 가드 적용 범위를
+ *   다시 나눠야 한다** — 사람이 직접 로그인해서 쓰는 라우트(목록·업로드·릴리스 등)와
+ *   SIREN만 불러야 하는 라우트(observer 계약)를 갈라야 하기 때문이다.
  */
 @Controller('artifacts')
+@UseGuards(SirenCallerGuard)
 export class ArtifactsController {
   constructor(
     private readonly artifacts: ArtifactsService,

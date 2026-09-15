@@ -24,6 +24,15 @@ import { MemoDocument } from '../memos/schemas/memo.schema';
 import { EdgeDocument } from '../edges/schemas/edge.schema';
 import { ReleaseDocument } from '../releases/schemas/release.schema';
 import { ArtifactServiceDocument } from '../hub/schemas/artifact-service.schema';
+import { CALYPSO_SERVICE_KEY } from '../hub/calypso-client.service';
+
+/**
+ * 개발용 고정 값 — Calypso→SIREN 이벤트 토큰(mock 모드). ArtifactService 시드와
+ * calypso/.env.example의 CALYPSO_EVENT_TOKEN 기본값이 이 리터럴로 맞춰져 있어야
+ * 로컬 Calypso가 아무 설정 없이도 이 SIREN 목업과 바로 맞물린다. 운영 값은 이 상수와
+ * 무관하게 별도로 발급해 실제 DB/배포 설정에 넣는다.
+ */
+export const DEV_CALYPSO_EVENT_TOKEN = 'mock-token-calypso';
 
 export interface SeedModels {
   ArtifactService: Model<ArtifactServiceDocument>;
@@ -366,8 +375,11 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
   } = models;
 
   /* ── Hub 레지스트리 ──
-   * Calypso는 여기 없다 — Hub가 "연동하는 외부 서비스"가 아니라 SIREN이 직접 만든 산출물
-   * 관리 기능이라서다.
+   * Calypso는 Service Manage 등록/목록 대상은 아니다 — Hub가 "연동하는 외부 서비스"가
+   * 아니라 SIREN이 직접 만든 산출물 관리 기능이라서다. 다만 Calypso→SIREN 이벤트 토큰도
+   * 다른 서비스와 같은 방식(DB에 저장된 ArtifactService.token)으로 검증하기로 했으므로
+   * (HubTokenGuard), `isBuiltIn:true` 문서 하나는 여기 있다 — 등록 UI에는 노출되지 않고
+   * 오직 토큰 조회 대상으로만 쓰인다.
    *
    * ★ A Tier(simhub/rpm)의 baseUrl은 **SIREN 자신이 띄우는 가짜 observer**를 가리킨다
    *   (src/hub/mock/mock-observer.controller.ts). 개발 환경에는 실서비스가 없어 게이트 2가
@@ -395,6 +407,13 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
     { key: 'layoutdb', name: 'LayoutDB', contractVersion: '1.0', defaultTier: 'B', transport: 'none',
       baseUrl: null, token: null, viewUrlTemplate: null,
       embedUploadUrlTemplate: null, isBuiltIn: false, enabled: true, isMock: true },
+    // Calypso 고정 항목 — baseUrl/transport는 CalypsoClientService가 자체 config로 직접
+    // 호출하므로 여기서 쓰이지 않는다(HubSyncService도 serviceKey로 따로 분기). 이 문서는
+    // 오직 HubTokenGuard의 token 조회 대상 역할만 한다. 토큰 값은 calypso/.env.example의
+    // CALYPSO_EVENT_TOKEN 개발 기본값과 같아야 한다(DEV_CALYPSO_EVENT_TOKEN).
+    { key: CALYPSO_SERVICE_KEY, name: 'Calypso', contractVersion: '1.0', defaultTier: 'B', transport: 'none',
+      baseUrl: null, token: DEV_CALYPSO_EVENT_TOKEN, viewUrlTemplate: null,
+      embedUploadUrlTemplate: null, isBuiltIn: true, enabled: true, isMock: true },
   ]);
 
   /* ── 과제 ──

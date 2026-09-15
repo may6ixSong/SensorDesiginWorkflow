@@ -1,9 +1,7 @@
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { ConfigService } from '@nestjs/config';
 import { ArtifactService, ArtifactServiceDocument } from '../schemas/artifact-service.schema';
-import { CALYPSO_SERVICE_KEY } from '../calypso-client.service';
 
 export interface HubEventSender {
   serviceKey: string;
@@ -19,9 +17,9 @@ export interface HubEventSender {
  * (1회 노출, rate limit, audit log 등)도 지금 UX상 도입하지 않기로 했다. 토큰 자체가
  * 유일한 인증 수단이다.
  *
- * ★ File Artifacts(B, Calypso)는 Hub 레지스트리 대상이 아니라서(§3.1) ArtifactService
- *   문서/토큰이 없다 — `CALYPSO_EVENT_TOKEN` 환경변수로 별도 발급한다. 이건 이번 구현에서
- *   임시로 정한 값이라, 실제로 Calypso 쪽에 토큰을 어떻게 배포할지는 별도로 확정이 필요하다.
+ * ★ File Artifacts(B, Calypso)도 다른 서비스와 같은 DB 조회 한 경로로 검증한다 — Service
+ *   Manage 등록 UI에는 안 나오지만, `isBuiltIn:true` ArtifactService 문서(및 token)는
+ *   있다(database/seed-data.ts). 그래서 이 가드에 Calypso 전용 분기가 없다.
  *
  * 통과하면 `HubEventSender`를 `req.hubEventSender_`에 캐시해 컨트롤러가 재조회하지 않게 한다.
  */
@@ -29,7 +27,6 @@ export interface HubEventSender {
 export class HubTokenGuard implements CanActivate {
   constructor(
     @InjectModel(ArtifactService.name) private readonly model: Model<ArtifactServiceDocument>,
-    private readonly config: ConfigService,
   ) {}
 
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
@@ -38,19 +35,13 @@ export class HubTokenGuard implements CanActivate {
     const token = header?.startsWith('Bearer ') ? header.slice('Bearer '.length).trim() : null;
     if (!token) throw new UnauthorizedException('Missing Bearer token.');
 
-    const calypsoToken = this.config.get<string>('calypsoEventToken');
-    if (calypsoToken && token === calypsoToken) {
-      req.hubEventSender_ = { serviceKey: CALYPSO_SERVICE_KEY, tier: 'B', artifactTypeKeys: [] } as HubEventSender;
-      return true;
-    }
-
     // enabled:false면 token이 이미 null로 폐기돼 있으므로 이 조회가 자연히 거절한다(§3.4).
     const svc = await this.model.findOne({ token }).exec();
     if (!svc) throw new UnauthorizedException('Unknown or revoked token.');
 
     req.hubEventSender_ = {
       serviceKey: svc.key,
-      tier: svc.defaultTier as 'A' | 'C',
+      tier: svc.defaultTier as 'A' | 'B' | 'C',
       artifactTypeKeys: (svc.artifactTypes ?? []).map((t) => t.key),
     } as HubEventSender;
     return true;
