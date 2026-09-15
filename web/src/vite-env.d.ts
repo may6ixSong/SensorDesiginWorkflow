@@ -1,10 +1,8 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
-  /** SIREN's own backend (api/). */
+  /** SIREN's own backend (api/) — Calypso is reached only through it now (설계서 07장 §2). */
   readonly SIREN_API: string;
-  /** Calypso's backend — SIREN web calls it directly for now (§11.5, calypso/web/README.md). */
-  readonly CALYPSO_API: string;
   /** Corporate ADSSO gateway — redirect target for login. */
   readonly MOBILAVE: string;
   /** Platform user group/authority/prefs service. */
