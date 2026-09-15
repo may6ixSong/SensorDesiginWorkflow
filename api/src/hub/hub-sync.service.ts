@@ -19,6 +19,8 @@ export interface NormalizedVersionInput {
   viewUrl: string | null;
   /** HPC Service 전용 (vwp path) */
   hpcPath: string | null;
+  /** release note/update note — 모든 서비스가 갖고 있는 건 아니라 nullable이다. */
+  note: string | null;
   observedAt: Date;
 }
 
@@ -47,6 +49,9 @@ export class HubSyncService {
   upsertVersionEntry(artifact: ArtifactDocument, tier: Tier, input: NormalizedVersionInput): void {
     const versions = artifact.versions ?? [];
     const idx = versions.findIndex((v) => v.versionLabel === input.versionLabel);
+    // pull(mapping-time·야간 재동기화)은 note를 모른다 — null로 덮어써서 push 이벤트가
+    // 이미 채워둔 note를 지우지 않게, 안 준 경우엔 기존 값을 그대로 이어받는다.
+    const note = input.note ?? versions[idx]?.note ?? '';
     const entry = {
       tier,
       versionLabel: input.versionLabel,
@@ -57,7 +62,7 @@ export class HubSyncService {
       sourceRefs: [],
       viewUrl: input.viewUrl,
       hpcPath: input.hpcPath,
-      note: '',
+      note,
       assertedBy: null,
       assertedAt: null,
       observedAt: input.observedAt,
@@ -94,6 +99,8 @@ export class HubSyncService {
             giverDept: null,
             viewUrl: v.viewUrl,
             hpcPath: null,
+            // pull 계약엔 note가 없다 — upsertVersionEntry가 기존 값을 그대로 이어받는다.
+            note: null,
             observedAt: new Date(),
           });
         }
@@ -115,6 +122,8 @@ export class HubSyncService {
           // 넓힌다.
           viewUrl: tier === 'C' ? null : r.viewUrl,
           hpcPath: tier === 'C' ? r.viewUrl : null,
+          // pull 계약엔 note가 없다 — upsertVersionEntry가 기존 값을 그대로 이어받는다.
+          note: null,
           observedAt: r.observedAt ? new Date(r.observedAt) : new Date(),
         });
       }

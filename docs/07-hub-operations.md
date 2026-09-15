@@ -118,6 +118,14 @@ interface VersionPublishedEvent {
 
   /** HPC Service 전용 (vwp path). 없으면 null */
   path: string | null;
+
+  /**
+   * release note/update note 같은 자유 텍스트 — 이 버전에 대한 설명. SIREN 상세 slide의
+   * 버전 목록에서 버전별로 그대로 보여준다(`ArtifactVersion.note`를 그대로 재사용 —
+   * `ArtifactVersionDto`에 이미 있던 필드라 읽는 쪽은 새로 만들 게 없다). 모든 서비스가
+   * 이런 note를 갖고 있는 건 아니므로 nullable이다.
+   */
+  note: string | null;
 }
 ```
 
@@ -151,6 +159,9 @@ export class VersionPublishedEventDto {
 
   @IsOptional() @IsString()
   path: string | null;
+
+  @IsOptional() @IsString()
+  note: string | null;
 }
 ```
 

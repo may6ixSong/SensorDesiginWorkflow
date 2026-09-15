@@ -52,4 +52,13 @@ export class VersionPublishedEventDto {
   @IsOptional()
   @IsString()
   path: string | null;
+
+  /**
+   * release note/update note 같은 자유 텍스트 — 이 버전에 대한 설명. SIREN 상세 slide의
+   * 버전 목록에서 버전별로 그대로 보여준다. 모든 서비스가 이런 note를 갖고 있는 건
+   * 아니므로 nullable이다.
+   */
+  @IsOptional()
+  @IsString()
+  note: string | null;
 }

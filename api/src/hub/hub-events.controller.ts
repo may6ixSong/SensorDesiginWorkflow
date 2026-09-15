@@ -52,6 +52,7 @@ export class HubEventsController {
       giverDept: null,
       viewUrl: dto.viewUrl ?? null,
       hpcPath: dto.path ?? null,
+      note: dto.note ?? null,
       observedAt: new Date(dto.updatedAt),
     });
     await artifact.save();

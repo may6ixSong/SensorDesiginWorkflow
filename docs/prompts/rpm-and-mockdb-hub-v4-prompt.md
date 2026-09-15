@@ -118,6 +118,12 @@ interface VersionPublishedEvent {
 
   /** RPM은 Tier A(OA Service)이므로 이 필드는 항상 null이다 (HPC Service 전용 필드) */
   path: null;
+
+  /**
+   * release note/update note 같은 자유 텍스트 — RPM에 그런 note가 있다면 그대로 보낸다.
+   * SIREN 상세 slide의 버전 목록에서 버전별로 그대로 보여준다. 없으면 null로 보낸다.
+   */
+  note: string | null;
 }
 ```
 
