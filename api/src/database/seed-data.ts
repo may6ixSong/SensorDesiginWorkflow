@@ -27,10 +27,10 @@ import { ArtifactServiceDocument } from '../hub/schemas/artifact-service.schema'
 import { CALYPSO_SERVICE_KEY } from '../hub/calypso-client.service';
 
 /**
- * 개발용 고정 값 — Calypso→SIREN 이벤트 토큰(mock 모드). ArtifactService 시드와
- * calypso/.env.example의 CALYPSO_EVENT_TOKEN 기본값이 이 리터럴로 맞춰져 있어야
- * 로컬 Calypso가 아무 설정 없이도 이 SIREN 목업과 바로 맞물린다. 운영 값은 이 상수와
- * 무관하게 별도로 발급해 실제 DB/배포 설정에 넣는다.
+ * 개발용 고정 값 — Calypso→SIREN 이벤트 토큰(mock 모드). Calypso가 이 이벤트를 실제로
+ * 보내는 코드를 갖추면, 그쪽 `.env.development`의 `CALYPSO_EVENT_TOKEN`을 이 리터럴과
+ * 같게 맞춰야 로컬에서 바로 맞물린다(지금은 그 코드가 없어 실질적으로 안 쓰인다).
+ * 운영 값은 이 상수와 무관하게 별도로 발급해 실제 DB/배포 설정에 넣는다.
  */
 export const DEV_CALYPSO_EVENT_TOKEN = 'mock-token-calypso';
 
