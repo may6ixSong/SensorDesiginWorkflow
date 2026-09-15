@@ -4,12 +4,18 @@
  *   Admin ─────────────────────────── 전 계층 무조건 통과
  *     ├─ Project    members 에 있는가?          ← 없으면 그 아래는 볼 것도 없다
  *     │   ├─ Workflow  Owner / Edit / View 인가?
- *     │   └─ Artifact  A: recipient(게이트) → 서비스 권한(게이트)
- *     │                B/C/D: SIREN artifact 권한
+ *     │   └─ Artifact  A/B/C(OA Service/File Artifacts/HPC Service): recipient(게이트) → 서비스 권한(게이트)
+ *     │                D(External/Attested): 이번 범위 밖(sirenArtifactLevel, 잠정)
  *
  * 이 파일은 **순수 함수만** 담는다 — 모델 조회도, 외부 호출도 하지 않는다. 그래야 Guard,
- * 서비스, DTO 마스킹이 전부 같은 판정을 쓰고 어긋나지 않는다. A Tier의 두 번째 게이트
- * (그 서비스에 canView를 물어보는 것)만 I/O가 필요해서 ArtifactAccessService가 담당한다.
+ * 서비스, DTO 마스킹이 전부 같은 판정을 쓰고 어긋나지 않는다. 게이트 2(그 서비스에 canView를
+ * 물어보는 것 — Calypso 포함)만 I/O가 필요해서 ArtifactAccessService가 담당한다.
+ *
+ * ★ v3 설계 도중 한 번 뒤집힌 결정이다(설계서 04장 §3, 01장 §4.1) — 원래는 B/C/D를
+ *   sirenArtifactLevel(artifact 단위 SIREN 보관 권한)로 판정했으나, 여러 workflow가 하나의
+ *   artifact를 공유할 때 한 workflow의 수정이 다른 workflow까지 번지는 문제와, HPC Service는
+ *   HPC망 안에서 사실상 권한 자체가 무의미하다는 점 때문에 A/B/C를 recipientLevel(게이트1)
+ *   + 그 서비스 라이브 응답(게이트2)으로 통일했다. sirenArtifactLevel은 이제 D 전용이다.
  */
 import { Actor } from './actor';
 
@@ -160,12 +166,9 @@ export interface BlockLike {
 }
 
 /**
- * B/C/D — SIREN이 artifact 단위로 들고 있는 권한. **artifact 하나에 붙어 그 과제 안의
- * 모든 workflow가 같은 값을 본다**(Calypso/HPC 공용 DB처럼 중앙 관리되므로).
- *
- * ★ workflow Edit Access가 있어도 artifact 권한이 없으면 null이다 — 실무적으로는
- *   artifact 권한도 부서 단위로 넣기 때문에 대개 함께 갖게 되지만, 판정의 근거는
- *   어디까지나 artifact 권한이다(설계서 01장 §4.2).
+ * D(External/Attested) 전용 — SIREN이 artifact 단위로 들고 있는 권한. A/B/C는 더 이상
+ * 이 함수를 쓰지 않는다(recipientLevel + 서비스 게이트 2로 통일 — 이 파일 head 참고).
+ * D는 이번 범위에서 세부 미정이라 잠정적으로 이 옛 모델을 그대로 쓴다.
  */
 export function sirenArtifactLevel(
   actor: Actor,
@@ -178,12 +181,13 @@ export function sirenArtifactLevel(
 }
 
 /**
- * A Tier의 **게이트 1** — SIREN이 관리하는 recipient. 그 workflow의 block에 저장되어 있어
- * 같은 artifact라도 workflow마다 다를 수 있다(설계서 01장 §4.1).
+ * A/B/C(OA Service/File Artifacts/HPC Service) 공통 **게이트 1** — SIREN이 관리하는
+ * recipient. 그 workflow의 block에 저장되어 있어 같은 artifact라도 workflow마다 다를 수
+ * 있다(설계서 01장 §4.1).
  *
  * ★ workflow Edit Access가 있어도 recipient가 아니면 null이다. 예전 설계의
  *   "workflow Edit Access는 항상 통과" 규칙은 폐지되었다(설계서 04장 §4.1).
- *   그래서 workflow를 만든 사람이 자기가 등록한 A Tier 산출물의 slide를 못 여는 상황이
+ *   그래서 workflow를 만든 사람이 자기가 등록한 산출물의 slide를 못 여는 상황이
  *   생길 수 있는데, **의도된 동작**이다 — recipient를 편집하는 권한과 recipient에
  *   속하는 것은 별개다.
  */

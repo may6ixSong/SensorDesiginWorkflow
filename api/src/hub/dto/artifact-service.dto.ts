@@ -1,91 +1,46 @@
-import { Type } from 'class-transformer';
-import {
-  IsArray, IsBoolean, IsIn, IsOptional, IsString, MaxLength, MinLength, ValidateNested,
-} from 'class-validator';
-import { ArtifactServiceDocument, Tier, Transport } from '../schemas/artifact-service.schema';
+import { IsBoolean, IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { ArtifactServiceDocument, Tier } from '../schemas/artifact-service.schema';
 
-/** §19.1 — 한 서비스가 낼 수 있는 산출물 종류 하나. */
-export class ArtifactTypeInput {
-  @IsString()
-  @MinLength(1)
-  @MaxLength(40)
-  key: string;
+/**
+ * Service Manage 등록 — OA Service/HPC Service 화면 공통(설계서 07장 §3). Tier 선택 필드는
+ * 없다 — 어느 화면(OA/HPC)에서 등록했는지로 이미 결정된다. 한 baseURL에 여러 artifact
+ * 종류를 등록할 수 있으므로, **한 번 호출 = artifact 종류 하나**다(구 "Add artifact type"
+ * 방식 폐지) — 같은 baseURL로 다시 부르면 기존 서비스에 종류만 추가된다.
+ */
+export class RegisterArtifactTypeDto {
+  /** 'A' = OA Service, 'C' = HPC Service. 이 값이 여기서 유일하게 tier를 결정한다. */
+  @IsIn(['A', 'C'])
+  tier: Extract<Tier, 'A' | 'C'>;
 
-  @IsString()
-  @MinLength(1)
-  @MaxLength(80)
-  name: string;
-
-  @IsOptional()
-  @IsString()
-  viewUrlTemplate?: string;
-
-  @IsOptional()
-  @IsString()
-  sampleUrl?: string;
-}
-
-export class RegisterServiceDto {
-  // key는 클라이언트가 안 보낸다 - HubService#register가 name을 바탕으로
-  // `{8자리 랜덤}_{name 슬러그}` 형태로 직접 만든다 (사용자 요청).
-
+  /** Service명. 이미 등록된 baseUrl이면 이 값은 무시되고 기존 Service명이 유지된다. */
   @IsString()
   @MinLength(1)
   @MaxLength(80)
   name: string;
+
+  /** Artifact명 — 이 baseURL이 낼 수 있는 산출물 종류 하나. */
+  @IsString()
+  @MinLength(1)
+  @MaxLength(80)
+  artifactName: string;
 
   @IsOptional()
   @IsString()
   @MaxLength(240)
   description?: string;
 
-  /**
-   * favicon 이미지 - 업로드한 파일을 브라우저에서 base64 data URI로 인코딩해 보낸다
-   * (별도 스토리지 없이 문서에 바로 저장). Service Manage 카드에 <img>로 그리고,
-   * 비어 있으면 이니셜로 대체한다. 400,000자 ≈ 원본 파일 약 290KB - FE가 그보다
-   * 큰 파일은 인코딩 전에 거절한다(ServiceManagePage.tsx).
-   */
+  @IsString()
+  @MinLength(1)
+  baseUrl: string;
+
+  /** favicon — base64 data URI. 400,000자 ≈ 원본 파일 약 290KB(FE가 그보다 큰 파일은 거절). */
   @IsOptional()
   @IsString()
   @MaxLength(400000)
   icon?: string;
-
-  @IsOptional()
-  @IsString()
-  contractVersion?: string;
-
-  @IsOptional()
-  @IsIn(['A', 'B', 'C', 'D'])
-  defaultTier?: Tier;
-
-  @IsOptional()
-  @IsIn(['http', 'shared-db', 'none'])
-  transport?: Transport;
-
-  @IsOptional()
-  @IsString()
-  baseUrl?: string;
-
-  @IsOptional()
-  @IsString()
-  viewUrlTemplate?: string;
-
-  @IsOptional()
-  @IsString()
-  embedUploadUrlTemplate?: string;
-
-  @IsOptional()
-  @IsBoolean()
-  enabled?: boolean;
-
-  @IsOptional()
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => ArtifactTypeInput)
-  artifactTypes?: ArtifactTypeInput[];
 }
 
-/** key는 없다 - 불변이라 수정 대상이 아니다. */
+/** key/token/tier/artifactTypes는 없다 — 불변이거나(key) 별도 경로로만 바뀐다(token=폐기·재발급, artifactTypes=registerArtifactType 재호출). */
 export class UpdateServiceDto {
   @IsOptional()
   @IsString()
@@ -98,12 +53,6 @@ export class UpdateServiceDto {
   @MaxLength(240)
   description?: string;
 
-  /**
-   * favicon 이미지 - 업로드한 파일을 브라우저에서 base64 data URI로 인코딩해 보낸다
-   * (별도 스토리지 없이 문서에 바로 저장). Service Manage 카드에 <img>로 그리고,
-   * 비어 있으면 이니셜로 대체한다. 400,000자 ≈ 원본 파일 약 290KB - FE가 그보다
-   * 큰 파일은 인코딩 전에 거절한다(ServiceManagePage.tsx).
-   */
   @IsOptional()
   @IsString()
   @MaxLength(400000)
@@ -111,39 +60,15 @@ export class UpdateServiceDto {
 
   @IsOptional()
   @IsString()
-  contractVersion?: string;
-
-  @IsOptional()
-  @IsIn(['A', 'B', 'C', 'D'])
-  defaultTier?: Tier;
-
-  @IsOptional()
-  @IsIn(['http', 'shared-db', 'none'])
-  transport?: Transport;
-
-  @IsOptional()
-  @IsString()
   baseUrl?: string;
 
-  @IsOptional()
-  @IsString()
-  viewUrlTemplate?: string;
-
-  @IsOptional()
-  @IsString()
-  embedUploadUrlTemplate?: string;
-
+  /** false로 바뀌면 토큰을 즉시 폐기한다(§3.4). true로 되돌리면 새 토큰을 발급한다. */
   @IsOptional()
   @IsBoolean()
   enabled?: boolean;
-
-  @IsOptional()
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => ArtifactTypeInput)
-  artifactTypes?: ArtifactTypeInput[];
 }
 
+/** 일반 사용자용 — "새 Artifact 추가" 다이얼로그의 서비스 드롭다운 등에서 쓴다. token은 뺀다. */
 export function toArtifactServiceDto(s: ArtifactServiceDocument) {
   return {
     key: s.key,
@@ -154,15 +79,17 @@ export function toArtifactServiceDto(s: ArtifactServiceDocument) {
     defaultTier: s.defaultTier,
     transport: s.transport,
     baseUrl: s.baseUrl ?? null,
-    viewUrlTemplate: s.viewUrlTemplate ?? null,
-    embedUploadUrlTemplate: s.embedUploadUrlTemplate ?? null,
     isBuiltIn: s.isBuiltIn === true,
     enabled: s.enabled !== false,
     artifactTypes: (s.artifactTypes ?? []).map((t) => ({
       key: t.key,
       name: t.name,
-      viewUrlTemplate: t.viewUrlTemplate ?? null,
-      sampleUrl: t.sampleUrl ?? null,
+      description: t.description ?? '',
     })),
   };
+}
+
+/** Admin 전용 — Service Manage 화면과 등록/재등록 응답에서만 쓴다. token을 포함한다(§3.2). */
+export function toArtifactServiceAdminDto(s: ArtifactServiceDocument) {
+  return { ...toArtifactServiceDto(s), token: s.token ?? null };
 }

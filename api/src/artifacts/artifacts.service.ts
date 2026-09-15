@@ -117,7 +117,7 @@ export class ArtifactsService {
    */
   async findOrCreateExternal(
     projectId: Types.ObjectId,
-    input: { tier: 'A' | 'B'; name: string; serviceKey: string; externalArtifactId: string },
+    input: { tier: 'A' | 'B' | 'C'; name: string; serviceKey: string; externalArtifactId: string },
     actor: Actor,
   ): Promise<ArtifactDocument> {
     const existing = await this.model
@@ -130,15 +130,12 @@ export class ArtifactsService {
         {
           name: input.name,
           tier: input.tier,
-          network: 'OA',
+          network: input.tier === 'C' ? 'HPC' : 'OA',
           serviceKey: input.serviceKey,
           externalArtifactId: input.externalArtifactId,
-          // B(File Artifacts)는 SIREN이 권한을 직접 들고 있다 — Calypso 접근은 "고를 수
-          // 있는가"를 한 번 거르는 문지기일 뿐, 등록 이후의 열람·recipient 관리는 SIREN의
-          // editAccess/viewAccess가 단일 진실이다(설계서 04장 §3.2). 등록자를 기본 edit으로
-          // 넣지 않으면 아무도(Admin 제외) 못 여는 채로 만들어진다 — 그 뒤로는 기존
-          // Recipients 탭(PUT /artifacts/:id/access)에서 그대로 넓히면 된다.
-          // A Tier는 create()가 이 값을 무조건 무시하므로 여기서 넘겨도 안전하다.
+          // A/B/C(OA Service/File Artifacts/HPC Service) 전부 그 서비스가 권한을 관리한다
+          // (설계서 04장 §3) — create()가 이 값을 무조건 무시하므로 여기서 넘겨도 안전하다.
+          // 남겨둔 이유는 D 전용 경로와 시그니처를 맞추기 위해서일 뿐이다.
           editAccess: { users: [actor.knoxId], departments: [] },
         },
         actor,
@@ -177,10 +174,9 @@ export class ArtifactsService {
   }
 
   /**
-   * B/C/D의 Edit/View 권한 교체. **viewAccess가 곧 recipient**이므로 이 한 번의 쓰기가
-   * 열람 권한과 수신 대상을 동시에 바꾼다(설계서 04장 §3.2).
-   *
-   * A Tier는 거부한다 — 그 권한은 그 서비스가 관리하고, SIREN의 recipient는 block에 있다.
+   * D(External/Attested)의 Edit/View 권한 교체 — 이제 이 tier에만 남은 옛 모델이다
+   * (설계서 04장 §3, §3.5). A/B/C(OA Service/File Artifacts/HPC Service)는 전부 그 서비스가
+   * 권한을 관리하고 SIREN의 recipient는 block에 있으므로 이 라우트를 거부한다.
    */
   async replaceAccess(
     artifactId: string,
@@ -193,7 +189,7 @@ export class ArtifactsService {
     const artifact = await this.findOrThrow(artifactId);
     if (isServiceGovernedTier(artifact.tier)) {
       throw new BadRequestException(
-        'Tier A permissions are governed by the owning service. Set recipients on the block instead.',
+        'These permissions are governed by the owning service. Set recipients on the block instead.',
       );
     }
     artifact.editAccess = normalizeGrant(input.editAccess);

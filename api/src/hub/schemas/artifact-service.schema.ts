@@ -6,37 +6,37 @@ export const TIERS = ['A', 'B', 'C', 'D'] as const;
 export type Tier = (typeof TIERS)[number];
 
 /**
- * 전송 수단. 의미 계약은 같고 수단만 다르다 (Hub 설계서 §4.2).
- * - http      : Observer 계약 엔드포인트를 직접 호출
- * - shared-db : HPC-OA 공용 DB의 테이블을 주기 동기화 (B 티어, §8)
- * - none      : 연동 없음. 링크나 수동 기록만 (C/D 티어)
+ * 전송 수단.
+ * - http : Observer 계약 엔드포인트를 직접 호출 — OA Service/HPC Service(A/C) 전부 이것뿐이다
+ * - none : 연동 없음 (D 전용)
+ *
+ * ★ `shared-db`(HPC-OA 공용 DB 주기 동기화)는 폐기했다 — HPC망과 양방향 API로 직접
+ *   연동하기로 결정이 바뀌면서(설계서 04장 §2) 더 이상 쓰지 않는다.
  */
-export const TRANSPORTS = ['http', 'shared-db', 'none'] as const;
+export const TRANSPORTS = ['http', 'none'] as const;
 export type Transport = (typeof TRANSPORTS)[number];
 
 export type ArtifactServiceDocument = ArtifactService & Document;
 
 /**
- * 한 서비스가 여러 종류의 산출물을 낼 수 있다(설계서 §19.1) — 예: SSM 하나가 "수식"과
- * "spec data"를 별도 종류로 냄. `viewUrlTemplate`처럼 산출물 종류마다 달라지는 값은
- * 서비스 레벨이 아니라 여기 둔다. 서비스에 이 목록이 비어 있으면(기존 SimHub/LayoutDB
- * 같은 단일 종류 서비스) 서비스 레벨 `viewUrlTemplate`를 그대로 쓴다 — 하위 호환.
+ * 한 서비스(baseURL)가 여러 종류의 산출물을 낼 수 있다(설계서 07장 §3.1) — 예: SSM 하나가
+ * "수식"과 "spec data"를 별도 종류로 냄. Service Manage에서 **종류별로 따로 등록**하며(구
+ * "Add artifact type" 방식 폐지), 같은 baseURL로 등록하면 기존 서비스에 항목만 추가된다.
+ *
+ * `key`는 **SIREN이 등록 시점에 발급**한다(설계서 07장 §3.2) — `artifactTypeKey`로
+ * Service Manage 화면에 노출되고, 그 서비스가 version 이벤트에 실어 보낸다.
  */
 @Schema({ _id: false })
 export class ArtifactType {
-  /** 그 서비스 안에서만 유일하면 된다(전역 unique 아님). */
+  /** SIREN이 발급 — `{8자리 랜덤}_{name 슬러그}` 형태(HubService#generateKey와 같은 방식). */
   @Prop({ required: true, trim: true })
   key: string;
 
   @Prop({ required: true, trim: true })
   name: string;
 
-  @Prop({ type: String, default: null, trim: true })
-  viewUrlTemplate: string | null;
-
-  /** 미정 기능(§19.8) — 있으면 상세창에 "샘플 보기" 링크로 노출, 없으면 생략. */
-  @Prop({ type: String, default: null, trim: true })
-  sampleUrl: string | null;
+  @Prop({ default: '', trim: true })
+  description: string;
 }
 export const ArtifactTypeSchema = SchemaFactory.createForClass(ArtifactType);
 
@@ -74,11 +74,25 @@ export class ArtifactService {
   @Prop({ type: String, required: true, enum: TRANSPORTS, default: 'none' })
   transport: Transport;
 
-  /** transport=http일 때 어댑터/서비스 엔드포인트의 베이스 URL. */
+  /**
+   * transport=http일 때 어댑터/서비스 엔드포인트의 베이스 URL. **토큰(`token`) 발급의
+   * dedup 키이기도 하다** — 정규화(scheme+host, 끝 슬래시 제거)한 값이 이미 등록된
+   * 서비스와 같으면 새 토큰을 만들지 않고 그 서비스에 artifact type만 추가한다
+   * (설계서 07장 §3.3).
+   */
   @Prop({ type: String, default: null, trim: true })
   baseUrl: string | null;
 
-  /** 예: "https://ssm.local/spec/{artifactId}" */
+  /**
+   * 이 서비스(baseURL)가 SIREN에 event를 보낼 때 쓰는 Bearer token — baseURL당 1개다
+   * (설계서 07장 §3.2). SIREN이 등록 시점에 발급하고, 서비스를 비활성화하면 즉시
+   * `null`로 폐기한다(§3.4) — 재활성화 시 새 토큰을 다시 발급한다.
+   */
+  @Prop({ type: String, default: null, index: true })
+  token: string | null;
+
+  /** 예: "https://ssm.local/spec/{artifactId}" — 등록 폼에서는 더 이상 입력받지 않는다
+   * (버전 이벤트가 viewUrl을 직접 실어 보내므로, 설계서 07장 §4.1). 레거시 필드로 남긴다. */
   @Prop({ type: String, default: null, trim: true })
   viewUrlTemplate: string | null;
 
@@ -104,3 +118,5 @@ export class ArtifactService {
 }
 
 export const ArtifactServiceSchema = SchemaFactory.createForClass(ArtifactService);
+// sparse — 토큰이 없는(null) 서비스가 여럿이어도 충돌하지 않는다(비활성화로 폐기된 경우 등).
+ArtifactServiceSchema.index({ token: 1 }, { unique: true, sparse: true });

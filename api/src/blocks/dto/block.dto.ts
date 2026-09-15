@@ -63,7 +63,8 @@ export function toBlockDto(
   artifactLevel: AccessLevel,
   publishState: PublishState,
 ): BlockDto {
-  const isATier = artifact ? isServiceGovernedTier(artifact.tier) : false;
+  // A/B/C(OA Service/File Artifacts/HPC Service) 전부 recipient가 block에 있다. D만 없다.
+  const usesBlockRecipients = artifact ? isServiceGovernedTier(artifact.tier) : false;
 
   return {
     id: block._id.toString(),
@@ -82,7 +83,7 @@ export function toBlockDto(
         : toArtifactDto(artifact, artifactLevel),
     // 열람 권한이 없으면 상태 자체가 정보이므로 배지를 그리지 않는다(설계서 03장 §2.2).
     publishState: artifactLevel === null ? 'unpublished' : publishState,
-    recipients: isATier
+    recipients: usesBlockRecipients
       ? {
           editAccess: {
             departments: [...(block.recipients?.editAccess?.departments ?? [])],

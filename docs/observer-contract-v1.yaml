@@ -19,8 +19,10 @@ info:
     - **SIREN → 서비스 (공용 데이터)**: `/hub/common`. SIREN이 구현하고 서비스들이 호출한다.
       프로젝트의 부서·멤버·일정을 내려준다.
 
-    `transport: "shared-db"`인 서비스(B 티어)는 `/artifacts/*` 대신 공용 DB의 테이블에
-    같은 필드를 쓴다. **의미 계약은 같고 전송 수단만 다르다** (설계서 §8).
+    File Artifacts(B, Calypso)는 이 계약의 별도 구현체다 - `/artifacts/*`를 자체 구현하고
+    있으며(calypso/src/artifacts/artifacts.controller.ts), 여느 서비스와 다르지 않다.
+    `transport: "shared-db"`(공용 DB 경유) 방식은 폐기했다 - HPC망도 이제 양방향 API로
+    직접 연동한다(설계서 04장 §2, 07장).
 
 servers:
   - url: https://{serviceHost}/api
@@ -132,22 +134,33 @@ paths:
       tags: [artifacts]
       summary: 이 서비스가 들고 있는 산출물 목록 (선택 구현)
       description: |
-        SIREN의 "등록된 산출물에서 선택"(설계서 §11.4) 화면이 쓴다. project/department로
-        스코프해서 고를 수 있어야 하므로 두 쿼리 파라미터를 지원한다.
+        SIREN의 "새 Artifact 추가" 다이얼로그(설계서 04장 §6.3)가 매번 실시간으로 호출한다.
+        **project 사전 링크 단계는 없다** — SIREN이 자기 project의 code+revision을 그대로
+        필터로 실어 보내고, 그 서비스가 알아서 필터링해서 답한다. code+revision이 그 서비스
+        안에서 유일하지 않을 수 있으면(예: production run·internal test가 같은 code/revision을
+        쓰는 경우) 해당하는 후보를 전부 돌려주면 된다 — SIREN은 사람이 그중 하나를 고르게 한다.
 
         구현하지 않아도 계약 위반은 아니다 - 다만 이게 없으면 SIREN 쪽에서 그 서비스의
         산출물을 골라 워크플로우에 얹는 흐름을 쓸 수 없고, 사용자가 externalArtifactId를
         직접 입력해야 한다.
       operationId: listArtifacts
       parameters:
-        - name: projectId
+        - name: code
+          in: query
+          required: true
+          schema: { type: string }
+        - name: revision
+          in: query
+          required: true
+          schema: { type: string }
+        - name: knoxId
+          in: query
+          required: true
+          schema: { type: string }
+        - name: isAdmin
           in: query
           required: false
-          schema: { type: string }
-        - name: department
-          in: query
-          required: false
-          schema: { type: string }
+          schema: { type: boolean }
       responses:
         '200':
           description: 산출물 요약 목록
@@ -173,8 +186,8 @@ paths:
         서비스의 권한 화면에 영향을 주므로, 서비스는 이 응답을 짧게 캐시하고 SIREN이
         응답하지 않을 때 마지막 캐시로 동작해야 한다(설계서 §4.4).
 
-        HPC망 서비스는 이 API를 직접 못 부른다 - 같은 내용을 공용 DB의 `siren_common`
-        테이블로 받는다(설계서 §8).
+        HPC망 서비스도 이제 이 API를 직접 호출한다 - 양방향 API 연동이 확정되면서 공용 DB
+        경유 방식은 폐기했다(설계서 04장 §2, 07장).
       operationId: getHubCommon
       parameters:
         - name: projectId

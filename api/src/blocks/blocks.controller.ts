@@ -30,10 +30,9 @@ export class BlocksController {
 
   /**
    * Tier별 후보 목록 — pickable 판정까지 서버가 끝내서 내려준다(설계서 04장 §6).
-   * source=live는 serviceKey와, project 검색으로 사람이 이미 고른 externalProjectId가
-   * 둘 다 필요하다(§6.3) — OA Service 드롭다운 자체는 `GET /hub/services`(Manage
-   * Service 등록 목록)를 그대로 쓰고, project 후보는 기존 `GET /hub/services/:key/
-   * projects/search?code=&revision=`을 그대로 쓴다. 여기서 새로 만들지 않는다.
+   * source=live|hpc는 serviceKey만 있으면 된다 — project 사전 링크 단계는 없다. code/
+   * revision은 그 workflow가 속한 project에서 그대로 채운다(§6.3). OA Service/HPC
+   * Service 드롭다운 자체는 `GET /hub/services`(Manage Service 등록 목록)를 그대로 쓴다.
    */
   @Get('workflows/:workflowId/artifact-candidates')
   @WorkflowAccess('edit')
@@ -41,7 +40,6 @@ export class BlocksController {
     @Query('source') source: string,
     @Query('intent') intent: string,
     @Query('serviceKey') serviceKey: string | undefined,
-    @Query('externalProjectId') externalProjectId: string | undefined,
     @CurrentProject() project: ProjectDocument,
     @CurrentActor() me: Actor,
   ) {
@@ -53,7 +51,6 @@ export class BlocksController {
       source as CandidateSource,
       intent as CandidateIntent,
       serviceKey,
-      externalProjectId,
     );
   }
 
@@ -68,9 +65,10 @@ export class BlocksController {
   }
 
   /**
-   * A Tier(Calypso 제외 Hub 등록 서비스)의 라이브 버전 조회(설계서 04장 §19.5/§19.6 복원).
-   * slide를 열었을 때만 그 block 하나에 대해 호출된다 — 캔버스 목록 조회는 절대 이걸
-   * 부르지 않는다(설계서 05장 §8).
+   * 버전 목록 — 이제 SIREN 캐시에서 읽는다(설계서 07장 §3·§4, 04장 §7). A/B/C
+   * (OA Service/File Artifacts/HPC Service) 공통이며, 열 때마다 그 서비스에 다시
+   * 묻지 않는다. slide를 열었을 때만 그 block 하나에 대해 호출된다 — 캔버스 목록 조회는
+   * 절대 이걸 부르지 않는다(설계서 05장 §8).
    */
   @Get('workflows/:workflowId/blocks/:blockId/live-versions')
   @WorkflowAccess('view')

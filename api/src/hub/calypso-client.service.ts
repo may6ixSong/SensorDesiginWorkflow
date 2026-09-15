@@ -3,6 +3,9 @@ import { ConfigService } from '@nestjs/config';
 
 const TIMEOUT_MS = 5000;
 
+/** Calypso의 고정 serviceKey — Hub 레지스트리 대상이 아니므로(§3.1) 한 곳에서만 정의해 공유한다. */
+export const CALYPSO_SERVICE_KEY = 'calypso';
+
 /**
  * Calypso는 Hub 레지스트리에 등록돼 있지 않다(SIREN 내장 기능이라 Service Manage
  * 목록에도 없음 — §19.1) — 그래서 ObserverClientService(레지스트리 기반)로는 못 부르고
@@ -72,6 +75,81 @@ export class CalypsoClientService {
     }
   }
 
+  /**
+   * File Artifacts(B)의 **게이트 2** — Calypso 자신의 canView/canEdit(설계서 04장 §3, §4.1).
+   * A/C와 동일한 2단 게이트 패턴을 쓰기로 하면서 새로 필요해졌다 — 이전엔 B의 권한을
+   * SIREN이 artifact 단위로 보관해서 이 라이브 호출 자체가 없었다.
+   *
+   * fail-closed다: Calypso가 죽었거나 느리면 access:false를 돌려준다 — ObserverClientService.access()와
+   * 같은 원칙이다(권한 판정에서 실패를 관대하게 처리하지 않는다).
+   */
+  async access(
+    externalArtifactId: string,
+    knoxId: string,
+    departments: string[],
+    isAdmin: boolean,
+  ): Promise<{ canView: boolean; canEdit: boolean }> {
+    if (!this.baseUrl) return { canView: false, canEdit: false };
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    try {
+      const res = await fetch(`${this.baseUrl}/artifacts/${encodeURIComponent(externalArtifactId)}`, {
+        signal: controller.signal,
+        headers: this.actorHeaders(knoxId, departments, isAdmin),
+      });
+      if (!res.ok) {
+        if (res.status !== 404) {
+          this.logger.warn(`Calypso access check failed (${res.status}) for ${externalArtifactId}`);
+        }
+        return { canView: false, canEdit: false };
+      }
+      const body = await res.json();
+      const myAccess = body?.data?.myAccess as 'edit' | 'view' | undefined;
+      return { canView: myAccess === 'edit' || myAccess === 'view', canEdit: myAccess === 'edit' };
+    } catch (e) {
+      this.logger.warn(`Calypso access check error for ${externalArtifactId} — ${(e as Error).message}`);
+      return { canView: false, canEdit: false };
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  /**
+   * release 시 recipient 부서에 view grant를 upsert한다(설계서 05장 §4.6). Calypso의
+   * `POST /:id/view-grants`는 부여자(actor) 본인이 edit 권한을 가져야 하고 — 없으면 Calypso가
+   * 알아서 거부한다, 그래서 여기서 별도로 canEdit를 먼저 확인하지 않는다 — 이미 있는 grant는
+   * Calypso가 스스로 idempotent하게 처리한다(중복 추가/에러 없음). 실패해도 release 자체를
+   * 막지 않는다 — 호출부가 best-effort로 다룬다.
+   */
+  async addViewGrant(
+    externalArtifactId: string,
+    department: string,
+    knoxId: string,
+    departments: string[],
+    isAdmin: boolean,
+  ): Promise<boolean> {
+    if (!this.baseUrl) return false;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    try {
+      const res = await fetch(`${this.baseUrl}/artifacts/${encodeURIComponent(externalArtifactId)}/view-grants`, {
+        method: 'POST',
+        signal: controller.signal,
+        headers: { ...this.actorHeaders(knoxId, departments, isAdmin), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'department', department }),
+      });
+      if (!res.ok) {
+        this.logger.warn(`Calypso view-grant upsert failed (${res.status}) for ${externalArtifactId}/${department}`);
+      }
+      return res.ok;
+    } catch (e) {
+      this.logger.warn(`Calypso view-grant upsert error for ${externalArtifactId}/${department} — ${(e as Error).message}`);
+      return false;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   async currentVersion(externalArtifactId: string, knoxId: string): Promise<{
     versionLabel: string;
     isReleased: boolean;
@@ -103,6 +181,42 @@ export class CalypsoClientService {
     } catch (e) {
       this.logger.warn(`Calypso current-version error for ${externalArtifactId} — ${(e as Error).message}`);
       return null;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  /**
+   * 매핑 시 즉시 전체 버전 이력을 한 번 pull할 때 쓴다(설계서 07장 §4.3, 04장 §6.3) — Calypso는
+   * 이미 observer 계약의 `/artifacts/:id/versions`를 자체 구현하고 있으므로(calypso/src/artifacts/
+   * artifacts.controller.ts) 그걸 그대로 부른다.
+   */
+  async versions(externalArtifactId: string, knoxId: string): Promise<
+    { versionLabel: string; isReleased: boolean; giverKnoxId: string | null; viewUrl: string | null }[]
+  > {
+    if (!this.baseUrl) return [];
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    try {
+      const res = await fetch(`${this.baseUrl}/artifacts/${encodeURIComponent(externalArtifactId)}/versions`, {
+        signal: controller.signal,
+        headers: { 'X-Knox-Id': knoxId },
+      });
+      if (!res.ok) {
+        this.logger.warn(`Calypso versions failed (${res.status}) for ${externalArtifactId}`);
+        return [];
+      }
+      const list = await res.json();
+      if (!Array.isArray(list)) return [];
+      return list.map((v: any) => ({
+        versionLabel: v.versionLabel ?? '',
+        isReleased: v.isReleased === true,
+        giverKnoxId: v.giver?.knoxId ?? null,
+        viewUrl: v.viewUrl ?? null,
+      }));
+    } catch (e) {
+      this.logger.warn(`Calypso versions error for ${externalArtifactId} — ${(e as Error).message}`);
+      return [];
     } finally {
       clearTimeout(timer);
     }
