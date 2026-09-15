@@ -179,11 +179,11 @@ ArtifactVersion {
   체계를 그대로 쓰되, SIREN에는 **"official한 버전"만** 넘긴다.
   - 서비스가 minor 단위까지 명확히 태깅한다면 그 minor까지 그대로 보낸다(예: `v1.3`).
   - **RPM처럼 minor 개념이 없고 snapshot만 찍는 서비스**는, 확정된 release 버전들과 함께
-    **`latest(+)` 항목 하나**만 추가로 보낸다 — 지금 구현되어 있는 RPM 어댑터 동작과 동일하다.
-    `latest(+)`는 `isPublished: false`(작업중) 스냅샷을 나타내는 자리표시자이며, giver 판정
-    대상에게만 보인다(§7의 가시성 규칙을 그대로 따른다).
+    작업중 snapshot 하나를 추가로 보낼 수 있다 — `isPublished: false`로 보내면 giver 판정
+    대상에게만 보인다(§7의 가시성 규칙을 그대로 따른다). 그 snapshot의 `versionLabel`엔
+    정해진 이름이 없다 — 예전엔 `latest+`라는 이름을 쓰도록 권했지만 그 관례는 없앴다.
   - 이 규칙은 `ArtifactVersion.versionLabel` 에 들어오는 값의 **의미**에 대한 것이고, 스키마
-    필드를 추가하지 않는다 — `latest(+)` 도 그냥 `versionLabel: "latest+"` 인 한 엔트리다.
+    필드를 추가하지 않는다 — 작업중 snapshot도 `isPublished:false`인 한 엔트리일 뿐이다.
 
 ### `major` 판정
 

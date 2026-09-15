@@ -226,8 +226,8 @@ const MOCK_ARTIFACTS: MockArtifact[] = [
     versions: [['v2.0', true, '2026-06-03 10:40', '2nd release'], ['v1.0', true, '2026-04-21 13:10', '1st release']] },
   { key: 'a_pll_post', project: 'p1', name: 'PLL Post-layout Simulation', tier: 'A', network: 'OA',
     serviceKey: 'simhub', externalArtifactId: 'SIM-PLL-0812', giver: 'u1',
-    // latest+ = RPM류 서비스가 보내는 "아직 official 버전이 아닌 snapshot" 자리표시자.
-    versions: [['latest+', false, '2026-08-12 09:00', 'in progress'], ['v1.0', true, '2026-07-28 18:22', '1st release']] },
+    // RPM류 서비스가 보내는 "아직 official 버전이 아닌 snapshot" — 이름에 정해진 관례는 없다.
+    versions: [['wip', false, '2026-08-12 09:00', 'in progress'], ['v1.0', true, '2026-07-28 18:22', '1st release']] },
   { key: 'a_rpm_spec', project: 'p1', name: 'ADC Ramp Spec (RPM)', tier: 'A', network: 'OA',
     serviceKey: 'rpm', externalArtifactId: 'RPM-ADC-771', giver: 'u4',
     versions: [['v3', true, '2026-05-11 11:00', 'ML3 release'], ['v2', true, '2026-03-20 15:30', 'AR release']] },

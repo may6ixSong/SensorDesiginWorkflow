@@ -36,8 +36,10 @@ export const SourceRefSchema = SchemaFactory.createForClass(SourceRef);
  *
  * A Tier 서비스는 **official하게 확정된 값만** 넘긴다(설계서 04장 §2.1):
  *   - minor까지 명확히 태깅되어 있으면 그대로 (`v1.3`)
- *   - RPM처럼 minor 개념이 없고 snapshot만 찍는 서비스는 release 버전들 + `latest+` 하나
- *     (`latest+`는 isPublished:false인 작업중 자리표시자라 giver에게만 보인다)
+ *   - RPM처럼 minor 개념이 없고 snapshot만 찍는 서비스는 release 버전들 + 작업중 snapshot
+ *     하나를 보낼 수 있다. 작업중 snapshot의 `versionLabel`엔 정해진 이름이 없다 —
+ *     `isPublished:false`만 지키면 되고(그러면 giver에게만 보인다), 이전엔 `latest+`라는
+ *     이름을 쓰도록 권했지만 그 관례는 없앴다.
  */
 @Schema({ _id: false, timestamps: false })
 export class ArtifactVersion {

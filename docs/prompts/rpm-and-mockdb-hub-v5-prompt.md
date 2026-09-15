@@ -122,12 +122,14 @@ interface VersionPublishedEvent {
 
   /**
    * 표시용이자 사실상의 불변 참조다 — **같은 externalArtifactId 안에서 이 값을 절대
-   * 재사용하면 안 된다.** RPM의 release 버전들 + `latest+`(작업중 snapshot 자리표시자,
-   * 아직 SIREN 문서에 있는 RPM 특유의 규칙 그대로) 둘 다 이 이벤트로 보낸다.
+   * 재사용하면 안 된다.** RPM의 release 버전들 + 작업중 snapshot(있다면) 둘 다 이
+   * 이벤트로 보낸다. 작업중 snapshot의 이름에는 정해진 관례가 없다 — 예전엔 `latest+`를
+   * 쓰도록 권했지만 그 관례는 없앴다. 아무 문자열이나 써도 되고, `isPublished:false`만
+   * 지키면 된다.
    */
   versionLabel: string;
 
-  /** 그 산출물을 받는(view 권한) 사람이 볼 수 있는 버전인지 — RPM의 release 확정 여부와 같다. `latest+`는 항상 false다 */
+  /** 그 산출물을 받는(view 권한) 사람이 볼 수 있는 버전인지 — RPM의 release 확정 여부와 같다. 작업중 snapshot은 항상 false다 */
   isPublished: boolean;
 
   /** RPM의 산출물 상세 페이지 링크. 없으면 null */
@@ -148,8 +150,8 @@ interface VersionPublishedEvent {
   매핑된 적이 없다는 뜻이다 — 정상이다, 재시도할 필요 없다(나중에 누가 매핑하면 SIREN이 그
   순간 RPM에 전체 이력을 다시 물어봐서 채운다).
 - 실패해도 RPM 자신의 publish 동작을 막지 말 것 — 로그만 남기고 계속 진행한다(best-effort).
-- `latest+`(작업중 snapshot)를 포함해 **버전이 갱신될 때마다** 쏜다 — official release만
-  쏘는 게 아니다.
+- 작업중 snapshot을 포함해 **버전이 갱신될 때마다** 쏜다 — official release만 쏘는 게
+  아니다.
 
 ---
 

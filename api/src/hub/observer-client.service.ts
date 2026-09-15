@@ -141,8 +141,10 @@ export class ObserverClientService {
    * publish/release 용어를 갈라 쓴다.
    *
    * A Tier 서비스는 official하게 확정된 값만 넘기기로 되어 있다(설계서 04장 §2.1).
-   * RPM처럼 minor가 없는 서비스는 release 버전들 + `latest+` 하나를 보내며, `latest+`는
-   * isReleased:false로 와서 여기서 isPublished:false가 된다 — 즉 giver에게만 보인다.
+   * RPM처럼 minor가 없는 서비스는 release 버전들 + 작업중 snapshot 하나를 보낼 수 있는데,
+   * 그 snapshot의 `versionLabel`엔 정해진 이름이 없다 — `isReleased:false`로 오면 여기서
+   * `isPublished:false`가 되어 giver에게만 보인다. `latest+`라는 이름을 쓰도록 권하던
+   * 관례는 없앴다.
    */
   toVersionEntry(record: ObserverVersionRecord, tier: 'A' | 'B') {
     return {
