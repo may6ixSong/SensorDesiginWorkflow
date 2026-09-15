@@ -22,6 +22,7 @@ CIS(CMOS Image Sensor) 설계 산출물을 workflow 캔버스 위에서 흐름�
 | [05-release.md](05-release.md) | Release 절차, 알림, Release history |
 | [06-ui-motion-and-migration.md](06-ui-motion-and-migration.md) | 모션 시스템, i18n, HLD 제거, 마이그레이션, TODO |
 | [07-hub-operations.md](07-hub-operations.md) | 허브 운영 — Service Manage(OA/HPC 등록·토큰), FE→BE 단일 경로, version 이벤트 수신·동기화 |
+| [08-service-integration.md](08-service-integration.md) | **새 서비스 연동 API 레퍼런스** — SIREN↔서비스 양방향 호출과 DTO를 한 파일에. 새 OA/HPC Service를 연동할 땐 이것부터 |
 | [prompts/a-tier-recipient-integration.md](prompts/a-tier-recipient-integration.md) | A Tier 연동 서비스에 전달할 **정책** 변경 요청 프롬프트 |
 | [prompts/rpm-access-endpoint.md](prompts/rpm-access-endpoint.md) | 위 요청 ①을 **구현 수준**으로 구체화한 것 — RPM 등 A Tier 서비스 세션에 그대로 전달 |
 | [prompts/db-migration-v3.md](prompts/db-migration-v3.md) | 실제 MongoDB의 데이터를 v3 스키마 모양으로 바꾸는 **실행 전용** 프롬프트 |
