@@ -25,6 +25,7 @@ CIS(CMOS Image Sensor) 설계 산출물을 workflow 캔버스 위에서 흐름�
 | [prompts/a-tier-recipient-integration.md](prompts/a-tier-recipient-integration.md) | A Tier 연동 서비스에 전달할 **정책** 변경 요청 프롬프트 |
 | [prompts/rpm-access-endpoint.md](prompts/rpm-access-endpoint.md) | 위 요청 ①을 **구현 수준**으로 구체화한 것 — RPM 등 A Tier 서비스 세션에 그대로 전달 |
 | [prompts/db-migration-v3.md](prompts/db-migration-v3.md) | 실제 MongoDB의 데이터를 v3 스키마 모양으로 바꾸는 **실행 전용** 프롬프트 |
+| [prompts/rpm-and-mockdb-hub-v4-prompt.md](prompts/rpm-and-mockdb-hub-v4-prompt.md) | 허브 재설계(07장)에 맞춰 RPM 코드 갱신 + mock/dev DB 정리 — **실행 전용** 프롬프트 |
 
 > `prompts/` 아래 문서는 **SIREN·Calypso 저장소 밖에서 수행해야 하는 작업**을 다른 세션에
 > 그대로 붙여넣기 위한 것이다. 이 저장소의 코드로는 끝낼 수 없는 일(실 DB 변경, 외부 서비스
@@ -222,7 +223,7 @@ CIS(CMOS Image Sensor) 설계 산출물을 workflow 캔버스 위에서 흐름�
 | T9 | Hub sync 주기 구체화 | A/B/C 모두 **version 발행 이벤트를 즉시 SIREN에 전송**하고, 유실 대비로 작업 없는 야간 시간대에 **1일 1회 전체 재동기화**를 하기로 잠정 합의. 정확한 실행 시각·윈도우·재시도 정책은 추후 확정 |
 | T10 | Tier B 자동 view 권한 부여 실패 시 재시도 | release 시 Calypso edit 권한자의 File Artifact를 recipient 부서에 view로 upsert하는 호출이 실패했을 때, 자동 재시도를 둘지 로그만 남길지 추후 결정(05장 §4.6) |
 | T11 | 기존 코드 주석의 Tier 명칭 일괄 치환 | 이 문서 묶음과 새로 쓰는 내용은 전부 OA Service/File Artifacts/HPC Service를 쓰지만, 기존 소스코드 주석(`api/src/**`, `web/src/**`)에 남아 있는 "Tier A/B/C" 표현과 04장 재구성으로 번호가 바뀐 `§3.x` 류 cross-reference는 이번 반영에서 건드리지 않았다 — 별도의 일괄 치환 작업으로 진행한다. 내부 enum 값(`'A'│'B'│'C'│'D'`)은 그대로 유지 |
-| T12 | RPM 연동 prompt 문서 재발급 | `prompts/rpm-integration-prompt.md`·`prompts/siren-rpm-mapping-ui-prompt.md`는 이번에 폐기한 `ProjectServiceLink`/project 사전 링크 흐름을 전제로 쓰여 있어 지금은 맞지 않다 — RPM(연동된 유일한 실서비스)에 새로 전달할 프롬프트를 다시 작성해야 한다(04장 §6.3, 07장 §4.3 — `externalArtifactId` 전역 유일성 요구사항 포함) |
+| ~~T12~~ | ~~RPM 연동 prompt 문서 재발급~~ | **완료.** `prompts/rpm-and-mockdb-hub-v4-prompt.md`가 새 계약(code+revision 후보 조회, `externalArtifactId` 전역 유일성, version push 이벤트)과 mock/dev DB 정리를 함께 담아 대체한다. 구 `prompts/rpm-integration-prompt.md`·`prompts/siren-rpm-mapping-ui-prompt.md`는 폐기한 `ProjectServiceLink` 흐름 전제라 더 이상 안 맞으니 새 프롬프트를 쓴다 |
 
 ## 5. 리뷰가 필요한 가정
 
