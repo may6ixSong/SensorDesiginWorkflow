@@ -43,13 +43,6 @@ export interface ObserverAccess {
   canEdit: boolean;
 }
 
-export interface ObserverProjectCandidate {
-  externalProjectId: string;
-  displayName: string;
-  code: string;
-  revision: string | null;
-}
-
 /** 계약의 ArtifactSummary (observer-contract-v1.yaml `/artifacts`) — 선택 구현이다. */
 export interface ObserverArtifactSummary {
   artifactId: string;
@@ -201,8 +194,13 @@ export class ObserverClientService {
   }
 
   /**
-   * 계약의 `/artifacts?projectId=&knoxId=` — **선택 구현**이다(observer-contract-v1.yaml).
-   * "새 Artifact 추가" 다이얼로그의 OA Service 후보 목록에 쓴다(설계서 04장 §6.3).
+   * 계약의 `/artifacts?code=&revision=&knoxId=` — **선택 구현**이다(observer-contract-v1.yaml).
+   * "새 Artifact 추가" 다이얼로그의 OA Service/HPC Service 후보 목록에 쓴다(설계서 04장 §6.3).
+   *
+   * ★ project 사전 링크 단계는 폐지했다 — code/revision을 그대로 필터로 실어 **다이얼로그를
+   *   열 때마다 실시간으로** 조회한다. code/revision이 그 서비스 안에서 유일하지 않은 문제
+   *   (RPM처럼 production run·internal test가 같은 code/revision을 쓸 수 있는 경우)는 이제
+   *   그 서비스 쪽이 필터링해서 답을 주는 문제다 — SIREN은 응답을 그대로 믿는다.
    *
    * 구현하지 않은 서비스는 이 호출이 그냥 실패/타임아웃으로 끝난다 — null을 돌려줘서
    * 호출부가 "이 서비스는 후보 브라우징을 지원하지 않는다 → externalArtifactId 수동 입력"
@@ -212,25 +210,14 @@ export class ObserverClientService {
    */
   async listArtifacts(
     svc: ArtifactServiceDocument,
-    externalProjectId: string,
+    code: string,
+    revision: string,
     knoxId: string,
     isAdmin: boolean,
   ): Promise<ObserverArtifactSummary[] | null> {
     if (!this.callable(svc)) return null;
-    const url = `${svc.baseUrl}/artifacts?projectId=${encodeURIComponent(externalProjectId)}&knoxId=${encodeURIComponent(knoxId)}${this.adminParam(isAdmin)}`;
+    const url = `${svc.baseUrl}/artifacts?code=${encodeURIComponent(code)}&revision=${encodeURIComponent(revision)}&knoxId=${encodeURIComponent(knoxId)}${this.adminParam(isAdmin)}`;
     const data = await this.getJson(url);
     return Array.isArray(data) ? data : null;
-  }
-
-  /** project 링크 단계에서만 쓴다 — 후보를 사람이 직접 확정한다. */
-  async searchProjects(
-    svc: ArtifactServiceDocument,
-    code: string,
-    revision: string,
-  ): Promise<ObserverProjectCandidate[]> {
-    if (!this.callable(svc)) return [];
-    const url = `${svc.baseUrl}/projects/search?code=${encodeURIComponent(code)}&revision=${encodeURIComponent(revision)}`;
-    const data = await this.getJson(url);
-    return Array.isArray(data) ? data : [];
   }
 }

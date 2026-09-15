@@ -4,24 +4,24 @@ import { AccessGrantDto } from '../../workflows/dto/workflow-crud.dto';
 
 /**
  * "새 Artifact 추가" 다이얼로그가 기존 artifact를 재사용하지 않고 그 자리에서 출처를
- * 확정할 때 보낸다(설계서 04장 §6). A/B는 서버가 pickable을 재검증한 뒤 find-or-create
- * 하고, D는 검증 없이 새로 만든다 — Tier C는 아직 잠겨 있어 여기 나오지 않는다.
+ * 확정할 때 보낸다(설계서 04장 §6). live/file/hpc(OA Service/File Artifacts/HPC Service)는
+ * 서버가 pickable을 재검증한 뒤 find-or-create 하고, attested(D)는 검증 없이 새로 만든다.
  */
 export class NewArtifactSourceDto {
-  @IsIn(['live', 'file', 'attested'])
-  source: 'live' | 'file' | 'attested';
+  @IsIn(['live', 'file', 'hpc', 'attested'])
+  source: 'live' | 'file' | 'hpc' | 'attested';
 
   @IsString()
   @MinLength(1)
   @MaxLength(160)
   name: string;
 
-  /** source: 'live'일 때만. */
+  /** source: 'live' | 'hpc'일 때만. */
   @IsOptional()
   @IsString()
   serviceKey?: string;
 
-  /** source: 'live' | 'file'일 때만 — 그 서비스 안에서의 산출물 id. */
+  /** source: 'live' | 'file' | 'hpc'일 때만 — 그 서비스 안에서의 산출물 id. */
   @IsOptional()
   @IsString()
   externalArtifactId?: string;
@@ -100,8 +100,8 @@ export class UpdateBlockDto {
 }
 
 /**
- * A Tier block의 recipient 교체 (설계서 04장 §3.3).
- * B/C/D는 artifact.viewAccess가 곧 recipient이므로 이 라우트를 쓰지 않는다.
+ * A/B/C(OA Service/File Artifacts/HPC Service) block의 recipient 교체 — 셋 다 공통
+ * (설계서 04장 §3.2). D는 이번 범위에서 세부 미정이라 이 라우트를 쓰지 않는다.
  */
 export class ReplaceRecipientsDto {
   @IsOptional()

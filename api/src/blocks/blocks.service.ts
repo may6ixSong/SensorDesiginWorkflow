@@ -8,7 +8,6 @@ import { ArtifactsService } from '../artifacts/artifacts.service';
 import { ArtifactSourceService, CandidateIntent } from '../artifacts/artifact-source.service';
 import { ArtifactDocument } from '../artifacts/schemas/artifact.schema';
 import { normalizeGrant } from '../common/access';
-import { isServiceGovernedTier } from '../common/constants/tier';
 import { WorkflowDocument } from '../workflows/schemas/workflow.schema';
 import { ProjectDocument } from '../projects/schemas/project.schema';
 import { NewArtifactSourceDto } from './dto/block-crud.dto';
@@ -204,10 +203,11 @@ export class BlocksService {
   }
 
   /**
-   * A Tier block의 recipient 교체 (설계서 04장 §3.3).
+   * A/B/C(OA Service/File Artifacts/HPC Service) block의 recipient 교체 (설계서 04장 §3.2).
    *
-   * ★ A Tier에서만 허용한다. B/C/D는 artifact.viewAccess가 곧 recipient이고 그건 artifact
-   *   단위로 중앙 관리되므로, block에 따로 넣으면 진실이 둘로 갈린다.
+   * ★ 셋 다 공통이다 — SIREN이 권한을 보관하지 않고, recipient는 항상 block(그 workflow
+   *   안의 자리) 단위다(옛 설계는 B/C/D를 artifact.viewAccess로 뒀었는데, 여러 workflow가
+   *   하나의 artifact를 공유할 때 진실이 갈리는 문제로 폐기했다). D는 이번 범위 제외.
    * ★ 편집 권한은 그 workflow의 Edit Access다 — 컨트롤러가 이미 검증하고 들어온다.
    *   recipient에 **속하는 것**과 recipient를 **편집하는 것**은 별개다(설계서 01장 §4.2).
    */
@@ -224,10 +224,8 @@ export class BlocksService {
       throw new BadRequestException('This block has no artifact mapped yet.');
     }
     const artifact = await this.artifacts.findOrThrow(block.artifactId.toString());
-    if (!isServiceGovernedTier(artifact.tier)) {
-      throw new BadRequestException(
-        'Recipients are only set on the block for Tier A. For B/C/D, edit the artifact view access instead.',
-      );
+    if (artifact.tier === 'D') {
+      throw new BadRequestException('Recipients are not yet supported for External/Attested (D).');
     }
     block.recipients = {
       editAccess: normalizeGrant(input.editAccess),

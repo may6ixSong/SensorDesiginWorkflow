@@ -24,7 +24,15 @@ import { MemoDocument } from '../memos/schemas/memo.schema';
 import { EdgeDocument } from '../edges/schemas/edge.schema';
 import { ReleaseDocument } from '../releases/schemas/release.schema';
 import { ArtifactServiceDocument } from '../hub/schemas/artifact-service.schema';
-import { HpcPathMockDocument } from '../artifacts/schemas/hpc-path-mock.schema';
+import { CALYPSO_SERVICE_KEY } from '../hub/calypso-client.service';
+
+/**
+ * 개발용 고정 값 — Calypso→SIREN 이벤트 토큰(mock 모드). ArtifactService 시드와
+ * calypso/.env.example의 CALYPSO_EVENT_TOKEN 기본값이 이 리터럴로 맞춰져 있어야
+ * 로컬 Calypso가 아무 설정 없이도 이 SIREN 목업과 바로 맞물린다. 운영 값은 이 상수와
+ * 무관하게 별도로 발급해 실제 DB/배포 설정에 넣는다.
+ */
+export const DEV_CALYPSO_EVENT_TOKEN = 'mock-token-calypso';
 
 export interface SeedModels {
   ArtifactService: Model<ArtifactServiceDocument>;
@@ -35,7 +43,6 @@ export interface SeedModels {
   Memo: Model<MemoDocument>;
   Edge: Model<EdgeDocument>;
   Release: Model<ReleaseDocument>;
-  HpcPathMock: Model<HpcPathMockDocument>;
 }
 
 /* ── 캔버스 좌표 상수 ──
@@ -365,12 +372,14 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
     Memo: MemoModel,
     Edge: EdgeModel,
     Release: ReleaseModel,
-    HpcPathMock: HpcPathMockModel,
   } = models;
 
   /* ── Hub 레지스트리 ──
-   * Calypso는 여기 없다 — Hub가 "연동하는 외부 서비스"가 아니라 SIREN이 직접 만든 산출물
-   * 관리 기능이라서다.
+   * Calypso는 Service Manage 등록/목록 대상은 아니다 — Hub가 "연동하는 외부 서비스"가
+   * 아니라 SIREN이 직접 만든 산출물 관리 기능이라서다. 다만 Calypso→SIREN 이벤트 토큰도
+   * 다른 서비스와 같은 방식(DB에 저장된 ArtifactService.token)으로 검증하기로 했으므로
+   * (HubTokenGuard), `isBuiltIn:true` 문서 하나는 여기 있다 — 등록 UI에는 노출되지 않고
+   * 오직 토큰 조회 대상으로만 쓰인다.
    *
    * ★ A Tier(simhub/rpm)의 baseUrl은 **SIREN 자신이 띄우는 가짜 observer**를 가리킨다
    *   (src/hub/mock/mock-observer.controller.ts). 개발 환경에는 실서비스가 없어 게이트 2가
@@ -379,19 +388,32 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
    *   로직을 우회하지 않는다. */
   const MOCK_OBSERVER = `http://localhost:${process.env.PORT ?? 3000}/api/v1/__mock-observer`;
   await ArtifactServiceModel.deleteMany({ isMock: true });
+  // ★ 아래 4개는 여전히 v3 최초 설계(B/C/D는 SIREN이 artifact 단위 권한 보관) 기준으로
+  // 남아 있다 — 04장 §3에서 A/B/C를 2단 게이트로 통일한 뒤로 'ssm'/'layoutdb'(구 B tier,
+  // transport 'shared-db') 개념 자체가 더 이상 맞지 않는다(File Artifacts는 이제 Calypso
+  // 하나뿐). 컴파일이 깨지지 않도록 transport만 'none'으로 고쳤고, 이 시드 전체를 새
+  // 모델(Service Manage 토큰 발급, HPC Service 실연동, block 단위 recipient)에 맞게
+  // 다시 쓰는 건 별도 작업으로 남겨둔다.
   await ArtifactServiceModel.insertMany([
-    { key: 'ssm', name: 'SSM', contractVersion: '1.0', defaultTier: 'B', transport: 'shared-db',
-      baseUrl: null, viewUrlTemplate: 'https://ssm.local/spec/{artifactId}',
+    { key: 'ssm', name: 'SSM', contractVersion: '1.0', defaultTier: 'B', transport: 'none',
+      baseUrl: null, token: null, viewUrlTemplate: 'https://ssm.local/spec/{artifactId}',
       embedUploadUrlTemplate: null, isBuiltIn: false, enabled: true, isMock: true },
     { key: 'simhub', name: 'SimHub', contractVersion: '1.0', defaultTier: 'A', transport: 'http',
-      baseUrl: MOCK_OBSERVER, viewUrlTemplate: 'https://simhub.local/run/{artifactId}',
+      baseUrl: MOCK_OBSERVER, token: 'mock-token-simhub', viewUrlTemplate: 'https://simhub.local/run/{artifactId}',
       embedUploadUrlTemplate: null, isBuiltIn: false, enabled: true, isMock: true },
     { key: 'rpm', name: 'RPM', contractVersion: '1.0', defaultTier: 'A', transport: 'http',
-      baseUrl: MOCK_OBSERVER, viewUrlTemplate: 'https://rpm.local/artifact/{artifactId}',
+      baseUrl: MOCK_OBSERVER, token: 'mock-token-rpm', viewUrlTemplate: 'https://rpm.local/artifact/{artifactId}',
       embedUploadUrlTemplate: null, isBuiltIn: false, enabled: true, isMock: true },
-    { key: 'layoutdb', name: 'LayoutDB', contractVersion: '1.0', defaultTier: 'B', transport: 'shared-db',
-      baseUrl: null, viewUrlTemplate: null,
+    { key: 'layoutdb', name: 'LayoutDB', contractVersion: '1.0', defaultTier: 'B', transport: 'none',
+      baseUrl: null, token: null, viewUrlTemplate: null,
       embedUploadUrlTemplate: null, isBuiltIn: false, enabled: true, isMock: true },
+    // Calypso 고정 항목 — baseUrl/transport는 CalypsoClientService가 자체 config로 직접
+    // 호출하므로 여기서 쓰이지 않는다(HubSyncService도 serviceKey로 따로 분기). 이 문서는
+    // 오직 HubTokenGuard의 token 조회 대상 역할만 한다. 토큰 값은 calypso/.env.example의
+    // CALYPSO_EVENT_TOKEN 개발 기본값과 같아야 한다(DEV_CALYPSO_EVENT_TOKEN).
+    { key: CALYPSO_SERVICE_KEY, name: 'Calypso', contractVersion: '1.0', defaultTier: 'B', transport: 'none',
+      baseUrl: null, token: DEV_CALYPSO_EVENT_TOKEN, viewUrlTemplate: null,
+      embedUploadUrlTemplate: null, isBuiltIn: true, enabled: true, isMock: true },
   ]);
 
   /* ── 과제 ──
@@ -712,15 +734,9 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
   // releaseSeq를 실제 release 수와 맞춰 둔다 — 다음 release가 v3부터 시작한다.
   await WorkflowModel.updateOne({ _id: workflowIds['wf1'] }, { $set: { releaseSeq: 2 } }).exec();
 
-  /* ── HPC Service(Tier C) 미리보기 mock ──
-   * HPC망 서비스와의 실연동은 아직 구체화되지 않았다(설계서 04장 §6.4) — 그래서 "새
-   * Artifact 추가" 다이얼로그의 HPC Service 소스는 항상 선택 불가로 잠겨 있다. 그래도
-   * "이 옵션이 왜 있는지" 알 수 있도록, project code+revision으로 필터되는 가짜 경로
-   * 몇 개만 미리보기용으로 심어 둔다 — 실제 매핑에는 절대 쓰이지 않는다. */
-  await HpcPathMockModel.deleteMany({ isMock: true });
-  await HpcPathMockModel.insertMany([
-    { projectCode: 'CIS-A7', projectRevision: 'EVT1', name: 'PLL Post-layout netlist', path: '/vwp/cis_a7/pll_main/post_layout/', isMock: true },
-    { projectCode: 'CIS-A7', projectRevision: 'EVT1', name: 'Pixel array DRC run', path: '/vwp/cis_a7/pixel_array/drc/', isMock: true },
-    { projectCode: 'CIS-B3', projectRevision: 'EVT0', name: 'ADC top-level LVS', path: '/vwp/cis_b3/adc_top/lvs/', isMock: true },
-  ]);
+  // ★ HPC Service(Tier C) 미리보기 mock(HpcPathMock)은 제거했다 — HPC망 양방향 API 연동이
+  // 확정되면서 OA Service와 동일한 실연동 대상이 됐다(설계서 04장 §2, §6.3). 이 시드가
+  // A/B/C의 recipient·권한 모델 전환(04장 §3)을 아직 따라가지 못한 부분 — Service Manage
+  // 등록/토큰/artifactTypeKey, block.recipients 기반 A/B/C recipient 시드 데이터 재정비 —
+  // 은 별도 작업으로 남겨둔다(README §4 참고).
 }

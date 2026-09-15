@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Box, CircularProgress } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
-import { listCalypsoArtifacts, setCalypsoUserDepartments } from '@/api/calypsoClient';
+import { listCalypsoArtifacts } from '@/api/calypsoClient';
 import { queryKeys } from '@/api/queryKeys';
 import { Field, TextInput } from '@/components/common/Panel';
 import { Badge } from '@/components/common/SirenButton';
@@ -10,8 +10,6 @@ import { CURSOR_POINTER, FONT_MONO, T } from '@/theme/tokens';
 
 interface Props {
   projectId: string | undefined;
-  /** Calypso ACL의 부서 단위 부여 판정에 쓰는 값 — 목록 자체엔 영향 없지만 항상 실어 보낸다. */
-  myDepartments: string[];
   value: string;
   onChange: (id: string) => void;
   onSelectName?: (name: string) => void;
@@ -27,17 +25,14 @@ interface Props {
  * 같은 code+revision 후보 검색을 쓸 수 없다. 대신 Calypso가 **이미 본인 view 권한 기준으로
  * 필터링해서 돌려주는** 이 project의 artifact 목록에서 직접 고르게 한다
  * (calypso/src/artifacts/artifacts.service.ts#list — computeAccess !== 'none'만 남긴다).
- * 후보가 하나뿐이어도 자동 선택하지 않는다 — ExternalArtifactPicker와 같은 원칙이다.
+ * 후보가 하나뿐이어도 자동 선택하지 않는다 — 오타로 잘못된 산출물을 고르는 사고를 막는다.
  */
-export function CalypsoArtifactPicker({ projectId, myDepartments, value, onChange, onSelectName, intent }: Props) {
+export function CalypsoArtifactPicker({ projectId, value, onChange, onSelectName, intent }: Props) {
   const [q, setQ] = useState('');
   const { data, isLoading, isError } = useQuery({
     queryKey: queryKeys.calypsoArtifacts(projectId ?? ''),
     enabled: !!projectId,
-    queryFn: () => {
-      setCalypsoUserDepartments(myDepartments);
-      return listCalypsoArtifacts({ projectId });
-    },
+    queryFn: () => listCalypsoArtifacts({ projectId: projectId as string }),
   });
 
   const filtered = useMemo(() => {

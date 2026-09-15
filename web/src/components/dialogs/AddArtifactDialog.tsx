@@ -41,7 +41,7 @@ interface Props {
  *   artifact를 바꿀 때(ChangeArtifactDialog) 둘 다에서 재사용한다.
  */
 export function AddArtifactDialog({
-  workflowName, workflowId, projectId, projectCode, projectRevision, phases, myDepartments, departmentOptions,
+  workflowName, workflowId, projectId, phases, myDepartments, departmentOptions,
   onClose, onCreate, submitting,
 }: Props) {
   const { t } = useTranslation();
@@ -59,7 +59,7 @@ export function AddArtifactDialog({
 
   const submit = () => {
     if (!name.trim() || !phaseId) { setErr('Name and phase are required.'); return; }
-    if (src.source === 'hpc' || !src.source) { setErr('Pick where this artifact comes from.'); return; }
+    if (!src.source) { setErr('Pick where this artifact comes from.'); return; }
     const newArtifact = resolveNewArtifact(src, name.trim());
     if (!newArtifact) { setErr('Finish picking the artifact for that source.'); return; }
     setErr(null);
@@ -146,8 +146,6 @@ export function AddArtifactDialog({
       <ArtifactSourcePicker
         workflowId={workflowId}
         projectId={projectId}
-        projectCode={projectCode}
-        projectRevision={projectRevision}
         intent={intent}
         myDepartments={myDepartments}
         departmentOptions={departmentOptions}

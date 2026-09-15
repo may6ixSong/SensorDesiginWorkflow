@@ -192,13 +192,14 @@ export interface ArtifactDto {
   externalUrl: string | null;
   myAccess: AccessLevel;
   /**
-   * B/C/D만 값이 있다. A는 그 서비스가 권한을 판정하므로 항상 null이다(설계서 04장 §3).
+   * D만 값이 있다. A/B/C(OA Service/File Artifacts/HPC Service)는 그 서비스가 권한을
+   * 판정하고 recipient는 block 단위이므로 항상 null이다(설계서 04장 §3).
    */
   editAccess: AccessGrant | null;
   viewAccess: AccessGrant | null;
   /**
-   * B/C/D는 viewAccess가 곧 recipient이며 서버가 그 값을 복사해 채워 준다(읽기 전용).
-   * **A Tier의 recipient는 artifact가 아니라 block에 있다** — workflow마다 다르기 때문이다.
+   * D는 viewAccess가 곧 recipient이며 서버가 그 값을 복사해 채워 준다(읽기 전용).
+   * **A/B/C의 recipient는 artifact가 아니라 block에 있다** — workflow마다 다르기 때문이다.
    */
   recipients: AccessGrant | null;
   /** Tier D 전용 표시용 메타데이터 — "누가 줄 것으로 기대되는지". 그 외 tier는 항상 null. */
@@ -236,8 +237,9 @@ export interface BlockDto {
   artifact: ArtifactDto | MaskedArtifactDto | null;
   publishState: PublishState;
   /**
-   * **A Tier에서만** 값이 있다 — 같은 artifact라도 workflow마다 recipient 구성이 다를 수
-   * 있어 block에 붙는다(설계서 01장 §4.1). B/C/D는 null이고 artifact.recipients를 본다.
+   * **A/B/C(OA Service/File Artifacts/HPC Service)에서만** 값이 있다 — 같은 artifact라도
+   * workflow마다 recipient 구성이 다를 수 있어 block에 붙는다(설계서 04장 §3.2). D만
+   * null이고 그 대신 artifact.editAccess/viewAccess(옛 모델)를 쓴다.
    */
   recipients: { editAccess: AccessGrant; viewAccess: AccessGrant } | null;
   series: string | null;
@@ -264,18 +266,10 @@ export interface EdgeDto {
 
 /* ------------------------------------------------------------------ *
  * Hub (외부 산출물 서비스 연동)
+ * ------------------------------------------------------------------ *
+ * project 사전 링크 단계(과거 ProjectSearchCandidateDto)는 폐지했다(설계서 07장 §7) —
+ * 후보 조회마다 그 workflow가 속한 project의 code+revision을 실시간으로 필터로 쓴다.
  * ------------------------------------------------------------------ */
-
-/**
- * 과제(code+revision)를 외부 서비스의 프로젝트와 이을 때 그 서비스가 돌려주는 후보.
- * 자동으로 잇지 않고 사람이 확정한다 — 코드 체계가 서비스마다 미묘하게 다르기 때문이다.
- */
-export interface ProjectSearchCandidateDto {
-  externalProjectId: string;
-  displayName: string;
-  code: string;
-  revision: string | null;
-}
 
 /* ------------------------------------------------------------------ *
  * Artifact 출처 선택 ("새 Artifact 추가" 다이얼로그, 설계서 04장 §6)

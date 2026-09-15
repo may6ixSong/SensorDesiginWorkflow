@@ -3,7 +3,6 @@ import { registerModels } from '../database/model-registration';
 import { AuditModule } from '../audit/audit.module';
 import { ArtifactService, ArtifactServiceSchema } from './schemas/artifact-service.schema';
 import { HubSyncCheckpoint, HubSyncCheckpointSchema } from './schemas/hub-sync-checkpoint.schema';
-import { ProjectServiceLink, ProjectServiceLinkSchema } from './schemas/project-service-link.schema';
 import { Project, ProjectSchema } from '../projects/schemas/project.schema';
 import { Workflow, WorkflowSchema } from '../workflows/schemas/workflow.schema';
 import { Artifact, ArtifactSchema } from '../artifacts/schemas/artifact.schema';
@@ -12,9 +11,11 @@ import { HubCommonService } from './hub-common.service';
 import { HubShowcaseService } from './hub-showcase.service';
 import { ObserverClientService } from './observer-client.service';
 import { CalypsoClientService } from './calypso-client.service';
-import { ProjectLinksService } from './project-links.service';
+import { HubSyncService } from './hub-sync.service';
 import { HubController } from './hub.controller';
-import { ProjectLinksController } from './project-links.controller';
+import { HubEventsController } from './hub-events.controller';
+import { CalypsoProxyController } from './calypso-proxy.controller';
+import { HubTokenGuard } from './guards/hub-token.guard';
 import { MockObserverController } from './mock/mock-observer.controller';
 
 /**
@@ -26,17 +27,19 @@ import { MockObserverController } from './mock/mock-observer.controller';
 const mockControllers = process.env.MOCKUP_ENABLED === 'true' ? [MockObserverController] : [];
 
 /**
- * Hub - 레지스트리(§3.2), 공용 데이터 API(§4.4), B 티어 동기화 커서(§8.4).
+ * Hub - 레지스트리(§3.2), 공용 데이터 API(§4.4), 야간 재동기화 커서(설계서 07장 §6).
  *
  * 여기 있는 코드는 SIREN이 각 산출물 서비스를 **관측**하기 위한 것이지, 산출물 데이터를
  * 소유하기 위한 것이 아니다(§1.2). 실물 파일·버전 이력·다운로드 판정은 전부 각 서비스에 있다.
+ *
+ * ★ `ProjectServiceLink`(project 사전 링크)는 제거했다 — 후보 조회는 이제 code+revision을
+ *   그대로 필터로 실어 매번 실시간으로 한다(설계서 04장 §6.3).
  */
 @Module({
   imports: [
     registerModels([
       { name: ArtifactService.name, schema: ArtifactServiceSchema },
       { name: HubSyncCheckpoint.name, schema: HubSyncCheckpointSchema },
-      { name: ProjectServiceLink.name, schema: ProjectServiceLinkSchema },
       { name: Project.name, schema: ProjectSchema },
       { name: Workflow.name, schema: WorkflowSchema },
       { name: Artifact.name, schema: ArtifactSchema },
@@ -49,9 +52,10 @@ const mockControllers = process.env.MOCKUP_ENABLED === 'true' ? [MockObserverCon
     HubShowcaseService,
     ObserverClientService,
     CalypsoClientService,
-    ProjectLinksService,
+    HubSyncService,
+    HubTokenGuard,
   ],
-  controllers: [HubController, ProjectLinksController, ...mockControllers],
-  exports: [HubService, HubCommonService, ObserverClientService, CalypsoClientService, ProjectLinksService],
+  controllers: [HubController, HubEventsController, CalypsoProxyController, ...mockControllers],
+  exports: [HubService, HubCommonService, ObserverClientService, CalypsoClientService, HubSyncService],
 })
 export class HubModule {}

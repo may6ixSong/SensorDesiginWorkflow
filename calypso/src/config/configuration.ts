@@ -39,6 +39,19 @@ export default () => ({
    * 데이터는 어느 쪽에서도 건드리지 않는다. (src/database/seed-runner.service.ts)
    */
   mockupEnabled: (process.env.MOCKUP_ENABLED ?? 'false') === 'true',
+  /**
+   * SIREN BE가 이 api를 호출할 때 실어 보내는 공유 비밀(`X-Siren-Token`) — actor.ts의
+   * X-Knox-Id 등은 신원 주장일 뿐 검증되지 않으므로, 최소한 "이 호출이 SIREN BE에서 온
+   * 게 맞는가"는 이 토큰으로 확인한다(SirenCallerGuard). SIREN 쪽 CALYPSO_API_TOKEN과
+   * 같은 값이어야 한다. 비어 있으면(로컬 개발 기본값) 검증을 건너뛴다 — 운영 배포 시
+   * 반드시 설정할 것.
+   *
+   * ★ Calypso가 나중에 자기 프론트엔드를 새로 갖게 되면, 사람이 직접 로그인해서 쓰는
+   *   라우트와 "SIREN BE만 불러야 하는" 라우트를 갈라야 한다 — 지금은 당분간 Calypso
+   *   자체 웹앱을 안 쓰기로 했으므로(§11.5) ArtifactsController 전체를 이 가드로 묶어도
+   *   무방하지만, 그 전제가 깨지면 이 가드의 적용 범위를 다시 나눠야 한다.
+   */
+  sirenCallerToken: process.env.SIREN_CALLER_TOKEN || '',
   /** S3 호환 오브젝트 스토리지 (SFM_API files.service.ts와 동일한 키 구성). */
   storage: {
     uri: process.env.S3_URI ?? '',

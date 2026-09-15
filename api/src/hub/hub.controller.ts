@@ -5,8 +5,9 @@ import { HubService } from './hub.service';
 import { HubCommonService } from './hub-common.service';
 import { HubShowcaseService } from './hub-showcase.service';
 import {
-  RegisterServiceDto,
+  RegisterArtifactTypeDto,
   UpdateServiceDto,
+  toArtifactServiceAdminDto,
   toArtifactServiceDto,
 } from './dto/artifact-service.dto';
 
@@ -18,25 +19,31 @@ export class HubController {
     private readonly showcase: HubShowcaseService,
   ) {}
 
-  /** 산출물의 출처를 고를 때 쓰는 목록. Admin은 꺼진 것까지 본다. */
+  /**
+   * 산출물의 출처를 고를 때 쓰는 목록. Admin은 꺼진 것까지 보고, 토큰도 함께 받는다
+   * (Service Manage 화면용) — 일반 사용자에게는 토큰을 절대 노출하지 않는다.
+   */
   @Get('services')
   async listServices(@Query('includeDisabled') includeDisabled: string, @CurrentActor() me: Actor) {
     const all = includeDisabled === 'true' && me.isAdmin;
     const list = await this.hub.list(all);
-    return { data: list.map(toArtifactServiceDto) };
+    return { data: list.map(me.isAdmin ? toArtifactServiceAdminDto : toArtifactServiceDto) };
   }
 
-  /** Admin 전용 (Hub 설계서 §13.4). 판정은 실제 호출자 기준이다. */
+  /**
+   * Admin 전용 (설계서 07장 §3.4). 판정은 실제 호출자 기준이다. 이미 등록된 baseURL이면
+   * 기존 서비스에 artifact 종류만 추가한다(§3.3) — `reusedExisting`으로 그 여부를 알려준다.
+   */
   @Post('services')
-  async register(@Body() dto: RegisterServiceDto, @CurrentActor() me: Actor) {
-    const svc = await this.hub.register(dto, me);
-    return { data: toArtifactServiceDto(svc) };
+  async register(@Body() dto: RegisterArtifactTypeDto, @CurrentActor() me: Actor) {
+    const { service, artifactTypeKey, reusedExisting } = await this.hub.registerArtifactType(dto, me);
+    return { data: { ...toArtifactServiceAdminDto(service), artifactTypeKey, reusedExisting } };
   }
 
   @Patch('services/:key')
   async update(@Param('key') key: string, @Body() dto: UpdateServiceDto, @CurrentActor() me: Actor) {
     const svc = await this.hub.update(key, dto, me);
-    return { data: toArtifactServiceDto(svc) };
+    return { data: toArtifactServiceAdminDto(svc) };
   }
 
   /**

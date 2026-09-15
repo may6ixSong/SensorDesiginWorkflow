@@ -213,7 +213,9 @@ export function ArtifactSlide({
   }
 
   const tier = TIER_COLOR[artifact.tier];
-  const isATier = artifact.tier === 'A';
+  // A/B/C(OA Service/File Artifacts/HPC Service) 전부 recipient가 block에 있다 — D만
+  // artifact.editAccess/viewAccess(옛 모델)를 쓴다(설계서 04장 §3).
+  const usesBlockRecipients = artifact.tier !== 'D';
   // Hub 라이브 대상이면 artifact.versions(스냅샷) 대신 방금 그 서비스에 물어본 값을 쓴다.
   const effectiveVersions = isHubLive ? (live.data ?? []) : artifact.versions;
   const published = effectiveVersions.filter((v) => v.isPublished);
@@ -297,10 +299,10 @@ export function ArtifactSlide({
           calypso/web(5174)은 이미 폐기됐으니 그쪽으로 새 탭을 열면 안 된다(사용자 지적).
           SirenButton은 component={motion.button}로 고정돼 있어 Link로 바꿔치기할 수
           없으므로, 그 primary variant 스타일을 그대로 옮겨 Link에 입힌다. */}
-      {artifact.serviceKey === 'calypso' && artifact.externalArtifactId && (
+      {artifact.serviceKey === 'calypso' && artifact.externalArtifactId && project && (
         <Box
           component={Link}
-          to={`/artifacts/${artifact.externalArtifactId}`}
+          to={`/projects/${project._id}/artifacts/${artifact.externalArtifactId}`}
           sx={{
             display: 'inline-flex', alignItems: 'center', gap: '5px',
             fontSize: 12.5, fontWeight: 500, padding: '6px 11px', borderRadius: `${R.sm}px`,
@@ -337,19 +339,19 @@ export function ArtifactSlide({
             selectedVersionLabel={requestedVersionLabel}
             onSelectVersion={(v) => setSelectedVersionLabel(v.versionLabel)}
             calypsoArtifactId={artifact.serviceKey === 'calypso' ? artifact.externalArtifactId : null}
+            projectId={project?._id}
             blockId={block.id}
             releases={releases ?? []}
             onOpenRelease={onOpenRelease}
             isLive={isHubLive}
             liveLoading={isHubLive && live.isLoading}
-            myDepartments={myDepartments ?? []}
           />
         )}
 
         {tab === 'recipients' && (
           <RecipientsTab
             block={block}
-            isATier={isATier}
+            usesBlockRecipients={usesBlockRecipients}
             canEdit={canEditRecipients}
             departmentOptions={project?.departments ?? []}
             onSaveBlockRecipients={onSaveBlockRecipients}
@@ -375,8 +377,7 @@ export function ArtifactSlide({
  */
 function OverviewTab({
   block, phases, versions, isCalypsoB, showHtmlPanel, htmlViewData, htmlViewLoading,
-  selectedVersionLabel, onSelectVersion, calypsoArtifactId, blockId, releases, onOpenRelease, isLive, liveLoading,
-  myDepartments,
+  selectedVersionLabel, onSelectVersion, calypsoArtifactId, projectId, blockId, releases, onOpenRelease, isLive, liveLoading,
 }: {
   block: BlockDto;
   phases: WorkflowPhase[];
@@ -390,8 +391,10 @@ function OverviewTab({
   selectedVersionLabel: string | undefined;
   onSelectVersion: (v: ArtifactVersionDto) => void;
   /** Calypso 산출물이면 값이 있다 — "Open"이 외부 viewUrl(예전 calypso/web, 폐기됨) 대신
-   * SIREN 안의 /artifacts/:id로 가야 한다(사용자 지적). */
+   * SIREN 안의 /projects/:projectId/artifacts/:id로 가야 한다(사용자 지적). */
   calypsoArtifactId: string | null;
+  /** SIREN project id — Calypso 프록시가 department를 계산하는 데 필요하다(설계서 07장 §2). */
+  projectId: string | undefined;
   blockId: string;
   releases: ReleaseDto[];
   onOpenRelease?: (releaseId: string) => void;
@@ -399,7 +402,6 @@ function OverviewTab({
    * 라이브 응답이라는 뜻이다(설계서 04장 §19.5/§19.6). */
   isLive?: boolean;
   liveLoading?: boolean;
-  myDepartments: string[];
 }) {
   const phase = phases.find((p) => p.id === block.phaseId);
   const orphan = isOrphanPhase(phases, block.phaseId);
@@ -408,11 +410,11 @@ function OverviewTab({
     <>
       <PhaseCard phase={phase} orphan={orphan} />
 
-      {isCalypsoB && calypsoArtifactId ? (
+      {isCalypsoB && calypsoArtifactId && projectId ? (
         <CalypsoInlinePanel
           artifactId={calypsoArtifactId}
+          projectId={projectId}
           blockId={blockId}
-          myDepartments={myDepartments}
           releases={releases}
           onOpenRelease={onOpenRelease}
         />
@@ -428,6 +430,7 @@ function OverviewTab({
             <VersionList
               versions={versions}
               calypsoArtifactId={calypsoArtifactId}
+              projectId={projectId}
               blockId={blockId}
               releases={releases}
               onOpenRelease={onOpenRelease}
@@ -442,6 +445,7 @@ function OverviewTab({
         <VersionList
           versions={versions}
           calypsoArtifactId={calypsoArtifactId}
+          projectId={projectId}
           blockId={blockId}
           releases={releases}
           onOpenRelease={onOpenRelease}
@@ -491,11 +495,12 @@ function PhaseCard({ phase, orphan }: { phase: WorkflowPhase | undefined; orphan
  * 지금 그대로 유지한다(사용자 요청).
  */
 function VersionList({
-  versions, calypsoArtifactId, blockId, releases, onOpenRelease, isLive, liveLoading,
+  versions, calypsoArtifactId, projectId, blockId, releases, onOpenRelease, isLive, liveLoading,
   selectedVersionLabel, onSelectVersion,
 }: {
   versions: ArtifactVersionDto[];
   calypsoArtifactId: string | null;
+  projectId: string | undefined;
   blockId: string;
   releases: ReleaseDto[];
   onOpenRelease?: (releaseId: string) => void;
@@ -623,10 +628,10 @@ function VersionList({
               {/* Calypso면 항상 SIREN 내부 artifact 페이지로 — v.viewUrl은 Calypso 백엔드의
                   PUBLIC_BASE_URL(폐기된 calypso/web, 5174)로 만들어져 그쪽을 가리키므로
                   쓰지 않는다. 그 외(계약 맺은 진짜 외부 서비스)만 viewUrl을 그대로 연다. */}
-              {calypsoArtifactId ? (
+              {calypsoArtifactId && projectId ? (
                 <Box
                   component={Link}
-                  to={`/artifacts/${calypsoArtifactId}`}
+                  to={`/projects/${projectId}/artifacts/${calypsoArtifactId}`}
                   sx={{
                     display: 'inline-flex', alignItems: 'center', gap: '4px',
                     fontSize: 11, color: T.pr, textDecoration: 'none', fontWeight: 600,
@@ -659,17 +664,19 @@ function VersionList({
 /**
  * 수신 대상 (설계서 04장 §5).
  *
- * ★ **A Tier**는 recipient가 그 workflow의 block에 붙는다 — 같은 artifact라도 workflow마다
- *   다를 수 있기 때문이다. 그리고 이 목록은 알림 대상이자 **slide 열람의 첫 게이트**다.
- * ★ **B/C/D**는 artifact의 viewAccess가 곧 recipient이고, 그 값은 artifact 단위로 중앙
- *   관리되어 그 산출물을 참조하는 **모든 workflow에 동일하게** 적용된다.
+ * ★ **A/B/C(OA Service/File Artifacts/HPC Service)** 전부 recipient가 그 workflow의
+ *   block에 붙는다 — 같은 artifact라도 workflow마다 다를 수 있기 때문이다(같은
+ *   artifact가 workflow X·Y 양쪽에 있어도 서로 다른 recipient를 가질 수 있다). 이
+ *   목록은 알림 대상이자 **slide 열람의 첫 게이트**다(§4.1).
+ * ★ **D**만 옛 모델(artifact.editAccess/viewAccess, artifact 단위 중앙 관리)을 그대로
+ *   쓴다 — 이번 범위에서 세부를 구체화하지 않는다(§3.5).
  * ★ View 권한자에게는 **읽기 전용**으로 노출한다 — 누가 받는지는 볼 수 있어야 한다.
  */
 function RecipientsTab({
-  block, isATier, canEdit, departmentOptions, onSaveBlockRecipients, onSaveArtifactAccess, saving,
+  block, usesBlockRecipients, canEdit, departmentOptions, onSaveBlockRecipients, onSaveArtifactAccess, saving,
 }: {
   block: BlockDto;
-  isATier: boolean;
+  usesBlockRecipients: boolean;
   canEdit: boolean;
   departmentOptions: string[];
   onSaveBlockRecipients: Props['onSaveBlockRecipients'];
@@ -679,10 +686,10 @@ function RecipientsTab({
   const { t } = useTranslation();
   const artifact = block.artifact && !isMaskedArtifact(block.artifact) ? block.artifact : null;
 
-  const initialEdit = isATier
+  const initialEdit = usesBlockRecipients
     ? (block.recipients?.editAccess ?? { departments: [], users: [] })
     : (artifact?.editAccess ?? { departments: [], users: [] });
-  const initialView = isATier
+  const initialView = usesBlockRecipients
     ? (block.recipients?.viewAccess ?? { departments: [], users: [] })
     : (artifact?.viewAccess ?? { departments: [], users: [] });
 
@@ -697,7 +704,7 @@ function RecipientsTab({
   );
 
   const save = () =>
-    isATier
+    usesBlockRecipients
       ? onSaveBlockRecipients({ editAccess, viewAccess })
       : onSaveArtifactAccess({ editAccess, viewAccess });
 
@@ -712,8 +719,8 @@ function RecipientsTab({
       >
         <Box sx={{ mt: '1px', flexShrink: 0 }}><Icon name="info" /></Box>
         <Box>
-          {isATier
-            ? 'Recipients are set per workflow for OA Service artifacts. Being a recipient also grants access to this slide — the owning service still decides what is actually visible.'
+          {usesBlockRecipients
+            ? 'Recipients are set per workflow for this artifact. Being a recipient also grants access to this slide — the owning service still decides what is actually visible.'
             : 'View access is the recipient list. It is shared by every workflow that uses this artifact.'}
         </Box>
       </Box>
@@ -723,7 +730,7 @@ function RecipientsTab({
       )}
 
       <Card sx={{ mb: '12px' }}>
-        <Ey sx={{ mb: '10px' }}>{isATier ? 'Edit recipients' : 'Edit access'}</Ey>
+        <Ey sx={{ mb: '10px' }}>{usesBlockRecipients ? 'Edit recipients' : 'Edit access'}</Ey>
         <AccessGrantEditor
           value={editAccess}
           onChange={setEditAccess}
@@ -733,7 +740,7 @@ function RecipientsTab({
       </Card>
 
       <Card>
-        <Ey sx={{ mb: '10px' }}>{isATier ? 'View recipients' : 'View access · recipients'}</Ey>
+        <Ey sx={{ mb: '10px' }}>{usesBlockRecipients ? 'View recipients' : 'View access · recipients'}</Ey>
         <AccessGrantEditor
           value={viewAccess}
           onChange={setViewAccess}

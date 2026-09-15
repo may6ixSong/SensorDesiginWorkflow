@@ -8,8 +8,7 @@ import { ArtifactDocument, ArtifactVersion } from '../artifacts/schemas/artifact
 import { BlocksService } from '../blocks/blocks.service';
 import { ArtifactsService, majorKeyOf } from '../artifacts/artifacts.service';
 import { EdgesService } from '../edges/edges.service';
-import { HubService } from '../hub/hub.service';
-import { ObserverClientService } from '../hub/observer-client.service';
+import { CalypsoClientService } from '../hub/calypso-client.service';
 import { NotificationService } from '../notifications/notification.service';
 import { AuditService } from '../audit/audit.service';
 import { Actor } from '../common/actor';
@@ -70,8 +69,7 @@ export class ReleasesService {
     private readonly blocks: BlocksService,
     private readonly artifacts: ArtifactsService,
     private readonly edges: EdgesService,
-    private readonly hub: HubService,
-    private readonly observer: ObserverClientService,
+    private readonly calypso: CalypsoClientService,
     private readonly notifications: NotificationService,
     private readonly audit: AuditService,
   ) {}
@@ -127,8 +125,8 @@ export class ReleasesService {
    * 평소 캔버스 렌더링은 외부 서비스를 한 번도 호출하지 않는다. 라이브 조회는 여기와
    * 산출물 상세 slide를 열 때뿐이다(설계서 05장 §8).
    */
-  async preview(workflow: WorkflowDocument, actor: Actor): Promise<ReleasePreview> {
-    const items = await this.buildItems(workflow, actor);
+  async preview(workflow: WorkflowDocument, _actor: Actor): Promise<ReleasePreview> {
+    const items = await this.buildItems(workflow);
     return {
       workflowId: workflow._id.toString(),
       nextSeq: (workflow.releaseSeq ?? 0) + 1,
@@ -137,7 +135,7 @@ export class ReleasesService {
     };
   }
 
-  private async buildItems(workflow: WorkflowDocument, actor: Actor): Promise<ReleasePreviewItem[]> {
+  private async buildItems(workflow: WorkflowDocument): Promise<ReleasePreviewItem[]> {
     const blocks = await this.blocks.releasableForWorkflow(workflow._id);
     const artifactMap = await this.artifacts.findMany(blocks.map((b) => b.artifactId!));
     const prev = await this.previous(workflow._id);
@@ -146,13 +144,12 @@ export class ReleasesService {
     const phaseName = new Map((workflow.phases ?? []).map((p) => [p.id, p.name]));
     const blockById = new Map(blocks.map((b) => [b._id.toString(), b]));
 
-    // 각 artifact의 "지금 최신 published"를 한 번씩만 해석한다.
+    // 각 artifact의 "지금 최신 published"를 한 번씩만 해석한다 — SIREN 캐시에서 읽는다
+    // (설계서 05장 §8, 07장 §3·§4). 라이브 조회는 더 이상 하지 않는다.
     const resolved = new Map<string, { version: ReleasedVersion | null; lookupFailed: boolean }>();
-    await Promise.all(
-      [...artifactMap.values()].map(async (a) => {
-        resolved.set(a._id.toString(), await this.resolveLatestPublished(a, actor));
-      }),
-    );
+    for (const a of artifactMap.values()) {
+      resolved.set(a._id.toString(), this.resolveLatestPublished(a));
+    }
 
     const items: ReleasePreviewItem[] = [];
 
@@ -245,8 +242,10 @@ export class ReleasesService {
 
   /**
    * 이 산출물이 전달될 대상(설계서 05장 §6.2).
-   *   A     → 그 **block**의 recipients(edit + view) — workflow마다 다를 수 있다
-   *   B/C/D → 그 **artifact**의 viewAccess + editAccess — 모든 workflow에서 동일
+   *   A/B/C(OA Service/File Artifacts/HPC Service) → 그 **block**의 recipients(edit + view)
+   *                                                    — workflow마다 다를 수 있다
+   *   D(External/Attested)                          → 그 **artifact**의 viewAccess +
+   *                                                    editAccess (이번 범위에서 세부 미정)
    */
   private recipientsFor(block: BlockDocument, artifact: ArtifactDocument) {
     const departments = new Set<string>();
@@ -268,42 +267,17 @@ export class ReleasesService {
   }
 
   /**
-   * 그 산출물의 "지금 최신 published"를 해석한다.
-   *   A/B (연동 있음) → 이 시점에 서비스에 라이브 조회
-   *   C/D             → SIREN 로컬 기록
-   *
-   * ★ 조회에 실패한 서비스는 **SIREN이 마지막으로 알고 있던 값**을 쓰고 lookupFailed를
-   *   세운다. release를 막지는 않는다(설계서 05장 §8).
+   * 그 산출물의 "지금 최신 published"를 해석한다 — **SIREN 캐시에서 읽는다.** A/B/C
+   * (OA Service/File Artifacts/HPC Service) 전부 event + 야간 재동기화로 이미
+   * `artifact.versions`에 채워져 있으므로(설계서 07장 §3·§4), release/preview 시점에
+   * 그 서비스로 라이브 조회를 하지 않는다(05장 §8). `lookupFailed`는 이제 항상 false다 —
+   * 필드는 응답 모양을 유지하기 위해 남겨둔다.
    */
-  private async resolveLatestPublished(
+  private resolveLatestPublished(
     artifact: ArtifactDocument,
-    actor: Actor,
-  ): Promise<{ version: ReleasedVersion | null; lookupFailed: boolean }> {
+  ): { version: ReleasedVersion | null; lookupFailed: boolean } {
     const local = this.artifacts.latestPublished(artifact);
-    const localVersion = local ? this.toReleasedVersion(local) : null;
-
-    const needsLive = artifact.serviceKey && artifact.externalArtifactId && artifact.tier !== 'C' && artifact.tier !== 'D';
-    if (!needsLive) return { version: localVersion, lookupFailed: false };
-
-    try {
-      const svc = await this.hub.findByKeyOrThrow(artifact.serviceKey!);
-      // release는 개인화된 조회가 아니라 공식 행위다 — 누가 눌러도 얼려지는 값이 같아야
-      // 하므로 admin 시야(isAdmin=true)를 넘기지 않는다.
-      const record = await this.observer.currentVersion(
-        svc,
-        artifact.externalArtifactId!,
-        actor.knoxId,
-        false,
-      );
-      if (!record) return { version: localVersion, lookupFailed: true };
-      if (!record.isReleased) return { version: null, lookupFailed: false };
-
-      const entry = this.observer.toVersionEntry(record, artifact.tier === 'A' ? 'A' : 'B');
-      return { version: this.toReleasedVersion(entry as ArtifactVersion), lookupFailed: false };
-    } catch (e) {
-      this.logger.warn(`Live version lookup failed for ${artifact.name} — ${(e as Error).message}`);
-      return { version: localVersion, lookupFailed: true };
-    }
+    return { version: local ? this.toReleasedVersion(local) : null, lookupFailed: false };
   }
 
   private toReleasedVersion(v: ArtifactVersion): ReleasedVersion {
@@ -337,7 +311,7 @@ export class ReleasesService {
     const note = (input.note ?? '').trim();
     if (!note) throw new BadRequestException('A release note is required.');
 
-    const previewItems = await this.buildItems(workflow, actor);
+    const previewItems = await this.buildItems(workflow);
     if (previewItems.length === 0) {
       throw new BadRequestException('There is nothing to release — no block has an artifact mapped.');
     }
@@ -411,7 +385,37 @@ export class ReleasesService {
       this.logger.error(`Release notification failed for v${seq} — ${(e as Error).message}`);
     });
 
+    await this.autoGrantFileArtifactViewAccess(items, actor);
+
     return release;
+  }
+
+  /**
+   * Tier B(File Artifacts) 자동 view 권한 부여(설계서 05장 §4.6) — release를 실행하는
+   * 사용자가 Calypso edit 권한을 가진 File Artifact마다, 그 block의 recipient 부서 각각에
+   * view grant를 upsert한다. release 자체는 절대 막지 않는다(best-effort, §6.4와 같은 원칙).
+   */
+  private async autoGrantFileArtifactViewAccess(items: ReleaseItem[], actor: Actor): Promise<void> {
+    const fileItems = items.filter((i) => i.tier === 'B');
+    if (fileItems.length === 0) return;
+
+    const artifactIds = fileItems.map((i) => i.artifactId);
+    const artifactMap = await this.artifacts.findMany(artifactIds);
+
+    for (const item of fileItems) {
+      const artifact = artifactMap.get(item.artifactId);
+      if (!artifact?.externalArtifactId) continue;
+      for (const department of item.recipients.departments) {
+        // eslint-disable-next-line no-await-in-loop
+        await this.calypso
+          .addViewGrant(artifact.externalArtifactId, department, actor.knoxId, [], actor.isAdmin)
+          .catch((e) => {
+            this.logger.warn(
+              `Auto view-grant failed for ${artifact.externalArtifactId}/${department} — ${(e as Error).message}`,
+            );
+          });
+      }
+    }
   }
 
   private pickSource(

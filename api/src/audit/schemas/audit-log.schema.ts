@@ -63,6 +63,8 @@ export const AUDIT_ACTIONS = [
   'IMPERSONATION_START',
   'ARTIFACT_SERVICE_REGISTER',
   'ARTIFACT_SERVICE_UPDATE',
+  /** 이미 등록된 baseURL에 artifact 종류만 추가된 경우(설계서 07장 §3.3). */
+  'ARTIFACT_SERVICE_ADD_TYPE',
 
   // --- 폐기됐지만 과거 문서에 남아 있는 값 (읽기 호환용) ---
   'RELEASE',

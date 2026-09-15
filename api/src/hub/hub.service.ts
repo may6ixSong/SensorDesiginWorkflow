@@ -1,18 +1,23 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { randomUUID } from 'crypto';
-import { ArtifactService, ArtifactServiceDocument, Tier, Transport } from './schemas/artifact-service.schema';
+import { randomBytes, randomUUID } from 'crypto';
+import { ArtifactService, ArtifactServiceDocument, ArtifactType } from './schemas/artifact-service.schema';
 import { Actor, assertAdmin } from '../common/actor';
 import { AuditService } from '../audit/audit.service';
-import { RegisterServiceDto, UpdateServiceDto } from './dto/artifact-service.dto';
+import { RegisterArtifactTypeDto, UpdateServiceDto } from './dto/artifact-service.dto';
 
 /**
- * Hub 레지스트리 (Hub 설계서 §3.2).
+ * Hub 레지스트리 (설계서 07장 §3).
  *
  * 등록·수정은 Admin 전용이다(§13.4) - 판정 기준은 ADSSO User.Group이며, 그 값은 항상
  * 실제 호출자(realKnoxId) 기준으로 본다. 사용자 시뮬레이션 중이어도 시뮬레이션 대상의
  * 권한으로 레지스트리를 고칠 수는 없다.
+ *
+ * ★ 등록 UX가 바뀌었다 — Service Manage는 이제 OA Service/HPC Service 두 공간으로 나뉘고,
+ *   한 번의 등록 호출은 **artifact 종류 하나**를 추가한다(구 "서비스 하나 만들고 그 안에
+ *   artifact type을 추가"하던 방식 폐지). 같은 baseURL로 다시 등록하면 새 서비스를 만들지
+ *   않고 기존 서비스에 종류만 추가하며, **토큰은 baseURL당 1개**를 그대로 재사용한다(§3.3).
  */
 @Injectable()
 export class HubService {
@@ -30,6 +35,13 @@ export class HubService {
   async findByKeyOrThrow(key: string) {
     const svc = await this.model.findOne({ key }).exec();
     if (!svc) throw new NotFoundException(`Unknown artifact service: ${key}`);
+    return svc;
+  }
+
+  /** 인바운드 version 이벤트의 Bearer token으로 서비스를 찾는다(설계서 07장 §3.4, §4.2). */
+  async findByTokenOrThrow(token: string) {
+    const svc = await this.model.findOne({ token }).exec();
+    if (!svc) throw new NotFoundException('Unknown or revoked token.');
     return svc;
   }
 
@@ -53,76 +65,94 @@ export class HubService {
     throw new BadRequestException('Could not generate a unique service key. Try again.');
   }
 
-  /** artifactTypes의 key가 그 서비스 안에서 중복되면 링크 시점에 어느 걸 가리키는지 모호해진다. */
-  private normalizeArtifactTypes(input?: RegisterServiceDto['artifactTypes']) {
-    const types = (input ?? []).map((t) => ({
-      key: t.key.trim(),
-      name: t.name.trim(),
-      viewUrlTemplate: t.viewUrlTemplate?.trim() || null,
-      sampleUrl: t.sampleUrl?.trim() || null,
-    }));
-    const seen = new Set<string>();
-    for (const t of types) {
-      if (seen.has(t.key)) {
-        throw new BadRequestException(`Duplicate artifact type key within this service: "${t.key}".`);
-      }
-      seen.add(t.key);
+  /**
+   * `artifactTypeKey`도 같은 방식으로 SIREN이 발급한다(설계서 07장 §3.2) — 그 서비스가
+   * event에 실어 보내는 값이라, key가 전역에서(다른 서비스의 artifactTypes까지 포함해)
+   * 유일해야 event 수신 시 애매함이 없다.
+   */
+  private async generateArtifactTypeKey(name: string): Promise<string> {
+    const slug = this.slugify(name);
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const unique = randomUUID().replace(/-/g, '').slice(0, 8);
+      const key = `${unique}_${slug}`;
+      // eslint-disable-next-line no-await-in-loop
+      if (!(await this.model.findOne({ 'artifactTypes.key': key }).exec())) return key;
     }
-    return types;
+    throw new BadRequestException('Could not generate a unique artifact type key. Try again.');
+  }
+
+  private generateToken(): string {
+    return randomBytes(32).toString('hex');
+  }
+
+  /** scheme+host, 끝 슬래시 제거 — 토큰 dedup 키로 쓰기 위한 정규화(설계서 07장 §3.3). */
+  private normalizeBaseUrl(raw: string): string {
+    const trimmed = raw.trim();
+    try {
+      const u = new URL(trimmed);
+      return `${u.protocol}//${u.host}${u.pathname}`.replace(/\/+$/, '');
+    } catch {
+      return trimmed.replace(/\/+$/, '');
+    }
   }
 
   /**
-   * A(Live) 티어가 아니면 실연동이 없다는 뜻이므로, transport/baseUrl/viewUrlTemplate을
-   * 서버가 무조건 비운다 - FE가 이미 폼에서 이 규칙대로 잠가두지만(ServiceManagePage.tsx),
-   * API를 직접 두드리는 경로에도 같은 불변식을 강제한다.
+   * 등록 — OA Service/HPC Service 화면 공통(§3). 이미 등록된 baseURL이면 **기존 서비스에
+   * artifact 종류만 추가**하고 기존 Service명·토큰을 그대로 쓴다. 처음 보는 baseURL이면
+   * 새 서비스 + 새 토큰을 만든다.
    */
-  private applyTierInvariant(
-    tier: Tier,
-    input: { transport?: Transport; baseUrl?: string | null; viewUrlTemplate?: string | null },
-  ): { transport: Transport; baseUrl: string | null; viewUrlTemplate: string | null } {
-    if (tier !== 'A') {
-      return { transport: 'none', baseUrl: null, viewUrlTemplate: null };
-    }
-    return {
-      transport: input.transport ?? 'http',
-      baseUrl: input.baseUrl?.trim() || null,
-      viewUrlTemplate: input.viewUrlTemplate?.trim() || null,
-    };
-  }
-
-  async register(dto: RegisterServiceDto, actor: Actor) {
+  async registerArtifactType(
+    dto: RegisterArtifactTypeDto,
+    actor: Actor,
+  ): Promise<{ service: ArtifactServiceDocument; artifactTypeKey: string; reusedExisting: boolean }> {
     assertAdmin(actor);
+    const baseUrl = this.normalizeBaseUrl(dto.baseUrl);
+    const artifactTypeKey = await this.generateArtifactTypeKey(dto.artifactName);
+    const newType: ArtifactType = {
+      key: artifactTypeKey,
+      name: dto.artifactName.trim(),
+      description: dto.description?.trim() || '',
+    };
+
+    const existing = await this.model.findOne({ baseUrl }).exec();
+    if (existing) {
+      existing.artifactTypes.push(newType);
+      await existing.save();
+      await this.audit.log(actor.realKnoxId, 'ARTIFACT_SERVICE_ADD_TYPE', 'artifactService', existing._id, {
+        key: existing.key,
+        artifactTypeKey,
+      });
+      return { service: existing, artifactTypeKey, reusedExisting: true };
+    }
+
     const key = await this.generateKey(dto.name);
-    const tier: Tier = dto.defaultTier ?? 'C';
-    const { transport, baseUrl, viewUrlTemplate } = this.applyTierInvariant(tier, dto);
     const svc = await this.model.create({
       key,
       name: dto.name.trim(),
       description: dto.description?.trim() || '',
       icon: dto.icon?.trim() || '',
-      contractVersion: dto.contractVersion?.trim() || '1.0',
-      defaultTier: tier,
-      transport,
+      defaultTier: dto.tier,
+      transport: 'http',
       baseUrl,
-      viewUrlTemplate,
-      embedUploadUrlTemplate: dto.embedUploadUrlTemplate?.trim() || null,
+      token: this.generateToken(),
       isBuiltIn: false,
       // 등록만 하고 못 쓰게 잠가두는 별도 활성화 단계는 두지 않는다(사용자 요청) -
       // 등록 즉시 워크플로우의 출처 선택지에 뜬다.
       enabled: true,
       isMock: false,
-      artifactTypes: this.normalizeArtifactTypes(dto.artifactTypes),
+      artifactTypes: [newType],
     });
     await this.audit.log(actor.realKnoxId, 'ARTIFACT_SERVICE_REGISTER', 'artifactService', svc._id, {
       key: svc.key,
-      transport: svc.transport,
+      tier: svc.defaultTier,
     });
-    return svc;
+    return { service: svc, artifactTypeKey, reusedExisting: false };
   }
 
   /**
-   * key는 생성 후 바꿀 수 없다 (§3.2) - 산출물이 그 값으로 서비스를 참조하므로,
-   * 이름이 바뀌어도 key는 유지한다. DTO에 아예 없으므로 여기서 막을 것도 없다.
+   * key는 생성 후 바꿀 수 없다 - 산출물이 그 값으로 서비스를 참조하므로, 이름이 바뀌어도
+   * key는 유지한다. tier/transport/artifactTypes도 여기서 바꾸지 않는다 — tier는 등록
+   * 시점에 고정, artifactTypes는 registerArtifactType() 재호출로만 늘어난다.
    */
   async update(key: string, dto: UpdateServiceDto, actor: Actor) {
     assertAdmin(actor);
@@ -130,24 +160,16 @@ export class HubService {
     if (dto.name !== undefined) svc.name = dto.name.trim();
     if (dto.description !== undefined) svc.description = dto.description.trim();
     if (dto.icon !== undefined) svc.icon = dto.icon.trim();
-    if (dto.contractVersion !== undefined) svc.contractVersion = dto.contractVersion.trim();
-    if (dto.defaultTier !== undefined) svc.defaultTier = dto.defaultTier;
+    if (dto.baseUrl !== undefined) svc.baseUrl = this.normalizeBaseUrl(dto.baseUrl);
 
-    const { transport, baseUrl, viewUrlTemplate } = this.applyTierInvariant(svc.defaultTier, {
-      transport: dto.transport ?? svc.transport,
-      baseUrl: dto.baseUrl !== undefined ? dto.baseUrl : svc.baseUrl,
-      viewUrlTemplate: dto.viewUrlTemplate !== undefined ? dto.viewUrlTemplate : svc.viewUrlTemplate,
-    });
-    svc.transport = transport;
-    svc.baseUrl = baseUrl;
-    svc.viewUrlTemplate = viewUrlTemplate;
-
-    if (dto.embedUploadUrlTemplate !== undefined) {
-      svc.embedUploadUrlTemplate = dto.embedUploadUrlTemplate.trim() || null;
-    }
-    if (dto.enabled !== undefined) svc.enabled = dto.enabled;
-    if (dto.artifactTypes !== undefined) {
-      svc.artifactTypes = this.normalizeArtifactTypes(dto.artifactTypes);
+    if (dto.enabled !== undefined && dto.enabled !== svc.enabled) {
+      if (dto.enabled === false) {
+        // 비활성화 시 토큰을 즉시 폐기한다(설계서 07장 §3.4) — 재활성화하면 새로 발급한다.
+        svc.token = null;
+      } else if (!svc.token) {
+        svc.token = this.generateToken();
+      }
+      svc.enabled = dto.enabled;
     }
     await svc.save();
 
@@ -158,13 +180,13 @@ export class HubService {
     return svc;
   }
 
-  /** `https://ssm.local/spec/{artifactId}` 같은 템플릿을 실제 링크로 바꾼다. */
+  /** `https://ssm.local/spec/{artifactId}` 같은 템플릿을 실제 링크로 바꾼다 — 레거시, 지금은 등록 폼에서 입력받지 않는다. */
   resolveViewUrl(svc: ArtifactServiceDocument, externalArtifactId: string | null): string | null {
     if (!svc.viewUrlTemplate || !externalArtifactId) return null;
     return svc.viewUrlTemplate.replace('{artifactId}', encodeURIComponent(externalArtifactId));
   }
 
-  /** null이면 SIREN은 링크-아웃으로 폴백한다 - 임베드 미지원은 정상 상태다 (§3.2). */
+  /** null이면 SIREN은 링크-아웃으로 폴백한다 - 임베드 미지원은 정상 상태다. 레거시, 등록 폼에서 입력받지 않는다. */
   resolveEmbedUploadUrl(svc: ArtifactServiceDocument, externalArtifactId: string | null): string | null {
     if (!svc.embedUploadUrlTemplate || !externalArtifactId) return null;
     return svc.embedUploadUrlTemplate.replace('{artifactId}', encodeURIComponent(externalArtifactId));

@@ -2,8 +2,7 @@ import { useEffect, useState } from 'react';
 import { Box } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  CalypsoVersionView, downloadCalypsoVersion, getCalypsoArtifact, releaseCalypsoArtifact,
-  setCalypsoUserDepartments, uploadCalypsoVersion,
+  CalypsoVersionView, downloadCalypsoVersion, getCalypsoArtifact, releaseCalypsoArtifact, uploadCalypsoVersion,
 } from '@/api/calypsoClient';
 import { queryKeys } from '@/api/queryKeys';
 import { ReleaseDto } from '@/types/domain';
@@ -17,8 +16,9 @@ import { T } from '@/theme/tokens';
 interface Props {
   /** Calypso 쪽 산출물 id (artifact.externalArtifactId). */
   artifactId: string;
+  /** SIREN project id — BE가 department를 계산하는 데 쓴다(설계서 07장 §2). */
+  projectId: string;
   blockId: string;
-  myDepartments: string[];
   releases: ReleaseDto[];
   onOpenRelease?: (releaseId: string) => void;
 }
@@ -37,37 +37,36 @@ interface Props {
  * 버전 트리의 "이 workflow에서 release 여부" 배지만 이 컴포넌트가 얹는다 — 독립
  * Artifact page는 특정 workflow에 매인 화면이 아니라 그 배지를 모른다.
  */
-export function CalypsoInlinePanel({ artifactId, blockId, myDepartments, releases, onOpenRelease }: Props) {
+export function CalypsoInlinePanel({ artifactId, projectId, blockId, releases, onOpenRelease }: Props) {
   const qc = useQueryClient();
   const [picked, setPicked] = useState<CalypsoVersionView | null>(null);
 
   const { data: a, isLoading, isError } = useQuery({
     queryKey: queryKeys.calypsoArtifact(artifactId),
-    queryFn: () => getCalypsoArtifact(artifactId),
+    queryFn: () => getCalypsoArtifact(artifactId, projectId),
     retry: false,
   });
 
-  useEffect(() => { setCalypsoUserDepartments(myDepartments); }, [myDepartments]);
   useEffect(() => setPicked(null), [artifactId]);
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: queryKeys.calypsoArtifact(artifactId) });
-    if (a) qc.invalidateQueries({ queryKey: queryKeys.calypsoArtifacts(a.projectId) });
+    qc.invalidateQueries({ queryKey: queryKeys.calypsoArtifacts(projectId) });
   };
 
   const upload = useMutation({
-    mutationFn: ({ file, note }: { file: File; note: string }) => uploadCalypsoVersion(artifactId, file, note),
+    mutationFn: ({ file, note }: { file: File; note: string }) => uploadCalypsoVersion(artifactId, projectId, file, note),
     onSuccess: () => { invalidate(); toast('Working copy uploaded'); },
     onError: (e: any) => toast(e?.response?.data?.message ?? 'Upload failed'),
   });
   const release = useMutation({
-    mutationFn: (note: string) => releaseCalypsoArtifact(artifactId, note),
+    mutationFn: (note: string) => releaseCalypsoArtifact(artifactId, projectId, note),
     onSuccess: () => { invalidate(); toast('Published'); },
     onError: (e: any) => toast(e?.response?.data?.message ?? 'Publish failed'),
   });
   const handleDownload = async (v: CalypsoVersionView) => {
     try {
-      const blob = await downloadCalypsoVersion(artifactId, v.versionRef);
+      const blob = await downloadCalypsoVersion(artifactId, projectId, v.versionRef);
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;

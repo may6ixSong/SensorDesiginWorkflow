@@ -124,6 +124,37 @@ Source 버전을 다시 고르는 것은 **이번 release에서 `changed: true` 
 **불가능하다.** Revoke 기능을 만들지 않는다. update/delete API도 두지 않는다.
 이건 약속된 시나리오이며, 요청이 와도 재논의 대상이다(README §4 T7).
 
+### 4.6 Tier B 자동 view 권한 부여
+
+release 실행 시, 이 release에 포함된 **Tier B(File Artifacts, Calypso) 항목마다** 아래를 확인해
+자동으로 처리한다.
+
+```
+release를 실행하는 사용자가 그 File Artifact에 대해 Calypso edit 권한을 갖고 있는가?
+  아니다 → 아무것도 하지 않는다.
+  맞다   → 그 block의 recipient 부서 각각에 대해, 그 File Artifact의 view 권한을 upsert한다.
+```
+
+- **대상**: 이 release에 포함된 모든 Tier B 항목. `changed` 여부와 무관하다 — §2.1의 "artifact가
+  매핑된 것 전부 자동 포함"과 같은 범위를 그대로 따른다.
+- **edit 권한 판정**은 SIREN이 아니라 **그 순간 Calypso에 라이브로 물어봐서** 확인한다 — B tier
+  권한은 이제 SIREN이 보관/판정하지 않는다(권한을 전 tier에서 각 서비스가 canView/canEdit로만
+  응답하고 SIREN은 관여하지 않기로 한 결정에 따른다). SIREN BE가 release 실행 시점에 Calypso BE를
+  호출해서 확인하며, FE가 직접 Calypso를 부르지 않는다.
+- **받는 부서**는 그 block의 recipient 부서다 — B tier도 A/C와 같은 방식으로 workflow(block)
+  단위로 recipient를 구성하므로(04장 §3), 그 recipient 목록을 그대로 쓴다. §6.2 "수신자 계산"
+  표도 이제 이 모델 기준이다.
+- **부서 단위 grant만** 대상이다. 개별 사용자 grant는 이 규칙으로 자동 추가하지 않는다.
+- **upsert다.** 그 File Artifact에 그 부서의 view grant가 이미 등록돼 있으면 그대로 두고 건드리지
+  않는다 — 중복 추가도, 에러도 없다.
+- 자동으로 추가되는 건 **view뿐**이다. edit 권한은 이 규칙으로 부여되지 않는다.
+- Calypso 자체 데이터(그 artifact의 viewGrants)에 쓰는 것이므로, 한 번 추가되면 **이 release가
+  끝난 뒤에도, 다른 workflow에서 같은 artifact를 참조할 때도 그대로 유지**된다 — B tier 권한은
+  artifact 단위로 중앙 관리되기 때문이다.
+- **실패 처리**: Calypso 호출이 실패해도 release 자체를 막지 않는다 — §6.4의 알림 전송 실패와
+  같은 원칙이다. 로그를 남기고 release는 그대로 확정한다. 재시도를 자동으로 할지는 추후 결정
+  (README §4 TODO로 별도 추가 예정).
+
 ---
 
 ## 5. 저장 내용
@@ -167,8 +198,8 @@ CC·DD 부서는 A가 있었다는 사실조차 알림에서 보지 못한다.
 
 | Tier | 알림 대상 |
 |---|---|
-| A | **그 block**의 `recipients.editAccess` + `recipients.viewAccess` 의 부서 + 사용자 (workflow별로 다를 수 있다) |
-| B/C/D | **그 artifact**의 `viewAccess` 의 부서 + 사용자 **및 `editAccess` 해당자** |
+| A/B/C(OA Service/File Artifacts/HPC Service) | **그 block**의 `recipients.editAccess` + `recipients.viewAccess` 의 부서 + 사용자 (workflow별로 다를 수 있다) — 04장 §3 참고, 세 tier 공통 규칙이다 |
+| D(External/Attested) | 이번 범위에서 세부 미정(04장 §3.5) |
 
 - 부서 → 실제 사람은 **그 과제 members 중 해당 부서 전원**으로 전개한다.
 - 같은 사람이 여러 경로로 걸리면 **한 통으로 합친다**(중복 발송 금지).
@@ -256,15 +287,17 @@ export interface NotificationSender {
 
 1. 그 workflow의 블록 중 `artifactId !== null` 인 것을 모은다.
 2. 각 artifact의 **최신 published 버전**을 확인한다.
-   - A/B Tier이고 연동이 있으면 이 시점에 서비스에 라이브 조회한다.
-   - 조회에 실패한 서비스는 **SIREN이 마지막으로 알고 있던 값**을 쓰고, 항목에 "조회 실패" 플래그를 단다.
-     release를 막지는 않는다.
-   - C/D는 SIREN 로컬 기록에서 찾는다.
+   - **OA Service/File Artifacts/HPC Service(A/B/C) 전부 SIREN 캐시에서 읽는다** — event +
+     야간 재동기화로 채워진 값이다(04장 §7, 07장 §3·§4). release/preview 시점에 그 서비스로
+     라이브 조회를 하지 않는다.
+   - D는 SIREN 로컬(수동) 기록에서 찾는다.
 3. 직전 release와 `majorKey` 를 비교해 `changed` 를 계산한다.
 4. **`changed: true`인 항목만** flow 그래프에서 직전 1홉 upstream을 모아 source 후보와
    기본값(최신 published)을 만든다. **`changed: false`인 항목은 직전 release의 `items[].sources`
    값을 그대로 복사**한다(§4.2) — source 후보 계산도, 사용자 선택도 필요 없다.
 5. tier별 규칙으로 recipient를 계산한다.
 
-> **평소 캔버스 렌더링은 외부 서비스를 한 번도 호출하지 않는다.** 라이브 조회는 preview/release
-> 실행 시점과 산출물 상세 slide를 열 때뿐이다. 그래야 서비스 하나가 느려도 캔버스가 멈추지 않는다.
+> **평소 캔버스 렌더링도, preview/release 실행도 이제 외부 서비스를 호출하지 않는다** — 버전은
+> SIREN 캐시에서 읽는다(위 2번). 그 서비스에 라이브로 묻는 건 **산출물 상세 slide를 열 때의
+> canView/canEdit·html-view뿐**이다(04장 §7, 07장 §5). 그래야 서비스 하나가 느려도 캔버스도,
+> release도 멈추지 않는다.

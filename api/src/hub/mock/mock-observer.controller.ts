@@ -7,21 +7,19 @@ import { Artifact, ArtifactDocument } from '../../artifacts/schemas/artifact.sch
 const MOCK_PREFIX = 'mock-proj-';
 
 /**
- * project 검색 결과를 code+revision으로부터 결정적으로 만들어낸다 — code+revision이
- * 그 서비스 안에서 항상 유일하지는 않다는 걸 보여주기 위해 **일부러 후보 2개**를
- * 돌려준다(RPM 연동 프롬프트의 "production run / internal test" 예시 그대로,
- * docs/rpm-integration-prompt.md).
+ * code+revision으로부터 결정적으로 fake artifact 후보를 만들어낸다 — project 사전 링크
+ * 단계는 폐지됐으므로(설계서 04장 §6.3), code+revision을 바로 후보 목록 필터로 쓴다.
+ * code+revision이 그 서비스 안에서 항상 유일하지는 않다는 걸 보여주기 위해 **일부러 두
+ * 그룹(production run/internal test)**을 합쳐 돌려준다(RPM 연동 프롬프트의 예시 그대로,
+ * docs/rpm-integration-prompt.md) — 실제 서비스라면 이 필터링을 자기가 알아서 한다.
  */
-function fakeProjectCandidates(code: string, revision: string) {
+function fakeArtifactGroups(code: string, revision: string) {
   const base = `${MOCK_PREFIX}${code}-${revision}`;
-  return [
-    { externalProjectId: `${base}-prod`, displayName: `${code} rev.${revision} (production run)`, code, revision },
-    { externalProjectId: `${base}-test`, displayName: `${code} rev.${revision} (internal test)`, code, revision },
-  ];
+  return [`${base}-prod`, `${base}-test`];
 }
 
 /**
- * 그 project 안의 fake Readout Pattern 3개 — 일부러 서로 다른 접근 등급을 섞어 둔다.
+ * 그 group(project) 안의 fake Readout Pattern 3개 — 일부러 서로 다른 접근 등급을 섞어 둔다.
  * pickability UI(edit만 되는 것/view만 되는 것/아예 안 되는 것)를 실제로 확인할 수 있게.
  */
 function fakeArtifactsInProject(externalProjectId: string) {
@@ -61,12 +59,13 @@ function fakeHtmlView(artifactName: string, versionLabel: string) {
 }
 
 /**
- * ★ 개발 전용 ★ — Observer 계약을 구현한 **가짜 A Tier 서비스**다.
+ * ★ 개발 전용 ★ — Observer 계약을 구현한 **가짜 OA Service**다(HPC Service가 이 mock을
+ * 가리키도록 시드해도 그대로 동작한다 — 둘은 이제 같은 계약을 쓴다).
  *
- * A Tier의 slide 열람은 2단 게이트인데(설계서 04장 §4.1), 게이트 2는 그 서비스에 실제로
- * HTTP로 물어본다. 그런데 개발 환경에는 SimHub/RPM 같은 실서비스가 없어서 그 호출이 항상
- * 실패하고, fail-closed 규칙에 따라 **A Tier 산출물이 아무에게도 안 보이게 된다.**
- * 그러면 A Tier UI를 만들 수도 확인할 수도 없다.
+ * OA/HPC Service의 slide 열람은 2단 게이트인데(설계서 04장 §4.1), 게이트 2는 그 서비스에
+ * 실제로 HTTP로 물어본다. 그런데 개발 환경에는 SimHub/RPM 같은 실서비스가 없어서 그 호출이
+ * 항상 실패하고, fail-closed 규칙에 따라 **그 산출물이 아무에게도 안 보이게 된다.** 그러면
+ * 이 UI를 만들 수도 확인할 수도 없다.
  *
  * 그래서 SIREN이 스스로 이 엔드포인트를 띄우고, 시드가 mock 서비스의 baseUrl을 여기로
  * 향하게 한다. 덕분에 **실제 코드 경로가 그대로 실행된다** — ObserverClientService가
@@ -78,8 +77,9 @@ function fakeHtmlView(artifactName: string, versionLabel: string) {
  *   - 이미 SIREN에 등록된 산출물(=Artifact.externalArtifactId로 찾아짐)은 기존 규칙대로:
  *     giver(=createdBy) → canEdit, 그 외 → canView, 'noaccess.'로 시작하는 KnoxID → 둘 다 false.
  *   - **아직 등록되지 않은 fake 후보**(`mock-proj-` 접두어)는 §후보 목록을 그대로 판정에 쓴다
- *     (`fakeArtifactsInProject`) — "새 Artifact 추가" 다이얼로그에서 project를 검색하고
- *     그 안의 artifact를 고르는 흐름을 실제 서비스처럼 끝까지 눌러볼 수 있게 하기 위함이다.
+ *     (`fakeArtifactsInProject`) — "새 Artifact 추가" 다이얼로그에서 code+revision으로 후보를
+ *     받고 그 안의 artifact를 고르는 흐름을 실제 서비스처럼 끝까지 눌러볼 수 있게 하기
+ *     위함이다.
  */
 @Controller('__mock-observer')
 export class MockObserverController {
@@ -103,23 +103,22 @@ export class MockObserverController {
     return { canView: entry.access !== 'none', canEdit: entry.access === 'edit' };
   }
 
-  /** 계약 §/projects/search — code+revision으로 찾을 수 있는 project 후보(선택 구현). */
-  @Get('projects/search')
-  async searchProjects(@Query('code') code: string, @Query('revision') revision: string) {
-    if (!code) return [];
-    return fakeProjectCandidates(code, revision ?? '');
-  }
-
-  /** 계약 §/artifacts — 이 project 안의 산출물 목록(선택 구현, 04장 §6.3). */
+  /**
+   * 계약 §/artifacts?code=&revision= — code+revision으로 필터된 산출물 목록(선택 구현,
+   * 04장 §6.3). project 사전 링크 단계는 없다 — 이 호출 하나로 후보가 곧장 나온다.
+   */
   @Get('artifacts')
-  async listArtifacts(@Query('projectId') projectId: string) {
-    if (!projectId || !this.isFakeId(projectId)) return [];
-    return fakeArtifactsInProject(projectId).map((a) => ({
-      artifactId: a.id,
-      name: a.name,
-      department: null,
-      currentVersion: fakeVersionRecord(),
-    }));
+  async listArtifacts(@Query('code') code: string, @Query('revision') revision: string) {
+    if (!code) return [];
+    const groups = fakeArtifactGroups(code, revision ?? '');
+    return groups.flatMap((projectId) =>
+      fakeArtifactsInProject(projectId).map((a) => ({
+        artifactId: a.id,
+        name: a.name,
+        department: null,
+        currentVersion: fakeVersionRecord(),
+      })),
+    );
   }
 
   /**

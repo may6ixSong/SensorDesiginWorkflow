@@ -43,6 +43,15 @@ export default () => ({
    * web/의 CALYPSO_API와 같은 기본값을 쓴다.
    */
   calypsoApiUrl: process.env.CALYPSO_API || 'http://localhost:3010/api/v1',
+  /**
+   * 반대 방향 — SIREN BE가 Calypso BE를 호출할 때(listArtifacts/access/upload/download/
+   * release/editors/view-grants 등, 설계서 07장 §2) 실어 보내는 공유 비밀 토큰.
+   * `X-Knox-Id` 등 actor 헤더는 신원 "주장"일 뿐 검증되지 않으므로(calypso/src/common/
+   * actor.ts), 최소한 "이 호출이 SIREN BE에서 온 게 맞는가"는 이 토큰으로 증명한다.
+   * Calypso 쪽 SIREN_CALLER_TOKEN과 같은 값을 심어야 한다. 비어 있으면(로컬 개발 기본값)
+   * Calypso 쪽도 검증을 건너뛴다 — 운영 배포 시 반드시 설정할 것.
+   */
+  calypsoApiToken: process.env.CALYPSO_API_TOKEN || '',
   /** S3 호환 오브젝트 스토리지 (SFM_API files.service.ts와 동일한 키 구성). */
   storage: {
     uri: process.env.S3_URI ?? '',
