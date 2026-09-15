@@ -12,12 +12,14 @@ blocks          ★개명★ 캔버스 위의 자리 (구 deliverables) — arti
 memos           메모 블록
 edges           flow 연결선
 releases        ★신규★ workflow release 기록 (구 hldReleases 폐기)
-artifactServices  연동 서비스 레지스트리 (기존 유지)
-hpcPathMocks    ★신규★ Tier C(HPC Service) 미리보기 전용 mock (04장 §6.3·§6.4) — 실제 매핑엔 안 쓰인다
+artifactServices  연동 서비스 레지스트리 — OA Service/HPC Service 등록, baseURL당 1개 토큰(07장 §3)
+hubSyncCheckpoints  야간 전체 재동기화 커서(07장 §6) — **폐기 취소.** 원래 B tier 공용 DB 동기화용으로
+                    만들었다가 그 설계가 바뀌어 한 번 폐기 대상이었는데, 지금의 야간 재동기화
+                    용도로 그대로 재사용한다
 auditLogs       감사 로그
 ```
 
-**폐기되는 컬렉션**: `hldReleases`, `hubSyncCheckpoints`.
+**폐기되는 컬렉션**: `hldReleases`, `hpcPathMocks`(§4.1), `projectServiceLinks`(04장 §6.3).
 
 ---
 
@@ -119,17 +121,16 @@ Artifact {
   network: 'OA' | 'HPC'
 
   // --- 출처 매핑 ---
-  serviceKey: string | null           // A/B는 필수. C는 링크만, D는 null
-  externalArtifactId: string | null
-  artifactTypeKey: string | null
-  externalUrl: string | null          // C 티어의 링크
+  serviceKey: string | null           // A/B/C는 필수(HPC Service도 이제 실연동). D는 null
+  externalArtifactId: string | null   // 그 서비스 전체에서 유일해야 한다(07장 §4.3)
+  artifactTypeKey: string | null      // Service Manage 등록 시 SIREN이 발급(07장 §3.2)
+  externalUrl: string | null          // 레거시 — C가 수동 링크만 갖던 시절의 필드. 이제 버전별
+                                       // 경로는 versions[].hpcPath로 온다(07장 §4.1)
 
-  // --- 권한 (B/C/D 전용. A는 비워둔다) ---
-  editAccess: { departments: string[], users: string[] }
-  viewAccess: { departments: string[], users: string[] }   // == recipient
-
-  // A Tier는 recipient를 여기 두지 않는다. workflow마다 달라질 수 있어서
-  // Block.recipients(§4)에 저장한다 — 01장 §4.1 참조.
+  // --- 권한: A/B/C 전부 SIREN이 보관하지 않는다(04장 §3) ---
+  // recipient는 여기 두지 않는다. workflow마다 달라질 수 있어서 Block.recipients(§4)에
+  // 저장한다 — 01장 §4.1 참조. (구 설계는 B/C/D를 여기 editAccess/viewAccess로 뒀었다 —
+  // 폐기했다.)
 
   // --- D Tier 전용 ★신규★ ---
   expectedGiver: { departments: string[], users: string[] }
@@ -174,8 +175,8 @@ ArtifactVersion {
   다른 project이므로(01장·02장 §1) 자동으로 후보에서 빠진다. Admin이 여러 과제를 동시에 볼 수
   있어도 이 제약은 그대로 적용된다 — 매핑 API는 `artifact.projectId !== workflow.projectId`
   이면 400으로 거부한다.
-- **A Tier의 버전 보고 규칙** — 그 서비스는 자기 버전 체계를 그대로 쓰되, SIREN에는 **"official한
-  버전"만** 넘긴다.
+- **OA Service/File Artifacts/HPC Service(A/B/C)의 버전 보고 규칙** — 그 서비스는 자기 버전
+  체계를 그대로 쓰되, SIREN에는 **"official한 버전"만** 넘긴다.
   - 서비스가 minor 단위까지 명확히 태깅한다면 그 minor까지 그대로 보낸다(예: `v1.3`).
   - **RPM처럼 minor 개념이 없고 snapshot만 찍는 서비스**는, 확정된 release 버전들과 함께
     **`latest(+)` 항목 하나**만 추가로 보낸다 — 지금 구현되어 있는 RPM 어댑터 동작과 동일하다.
@@ -216,9 +217,9 @@ Block {
   layout: { x, y, w, h }
   intent: 'own' | 'received'    // "새 Artifact 추가" 다이얼로그 첫 질문. 생성 후 불변(04장 §6)
 
-  // A Tier artifact가 매핑된 block에서만 의미가 있다. B/C/D는 항상 비워둔다
-  // (그 경우 recipient는 artifact.viewAccess 에서 파생 — §3).
-  // workflow마다 독립이라 여기, block에 둔다 — 01장 §4.1/§4.4.
+  // A/B/C(OA Service/File Artifacts/HPC Service) artifact가 매핑된 block에서 의미가 있다.
+  // workflow마다 독립이라 여기, block에 둔다 — 01장 §4.1/§4.4. (구 설계는 B/C/D를 항상
+  // 비워두고 artifact.viewAccess에서 recipient를 파생시켰다 — 04장 §3에서 폐기했다.)
   recipients: {
     editAccess: { departments: string[], users: string[] }
     viewAccess: { departments: string[], users: string[] }
@@ -231,7 +232,7 @@ Block {
 
 - `series` / `seriesIdx` / `seriesTotal` 은 **유지**한다(반복 릴리스 일정 개념은 그대로).
 - `recvDept` / `recvContact` / `recvWorkflowId` / `sourceDept` / `sourceContact` 는 **제거**한다 —
-  수신 대상은 이제 artifact의 recipient(B/C/D) 또는 block의 recipients(A)가 유일한 진실이다.
+  수신 대상은 이제 block의 `recipients`가 유일한 진실이다(A/B/C 공통).
 - `versions` 는 제거하고 `artifactId` 참조로 대체한다.
 - `recipients` 편집 권한은 그 workflow의 **Edit Access**다(04장 §3.3). recipient에 속하는 것과
   recipient를 편집할 수 있는 것은 별개다(01장 §4.2).
@@ -239,21 +240,11 @@ Block {
   block에 매핑할 수 없다. intent(own/received) 무관하게 적용된다(04장 §6.5). 다른 workflow에서
   같은 artifact를 재사용하는 것은 그대로 허용된다.
 
-## 4.1 hpcPathMocks ★신규★
+## 4.1 `hpcPathMocks` — 폐기 ★
 
-Tier C(HPC Service) 미리보기 전용. 실제 매핑에는 전혀 쓰이지 않는다 — HPC망 서비스와의 실연동이
-아직 구체화되지 않아 "새 Artifact 추가" 다이얼로그의 HPC Service 소스는 항상 잠겨 있다(04장 §6.3).
-
-```ts
-HpcPathMock {
-  _id
-  projectCode: string
-  projectRevision: string
-  name: string
-  path: string
-  isMock: boolean   // 항상 true — 실제 데이터를 넣을 계획이 생기면 그때 이 컬렉션 자체를 대체한다
-}
-```
+HPC망과의 양방향 API 연동이 확정되면서 더 이상 필요 없다 — HPC Service는 이제 OA Service와
+같은 실제 event·라이브 게이트 대상이다(04장 §2, §6.3, 07장). 이 컬렉션과 그 미리보기 전용
+후보 목록 UI는 제거 대상이다.
 
 ---
 
@@ -385,9 +376,8 @@ ReleaseItem {
 | Method | Path | 비고 |
 |---|---|---|
 | `GET` | `/artifacts/:id` | 열람 권한(01장 §4.2) 없으면 403. 버전은 권한에 따라 마스킹 |
-| `PUT` | `/artifacts/:id/access` | B/C/D만. `{ editAccess, viewAccess }` |
-| `PUT` | `/workflows/:wfId/blocks/:blockId/recipients` | **A Tier block만.** `{ editAccess, viewAccess }`. workflow Edit Access 필요 |
-| `GET` | `/workflows/:wfId/artifact-candidates` | `?source=live\|file\|hpc&intent=own\|received&serviceKey=&externalProjectId=` — pickable까지 판정된 후보 목록 (04장 §6.2). OA Service 드롭다운은 기존 `GET /hub/services`를, project 후보는 기존 `GET /hub/services/:key/projects/search`를 그대로 쓴다(04장 §6.3) |
+| `PUT` | `/workflows/:wfId/blocks/:blockId/recipients` | **A/B/C(OA Service/File Artifacts/HPC Service) block 공통.** `{ editAccess, viewAccess }`. workflow Edit Access 필요. (구 `PUT /artifacts/:id/access`는 제거 — B/C/D artifact 단위 권한 자체가 폐기됐다) |
+| `GET` | `/workflows/:wfId/artifact-candidates` | `?source=live\|file\|hpc&intent=own\|received&serviceKey=&code=&revision=` — pickable까지 판정된 후보 목록 (04장 §6.2). code/revision은 그 workflow가 속한 project에서 그대로 채운다 — 사전 링크 단계 없음(04장 §6.3) |
 | `POST` | `/workflows/:wfId/blocks` | `{ name, phaseId, layout, intent, artifactId? \| newArtifact? }` — newArtifact가 있으면 find-or-create 후 매핑 (04장 §6.7) |
 | `PATCH` | `/blocks/:id` | `{ name?, artifactId? \| newArtifact? }` — 재매핑. 이전 값과 다르면 block.recipients 초기화 (04장 §6.6) |
 

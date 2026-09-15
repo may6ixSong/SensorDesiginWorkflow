@@ -18,9 +18,10 @@ CIS(CMOS Image Sensor) 설계 산출물을 workflow 캔버스 위에서 흐름�
 | [01-permissions.md](01-permissions.md) | 3계층 권한 모델(Project → Workflow → Artifact), 가시성 판정 |
 | [02-data-model.md](02-data-model.md) | MongoDB 스키마, API 계약 |
 | [03-canvas.md](03-canvas.md) | 캔버스, 편집 세션 lock, flow, 필터 |
-| [04-artifact-and-publish.md](04-artifact-and-publish.md) | Tier A~D, publish, recipient, 상세 slide 열람 |
+| [04-artifact-and-publish.md](04-artifact-and-publish.md) | Tier(OA Service/File Artifacts/HPC Service/External·Attested), publish, recipient, 상세 slide 열람 |
 | [05-release.md](05-release.md) | Release 절차, 알림, Release history |
 | [06-ui-motion-and-migration.md](06-ui-motion-and-migration.md) | 모션 시스템, i18n, HLD 제거, 마이그레이션, TODO |
+| [07-hub-operations.md](07-hub-operations.md) | 허브 운영 — Service Manage(OA/HPC 등록·토큰), FE→BE 단일 경로, version 이벤트 수신·동기화 |
 | [prompts/a-tier-recipient-integration.md](prompts/a-tier-recipient-integration.md) | A Tier 연동 서비스에 전달할 **정책** 변경 요청 프롬프트 |
 | [prompts/rpm-access-endpoint.md](prompts/rpm-access-endpoint.md) | 위 요청 ①을 **구현 수준**으로 구체화한 것 — RPM 등 A Tier 서비스 세션에 그대로 전달 |
 | [prompts/db-migration-v3.md](prompts/db-migration-v3.md) | 실제 MongoDB의 데이터를 v3 스키마 모양으로 바꾸는 **실행 전용** 프롬프트 |
@@ -62,7 +63,7 @@ CIS(CMOS Image Sensor) 설계 산출물을 workflow 캔버스 위에서 흐름�
 | **Block** | 캔버스 위의 노드. 산출물 블록 ∪ 메모 블록 |
 | **Artifact(산출물)** | 버전 관리 대상 실체. Block은 artifact를 가리키는 **자리(placement)**일 뿐이다 |
 | **Flow(Edge)** | 블록 간 흐름 선 |
-| **Tier** | 산출물의 연동 신뢰도 A~D (04장) |
+| **Tier** | 산출물의 연동 신뢰도 A~D (04장). **사람이 보는 이름은 A=OA Service, B=File Artifacts, C=HPC Service, D=External/Attested다** — 글자(A/B/C/D)는 DB에 저장되는 내부 값으로만 남고, UI·문서·주석은 전부 이 이름을 쓴다 |
 | **Recipient** | release 시 그 산출물을 **전달받는** 부서/사용자 |
 | **Owner** | workflow의 대표 담당자. **정확히 1명**, 현재 이양 불가 |
 | **Edit / View Access** | workflow 또는 artifact에 대한 편집/열람 권한. **부서 다중 + 개별 사용자 다중** |
@@ -76,10 +77,15 @@ CIS(CMOS Image Sensor) 설계 산출물을 workflow 캔버스 위에서 흐름�
    release는 "**각 부서에게 각자 받을 산출물을 전달**"하는 행위다.
 2. **캔버스에서 version 개념 제거.** 캔버스 편집은 항상 overwrite이고, 스냅샷을 찍지 않는다.
    Edit 권한자와 View 권한자가 **완전히 동일한 실시간 캔버스**를 본다.
-3. **Artifact가 1급 실체로 승격.** B/C/D 산출물의 Edit/View 권한은 **artifact 단위로 SIREN이
-   보관**하고 여러 workflow가 공유한다. Block은 그 artifact를 가리키는 자리다.
-4. **Recipient 개념 신설.** B/C/D는 artifact의 View 권한이 곧 recipient다. A Tier는 서비스가
-   권한을 관리하므로, SIREN에 **알림 전용 recipient**를 따로 둔다.
+3. **Artifact가 1급 실체로 승격.** 산출물의 버전 이력은 artifact 단위로 SIREN이 보관하고 여러
+   workflow가 공유한다. Block은 그 artifact를 가리키는 자리다. (Edit/View **권한**은 SIREN이
+   보관하지 않는다 — 아래 4 참고. 이건 v3 최초 설계에서 한 번 바뀐 결정이다 — 처음엔 B/C/D
+   권한을 SIREN이 보관하기로 했었다.)
+4. **Recipient 개념 신설, 전 tier에 통일 적용.** SIREN은 Edit/View **권한**을 전혀 들고 있지
+   않는다 — OA Service·File Artifacts·HPC Service 모두 그 서비스(Calypso 포함)가 매번 라이브로
+   canView/canEdit를 판정한다. SIREN에는 **block(=그 workflow 안의 자리) 단위 recipient**만
+   따로 둔다 — release 알림 대상이자 상세 slide 열람의 첫 번째 게이트다(04장 §3, §4).
+   External/Attested(D)는 아직 이 모델에서 제외 — 추후 구체화.
 5. **Release는 산출물 단위 배송.** 부서마다 자기가 받을 산출물만 전달받는다. 이전 release 대비
    major 버전이 바뀐 것만 highlight하되, **안 바뀐 것도 알림은 같이 간다.**
 6. **권한 필터가 전 시스템에 적용.** app bar의 Project/Workflow 목록은 권한 있는 것만 노출한다.
@@ -156,19 +162,18 @@ CIS(CMOS Image Sensor) 설계 산출물을 workflow 캔버스 위에서 흐름�
 
 | 항목 | 결정 |
 |---|---|
-| B/C/D 권한 | **SIREN이 artifact 단위로 보관**하고 여러 workflow가 공유한다 (Calypso/HPC처럼 중앙 관리되므로) |
-| B/C/D recipient | **View 권한 목록이 곧 recipient.** artifact 하나에 붙어 모든 workflow에 동일하게 적용 |
-| A Tier 권한 | 그 서비스가 관리한다. SIREN은 실제 데이터 접근에 관여하지 않는다 |
-| A Tier recipient | SIREN이 **block(=그 workflow 안의 자리) 단위로 저장**. 같은 artifact도 workflow마다 recipient 구성이 다를 수 있고, edit/view 두 단계로 나뉜다 |
-| Recipient 설정(편집) 권한 | workflow **Edit Access** (향후 A Tier 서비스의 edit 권한자로 좁힐 예정) |
+| OA Service/File Artifacts/HPC Service(A/B/C) 권한 | **SIREN이 보관하지 않는다.** 그 서비스(Calypso 포함)가 매번 라이브로 canView/canEdit를 판정한다 — 셋 다 같은 규칙 |
+| OA Service/File Artifacts/HPC Service(A/B/C) recipient | SIREN이 **block(=그 workflow 안의 자리) 단위로 저장**. 같은 artifact도 workflow마다 recipient 구성이 다를 수 있고, edit/view 두 단계로 나뉜다 — 셋 다 같은 규칙(옛 결정은 B/C/D를 artifact 단위로 뒀었는데, 여러 workflow가 동시에 고치면 꼬이는 문제가 있어 폐기했다) |
+| External/Attested(D) | 이번 범위에서 제외 — 권한·recipient 모델을 아직 구체화하지 않았다. 받는 workflow가 comment·경로 등을 자유롭게 적어두는 정도로만 우선 취급한다 |
+| Recipient 설정(편집) 권한 | workflow **Edit Access** (전 tier 동일 — 이제 A만의 예외가 아니다) |
 | Recipient 탭 열람 | View 권한자에게 **읽기 전용**으로 노출 |
-| 상세 slide 열람 (A) | **2단 게이트.** ① SIREN recipient(edit/view)에 속하는가 → ② 그 서비스에서 view 권한이 있는가(라이브 조회). 둘 다 통과해야 열린다. **workflow Edit Access만으로는 더 이상 열리지 않는다** |
-| 상세 slide 열람 (B/C/D) | 그 artifact의 Edit/View 권한이 있어야 열린다. **workflow Edit Access만으로는 열리지 않는다** |
+| 상세 slide 열람 (A/B/C) | **2단 게이트, 3 tier 공통.** ① SIREN recipient(edit/view)에 속하는가 → ② 그 서비스에서 view 권한이 있는가(라이브 조회). 둘 다 통과해야 열린다. **workflow Edit Access만으로는 더 이상 열리지 않는다** |
 | Mapping 범위 | block을 artifact에 매핑할 때, **같은 project(code+revision)의 artifact만** 후보로 나온다 |
-| A Tier 버전 보고 | 서비스는 **official한 버전만** SIREN에 전달. minor가 없는 snapshot형(RPM 등)은 release 버전 + `latest(+)` 하나만 |
+| 버전 정보의 출처 | A/B/C 전부 **push event + 야간 전체 재동기화**로 SIREN이 직접 보관한다(07장). details·release 열람은 이 SIREN 캐시를 읽는다 — **canView/canEdit·html-view만 그때그때 라이브로** 그 서비스에 묻는다 |
+| A/B/C 버전 보고 | 서비스는 **official한 버전만** SIREN에 전달. minor가 없는 snapshot형(RPM 등)은 release 버전 + `latest(+)` 하나만 |
 | 미매핑 블록 | recipient UI를 감추고, release 대상에서 제외 |
 | slide 내부 콘텐츠 | **TODO** — 이번 범위 밖. 대규모 개편 예정 |
-| 주는/받는 산출물의 선택 범위 | **대칭 규칙** — 주는 쪽은 그 tier의 edit 게이트, 받는 쪽은 view 게이트. A/B(OA Service/File Artifacts)는 라이브 조회, C(HPC Service)는 항상 잠김, D(External/Attested)는 받는 전용·자유 (04장 §6) |
+| 주는/받는 산출물의 선택 범위 | **대칭 규칙** — 주는 쪽은 그 서비스의 edit 게이트, 받는 쪽은 view 게이트. OA Service/File Artifacts/HPC Service **셋 다 라이브 조회**(더 이상 HPC Service만 예외로 잠겨 있지 않다 — HPC망 양방향 API 연동 확정), External/Attested는 받는 전용·자유 (04장 §6) |
 | 한 workflow 안 artifact 중복 매핑 | **금지.** 주는/받는 모두 — 같은 workflow의 두 block이 같은 artifact를 가리킬 수 없다(04장 §6.5) |
 
 ### 3.6 Release
@@ -211,11 +216,13 @@ CIS(CMOS Image Sensor) 설계 산출물을 workflow 캔버스 위에서 흐름�
 | T3 | 알림 전송 인프라 | 실제 메일 발송 + SIREN 내 "My workspace"·알림 페이지 신설 |
 | T4 | B/C/D release 알림의 세분화 | view·edit 권한자 모두에게 알림, workflow 소속 부서에는 별도 notice — 규칙 구체화 필요 |
 | T5 | Owner 이양 | 현재 불가. 요청이 오면 열 수 있도록 코드에 TODO 주석 유지 |
-| T6 | A Tier 연동 서비스의 slide 차단 규칙 반영 | SIREN 쪽은 완료(게이트 1·2 모두 동작). 남은 것은 **서비스 쪽 `access` 구현**이다 — `prompts/rpm-access-endpoint.md` 를 그 서비스 세션에 전달 |
+| T6 | OA Service/HPC Service 연동 서비스의 slide 차단 규칙 반영 | SIREN 쪽은 완료(게이트 1·2 모두 동작, A/C 공통). 남은 것은 **각 서비스 쪽 `access` 구현**이다 — `prompts/rpm-access-endpoint.md` 를 그 서비스 세션에 전달 (HPC Service는 이제 A와 같은 라이브 게이트 대상이라, HPC 쪽에도 같은 요청이 추가로 필요하다) |
 | T8 | 실 DB 마이그레이션 | 인메모리 모드는 시드가 새 스키마로 다시 만들어져 해당 없음. 실 DB 환경에서만 `prompts/db-migration-v3.md` 를 desktop 세션에 전달. **코드 변경 없이 데이터만 바꾸는 작업**이다 |
 | T7 | Release Revoke | **열지 않기로 약속된 시나리오.** 요청이 와도 재논의 대상 |
 | T9 | Hub sync 주기 구체화 | A/B/C 모두 **version 발행 이벤트를 즉시 SIREN에 전송**하고, 유실 대비로 작업 없는 야간 시간대에 **1일 1회 전체 재동기화**를 하기로 잠정 합의. 정확한 실행 시각·윈도우·재시도 정책은 추후 확정 |
 | T10 | Tier B 자동 view 권한 부여 실패 시 재시도 | release 시 Calypso edit 권한자의 File Artifact를 recipient 부서에 view로 upsert하는 호출이 실패했을 때, 자동 재시도를 둘지 로그만 남길지 추후 결정(05장 §4.6) |
+| T11 | 기존 코드 주석의 Tier 명칭 일괄 치환 | 이 문서 묶음과 새로 쓰는 내용은 전부 OA Service/File Artifacts/HPC Service를 쓰지만, 기존 소스코드 주석(`api/src/**`, `web/src/**`)에 남아 있는 "Tier A/B/C" 표현과 04장 재구성으로 번호가 바뀐 `§3.x` 류 cross-reference는 이번 반영에서 건드리지 않았다 — 별도의 일괄 치환 작업으로 진행한다. 내부 enum 값(`'A'│'B'│'C'│'D'`)은 그대로 유지 |
+| T12 | RPM 연동 prompt 문서 재발급 | `prompts/rpm-integration-prompt.md`·`prompts/siren-rpm-mapping-ui-prompt.md`는 이번에 폐기한 `ProjectServiceLink`/project 사전 링크 흐름을 전제로 쓰여 있어 지금은 맞지 않다 — RPM(연동된 유일한 실서비스)에 새로 전달할 프롬프트를 다시 작성해야 한다(04장 §6.3, 07장 §4.3 — `externalArtifactId` 전역 유일성 요구사항 포함) |
 
 ## 5. 리뷰가 필요한 가정
 
