@@ -1,6 +1,8 @@
-import { BadRequestException, Body, Controller, Post, Req, UseGuards, UsePipes, ValidationPipe } from '@nestjs/common';
+import { BadRequestException, Controller, Post, Req, UseGuards } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
 import { Artifact, ArtifactDocument } from '../artifacts/schemas/artifact.schema';
 import { HubSyncService } from './hub-sync.service';
 import { HubEventSender, HubTokenGuard } from './guards/hub-token.guard';
@@ -20,16 +22,28 @@ export class HubEventsController {
   ) {}
 
   /**
-   * ★ 이 라우트만 `forbidNonWhitelisted:true`로 전역 설정(main.ts)을 덮어쓴다 — DTO
-   *   모양을 조금이라도 벗어나면(필수 필드 누락·타입 불일치·정의 안 된 필드 포함) 400으로
-   *   요청 전체를 거부한다. 일부만 기록하는 부분 반영은 하지 않는다(설계서 07장 §4.1).
+   * ★ 이 라우트만 `forbidNonWhitelisted:true`로 검증한다 — DTO 모양을 조금이라도
+   *   벗어나면(필수 필드 누락·타입 불일치·정의 안 된 필드 포함) 400으로 요청 전체를
+   *   거부한다. 일부만 기록하는 부분 반영은 하지 않는다(설계서 07장 §4.1).
+   *
+   * ★ `@Body()` 데코레이터 대신 `req.body`를 직접 검증한다 — 전역 파이프(main.ts,
+   *   `whitelist:true, forbidNonWhitelisted:false`)가 `@Body()` 값에 먼저 적용되면서
+   *   정의 안 된 필드를 조용히 지워버리면, 그 뒤에 걸리는 이 라우트만의 엄격한 검증은
+   *   이미 지워진 값을 보게 되어 절대 걸리지 않는다(파이프는 순서대로 값을 넘겨받아
+   *   체이닝된다) — 원본 body를 직접 검증해야 "정의 안 된 필드 포함 시 거부"가 실제로
+   *   동작한다.
    */
   @Post('version-published')
-  @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }))
   async versionPublished(
-    @Body() dto: VersionPublishedEventDto,
-    @Req() req: { hubEventSender_: HubEventSender },
+    @Req() req: { body: unknown; hubEventSender_: HubEventSender },
   ): Promise<{ recorded: boolean }> {
+    const dto = plainToInstance(VersionPublishedEventDto, req.body);
+    const errors = await validate(dto, { whitelist: true, forbidNonWhitelisted: true });
+    if (errors.length > 0) {
+      const messages = errors.flatMap((e) => Object.values(e.constraints ?? {}));
+      throw new BadRequestException(messages.length > 0 ? messages : 'Validation failed.');
+    }
+
     const sender = req.hubEventSender_;
 
     if (sender.artifactTypeKeys.length > 0 && !sender.artifactTypeKeys.includes(dto.artifactTypeKey)) {
