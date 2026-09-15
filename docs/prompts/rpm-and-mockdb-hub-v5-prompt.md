@@ -251,20 +251,42 @@ mock 데이터에 남아있는 버전이 실제로 검증 가능한 근거 없�
 
 ---
 
-### C. Calypso event 토큰 — 실제 운영 DB + 실제 Calypso 배포 반영
+### C. Calypso 실제 운영 반영 — 배포 주소 + 이벤트 토큰 + 호출 인증 토큰
+
+> ★ 이 문서 자체가 git에 커밋되는 파일이다. **아래에 실제 토큰 값을 절대 적지 마라** —
+> 적는 순간 그 값은 이 시점부터 SIREN 저장소를 읽을 수 있는 아무나 알게 되는 값이 되어
+> 비밀로서 의미가 없어진다(로컬 mock 토큰 `mock-token-calypso`가 seed-data.ts에 리터럴로
+> 박혀 있는 것과 똑같은 이유다 — 그건 로컬 mock이라 상관없지만 운영 값은 절대 안 된다).
+> 실제 토큰 값은 **사용자가 채팅으로 직접 준다** — 아래 `<PROD_CALYPSO_EVENT_TOKEN>`,
+> `<PROD_CALYPSO_API_TOKEN>` 자리에 그 값을 채워 쓰기만 하고, 문서·커밋·로그 어디에도
+> 평문으로 남기지 마라.
+
+#### C-0. 실제 Calypso 배포 주소를 SIREN 운영 설정에 반영
+
+Calypso BE의 실제 API 주소: `https://siren.samsungds.net:44353/api/v1`
+
+**실제 운영 SIREN 배포**의 환경변수에 아래를 반영한다(`api/src/config/configuration.ts`의
+`calypsoApiUrl` — SIREN BE가 release 시점 currentVersion 조회와 Calypso 프록시 라우트
+(`/calypso-artifacts/*`) 호출에 쓰는 베이스 URL이다. Calypso 자신의 `PUBLIC_BASE_URL`과는
+다른 값이니 헷갈리지 말 것 — 이건 SIREN이 Calypso **BE api**를 부르는 주소다):
+
+```
+CALYPSO_API=https://siren.samsungds.net:44353/api/v1
+```
+
+#### C-1. Calypso→SIREN 이벤트 토큰 — 운영 SIREN DB에 반영
 
 배경: Calypso(File Artifacts, B tier)가 SIREN에 version 이벤트를 보낼 때 쓰는 Bearer 토큰은
 이제 다른 서비스와 똑같이 **SIREN DB의 `artifactServices` 컬렉션에 저장된 문서의 `token`
 필드**로 검증한다(SIREN 코드는 이미 이렇게 병합되어 있다 — `api/src/hub/guards/hub-token.guard.ts`).
 로컬 mock/dev 모드에서는 SIREN이 부팅 시 `key:'calypso', isBuiltIn:true` 문서를 고정 토큰
 (`mock-token-calypso`)으로 자동으로 넣어주지만(`api/src/database/seed-data.ts`), **실제 운영
-DB에는 이 문서가 없다** — 네가 지금 만들어 넣어야 한다.
+DB에는 이 문서가 없다** — 네가 지금 만들어 넣어야 한다. **`mock-token-calypso`를 그대로
+운영에 재사용하지 마라** — 그 값은 이미 저장소에 공개로 커밋되어 있어 누구나 안다.
 
 ★ 참고로 Calypso 쪽에는 아직 이 이벤트를 실제로 **보내는 코드 자체가 없다**(별도로 나중에
 구현될 기능이다). 그러니 이 작업을 해도 지금 당장 뭔가 동작이 바뀌지는 않는다 — 나중에 그
 기능이 구현됐을 때 바로 쓸 수 있도록 운영 값만 미리 준비해 두는 것이다.
-
-#### C-1. 운영 SIREN DB에 Calypso `ArtifactService` 문서 추가
 
 1. **실제 운영(production) SIREN MongoDB**에 접속한다 — B에서 다룬 mock/dev DB와는 다른
    인스턴스다. 접속 정보를 모르면 진행하지 말고 사용자에게 물어봐라.
@@ -273,8 +295,9 @@ DB에는 이 문서가 없다** — 네가 지금 만들어 넣어야 한다.
    추측하지 말고 실제 DB에서 확인 후 진행한다)에 `key: 'calypso'`인 문서가 이미 있는지 먼저
    확인한다. **이미 있으면 아무것도 하지 말고, 그 사실을 사용자에게 보고하고 멈춰라** — 이미
    누가 해뒀다는 뜻이다.
-3. 없으면 새 토큰을 생성한다. SIREN 자체가 다른 서비스 토큰을 발급할 때 쓰는 방식과 같게
-   맞춘다: `require('crypto').randomBytes(32).toString('hex')` (64자리 hex 문자열).
+3. **토큰 값은 사용자가 이미 준비해서 알려준다 — 네가 새로 생성하지 마라.** 사용자가 값을
+   주지 않았으면 먼저 물어봐라(직접 생성해야 한다면 SIREN 자체가 쓰는 방식과 같게 맞춘다:
+   `require('crypto').randomBytes(32).toString('hex')`, 64자리 hex).
 4. 아래 문서를 **DB에 쓰기 전에 내용을 사용자에게 보여주고 진행해도 되는지 확인받은 뒤** 삽입한다:
    ```js
    {
@@ -286,7 +309,7 @@ DB에는 이 문서가 없다** — 네가 지금 만들어 넣어야 한다.
      defaultTier: 'B',
      transport: 'none',
      baseUrl: null,
-     token: '<C-3에서 생성한 값>',
+     token: '<PROD_CALYPSO_EVENT_TOKEN>', // 사용자가 준 값으로 치환
      viewUrlTemplate: null,
      embedUploadUrlTemplate: null,
      isBuiltIn: true,
@@ -305,7 +328,7 @@ DB에는 이 문서가 없다** — 네가 지금 만들어 넣어야 한다.
 말고 사용자에게 물어봐라)의 환경변수에 아래를 추가/갱신한다:
 
 ```
-CALYPSO_EVENT_TOKEN=<C-1에서 SIREN DB에 넣은 것과 정확히 같은 값>
+CALYPSO_EVENT_TOKEN=<PROD_CALYPSO_EVENT_TOKEN>   # C-1과 정확히 같은 값
 ```
 
 (Calypso 저장소의 `.env.example`에 이미 이 키에 대한 설명 주석이 있다 — 참고만 하고 그
@@ -313,19 +336,42 @@ CALYPSO_EVENT_TOKEN=<C-1에서 SIREN DB에 넣은 것과 정확히 같은 값>
 Calypso 코드가 이 값을 아직 읽지 않으므로 지금 당장 재시작이 꼭 필요하진 않지만, 배포
 파이프라인 관례상 재시작이 필요하면 사용자와 상의해서 진행해라.)
 
-#### C-3. 보고
+#### C-3. 반대 방향 — SIREN→Calypso 호출 인증 토큰도 운영 값으로 채운다
 
-C-1에서 생성한 토큰 값을 **평문으로 채팅에 남기지 말고**(운영 비밀이다), 어디에 저장했는지
-(운영 DB의 `artifactServices.calypso` 문서, Calypso 배포 설정의 `CALYPSO_EVENT_TOKEN`)와 두
-값이 동일한지 확인했다는 사실만 요약해서 보고한다.
+배경: C-0에서 실제 주소를 넣으면 SIREN BE가 그 순간부터 진짜로 Calypso BE를 호출하기
+시작한다. 이 호출엔 별도의 공유 비밀(`X-Siren-Token` 헤더, `docs/07-hub-operations.md §2.1`)
+이 있는데, SIREN 쪽 `CALYPSO_API_TOKEN`과 Calypso 쪽 `SIREN_CALLER_TOKEN`이 **둘 다 비어
+있으면 검증을 건너뛴다(fail-open, 로컬 개발 기본값)** — 운영에 이 값을 채우지 않으면
+Calypso BE의 사람용 화면·observer 라우트 전체가 사실상 인증 없이 열려 있는 것과 같다.
+C-0로 실제 연동이 시작되는 지금 이 값도 같이 채워야 한다.
+
+1. 토큰 값도 사용자가 이미 준비해서 알려준다 — 없으면 물어보고, 직접 만들어야 하면 C-1과
+   같은 방식(`randomBytes(32).toString('hex')`)으로 생성한다. **C-1의 이벤트 토큰과는
+   다른 값을 써야 한다** — 서로 다른 방향의 호출을 서로 다른 비밀로 증명한다는 게 설계
+   원칙이다(같은 값을 재사용하지 말 것).
+2. **실제 운영 SIREN 배포**의 환경변수에 반영한다:
+   ```
+   CALYPSO_API_TOKEN=<PROD_CALYPSO_API_TOKEN>
+   ```
+3. **실제 Calypso 배포**의 환경변수에 정확히 같은 값을 반영한다:
+   ```
+   SIREN_CALLER_TOKEN=<PROD_CALYPSO_API_TOKEN>   # 위와 정확히 같은 값
+   ```
+
+#### C-4. 보고
+
+C-1/C-3에서 쓴 토큰 값을 **평문으로 채팅에 남기지 말고**(운영 비밀이다), 어디에 저장했는지
+(운영 DB의 `artifactServices.calypso` 문서, SIREN 운영 설정의 `CALYPSO_API`/`CALYPSO_API_TOKEN`,
+Calypso 배포 설정의 `CALYPSO_EVENT_TOKEN`/`SIREN_CALLER_TOKEN`)와 각 쌍의 값이 서로 정확히
+동일한지 확인했다는 사실만 요약해서 보고한다.
 
 ---
 
 ### 확인 후 진행
 
 RPM 저장소 경로, SIREN이 RPM에 발급한 토큰/artifactTypeKey, mock/dev DB 접속 정보, 운영
-SIREN DB 접속 정보, 실제 Calypso 배포 접근 권한 — 이 중 하나라도 모르면 그 부분을 진행하기
-전에 먼저 사용자에게 물어봐라(다른 부분은 아는 것부터 먼저 진행해도 된다). 다 끝나면 A/B/C
-각각 무엇을 바꿨는지(RPM 쪽 diff 요약, DB에서 지운/바꾼 것, 운영 DB에 넣은 문서와 Calypso
-배포 설정 반영 여부) 정리해서 보고하고, **아무것도 커밋하지 않았다는 것**을 마지막에 다시
-확인해줘.
+SIREN DB 접속 정보, 실제 SIREN/Calypso 배포 접근 권한, C-1/C-3의 운영 토큰 값 — 이 중
+하나라도 모르면 그 부분을 진행하기 전에 먼저 사용자에게 물어봐라(다른 부분은 아는 것부터
+먼저 진행해도 된다). 다 끝나면 A/B/C 각각 무엇을 바꿨는지(RPM 쪽 diff 요약, DB에서 지운/
+바꾼 것, 운영 DB에 넣은 문서와 SIREN/Calypso 배포 설정 반영 여부 — 토큰 값 자체는 빼고)
+정리해서 보고하고, **아무것도 커밋하지 않았다는 것**을 마지막에 다시 확인해줘.
