@@ -13,6 +13,8 @@ import { ObserverClientService } from './observer-client.service';
 import { CalypsoClientService } from './calypso-client.service';
 import { HubSyncService } from './hub-sync.service';
 import { HubController } from './hub.controller';
+import { HubEventsController } from './hub-events.controller';
+import { HubTokenGuard } from './guards/hub-token.guard';
 import { MockObserverController } from './mock/mock-observer.controller';
 
 /**
@@ -50,8 +52,9 @@ const mockControllers = process.env.MOCKUP_ENABLED === 'true' ? [MockObserverCon
     ObserverClientService,
     CalypsoClientService,
     HubSyncService,
+    HubTokenGuard,
   ],
-  controllers: [HubController, ...mockControllers],
+  controllers: [HubController, HubEventsController, ...mockControllers],
   exports: [HubService, HubCommonService, ObserverClientService, CalypsoClientService, HubSyncService],
 })
 export class HubModule {}

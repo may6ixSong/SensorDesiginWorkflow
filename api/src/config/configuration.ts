@@ -43,6 +43,14 @@ export default () => ({
    * web/의 CALYPSO_API와 같은 기본값을 쓴다.
    */
   calypsoApiUrl: process.env.CALYPSO_API || 'http://localhost:3010/api/v1',
+  /**
+   * File Artifacts(B, Calypso)가 version 발행 이벤트를 보낼 때 쓰는 Bearer token(설계서
+   * 07장 §3.4, §4.2) — Calypso는 Service Manage 등록 대상이 아니라서(§3.1) 다른 서비스처럼
+   * baseURL당 토큰을 자동 발급받지 못한다. 임시로 환경변수 하나로 고정한다 — 실제 배포
+   * 시 이 값을 SIREN과 Calypso 양쪽에 같이 심어야 한다. 비어 있으면 Calypso의 event
+   * 수신 자체가 항상 401이다.
+   */
+  calypsoEventToken: process.env.CALYPSO_EVENT_TOKEN || '',
   /** S3 호환 오브젝트 스토리지 (SFM_API files.service.ts와 동일한 키 구성). */
   storage: {
     uri: process.env.S3_URI ?? '',
