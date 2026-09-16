@@ -197,6 +197,17 @@ class FakeQuery<T> implements PromiseLike<T> {
     return this;
   }
 
+  /**
+   * 실제 Mongoose의 `.lean()`은 Document로 감싸지 않고 원본을 그대로 돌려준다는 뜻이라,
+   * `_id:true` 서브다큐먼트 배열에 저장된 `_id` 없는 엔트리를 hydrate 시점에 위조로
+   * 채우지 않는다(version-id-backfill.service.ts 참고). 이 가짜 드라이버는 애초에
+   * 문서를 항상 순수 객체로만 다뤄서 그런 위조가 없으므로, 여기서는 그냥 아무것도 안
+   * 하고 체이닝만 유지한다.
+   */
+  lean(): this {
+    return this;
+  }
+
   private resolveMatches(): AnyDoc[] {
     return Array.from(this.store.values()).filter((d) => matches(d, this.filter ?? undefined));
   }
