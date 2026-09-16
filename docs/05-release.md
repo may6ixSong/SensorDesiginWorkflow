@@ -173,10 +173,8 @@ CC·DD 부서는 A가 있었다는 사실조차 알림에서 보지 못한다.
 
 ### 6.2 수신자 계산
 
-| Tier | 알림 대상 |
-|---|---|
-| A/B/C(OA Service/File Artifacts/HPC Service) | **그 block**의 `recipients.editAccess` + `recipients.viewAccess` 의 부서 + 사용자 (workflow별로 다를 수 있다) — 04장 §3 참고, 세 tier 공통 규칙이다 |
-| D(External/Attested) | 이번 범위에서 세부 미정(04장 §3.5) |
+**A/B/C/D 전부 공통** — **그 block**의 `recipients`(부서 + 사용자, workflow별로 다를 수
+있다) — 04장 §3 참고. artifact 단위로 따로 두던 옛 모델(D 전용)은 폐기했다.
 
 - 부서 → 실제 사람은 **그 과제 members 중 해당 부서 전원**으로 전개한다.
 - 같은 사람이 여러 경로로 걸리면 **한 통으로 합친다**(중복 발송 금지).

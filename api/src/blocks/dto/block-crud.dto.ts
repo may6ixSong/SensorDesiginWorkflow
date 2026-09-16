@@ -25,12 +25,6 @@ export class NewArtifactSourceDto {
   @IsOptional()
   @IsString()
   externalArtifactId?: string;
-
-  /** source: 'attested'(Tier D)일 때만 — 권한이 아니라 화면 표시용 메타데이터다. */
-  @IsOptional()
-  @ValidateNested()
-  @Type(() => AccessGrantDto)
-  expectedGiver?: AccessGrantDto;
 }
 
 export class LayoutDto {
@@ -99,18 +93,5 @@ export class UpdateBlockDto {
   newArtifact?: NewArtifactSourceDto;
 }
 
-/**
- * A/B/C(OA Service/File Artifacts/HPC Service) block의 recipient 교체 — 셋 다 공통
- * (설계서 04장 §3.2). D는 이번 범위에서 세부 미정이라 이 라우트를 쓰지 않는다.
- */
-export class ReplaceRecipientsDto {
-  @IsOptional()
-  @ValidateNested()
-  @Type(() => AccessGrantDto)
-  editAccess?: AccessGrantDto;
-
-  @IsOptional()
-  @ValidateNested()
-  @Type(() => AccessGrantDto)
-  viewAccess?: AccessGrantDto;
-}
+/** block의 recipient 교체 — A/B/C/D 전부 공통이다(설계서 04장 §3.2). */
+export class ReplaceRecipientsDto extends AccessGrantDto {}

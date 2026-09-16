@@ -114,17 +114,7 @@ export function toCanvasNode(b: BlockDto): CanvasNode {
     net: artifact?.network ?? null,
     intent: b.intent,
     publishState: b.publishState,
-    // A Tier는 block에, B/C/D는 artifact에 recipient가 있다 — 캔버스 필터는 둘을 합쳐 본다.
-    recipientDepartments: b.recipients
-      ? [
-          ...new Set([
-            ...b.recipients.editAccess.departments,
-            ...b.recipients.viewAccess.departments,
-          ]),
-        ]
-      : !masked && artifact && artifact.recipients
-        ? [...artifact.recipients.departments]
-        : [],
+    recipientDepartments: b.recipients ? [...b.recipients.departments] : [],
     series: b.series,
     seriesIdx: b.seriesIdx,
     seriesTotal: b.seriesTotal,

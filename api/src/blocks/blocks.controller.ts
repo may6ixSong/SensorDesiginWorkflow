@@ -132,7 +132,7 @@ export class BlocksController {
   }
 
   /**
-   * A Tier block의 recipient 교체 (설계서 04장 §3.3).
+   * block의 recipient 교체 — A/B/C/D 전부 공통이다(설계서 04장 §3.3).
    *
    * 편집 권한은 그 workflow의 **Edit Access**다 — recipient에 **속하는 것**과 recipient를
    * **편집하는 것**은 별개다(설계서 01장 §4.2). 즉 자기가 recipient가 아니어도 목록은

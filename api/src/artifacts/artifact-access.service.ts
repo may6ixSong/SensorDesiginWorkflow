@@ -5,9 +5,9 @@ import {
   ArtifactLike,
   BlockLike,
   ProjectLike,
+  attestedLevel,
   myDepartments,
   recipientLevel,
-  sirenArtifactLevel,
 } from '../common/access';
 import { ArtifactDocument, ArtifactVersion } from './schemas/artifact.schema';
 import { ArtifactVersionDto, toVersionDtoList } from './dto/artifact.dto';
@@ -22,7 +22,7 @@ import { CALYPSO_SERVICE_KEY, CalypsoClientService } from '../hub/calypso-client
  * 라이브로 물어보는 호출이기 때문이다.
  *
  * ┌ OA Service/File Artifacts/HPC Service(A/B/C) — 2단 게이트, 공통 ──────┐
- * │ 게이트 1 (SIREN)  그 block의 recipients(edit 또는 view)에 속하나?      │
+ * │ 게이트 1 (SIREN)  그 block의 recipients에 속하나?                     │
  * │                    아니다 → 막는다. 서비스에 물어보지도 않는다.         │
  * │ 게이트 2 (서비스)  access.canView 가 true 인가? (File Artifacts는       │
  * │                    SIREN BE가 Calypso에 대신 물어본다)                 │
@@ -32,13 +32,14 @@ import { CALYPSO_SERVICE_KEY, CalypsoClientService } from '../hub/calypso-client
  *
  * ★ workflow Edit Access가 있어도 recipient가 아니면 막힌다. 예전 설계의 "workflow Edit
  *   Access는 항상 통과" 규칙은 폐지되었다.
- * ★ v3 설계 도중 한 번 뒤집힌 결정이다(설계서 04장 §3) — 원래는 B/C/D를 artifact 단위
- *   SIREN 보관 권한(sirenArtifactLevel)으로 판정했는데, 여러 workflow가 하나의 artifact를
- *   공유할 때 한 workflow의 수정이 다른 workflow까지 번지는 문제와 HPC Service는 HPC망
- *   안에서 권한 자체가 무의미하다는 점 때문에 A/B/C를 이 2단 게이트로 통일했다.
+ * ★ artifact 단위로 SIREN이 editAccess/viewAccess를 직접 보관하던 옛 모델은 완전히
+ *   폐기했다 — recipient는 항상 block 단위다. 여러 workflow가 하나의 artifact를 공유할 때
+ *   한 workflow의 수정이 다른 workflow까지 번지는 문제와 HPC Service는 HPC망 안에서 권한
+ *   자체가 무의미하다는 점 때문에 A/B/C를 이 2단 게이트로 통일했다.
  *
- * External/Attested(D)만 이번 범위에서 제외 — 물어볼 서비스가 없으므로 옛 방식
- * (sirenArtifactLevel, artifact 단위 SIREN 보관 권한)을 잠정적으로 그대로 쓴다.
+ * External/Attested(D)만 서비스가 없어 게이트 2가 없다 — block recipient면 view,
+ * artifact.createdBy(+Admin)면 edit이다(attestedLevel, 이번 범위에서 더 정교화하지
+ * 않기로 함).
  */
 @Injectable()
 export class ArtifactAccessService {
@@ -66,8 +67,8 @@ export class ArtifactAccessService {
     const myDepts = myDepartments(actor, project);
 
     if ((artifact.tier ?? 'D') === 'D') {
-      // External/Attested — 이번 범위에서 세부 미정. 물어볼 서비스가 없으므로 옛 방식을 쓴다.
-      return sirenArtifactLevel(actor, artifact, myDepts);
+      // External/Attested — 물어볼 서비스가 없다. block recipient(view) + createdBy(edit).
+      return attestedLevel(actor, block, artifact, myDepts);
     }
 
     // --- A/B/C(OA Service/File Artifacts/HPC Service) 공통 ---

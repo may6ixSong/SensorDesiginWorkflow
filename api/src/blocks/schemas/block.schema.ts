@@ -2,11 +2,7 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types, SchemaTypes } from 'mongoose';
 // @Prop의 런타임 type은 반드시 SchemaTypes.ObjectId를 쓴다 - Types.ObjectId(값 클래스)를 주면
 // Mongoose가 Mixed 경로를 만들고, Mixed는 캐스팅을 하지 않아 문자열 id 필터가 전부 0건이 된다.
-import {
-  RecipientGrants,
-  RecipientGrantsSchema,
-  emptyRecipientGrants,
-} from '../../common/schemas/access-grant.schema';
+import { AccessGrant, AccessGrantSchema, emptyAccessGrant } from '../../common/schemas/access-grant.schema';
 
 @Schema({ _id: false })
 export class Layout {
@@ -73,19 +69,20 @@ export class Block {
   intent: 'own' | 'received';
 
   /**
-   * ★ A Tier artifact가 매핑된 block에서만 의미가 있다.
+   * artifact가 매핑된 block에서만 의미가 있다 — A/B/C/D 전부 공통이다(설계서 04장 §3).
    *
-   * A Tier는 그 서비스가 권한을 관리하므로 SIREN은 recipient를 따로 들고 있는데, 이 구성은
+   * SIREN은 여기서 "누가 이 자리의 산출물을 받는가"만 관리한다. 이 구성은
    * **workflow마다 독립**이다 — 같은 artifact가 workflow X와 Y에 놓여도 X는 AA·BB 부서에,
    * Y는 CC 부서에만 갈 수 있다. 그래서 artifact가 아니라 여기(block)에 붙는다.
    *
-   * B/C/D는 항상 비워둔다 — 그 경우 recipient는 artifact.viewAccess에서 파생하며,
-   * 모든 workflow에 동일하게 적용된다(설계서 01장 §4.1, 04장 §3).
+   * ★ edit/view로 나뉘지 않는다 — recipient는 오직 "볼 수 있는가"의 게이트 1일 뿐이고,
+   *   실제 edit 여부는 A/B/C는 그 서비스가, D는 artifact.createdBy가 최종 판정한다
+   *   (그래서 recipient를 편집하는 권한과 recipient에 속하는 것은 여전히 별개다).
    *
    * 이 목록은 release 알림 대상이자 **slide 열람의 첫 번째 게이트**다(설계서 04장 §4.1).
    */
-  @Prop({ type: RecipientGrantsSchema, default: emptyRecipientGrants })
-  recipients: RecipientGrants;
+  @Prop({ type: AccessGrantSchema, default: emptyAccessGrant })
+  recipients: AccessGrant;
 
   /** null이면 원본. 회차 인스턴스는 원본의 _id를 담는다(반복 릴리스 일정). */
   @Prop({ type: SchemaTypes.ObjectId, ref: 'Block', default: null })

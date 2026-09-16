@@ -191,19 +191,6 @@ export interface ArtifactDto {
   artifactTypeKey: string | null;
   externalUrl: string | null;
   myAccess: AccessLevel;
-  /**
-   * D만 값이 있다. A/B/C(OA Service/File Artifacts/HPC Service)는 그 서비스가 권한을
-   * 판정하고 recipient는 block 단위이므로 항상 null이다(설계서 04장 §3).
-   */
-  editAccess: AccessGrant | null;
-  viewAccess: AccessGrant | null;
-  /**
-   * D는 viewAccess가 곧 recipient이며 서버가 그 값을 복사해 채워 준다(읽기 전용).
-   * **A/B/C의 recipient는 artifact가 아니라 block에 있다** — workflow마다 다르기 때문이다.
-   */
-  recipients: AccessGrant | null;
-  /** Tier D 전용 표시용 메타데이터 — "누가 줄 것으로 기대되는지". 그 외 tier는 항상 null. */
-  expectedGiver: AccessGrant | null;
   versions: ArtifactVersionDto[];
   createdBy: string;
   masked?: false;
@@ -236,12 +223,8 @@ export interface BlockDto {
   /** 열람 권한이 없으면 masked 형태로 온다. 미매핑이면 null. */
   artifact: ArtifactDto | MaskedArtifactDto | null;
   publishState: PublishState;
-  /**
-   * **A/B/C(OA Service/File Artifacts/HPC Service)에서만** 값이 있다 — 같은 artifact라도
-   * workflow마다 recipient 구성이 다를 수 있어 block에 붙는다(설계서 04장 §3.2). D만
-   * null이고 그 대신 artifact.editAccess/viewAccess(옛 모델)를 쓴다.
-   */
-  recipients: { editAccess: AccessGrant; viewAccess: AccessGrant } | null;
+  /** artifact가 매핑된 block에서만 값이 있다 — A/B/C/D 전부 공통이다(설계서 04장 §3.2). */
+  recipients: AccessGrant | null;
   series: string | null;
   seriesIdx: number;
   seriesTotal: number;

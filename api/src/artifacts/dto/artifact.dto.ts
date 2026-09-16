@@ -1,6 +1,5 @@
 import { ArtifactDocument, ArtifactVersion } from '../schemas/artifact.schema';
 import { AccessLevel } from '../../common/access';
-import { isSirenGovernedTier } from '../../common/constants/tier';
 
 /**
  * 산출물 응답 조립의 **단일 통로**다(설계서 01장 §5).
@@ -41,20 +40,6 @@ export interface ArtifactDto {
   externalUrl: string | null;
   /** 이 호출자의 실효 권한. FE의 UX 게이트용이며, 실제 차단은 서버가 이미 끝냈다. */
   myAccess: AccessLevel;
-  /**
-   * B/C/D만 값이 있다. A는 그 서비스가 권한을 판정하므로 항상 비어 있다
-   * (설계서 04장 §3) — 값이 저장돼 있더라도 여기서 비운다.
-   */
-  editAccess: { departments: string[]; users: string[] } | null;
-  viewAccess: { departments: string[]; users: string[] } | null;
-  /**
-   * 화면이 tier별 분기를 하지 않도록, B/C/D는 viewAccess를 그대로 recipient로 채워
-   * 내려준다. 단 **편집은 viewAccess를 통해서만** 한다 — 단일 진실은 viewAccess다.
-   * A Tier의 recipient는 artifact가 아니라 block에 있으므로 여기서는 항상 null이다.
-   */
-  recipients: { departments: string[]; users: string[] } | null;
-  /** D Tier 전용 표시용 메타데이터 — "누가 줄 것으로 기대되는지". 그 외 tier는 항상 null. */
-  expectedGiver: { departments: string[]; users: string[] } | null;
   versions: ArtifactVersionDto[];
   createdBy: string;
 }
@@ -84,8 +69,8 @@ export function toVersionDto(v: ArtifactVersion): ArtifactVersionDto {
  *   - 그 외 전원 (recipient 포함)      → isPublished: true 인 것만
  *
  * A Tier의 giver 여부는 SIREN이 알 수 없으므로 호출부가 그 서비스의 `access.canEdit`를
- * 그대로 level로 넘겨준다(ArtifactAccessService). 즉 A Tier에서는 recipient에 edit으로
- * 들어 있어도 그 서비스에서 edit 권한이 없으면 working 버전이 보이지 않는다.
+ * 그대로 level로 넘겨준다(ArtifactAccessService). 즉 A Tier에서는 recipient로 들어 있어도
+ * 그 서비스에서 edit 권한이 없으면 working 버전이 보이지 않는다.
  */
 /** 버전 배열 → 권한에 맞춰 거른 DTO 목록. DB에서 읽은 것이든 라이브 조회 결과든 공용이다. */
 export function toVersionDtoList(versions: ArtifactVersion[], level: AccessLevel): ArtifactVersionDto[] {
@@ -99,14 +84,6 @@ export function visibleVersions(artifact: ArtifactDocument, level: AccessLevel):
 }
 
 export function toArtifactDto(artifact: ArtifactDocument, level: AccessLevel): ArtifactDto {
-  const sirenGoverned = isSirenGovernedTier(artifact.tier);
-  const view = sirenGoverned
-    ? {
-        departments: [...(artifact.viewAccess?.departments ?? [])],
-        users: [...(artifact.viewAccess?.users ?? [])],
-      }
-    : null;
-
   return {
     id: artifact._id.toString(),
     projectId: artifact.projectId.toString(),
@@ -118,21 +95,6 @@ export function toArtifactDto(artifact: ArtifactDocument, level: AccessLevel): A
     artifactTypeKey: artifact.artifactTypeKey ?? null,
     externalUrl: artifact.externalUrl ?? null,
     myAccess: level,
-    editAccess: sirenGoverned
-      ? {
-          departments: [...(artifact.editAccess?.departments ?? [])],
-          users: [...(artifact.editAccess?.users ?? [])],
-        }
-      : null,
-    viewAccess: view,
-    // B/C/D는 view가 곧 recipient. A는 block에 있으므로 null.
-    recipients: view ? { departments: [...view.departments], users: [...view.users] } : null,
-    expectedGiver: artifact.tier === 'D'
-      ? {
-          departments: [...(artifact.expectedGiver?.departments ?? [])],
-          users: [...(artifact.expectedGiver?.users ?? [])],
-        }
-      : null,
     versions: visibleVersions(artifact, level),
     createdBy: artifact.createdBy,
   };

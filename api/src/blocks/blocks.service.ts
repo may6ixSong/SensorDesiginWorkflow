@@ -12,10 +12,7 @@ import { WorkflowDocument } from '../workflows/schemas/workflow.schema';
 import { ProjectDocument } from '../projects/schemas/project.schema';
 import { NewArtifactSourceDto } from './dto/block-crud.dto';
 
-const EMPTY_RECIPIENTS = () => ({
-  editAccess: { departments: [], users: [] },
-  viewAccess: { departments: [], users: [] },
-});
+const EMPTY_RECIPIENTS = () => ({ departments: [], users: [] });
 
 @Injectable()
 export class BlocksService {
@@ -61,10 +58,7 @@ export class BlocksService {
     if (input.newArtifact) {
       const na = input.newArtifact;
       if (na.source === 'attested') {
-        return this.sources.resolveAttested(project, actor, intent, {
-          name: na.name,
-          expectedGiver: na.expectedGiver,
-        });
+        return this.sources.resolveAttested(project, actor, intent, { name: na.name });
       }
       if (!na.externalArtifactId) {
         throw new BadRequestException('externalArtifactId is required for this source.');
@@ -203,34 +197,23 @@ export class BlocksService {
   }
 
   /**
-   * A/B/C(OA Service/File Artifacts/HPC Service) block의 recipient 교체 (설계서 04장 §3.2).
+   * block의 recipient 교체 — A/B/C/D 전부 공통이다(설계서 04장 §3.2). SIREN은 여기서
+   * "누가 볼 수 있는지"만 보관하고, 실제 edit 여부는 A/B/C는 그 서비스가, D는
+   * artifact.createdBy가 판정한다(common/access.ts의 attestedLevel).
    *
-   * ★ 셋 다 공통이다 — SIREN이 권한을 보관하지 않고, recipient는 항상 block(그 workflow
-   *   안의 자리) 단위다(옛 설계는 B/C/D를 artifact.viewAccess로 뒀었는데, 여러 workflow가
-   *   하나의 artifact를 공유할 때 진실이 갈리는 문제로 폐기했다). D는 이번 범위 제외.
    * ★ 편집 권한은 그 workflow의 Edit Access다 — 컨트롤러가 이미 검증하고 들어온다.
    *   recipient에 **속하는 것**과 recipient를 **편집하는 것**은 별개다(설계서 01장 §4.2).
    */
   async replaceRecipients(
     blockId: string,
-    input: {
-      editAccess?: { departments?: string[]; users?: string[] };
-      viewAccess?: { departments?: string[]; users?: string[] };
-    },
+    input: { departments?: string[]; users?: string[] },
     actor: Actor,
   ): Promise<BlockDocument> {
     const block = await this.findOrThrow(blockId);
     if (!block.artifactId) {
       throw new BadRequestException('This block has no artifact mapped yet.');
     }
-    const artifact = await this.artifacts.findOrThrow(block.artifactId.toString());
-    if (artifact.tier === 'D') {
-      throw new BadRequestException('Recipients are not yet supported for External/Attested (D).');
-    }
-    block.recipients = {
-      editAccess: normalizeGrant(input.editAccess),
-      viewAccess: normalizeGrant(input.viewAccess),
-    };
+    block.recipients = normalizeGrant(input);
     await block.save();
     await this.audit.log(actor.knoxId, 'BLOCK_RECIPIENTS_REPLACE', 'block', block._id, {
       recipients: block.recipients,

@@ -16,7 +16,6 @@ import { Toast } from '@/components/common/Toast';
 import { useProject, useProjectWorkflows, useProjectMilestones, useProjects } from '@/api/hooks/useProjects';
 import { useUpdateWorkflow, useReplaceWorkflowAccess, useWorkflow, useUpdateWorkflowPhases } from '@/api/hooks/useWorkflow';
 import { useBlocks, useCreateBlock, useDeleteBlock, useReplaceBlockRecipients, useUpdateBlock } from '@/api/hooks/useBlocks';
-import { useReplaceArtifactAccess } from '@/api/hooks/useArtifacts';
 import { useCreateRelease, useReleasePreview, useReleases } from '@/api/hooks/useReleases';
 import { useMemos } from '@/api/hooks/useMemos';
 import { useEdges } from '@/api/hooks/useEdges';
@@ -67,7 +66,6 @@ export function BoardPage() {
   const updateBlock = useUpdateBlock(workflowId ?? '');
   const deleteBlock = useDeleteBlock(workflowId ?? '');
   const replaceRecipients = useReplaceBlockRecipients(workflowId ?? '');
-  const replaceArtifactAccess = useReplaceArtifactAccess(workflowId ?? '');
 
   const [saveErr, setSaveErr] = useState<string | null>(null);
   const [phasesErr, setPhasesErr] = useState<string | null>(null);
@@ -267,8 +265,8 @@ export function BoardPage() {
                 setHistoryPreselect(releaseId);
                 setHistoryOpen(true);
               }}
-              saving={replaceRecipients.isPending || replaceArtifactAccess.isPending}
-              onSaveBlockRecipients={(p) =>
+              saving={replaceRecipients.isPending}
+              onSaveRecipients={(p) =>
                 replaceRecipients.mutate(
                   { blockId: openBlock.id, ...p },
                   {
@@ -277,16 +275,6 @@ export function BoardPage() {
                   },
                 )
               }
-              onSaveArtifactAccess={(p) => {
-                if (!openBlock.artifactId) return;
-                replaceArtifactAccess.mutate(
-                  { artifactId: openBlock.artifactId, ...p },
-                  {
-                    onSuccess: () => toast('Access saved'),
-                    onError: (e: any) => toast(e?.response?.data?.message ?? 'Failed to save access'),
-                  },
-                );
-              }}
               onDelete={
                 canEdit
                   ? () =>

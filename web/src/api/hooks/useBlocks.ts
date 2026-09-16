@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
 import { queryKeys } from '../queryKeys';
-import { AccessGrant, ArtifactHtmlView, ArtifactIntent, ArtifactVersionDto, BlockDto } from '@/types/domain';
+import { ArtifactHtmlView, ArtifactIntent, ArtifactVersionDto, BlockDto } from '@/types/domain';
 
 /**
  * artifactId(재사용) 대신 넘기면 서버가 그 자리에서 출처를 확정한다(find-or-create,
@@ -13,7 +13,6 @@ export interface NewArtifactSourceInput {
   name: string;
   serviceKey?: string;
   externalArtifactId?: string;
-  expectedGiver?: AccessGrant;
 }
 
 /**
@@ -139,9 +138,7 @@ export function useDeleteBlock(workflowId: string) {
 }
 
 /**
- * **A/B/C(OA Service/File Artifacts/HPC Service) block의 recipient 교체** (설계서
- * 04장 §3.2, §3.3). 셋 다 공통이다 — D만 이 라우트를 쓰지 않는다(그쪽은 옛 모델인
- * artifact.editAccess/viewAccess를 쓴다, useArtifacts의 useReplaceArtifactAccess).
+ * **block의 recipient 교체** (설계서 04장 §3.2, §3.3) — A/B/C/D 전부 공통이다.
  *
  * ★ 편집 권한은 그 workflow의 Edit Access다. recipient에 **속하는 것**과 recipient를
  *   **편집하는 것**은 별개라, 자기를 넣지 않으면 고쳐놓고도 그 slide를 못 열 수 있다.
@@ -154,8 +151,8 @@ export function useReplaceBlockRecipients(workflowId: string) {
       ...input
     }: {
       blockId: string;
-      editAccess: AccessGrant;
-      viewAccess: AccessGrant;
+      departments?: string[];
+      users?: string[];
     }) => {
       const res = await apiClient.patch<BlockDto>(
         `/workflows/${workflowId}/blocks/${blockId}/recipients`,

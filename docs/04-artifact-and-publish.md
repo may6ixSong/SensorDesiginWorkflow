@@ -111,28 +111,25 @@ recipient는 **release 알림 대상**이면서 동시에 **SIREN 쪽 slide 열�
 쓰인다(§4.1). "recipient = 알림 대상"과 "recipient = 그 서비스의 실제 권한"은 여전히 무관하다 —
 recipient에 들어 있어도 그 서비스에서 view 권한이 없으면 결국 slide는 막힌다.
 
-### 3.2 recipient는 block에, edit/view 구조로 — A/B/C 공통
+### 3.2 recipient는 block에 — A/B/C/D 공통, 단일 grant
 
-`Block.recipients`(02장 §4)에 저장하며, workflow의 editAccess/viewAccess와 같은 모양이다 —
-부서 다중 + 사용자 다중, **edit/view 두 단계**로 나뉜다.
+`Block.recipients`(02장 §4)에 저장하며, 부서 다중 + 사용자 다중의 **단일 grant**다.
+edit/view로 나뉘지 않는다 — 실제 edit 여부는 A/B/C는 그 서비스가(게이트 2), D는
+`Artifact.createdBy`가 최종 판정한다(§6.4).
 
 ```ts
-Block.recipients = {
-  editAccess: { departments: string[], users: string[] },
-  viewAccess: { departments: string[], users: string[] },
-}
+Block.recipients = { departments: string[], users: string[] }
 ```
 
 - 같은 artifact가 workflow X와 workflow Y 양쪽에 놓여 있어도, X의 block과 Y의 block은
   **서로 다른 recipients**를 가질 수 있다 — X는 AA·BB 부서에게, Y는 CC 부서에게만 알림이
   가는 식으로 독립적으로 구성한다.
-- `editAccess`/`viewAccess` 두 단계를 두는 이유는 §4.1의 slide 열람 판정과 §7의 버전 트리
-  깊이 판정에 그대로 쓰기 위해서다.
 - **`recipients`에 사람을 넣는 것 자체가 그 서비스의 권한을 부여하지 않는다.** 그 서비스에서
   실제로 view/edit 권한이 없는 사람을 recipient에 넣으면, 그 사람은 여전히 slide가 막힌다
   (§4.1 게이트 2). recipient 관리자가 이를 인지하고 구성해야 한다.
-- `Artifact.editAccess`/`viewAccess`(`AccessGrant`) 필드는 A/B/C에서 더 이상 쓰지 않는다 —
-  옛 모델의 잔재이며, 실제 마이그레이션 시 정리 대상이다.
+- `Artifact.editAccess`/`viewAccess`/`expectedGiver`(`AccessGrant`) 필드는 완전히 제거했다 —
+  artifact는 더 이상 권한을 전혀 들고 있지 않는다. D도 이제 A/B/C와 같은 block 단위
+  recipient를 쓴다.
 
 ### 3.3 Recipient 설정(편집) 권한
 
@@ -213,7 +210,7 @@ artifact 상세 slide 안의 탭 하나로 둔다.
 
 | 열람자 | 표시 |
 |---|---|
-| workflow Edit Access (A/B/C 공통) | 편집 가능 — `block.recipients.editAccess`/`viewAccess`에 부서·사용자 추가·삭제 (§3.2) |
+| workflow Edit Access (A/B/C/D 공통) | 편집 가능 — `block.recipients`에 부서·사용자 추가·삭제 (§3.2) |
 | View 권한자 | **읽기 전용으로 노출.** 누가 받는지는 볼 수 있고, 추가/삭제 버튼이 없다 |
 | 미매핑 블록 | **탭 자체를 감춘다** |
 
@@ -318,14 +315,15 @@ code/revision을 쓸 수 있는 경우)는 이제 **그 서비스 쪽이 필터�
   code+revision으로 후보를 받고, canEdit/canView를 라이브로 물어보고, 매핑 즉시 버전 이력을
   pull한다. 유일한 차이는 응답에 실 설계 데이터·파일이 없고 경로(vwp path)만 있다는 것뿐이다
   (07장).
-- **External/Attested(D)** — 후보 목록 자체가 없다. 이름과 "누가 줄 것으로 기대되는지"
-  (`Artifact.expectedGiver` — 부서/사용자 다중, §6.4)만 입력하면 바로 새 D Tier artifact가
-  만들어진다.
+- **External/Attested(D)** — 후보 목록 자체가 없다. 이름만 입력하면 바로 새 D Tier artifact가
+  만들어진다. 등록자(`createdBy`)가 자동으로 그 artifact의 사실상 유일한 편집자가 된다(§6.4).
 
 ### 6.4 D Tier — 받는 전용, 그리고 남겨둔 TODO
 
-- **D는 이번 라운드에서 받는 쪽에서만 만든다.** `expectedGiver`는 권한이 아니라 화면 표시용
-  메타데이터일 뿐이다 — SIREN이 검증할 시스템이 없으므로 강제할 방법도 없다.
+- **D는 이번 라운드에서 받는 쪽에서만 만든다.** 권한은 A/B/C와 같은 block 단위 recipient를
+  쓰고(§3.2), 실제 edit(새 버전 등록/교체)은 물어볼 서비스가 없어 `Artifact.createdBy`
+  (+Admin)로 잠정 고정했다 — 이 이상은 이번 범위에서 정교화하지 않는다(사용자 결정).
+  이전에 있던 "누가 줄 것으로 기대되는지"(`expectedGiver`) 표시용 메타데이터는 제거했다.
 - **줘야 하는 쪽의 D는 아직 구체화되지 않았다.** 장차 어떤 외부 interface를 통해 값이 들어오면
   SIREN(Hub)이 그 메시지를 받아 그 workflow 안에서 자체적으로 versioning하는 방식을 생각하고
   있다 — 지금은 그 인터페이스가 없으므로 옵션 자체를 주는 쪽 다이얼로그에서 뺀다.
@@ -362,7 +360,7 @@ GET /workflows/:workflowId/artifact-candidates
 
 POST /workflows/:workflowId/blocks       { name, phaseId, layout, intent, artifactId? | newArtifact? }
 PATCH /blocks/:id                        { name?, artifactId? | newArtifact? }
-→ newArtifact = { source: 'live'|'file'|'hpc'|'attested', name, serviceKey?, externalArtifactId?, expectedGiver? }
+→ newArtifact = { source: 'live'|'file'|'hpc'|'attested', name, serviceKey?, externalArtifactId? }
   둘 다 §6.2를 서버가 다시 검증하고(§6.5의 중복 금지 포함), find-or-create 또는 신규 생성 후
   block에 매핑한다. 최종 식별은 (serviceKey, externalArtifactId) 조합이다 — externalArtifactId는
   그 서비스 전체에서(project를 넘나들어) 유일해야 한다(07장 §3). 매핑이 확정되는 순간 SIREN이

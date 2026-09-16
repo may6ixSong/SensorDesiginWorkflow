@@ -5,8 +5,9 @@
  * ★ v3 구조를 그대로 반영한다:
  *   - 산출물의 **실체(Artifact)**와 캔버스 위의 **자리(Block)**가 분리되어 있다.
  *   - Artifact는 과제 단위로 스코프되고, 같은 artifact가 여러 workflow에 놓일 수 있다.
- *   - B/C/D는 SIREN이 권한을 들고 있고 **viewAccess가 곧 recipient**다.
- *     A는 그 서비스가 권한을 판정하고, recipient는 **block마다** 따로 붙는다.
+ *   - Artifact는 권한을 들고 있지 않는다 — recipient(누가 볼 수 있는지)는 항상
+ *     **block마다** 따로 붙는다(A/B/C/D 공통). A/B/C는 실제 edit/view를 그 서비스가
+ *     판정하고, D는 artifact.createdBy가 edit을 판정한다.
  *   - Release는 부서별 배송 기록이며 캔버스 스냅샷을 담지 않는다.
  *
  * 이 시드는 아래 상황을 일부러 만들어 둔다 — 화면에서 바로 확인할 수 있게:
@@ -211,16 +212,13 @@ interface MockArtifact {
   serviceKey?: string | null;
   externalArtifactId?: string | null;
   externalUrl?: string | null;
-  /** B/C/D 전용. viewAccess가 곧 recipient다. A는 비워 둔다. */
-  editAccess?: { departments?: string[]; users?: UserKey[] };
-  viewAccess?: { departments?: string[]; users?: UserKey[] };
   versions: VerTuple[];
   giver: UserKey;
   hpcPath?: string;
 }
 
 const MOCK_ARTIFACTS: MockArtifact[] = [
-  /* ── A Tier — 서비스가 권한을 판정한다. recipient는 block마다 따로 붙는다 ── */
+  /* ── A Tier — OA Service. recipient는 block마다 따로 붙는다 ── */
   { key: 'a_pll_sim', project: 'p1', name: 'PLL Pre-layout Simulation', tier: 'A', network: 'OA',
     serviceKey: 'simhub', externalArtifactId: 'SIM-PLL-0421', giver: 'u1',
     versions: [['v2.0', true, '2026-06-03 10:40', '2nd release'], ['v1.0', true, '2026-04-21 13:10', '1st release']] },
@@ -232,53 +230,36 @@ const MOCK_ARTIFACTS: MockArtifact[] = [
     serviceKey: 'rpm', externalArtifactId: 'RPM-ADC-771', giver: 'u4',
     versions: [['v3', true, '2026-05-11 11:00', 'ML3 release'], ['v2', true, '2026-03-20 15:30', 'AR release']] },
 
-  /* ── B Tier — HPC 공용 DB 경유. SIREN이 권한을 들고 있고 viewAccess가 곧 recipient ── */
-  { key: 'b_pll_pex', project: 'p1', name: 'PLL Netlist / PEX', tier: 'B', network: 'HPC',
-    serviceKey: 'ssm', externalArtifactId: 'SSM-PEX-PLL', giver: 'u1',
-    hpcPath: '/vwp/cis_a7/pll_main/pex/r1',
-    editAccess: { departments: ['Analog'] },
-    viewAccess: { departments: ['Digital', 'PTE'] },
+  /* ── B Tier — File Artifacts(Calypso). recipient는 block마다 따로 붙는다 ── */
+  { key: 'b_pll_pex', project: 'p1', name: 'PLL Netlist / PEX', tier: 'B', network: 'OA',
+    serviceKey: CALYPSO_SERVICE_KEY, externalArtifactId: 'calypso-pex-pll', giver: 'u1',
     versions: [['r1', true, '2026-06-04 19:55', 'RC extraction']] },
   { key: 'b_ldo_spec', project: 'p1', name: 'LDO Spec Data', tier: 'B', network: 'OA',
-    serviceKey: 'ssm', externalArtifactId: 'SSM-LDO-SPEC', giver: 'u2',
-    editAccess: { departments: ['Analog'], users: ['u2'] },
-    viewAccess: { departments: ['PI/PD', 'Solution'] },
+    serviceKey: CALYPSO_SERVICE_KEY, externalArtifactId: 'calypso-ldo-spec', giver: 'u2',
     versions: [['v2.1', true, '2026-05-18 14:20', 'Updated dropout'], ['v1.0', true, '2026-03-02 09:15', 'Initial']] },
   { key: 'b_tg_timing', project: 'p1', name: 'TG Timing Table', tier: 'B', network: 'OA',
-    serviceKey: 'ssm', externalArtifactId: 'SSM-TG-TIM', giver: 'u3',
-    editAccess: { departments: ['Digital'] },
-    viewAccess: { departments: ['Analog', 'APS'] },
+    serviceKey: CALYPSO_SERVICE_KEY, externalArtifactId: 'calypso-tg-timing', giver: 'u3',
     versions: [['v1.0', true, '2026-04-10 10:00', 'Initial']] },
 
   /* ── C Tier — 링크만 있고 버전은 사람이 입력 ── */
   { key: 'c_pll_req', project: 'p1', name: 'PLL Requirements Intake', tier: 'C', network: 'OA',
     externalUrl: 'https://docs.local/cis-a7/pll-req', giver: 'u1',
-    editAccess: { departments: ['Analog'] },
-    viewAccess: { departments: ['Digital'] },
     versions: [['v1.0', true, '2026-01-09 10:20', 'Initial draft']] },
   { key: 'c_adc_ar', project: 'p1', name: 'ADC AR Review Package', tier: 'C', network: 'OA',
     externalUrl: 'https://docs.local/cis-a7/adc-ar', giver: 'u4',
-    editAccess: { departments: ['APS'] },
-    viewAccess: { departments: ['Analog', 'PTE'] },
     versions: [['v2.1', false, '2026-04-02 09:30', 'Added action items'], ['v2.0', true, '2026-03-18 14:00', '2nd release']] },
 
   /* ── D Tier — 시스템 자체가 없다. 출처를 자유 텍스트로 기록 ── */
   { key: 'd_bgr_meas', project: 'p1', name: 'BGR Measurement Report (vendor)', tier: 'D', network: 'OA',
     giver: 'u2',
-    editAccess: { departments: ['Analog'] },
-    viewAccess: { departments: ['PTE'] },
     versions: [['rev.B', true, '2026-05-02 16:40', 'From vendor']] },
   { key: 'd_cmp_note', project: 'p1', name: 'Comparator Hand Calc', tier: 'D', network: 'OA',
     giver: 'u6',
-    editAccess: { departments: ['PI/PD'] },
-    viewAccess: { departments: ['Analog'] },
     versions: [] }, // publish된 적 없음 — 캔버스에서 "미발행" 배지로 보인다
 
   /* ── 두 번째 과제 ── */
   { key: 'p2_iso', project: 'p2', name: 'Isolation Spec', tier: 'C', network: 'OA',
     externalUrl: 'https://docs.local/cis-b3/iso', giver: 'u7',
-    editAccess: { departments: ['Analog'] },
-    viewAccess: { departments: ['Digital'] },
     versions: [['v1.0', true, '2026-02-11 11:00', 'Initial']] },
 ];
 
@@ -291,11 +272,8 @@ interface MockBlock {
   /** artifact를 가리키지 않는 "정상 빈 상태"면 생략. 그 경우 name이 표시된다. */
   artifact?: string;
   name: string;
-  /** A Tier에서만 의미가 있다 — workflow마다 독립인 recipient. */
-  recipients?: {
-    editAccess?: { departments?: string[]; users?: UserKey[] };
-    viewAccess?: { departments?: string[]; users?: UserKey[] };
-  };
+  /** artifact가 매핑된 block에서만 의미가 있다 — A/B/C/D 공통, workflow마다 독립인 recipient. */
+  recipients?: { departments?: string[]; users?: UserKey[] };
   series?: string;
   seriesIdx?: number;
   seriesTotal?: number;
@@ -303,13 +281,15 @@ interface MockBlock {
 
 const MOCK_BLOCKS: MockBlock[] = [
   /* ── PLL_MAIN ── */
-  { key: 'k01', workflow: 'wf1', phase: 'ph_pll_ko', row: 0, artifact: 'c_pll_req', name: 'PLL Requirements Intake' },
+  { key: 'k01', workflow: 'wf1', phase: 'ph_pll_ko', row: 0, artifact: 'c_pll_req', name: 'PLL Requirements Intake',
+    recipients: { departments: ['Digital'] } },
   { key: 'k02', workflow: 'wf1', phase: 'ph_pll_ml2', row: 0, artifact: 'a_pll_sim', name: 'PLL Pre-layout Simulation',
-    // A Tier — 이 workflow에서는 Digital·PTE가 받는다.
-    recipients: { editAccess: { users: ['u1'] }, viewAccess: { departments: ['Digital', 'PTE'] } } },
-  { key: 'k03', workflow: 'wf1', phase: 'ph_pll_ml3', row: 0, artifact: 'b_pll_pex', name: 'PLL Netlist / PEX' },
+    // 이 workflow에서는 Digital·PTE·u1이 받는다 — 실제 edit/view는 그 서비스(simhub)가 판정한다.
+    recipients: { departments: ['Digital', 'PTE'], users: ['u1'] } },
+  { key: 'k03', workflow: 'wf1', phase: 'ph_pll_ml3', row: 0, artifact: 'b_pll_pex', name: 'PLL Netlist / PEX',
+    recipients: { departments: ['Digital', 'PTE'] } },
   { key: 'k04', workflow: 'wf1', phase: 'ph_pll_ml4', row: 0, artifact: 'a_pll_post', name: 'PLL Post-layout Simulation',
-    // 일부러 recipient를 비워 둔다 — A Tier 게이트 1에서 막히는 상황을 화면에서 확인할 수 있다.
+    // 일부러 recipient를 비워 둔다 — 게이트 1에서 막히는 상황을 화면에서 확인할 수 있다.
     recipients: {} },
   { key: 'k05', workflow: 'wf1', phase: 'ph_pll_mdr', row: 0, name: 'Design Review Package',
     series: 'k05', seriesIdx: 1, seriesTotal: 2 },
@@ -318,26 +298,32 @@ const MOCK_BLOCKS: MockBlock[] = [
   { key: 'k07', workflow: 'wf1', phase: 'ph_pll_mto', row: 0, name: 'MTO Sign-off Sheet' },
 
   /* ── LDO_CORE ── */
-  { key: 'k10', workflow: 'wf2', phase: 'ph_ldo_a', row: 0, artifact: 'b_ldo_spec', name: 'LDO Spec Data' },
+  { key: 'k10', workflow: 'wf2', phase: 'ph_ldo_a', row: 0, artifact: 'b_ldo_spec', name: 'LDO Spec Data',
+    recipients: { departments: ['PI/PD', 'Solution'] } },
   { key: 'k11', workflow: 'wf2', phase: 'ph_ldo_b', row: 0, name: 'LDO Schematic Review' },
-  { key: 'k12', workflow: 'wf2', phase: 'ph_ldo_c', row: 0, artifact: 'd_bgr_meas', name: 'BGR Measurement Report (vendor)' },
+  { key: 'k12', workflow: 'wf2', phase: 'ph_ldo_c', row: 0, artifact: 'd_bgr_meas', name: 'BGR Measurement Report (vendor)',
+    recipients: { departments: ['PTE'] } },
 
   /* ── ADC_RAMP ── */
   { key: 'k20', workflow: 'wf3', phase: 'ph_adc_ko', row: 0, artifact: 'a_rpm_spec', name: 'ADC Ramp Spec (RPM)',
-    recipients: { editAccess: { users: ['u4'] }, viewAccess: { departments: ['Analog'] } } },
-  { key: 'k21', workflow: 'wf3', phase: 'ph_adc_ar', row: 0, artifact: 'c_adc_ar', name: 'ADC AR Review Package' },
+    recipients: { departments: ['Analog'], users: ['u4'] } },
+  { key: 'k21', workflow: 'wf3', phase: 'ph_adc_ar', row: 0, artifact: 'c_adc_ar', name: 'ADC AR Review Package',
+    recipients: { departments: ['Analog', 'PTE'] } },
   { key: 'k22', workflow: 'wf3', phase: 'ph_adc_ml3', row: 0, name: 'Ramp Linearity Report' },
 
   /* ── BGR_REF ── */
-  { key: 'k30', workflow: 'wf4', phase: 'ph_bgr_ml1', row: 0, artifact: 'd_bgr_meas', name: 'BGR Measurement Report (vendor)' },
+  { key: 'k30', workflow: 'wf4', phase: 'ph_bgr_ml1', row: 0, artifact: 'd_bgr_meas', name: 'BGR Measurement Report (vendor)',
+    recipients: { departments: ['PTE'] } },
   { key: 'k31', workflow: 'wf4', phase: 'ph_bgr_ml2', row: 0, name: 'BGR Corner Summary' },
 
   /* ── TG_DRIVER ── */
-  { key: 'k40', workflow: 'wf5', phase: 'ph_tg_ko', row: 0, artifact: 'b_tg_timing', name: 'TG Timing Table' },
+  { key: 'k40', workflow: 'wf5', phase: 'ph_tg_ko', row: 0, artifact: 'b_tg_timing', name: 'TG Timing Table',
+    recipients: { departments: ['Analog', 'APS'] } },
   { key: 'k41', workflow: 'wf5', phase: 'ph_tg_mid', row: 0, name: 'TG Driver Sizing' },
 
   /* ── COMP_BLOCK — 유실 상태 두 개 ── */
-  { key: 'k50', workflow: 'wf6', phase: 'ph_cmp_ko', row: 0, artifact: 'd_cmp_note', name: 'Comparator Hand Calc' },
+  { key: 'k50', workflow: 'wf6', phase: 'ph_cmp_ko', row: 0, artifact: 'd_cmp_note', name: 'Comparator Hand Calc',
+    recipients: { departments: ['Analog'] } },
   { key: 'k51', workflow: 'wf6', phase: ORPHAN_PHASE_ID, row: 0, name: 'Comparator Layout DB' },
   { key: 'k52', workflow: 'wf6', phase: ORPHAN_PHASE_ID, row: 1, name: 'Comparator Offset Sim' },
 ];
@@ -388,24 +374,12 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
    *   로직을 우회하지 않는다. */
   const MOCK_OBSERVER = `http://localhost:${process.env.PORT ?? 3000}/api/v1/__mock-observer`;
   await ArtifactServiceModel.deleteMany({ isMock: true });
-  // ★ 아래 4개는 여전히 v3 최초 설계(B/C/D는 SIREN이 artifact 단위 권한 보관) 기준으로
-  // 남아 있다 — 04장 §3에서 A/B/C를 2단 게이트로 통일한 뒤로 'ssm'/'layoutdb'(구 B tier,
-  // transport 'shared-db') 개념 자체가 더 이상 맞지 않는다(File Artifacts는 이제 Calypso
-  // 하나뿐). 컴파일이 깨지지 않도록 transport만 'none'으로 고쳤고, 이 시드 전체를 새
-  // 모델(Service Manage 토큰 발급, HPC Service 실연동, block 단위 recipient)에 맞게
-  // 다시 쓰는 건 별도 작업으로 남겨둔다.
   await ArtifactServiceModel.insertMany([
-    { key: 'ssm', name: 'SSM', contractVersion: '1.0', defaultTier: 'B', transport: 'none',
-      baseUrl: null, token: null, viewUrlTemplate: 'https://ssm.local/spec/{artifactId}',
-      embedUploadUrlTemplate: null, isBuiltIn: false, enabled: true, isMock: true },
     { key: 'simhub', name: 'SimHub', contractVersion: '1.0', defaultTier: 'A', transport: 'http',
       baseUrl: MOCK_OBSERVER, token: 'mock-token-simhub', viewUrlTemplate: 'https://simhub.local/run/{artifactId}',
       embedUploadUrlTemplate: null, isBuiltIn: false, enabled: true, isMock: true },
     { key: 'rpm', name: 'RPM', contractVersion: '1.0', defaultTier: 'A', transport: 'http',
       baseUrl: MOCK_OBSERVER, token: 'mock-token-rpm', viewUrlTemplate: 'https://rpm.local/artifact/{artifactId}',
-      embedUploadUrlTemplate: null, isBuiltIn: false, enabled: true, isMock: true },
-    { key: 'layoutdb', name: 'LayoutDB', contractVersion: '1.0', defaultTier: 'B', transport: 'none',
-      baseUrl: null, token: null, viewUrlTemplate: null,
       embedUploadUrlTemplate: null, isBuiltIn: false, enabled: true, isMock: true },
     // Calypso 고정 항목 — baseUrl/transport는 CalypsoClientService가 자체 config로 직접
     // 호출하므로 여기서 쓰이지 않는다(HubSyncService도 serviceKey로 따로 분기). 이 문서는
@@ -492,7 +466,6 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
   /* ── Artifact ── */
   const artifactDocs = await ArtifactModel.insertMany(
     MOCK_ARTIFACTS.map((a) => {
-      const isA = a.tier === 'A';
       const versions = a.versions.map(([label, isPublished, when, note]) => ({
         tier: a.tier,
         versionLabel: label,
@@ -519,9 +492,6 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
         externalArtifactId: a.externalArtifactId ?? null,
         artifactTypeKey: null,
         externalUrl: a.externalUrl ?? null,
-        // A Tier는 그 서비스가 권한을 판정하므로 SIREN 쪽 권한을 비워 둔다.
-        editAccess: isA ? { departments: [], users: [] } : grant(a.editAccess),
-        viewAccess: isA ? { departments: [], users: [] } : grant(a.viewAccess),
         versions,
         createdBy: KNOX[a.giver],
         isMock: true,
@@ -543,10 +513,7 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
       name: b.name,
       layout: seedXY(LANE_INDEX[b.phase] ?? 0, b.row, NW, NH),
       intent: 'own',
-      recipients: {
-        editAccess: grant(b.recipients?.editAccess),
-        viewAccess: grant(b.recipients?.viewAccess),
-      },
+      recipients: grant(b.recipients),
       series: null,
       seriesIdx: b.seriesIdx ?? 1,
       seriesTotal: b.seriesTotal ?? 1,
@@ -677,12 +644,12 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
           blockId: blockIds['k03'].toString(),
           artifactId: artifactIds['b_pll_pex'].toString(),
           artifactName: 'PLL Netlist / PEX',
-          tier: 'B', network: 'HPC',
+          tier: 'B', network: 'OA',
           phaseId: 'ph_pll_ml3', phaseName: 'ML3',
           published: {
-            versionLabel: 'r1', versionRef: 'ssm:SSM-PEX-PLL:r1', majorKey: 'r1',
+            versionLabel: 'r1', versionRef: 'calypso:calypso-pex-pll:r1', majorKey: 'r1',
             publishedAt: at('2026-06-04 19:55'), viewUrl: null,
-            hpcPath: '/vwp/cis_a7/pll_main/pex/r1', giverKnoxId: KNOX.u1,
+            hpcPath: null, giverKnoxId: KNOX.u1,
           },
           changed: true, firstTime: true,
           recipients: { departments: ['Digital', 'PTE', 'Analog'], users: [] },
@@ -716,9 +683,9 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
               artifactId: artifactIds['b_pll_pex'].toString(),
               artifactName: 'PLL Netlist / PEX',
               selected: {
-                versionLabel: 'r1', versionRef: 'ssm:SSM-PEX-PLL:r1', majorKey: 'r1',
+                versionLabel: 'r1', versionRef: 'calypso:calypso-pex-pll:r1', majorKey: 'r1',
                 publishedAt: at('2026-06-04 19:55'), viewUrl: null,
-                hpcPath: '/vwp/cis_a7/pll_main/pex/r1', giverKnoxId: KNOX.u1,
+                hpcPath: null, giverKnoxId: KNOX.u1,
               },
             },
           ],
@@ -735,8 +702,8 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
   await WorkflowModel.updateOne({ _id: workflowIds['wf1'] }, { $set: { releaseSeq: 2 } }).exec();
 
   // ★ HPC Service(Tier C) 미리보기 mock(HpcPathMock)은 제거했다 — HPC망 양방향 API 연동이
-  // 확정되면서 OA Service와 동일한 실연동 대상이 됐다(설계서 04장 §2, §6.3). 이 시드가
-  // A/B/C의 recipient·권한 모델 전환(04장 §3)을 아직 따라가지 못한 부분 — Service Manage
-  // 등록/토큰/artifactTypeKey, block.recipients 기반 A/B/C recipient 시드 데이터 재정비 —
-  // 은 별도 작업으로 남겨둔다(README §4 참고).
+  // 확정되면서 OA Service와 동일한 실연동 대상이 될 예정이다(설계서 04장 §2, §6.3). 이
+  // 시드의 C Tier는 아직 그 전환 전(externalUrl + 수동 버전 입력) 상태 그대로다 — Service
+  // Manage 등록/토큰/artifactTypeKey를 붙이는 실제 HPC Service 연동은 별도 작업으로
+  // 남겨둔다(README §4 참고).
 }

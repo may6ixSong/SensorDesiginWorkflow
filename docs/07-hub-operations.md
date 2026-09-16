@@ -265,6 +265,9 @@ event 유실에 대비해, 작업이 없는 야간 시간대에 하루 한 번 �
   확정되면서 OA Service와 동일한 라이브 게이트·event 대상이 됐다(04장 §2, §6.2, §6.3).
 - **`Artifact.editAccess`/`viewAccess`(SIREN이 A/B/C 권한을 직접 보관하던 옛 모델)** —
   04장 §3 참고.
+- **`Artifact.editAccess`/`viewAccess`/`expectedGiver`(D 전용으로 마지막까지 남아 있던 옛
+  모델)** — recipient를 A/B/C처럼 `Block.recipients`(단일 grant, edit/view 구분 없음)로
+  옮겼다. D의 실제 edit은 `Artifact.createdBy`(+Admin)로 잠정 고정했다(01장 §4, 04장 §3).
 
 ## 8. 명칭
 

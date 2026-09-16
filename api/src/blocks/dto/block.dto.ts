@@ -2,7 +2,6 @@ import { BlockDocument } from '../schemas/block.schema';
 import { ArtifactDocument } from '../../artifacts/schemas/artifact.schema';
 import { AccessLevel } from '../../common/access';
 import { ArtifactDto, MaskedArtifactDto, toArtifactDto, toMaskedArtifactDto } from '../../artifacts/dto/artifact.dto';
-import { isServiceGovernedTier } from '../../common/constants/tier';
 
 /**
  * 캔버스 블록 하나의 공개 모양.
@@ -26,14 +25,8 @@ export interface BlockDto {
   /** 열람 권한이 없으면 masked 형태로만 온다. 미매핑이면 null. */
   artifact: ArtifactDto | MaskedArtifactDto | null;
   publishState: PublishState;
-  /**
-   * A Tier에서만 값이 있다. B/C/D의 recipient는 artifact.viewAccess에서 파생하므로
-   * 여기가 아니라 artifact 쪽에 실린다(설계서 04장 §3).
-   */
-  recipients: {
-    editAccess: { departments: string[]; users: string[] };
-    viewAccess: { departments: string[]; users: string[] };
-  } | null;
+  /** artifact가 매핑된 block에서만 값이 있다 — A/B/C/D 전부 공통이다(설계서 04장 §3). */
+  recipients: { departments: string[]; users: string[] } | null;
   series: string | null;
   seriesIdx: number;
   seriesTotal: number;
@@ -63,9 +56,6 @@ export function toBlockDto(
   artifactLevel: AccessLevel,
   publishState: PublishState,
 ): BlockDto {
-  // A/B/C(OA Service/File Artifacts/HPC Service) 전부 recipient가 block에 있다. D만 없다.
-  const usesBlockRecipients = artifact ? isServiceGovernedTier(artifact.tier) : false;
-
   return {
     id: block._id.toString(),
     workflowId: block.workflowId.toString(),
@@ -83,16 +73,10 @@ export function toBlockDto(
         : toArtifactDto(artifact, artifactLevel),
     // 열람 권한이 없으면 상태 자체가 정보이므로 배지를 그리지 않는다(설계서 03장 §2.2).
     publishState: artifactLevel === null ? 'unpublished' : publishState,
-    recipients: usesBlockRecipients
+    recipients: artifact
       ? {
-          editAccess: {
-            departments: [...(block.recipients?.editAccess?.departments ?? [])],
-            users: [...(block.recipients?.editAccess?.users ?? [])],
-          },
-          viewAccess: {
-            departments: [...(block.recipients?.viewAccess?.departments ?? [])],
-            users: [...(block.recipients?.viewAccess?.users ?? [])],
-          },
+          departments: [...(block.recipients?.departments ?? [])],
+          users: [...(block.recipients?.users ?? [])],
         }
       : null,
     series: block.series?.toString() ?? null,

@@ -4,8 +4,7 @@ import { Model, Types } from 'mongoose';
 import { Artifact, ArtifactDocument, ArtifactVersion } from './schemas/artifact.schema';
 import { Actor } from '../common/actor';
 import { AuditService } from '../audit/audit.service';
-import { normalizeGrant } from '../common/access';
-import { Tier, isServiceGovernedTier } from '../common/constants/tier';
+import { Tier } from '../common/constants/tier';
 
 /**
  * 변경 감지용 major 키 (설계서 02장 §3).
@@ -80,12 +79,9 @@ export class ArtifactsService {
       externalArtifactId?: string | null;
       artifactTypeKey?: string | null;
       externalUrl?: string | null;
-      editAccess?: { departments?: string[]; users?: string[] };
-      viewAccess?: { departments?: string[]; users?: string[] };
     },
     actor: Actor,
   ): Promise<ArtifactDocument> {
-    const sirenGoverned = !isServiceGovernedTier(input.tier);
     const artifact = await this.model.create({
       projectId,
       name: input.name.trim(),
@@ -95,9 +91,6 @@ export class ArtifactsService {
       externalArtifactId: input.externalArtifactId ?? null,
       artifactTypeKey: input.artifactTypeKey ?? null,
       externalUrl: input.externalUrl ?? null,
-      // A Tier는 그 서비스가 권한을 판정한다 — 값이 들어와도 저장하지 않는다.
-      editAccess: sirenGoverned ? normalizeGrant(input.editAccess) : { departments: [], users: [] },
-      viewAccess: sirenGoverned ? normalizeGrant(input.viewAccess) : { departments: [], users: [] },
       versions: [],
       createdBy: actor.knoxId,
       isMock: false,
@@ -133,10 +126,6 @@ export class ArtifactsService {
           network: input.tier === 'C' ? 'HPC' : 'OA',
           serviceKey: input.serviceKey,
           externalArtifactId: input.externalArtifactId,
-          // A/B/C(OA Service/File Artifacts/HPC Service) 전부 그 서비스가 권한을 관리한다
-          // (설계서 04장 §3) — create()가 이 값을 무조건 무시하므로 여기서 넘겨도 안전하다.
-          // 남겨둔 이유는 D 전용 경로와 시그니처를 맞추기 위해서일 뿐이다.
-          editAccess: { users: [actor.knoxId], departments: [] },
         },
         actor,
       );
@@ -153,53 +142,15 @@ export class ArtifactsService {
   }
 
   /**
-   * D Tier(Attested) — 검증할 시스템이 없으므로 그냥 새로 만든다. `expectedGiver`는 권한이
-   * 아니라 "누가 채워줄 것으로 기대되는지"를 적어두는 화면 표시용 메타데이터일 뿐이다
-   * (설계서 04장 §6.4).
+   * D Tier(Attested) — 검증할 시스템이 없으므로 그냥 새로 만든다. edit은 등록자
+   * (createdBy)로 고정된다 — attestedLevel(common/access.ts)이 그 값을 그대로 쓴다.
    */
   async createAttested(
     projectId: Types.ObjectId,
-    input: { name: string; expectedGiver?: { departments?: string[]; users?: string[] } },
+    input: { name: string },
     actor: Actor,
   ): Promise<ArtifactDocument> {
-    // 등록자를 기본 edit으로 — 안 그러면 열람 권한이 아무에게도 없는 채로 만들어진다.
-    const artifact = await this.create(
-      projectId,
-      { name: input.name, tier: 'D', network: 'OA', editAccess: { users: [actor.knoxId], departments: [] } },
-      actor,
-    );
-    artifact.expectedGiver = normalizeGrant(input.expectedGiver);
-    await artifact.save();
-    return artifact;
-  }
-
-  /**
-   * D(External/Attested)의 Edit/View 권한 교체 — 이제 이 tier에만 남은 옛 모델이다
-   * (설계서 04장 §3, §3.5). A/B/C(OA Service/File Artifacts/HPC Service)는 전부 그 서비스가
-   * 권한을 관리하고 SIREN의 recipient는 block에 있으므로 이 라우트를 거부한다.
-   */
-  async replaceAccess(
-    artifactId: string,
-    input: {
-      editAccess?: { departments?: string[]; users?: string[] };
-      viewAccess?: { departments?: string[]; users?: string[] };
-    },
-    actor: Actor,
-  ): Promise<ArtifactDocument> {
-    const artifact = await this.findOrThrow(artifactId);
-    if (isServiceGovernedTier(artifact.tier)) {
-      throw new BadRequestException(
-        'These permissions are governed by the owning service. Set recipients on the block instead.',
-      );
-    }
-    artifact.editAccess = normalizeGrant(input.editAccess);
-    artifact.viewAccess = normalizeGrant(input.viewAccess);
-    await artifact.save();
-    await this.audit.log(actor.knoxId, 'ARTIFACT_ACCESS_REPLACE', 'artifact', artifact._id, {
-      editAccess: artifact.editAccess,
-      viewAccess: artifact.viewAccess,
-    });
-    return this.findOrThrow(artifactId);
+    return this.create(projectId, { name: input.name, tier: 'D', network: 'OA' }, actor);
   }
 
   /**

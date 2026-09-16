@@ -2,7 +2,6 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types, SchemaTypes } from 'mongoose';
 // @Prop의 런타임 type은 반드시 SchemaTypes.ObjectId를 쓴다 - Types.ObjectId(값 클래스)를 주면
 // Mongoose가 Mixed 경로를 만들고, Mixed는 캐스팅을 하지 않아 문자열 id 필터가 전부 0건이 된다.
-import { AccessGrant, AccessGrantSchema, emptyAccessGrant } from '../../common/schemas/access-grant.schema';
 import { TIERS, Tier } from '../../common/constants/tier';
 
 export type NetworkKind = 'OA' | 'HPC';
@@ -157,29 +156,10 @@ export class Artifact {
   @Prop({ type: String, default: null, trim: true })
   externalUrl: string | null;
 
-  /**
-   * --- 권한 (B/C/D 전용) ---
-   *
-   * ★ tier === 'A'이면 쓰지 않는다. 값이 들어와도 서비스가 무시하고 응답에서도 비운다 —
-   *   A의 권한은 전적으로 그 서비스가 판정한다(설계서 04장 §3).
-   * ★ viewAccess가 곧 recipient다. B/C/D는 Calypso나 HPC 공용 DB처럼 권한이 한 군데서
-   *   중앙 관리되므로, 이 목록이 그 artifact를 참조하는 **모든 workflow에 동일하게** 적용된다.
-   */
-  @Prop({ type: AccessGrantSchema, default: emptyAccessGrant })
-  editAccess: AccessGrant;
-
-  @Prop({ type: AccessGrantSchema, default: emptyAccessGrant })
-  viewAccess: AccessGrant;
-
-  // A Tier의 recipient는 여기 없다 — workflow마다 달라질 수 있어 Block.recipients에 있다.
-
-  /**
-   * D Tier 전용 — 이 산출물을 "누가 줄 것으로 기대되는지" 설명하는 메타데이터일 뿐이다.
-   * 권한 판정에는 전혀 쓰이지 않는다 — D는 검증할 시스템이 없으므로(설계서 04장 §6) SIREN이
-   * 강제할 방법도 없다. 그저 캔버스에 "OO 부서가 채워줄 예정"이라고 적어 두는 자유 지정.
-   */
-  @Prop({ type: AccessGrantSchema, default: emptyAccessGrant })
-  expectedGiver: AccessGrant;
+  // 권한은 artifact가 들고 있지 않는다 — A/B/C(OA Service/File Artifacts/HPC Service)는
+  // 그 서비스가 실시간으로 판정하고, recipient(누가 볼 수 있는지)는 workflow마다 달라질 수
+  // 있어 Block.recipients에 있다. D(External/Attested)도 이제 같은 규칙을 쓴다 — 이번
+  // 범위에서 "누가 새 버전을 등록/교체할 수 있는지"는 정교화하지 않았다(우선순위 낮음).
 
   /** publish 이력. 최신 버전이 배열 앞(index 0)에 오도록 유지한다. */
   @Prop({ type: [ArtifactVersionSchema], default: [] })
@@ -198,5 +178,3 @@ export const ArtifactSchema = SchemaFactory.createForClass(Artifact);
 // 같은 (serviceKey, externalArtifactId)는 과제 안에서 하나여야 한다 — 여러 workflow가
 // 그 하나를 공유하는 것이 정상이고, 중복 생성되면 권한이 갈라진다.
 ArtifactSchema.index({ projectId: 1, serviceKey: 1, externalArtifactId: 1 });
-ArtifactSchema.index({ 'viewAccess.departments': 1 });
-ArtifactSchema.index({ 'editAccess.departments': 1 });

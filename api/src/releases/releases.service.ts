@@ -11,7 +11,6 @@ import { EdgesService } from '../edges/edges.service';
 import { NotificationService } from '../notifications/notification.service';
 import { AuditService } from '../audit/audit.service';
 import { Actor } from '../common/actor';
-import { isServiceGovernedTier } from '../common/constants/tier';
 
 /** preview 응답의 한 줄. release 실행 결과와 같은 로직으로 만들어진다. */
 export interface ReleasePreviewItem {
@@ -189,7 +188,7 @@ export class ReleasesService {
         changed,
         firstTime,
         lookupFailed: current.lookupFailed,
-        recipients: this.recipientsFor(block, artifact),
+        recipients: this.recipientsFor(block),
         sources,
       });
     }
@@ -239,29 +238,15 @@ export class ReleasesService {
   }
 
   /**
-   * 이 산출물이 전달될 대상(설계서 05장 §6.2).
-   *   A/B/C(OA Service/File Artifacts/HPC Service) → 그 **block**의 recipients(edit + view)
-   *                                                    — workflow마다 다를 수 있다
-   *   D(External/Attested)                          → 그 **artifact**의 viewAccess +
-   *                                                    editAccess (이번 범위에서 세부 미정)
+   * 이 산출물이 전달될 대상(설계서 05장 §6.2) — 그 **block**의 recipients. A/B/C/D 전부
+   * 공통이다(같은 workflow마다 다를 수 있다). artifact 단위로 SIREN이 따로 들고 있던
+   * 옛 모델(viewAccess/editAccess)은 폐기했다.
    */
-  private recipientsFor(block: BlockDocument, artifact: ArtifactDocument) {
-    const departments = new Set<string>();
-    const users = new Set<string>();
-
-    if (isServiceGovernedTier(artifact.tier)) {
-      for (const g of [block.recipients?.editAccess, block.recipients?.viewAccess]) {
-        (g?.departments ?? []).forEach((d) => departments.add(d));
-        (g?.users ?? []).forEach((u) => users.add(u));
-      }
-    } else {
-      for (const g of [artifact.viewAccess, artifact.editAccess]) {
-        (g?.departments ?? []).forEach((d) => departments.add(d));
-        (g?.users ?? []).forEach((u) => users.add(u));
-      }
-    }
-
-    return { departments: [...departments], users: [...users] };
+  private recipientsFor(block: BlockDocument) {
+    return {
+      departments: [...(block.recipients?.departments ?? [])],
+      users: [...(block.recipients?.users ?? [])],
+    };
   }
 
   /**

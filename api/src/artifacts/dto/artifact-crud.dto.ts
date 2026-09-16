@@ -1,6 +1,4 @@
-import { Type } from 'class-transformer';
-import { IsIn, IsOptional, IsString, MaxLength, MinLength, ValidateNested } from 'class-validator';
-import { AccessGrantDto } from '../../workflows/dto/workflow-crud.dto';
+import { IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import { TIERS } from '../../common/constants/tier';
 
 export class CreateArtifactDto {
@@ -31,27 +29,4 @@ export class CreateArtifactDto {
   @IsOptional()
   @IsString()
   externalUrl?: string | null;
-
-  @IsOptional()
-  @ValidateNested()
-  @Type(() => AccessGrantDto)
-  editAccess?: AccessGrantDto;
-
-  @IsOptional()
-  @ValidateNested()
-  @Type(() => AccessGrantDto)
-  viewAccess?: AccessGrantDto;
-}
-
-/** B/C/D 전용. A Tier에 보내면 서비스가 400으로 거부한다(설계서 04장 §3). */
-export class ReplaceArtifactAccessDto {
-  @IsOptional()
-  @ValidateNested()
-  @Type(() => AccessGrantDto)
-  editAccess?: AccessGrantDto;
-
-  @IsOptional()
-  @ValidateNested()
-  @Type(() => AccessGrantDto)
-  viewAccess?: AccessGrantDto;
 }

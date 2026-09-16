@@ -92,8 +92,7 @@ export class ReleaseItem {
 
   /**
    * 그 시점 확정값. 이후 권한이 바뀌어도 "그때 누가 받았는지"는 이 값으로 남는다.
-   * A Tier는 block.recipients(edit+view 합집합), B/C/D는 artifact.viewAccess(+editAccess)에서
-   * 계산해 여기에 평탄화해 담는다(설계서 05장 §6.2).
+   * A/B/C/D 전부 그 block.recipients를 그대로 담는다(설계서 05장 §6.2).
    */
   @Prop({ type: AccessGrantSchema, default: emptyAccessGrant })
   recipients: AccessGrant;

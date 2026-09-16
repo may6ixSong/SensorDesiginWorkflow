@@ -92,10 +92,8 @@ interface Props {
   /** 이 workflow의 phase 목록 — Overview 탭의 Phase 카드(설계서 04장 §4.4 이전 표기 복원)에 쓴다. */
   phases?: WorkflowPhase[];
   onClose: () => void;
-  /** A Tier — block에 붙은 recipient를 교체한다. */
-  onSaveBlockRecipients: (p: { editAccess: AccessGrant; viewAccess: AccessGrant }) => void;
-  /** B/C/D — artifact의 edit/view를 교체한다. viewAccess가 곧 recipient다. */
-  onSaveArtifactAccess: (p: { editAccess: AccessGrant; viewAccess: AccessGrant }) => void;
+  /** block에 붙은 recipient를 교체한다 — A/B/C/D 전부 공통이다. */
+  onSaveRecipients: (p: AccessGrant) => void;
   saving?: boolean;
   onDelete?: () => void;
   /** 산출물 매핑/재매핑(설계서 04장 §6) — Block과 Artifact가 분리돼 있어 언제든 바꿀 수 있다. */
@@ -120,7 +118,7 @@ interface Props {
  *   (설계서 04장 §4.3). 전자는 패널이 잠긴 상태, 후자는 열린 패널 안의 빈 목록이다.
  */
 export function ArtifactSlide({
-  block, own, project, myDepartments, phases, onClose, onSaveBlockRecipients, onSaveArtifactAccess, saving, onDelete,
+  block, own, project, myDepartments, phases, onClose, onSaveRecipients, saving, onDelete,
   onChangeArtifact, changingArtifact, releases, onOpenRelease,
 }: Props) {
   const { t } = useTranslation();
@@ -213,9 +211,6 @@ export function ArtifactSlide({
   }
 
   const tier = TIER_COLOR[artifact.tier];
-  // A/B/C(OA Service/File Artifacts/HPC Service) 전부 recipient가 block에 있다 — D만
-  // artifact.editAccess/viewAccess(옛 모델)를 쓴다(설계서 04장 §3).
-  const usesBlockRecipients = artifact.tier !== 'D';
   // Hub 라이브 대상이면 artifact.versions(스냅샷) 대신 방금 그 서비스에 물어본 값을 쓴다.
   const effectiveVersions = isHubLive ? (live.data ?? []) : artifact.versions;
   const published = effectiveVersions.filter((v) => v.isPublished);
@@ -351,11 +346,9 @@ export function ArtifactSlide({
         {tab === 'recipients' && (
           <RecipientsTab
             block={block}
-            usesBlockRecipients={usesBlockRecipients}
             canEdit={canEditRecipients}
             departmentOptions={project?.departments ?? []}
-            onSaveBlockRecipients={onSaveBlockRecipients}
-            onSaveArtifactAccess={onSaveArtifactAccess}
+            onSaveRecipients={onSaveRecipients}
             saving={saving}
           />
         )}
@@ -664,49 +657,31 @@ function VersionList({
 /**
  * 수신 대상 (설계서 04장 §5).
  *
- * ★ **A/B/C(OA Service/File Artifacts/HPC Service)** 전부 recipient가 그 workflow의
- *   block에 붙는다 — 같은 artifact라도 workflow마다 다를 수 있기 때문이다(같은
- *   artifact가 workflow X·Y 양쪽에 있어도 서로 다른 recipient를 가질 수 있다). 이
- *   목록은 알림 대상이자 **slide 열람의 첫 게이트**다(§4.1).
- * ★ **D**만 옛 모델(artifact.editAccess/viewAccess, artifact 단위 중앙 관리)을 그대로
- *   쓴다 — 이번 범위에서 세부를 구체화하지 않는다(§3.5).
+ * ★ **A/B/C/D 전부 공통** — recipient는 그 workflow의 block에 붙는다. 같은 artifact라도
+ *   workflow마다 다를 수 있기 때문이다(같은 artifact가 workflow X·Y 양쪽에 있어도 서로
+ *   다른 recipient를 가질 수 있다). 이 목록은 알림 대상이자 **slide 열람의 첫 게이트**다
+ *   (§4.1). recipient는 더 이상 edit/view로 나뉘지 않는다 — 속하면 볼 수 있고, 실제
+ *   edit 여부는 A/B/C는 그 서비스가, D는 artifact를 등록한 사람이 정한다.
  * ★ View 권한자에게는 **읽기 전용**으로 노출한다 — 누가 받는지는 볼 수 있어야 한다.
  */
 function RecipientsTab({
-  block, usesBlockRecipients, canEdit, departmentOptions, onSaveBlockRecipients, onSaveArtifactAccess, saving,
+  block, canEdit, departmentOptions, onSaveRecipients, saving,
 }: {
   block: BlockDto;
-  usesBlockRecipients: boolean;
   canEdit: boolean;
   departmentOptions: string[];
-  onSaveBlockRecipients: Props['onSaveBlockRecipients'];
-  onSaveArtifactAccess: Props['onSaveArtifactAccess'];
+  onSaveRecipients: Props['onSaveRecipients'];
   saving?: boolean;
 }) {
   const { t } = useTranslation();
-  const artifact = block.artifact && !isMaskedArtifact(block.artifact) ? block.artifact : null;
 
-  const initialEdit = usesBlockRecipients
-    ? (block.recipients?.editAccess ?? { departments: [], users: [] })
-    : (artifact?.editAccess ?? { departments: [], users: [] });
-  const initialView = usesBlockRecipients
-    ? (block.recipients?.viewAccess ?? { departments: [], users: [] })
-    : (artifact?.viewAccess ?? { departments: [], users: [] });
-
-  const [editAccess, setEditAccess] = useState<AccessGrant>(initialEdit);
-  const [viewAccess, setViewAccess] = useState<AccessGrant>(initialView);
+  const initial = block.recipients ?? { departments: [], users: [] };
+  const [recipients, setRecipients] = useState<AccessGrant>(initial);
 
   const dirty = useMemo(
-    () =>
-      JSON.stringify(editAccess) !== JSON.stringify(initialEdit) ||
-      JSON.stringify(viewAccess) !== JSON.stringify(initialView),
-    [editAccess, viewAccess, initialEdit, initialView],
+    () => JSON.stringify(recipients) !== JSON.stringify(initial),
+    [recipients, initial],
   );
-
-  const save = () =>
-    usesBlockRecipients
-      ? onSaveBlockRecipients({ editAccess, viewAccess })
-      : onSaveArtifactAccess({ editAccess, viewAccess });
 
   return (
     <>
@@ -719,9 +694,8 @@ function RecipientsTab({
       >
         <Box sx={{ mt: '1px', flexShrink: 0 }}><Icon name="info" /></Box>
         <Box>
-          {usesBlockRecipients
-            ? 'Recipients are set per workflow for this artifact. Being a recipient also grants access to this slide — the owning service still decides what is actually visible.'
-            : 'View access is the recipient list. It is shared by every workflow that uses this artifact.'}
+          Recipients are set per workflow for this artifact. Being a recipient also grants access to
+          this slide — the owning service still decides what is actually visible.
         </Box>
       </Box>
 
@@ -729,21 +703,11 @@ function RecipientsTab({
         <Box sx={{ fontSize: 11.5, color: T.dm2, mb: '10px' }}>{t('artifact.recipientsReadOnly')}</Box>
       )}
 
-      <Card sx={{ mb: '12px' }}>
-        <Ey sx={{ mb: '10px' }}>{usesBlockRecipients ? 'Edit recipients' : 'Edit access'}</Ey>
-        <AccessGrantEditor
-          value={editAccess}
-          onChange={setEditAccess}
-          departmentOptions={departmentOptions}
-          readOnly={!canEdit}
-        />
-      </Card>
-
       <Card>
-        <Ey sx={{ mb: '10px' }}>{usesBlockRecipients ? 'View recipients' : 'View access · recipients'}</Ey>
+        <Ey sx={{ mb: '10px' }}>{t('artifact.recipients')}</Ey>
         <AccessGrantEditor
-          value={viewAccess}
-          onChange={setViewAccess}
+          value={recipients}
+          onChange={setRecipients}
           departmentOptions={departmentOptions}
           readOnly={!canEdit}
         />
@@ -751,7 +715,11 @@ function RecipientsTab({
 
       {canEdit && (
         <Box sx={{ mt: '14px' }}>
-          <SirenButton variant="primary" onClick={save} disabled={saving || !dirty}>
+          <SirenButton
+            variant="primary"
+            onClick={() => onSaveRecipients(recipients)}
+            disabled={saving || !dirty}
+          >
             <Icon name="check" /> {saving ? 'Saving…' : 'Save'}
           </SirenButton>
         </Box>

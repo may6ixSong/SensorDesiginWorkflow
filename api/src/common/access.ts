@@ -4,18 +4,18 @@
  *   Admin ─────────────────────────── 전 계층 무조건 통과
  *     ├─ Project    members 에 있는가?          ← 없으면 그 아래는 볼 것도 없다
  *     │   ├─ Workflow  Owner / Edit / View 인가?
- *     │   └─ Artifact  A/B/C(OA Service/File Artifacts/HPC Service): recipient(게이트) → 서비스 권한(게이트)
- *     │                D(External/Attested): 이번 범위 밖(sirenArtifactLevel, 잠정)
+ *     │   └─ Artifact  A/B/C(OA Service/File Artifacts/HPC Service): recipient(게이트1) → 서비스 권한(게이트2)
+ *     │                D(External/Attested): recipient(게이트1)만 — edit은 createdBy(잠정, §attestedLevel)
  *
  * 이 파일은 **순수 함수만** 담는다 — 모델 조회도, 외부 호출도 하지 않는다. 그래야 Guard,
  * 서비스, DTO 마스킹이 전부 같은 판정을 쓰고 어긋나지 않는다. 게이트 2(그 서비스에 canView를
  * 물어보는 것 — Calypso 포함)만 I/O가 필요해서 ArtifactAccessService가 담당한다.
  *
- * ★ v3 설계 도중 한 번 뒤집힌 결정이다(설계서 04장 §3, 01장 §4.1) — 원래는 B/C/D를
- *   sirenArtifactLevel(artifact 단위 SIREN 보관 권한)로 판정했으나, 여러 workflow가 하나의
- *   artifact를 공유할 때 한 workflow의 수정이 다른 workflow까지 번지는 문제와, HPC Service는
- *   HPC망 안에서 사실상 권한 자체가 무의미하다는 점 때문에 A/B/C를 recipientLevel(게이트1)
- *   + 그 서비스 라이브 응답(게이트2)으로 통일했다. sirenArtifactLevel은 이제 D 전용이다.
+ * ★ artifact 단위로 SIREN이 editAccess/viewAccess를 직접 보관하던 옛 모델은 폐기했다 —
+ *   recipient는 항상 block(그 workflow 안의 자리) 단위이고, A/B/C/D 전부 공통이다. 여러
+ *   workflow가 하나의 artifact를 공유할 때 한 workflow의 수정이 다른 workflow까지 번지는
+ *   문제 때문이다. D는 물어볼 서비스가 없어 recipient만으로 view를 판정하고, edit은
+ *   artifact.createdBy(+Admin)로 잠정 고정했다 — 이번 범위에서 더 정교화하지 않는다.
  */
 import { Actor } from './actor';
 
@@ -157,33 +157,19 @@ export function canViewWorkflow(
 
 export interface ArtifactLike {
   tier?: string;
-  editAccess?: GrantLike;
-  viewAccess?: GrantLike;
+  createdBy?: string;
 }
 
 export interface BlockLike {
-  recipients?: { editAccess?: GrantLike; viewAccess?: GrantLike };
+  recipients?: GrantLike;
 }
 
 /**
- * D(External/Attested) 전용 — SIREN이 artifact 단위로 들고 있는 권한. A/B/C는 더 이상
- * 이 함수를 쓰지 않는다(recipientLevel + 서비스 게이트 2로 통일 — 이 파일 head 참고).
- * D는 이번 범위에서 세부 미정이라 잠정적으로 이 옛 모델을 그대로 쓴다.
- */
-export function sirenArtifactLevel(
-  actor: Actor,
-  artifact: ArtifactLike | null | undefined,
-  myDepts: string[],
-): AccessLevel {
-  if (actor.isAdmin) return 'edit';
-  if (!artifact) return null;
-  return grantLevel(actor, artifact.editAccess, artifact.viewAccess, myDepts);
-}
-
-/**
- * A/B/C(OA Service/File Artifacts/HPC Service) 공통 **게이트 1** — SIREN이 관리하는
- * recipient. 그 workflow의 block에 저장되어 있어 같은 artifact라도 workflow마다 다를 수
- * 있다(설계서 01장 §4.1).
+ * A/B/C/D 공통 **게이트 1** — SIREN이 관리하는 recipient. 그 workflow의 block에 저장되어
+ * 있어 같은 artifact라도 workflow마다 다를 수 있다(설계서 01장 §4.1).
+ *
+ * recipient는 더 이상 edit/view로 나뉘지 않는다 — 속하면 'view'(=볼 자격이 있다)이고,
+ * 실제 edit 여부는 A/B/C는 그 서비스가(게이트 2), D는 artifact.createdBy가 최종 판정한다.
  *
  * ★ workflow Edit Access가 있어도 recipient가 아니면 null이다. 예전 설계의
  *   "workflow Edit Access는 항상 통과" 규칙은 폐지되었다(설계서 04장 §4.1).
@@ -197,8 +183,24 @@ export function recipientLevel(
   myDepts: string[],
 ): AccessLevel {
   if (actor.isAdmin) return 'edit';
-  if (!block?.recipients) return null;
-  return grantLevel(actor, block.recipients.editAccess, block.recipients.viewAccess, myDepts);
+  if (matchesGrant(actor, block?.recipients, myDepts)) return 'view';
+  return null;
+}
+
+/**
+ * D(External/Attested) 전용 — 물어볼 서비스가 없다. block recipient면 view, 그 산출물을
+ * 만든 사람(또는 Admin)이면 edit. 이번 범위에서는 이 이상 정교화하지 않는다(사용자 결정 —
+ * "Tier D는 지금 구체화하기 어려우니 우선 신경쓰지 말 것").
+ */
+export function attestedLevel(
+  actor: Actor,
+  block: BlockLike | null | undefined,
+  artifact: ArtifactLike | null | undefined,
+  myDepts: string[],
+): AccessLevel {
+  if (actor.isAdmin) return 'edit';
+  if (artifact?.createdBy === actor.knoxId) return 'edit';
+  return recipientLevel(actor, block, myDepts) !== null ? 'view' : null;
 }
 
 /* ------------------------------------------------------------------ *

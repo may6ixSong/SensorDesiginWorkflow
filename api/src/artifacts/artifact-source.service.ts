@@ -242,7 +242,7 @@ export class ArtifactSourceService {
     project: ProjectDocument,
     actor: Actor,
     intent: CandidateIntent,
-    input: { name: string; expectedGiver?: { departments?: string[]; users?: string[] } },
+    input: { name: string },
   ): Promise<ArtifactDocument> {
     if (intent !== 'received') {
       throw new BadRequestException('Tier D can only be used for artifacts this workflow receives.');

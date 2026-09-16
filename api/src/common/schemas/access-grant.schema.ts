@@ -1,12 +1,13 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 
 /**
- * 권한 한 벌 — 부서 다중 + 개별 사용자 다중 (설계서 01장 §3.1, §4.3).
+ * 권한/수신 대상 한 벌 — 부서 다중 + 개별 사용자 다중 (설계서 01장 §3.1, §4.3).
  *
  * 이 모양이 시스템 전체에서 반복된다:
- *   - Workflow.editAccess / viewAccess
- *   - Artifact.editAccess / viewAccess   (B/C/D 전용. viewAccess가 곧 recipient)
- *   - Block.recipients.editAccess / viewAccess (A Tier 전용)
+ *   - Workflow.editAccess / viewAccess (workflow 자체를 편집/열람할 수 있는가 — 이 둘은
+ *     여전히 edit/view로 나뉜다. artifact/recipient와는 별개 축이다)
+ *   - Block.recipients (A/B/C/D 공통 — 그 block의 artifact를 받을 대상. 실제 edit/view
+ *     여부는 더 이상 여기서 갈리지 않는다 — A/B/C는 그 서비스가, D는 createdBy가 정한다)
  *
  * ★ 부서 단위 권한은 **조회 시점에 실시간으로** 판정한다 — 부여 시점의 멤버를 얼려두지
  *   않는다. 그래야 나중에 그 부서에 합류한 사람도 즉시 권한을 얻는다(설계서 01장 §3.2).
@@ -27,25 +28,5 @@ export class AccessGrant {
 
 export const AccessGrantSchema = SchemaFactory.createForClass(AccessGrant);
 
-/** 빈 권한 한 벌. 스키마 default로 쓴다. */
+/** 빈 권한/수신 대상 한 벌. 스키마 default로 쓴다. */
 export const emptyAccessGrant = (): AccessGrant => ({ departments: [], users: [] });
-
-/**
- * A Tier block의 recipient — 알림 대상이자 SIREN 쪽 slide 열람 게이트(설계서 04장 §3.3).
- * workflow마다 독립이라 artifact가 아니라 block에 붙는다.
- */
-@Schema({ _id: false })
-export class RecipientGrants {
-  @Prop({ type: AccessGrantSchema, default: emptyAccessGrant })
-  editAccess: AccessGrant;
-
-  @Prop({ type: AccessGrantSchema, default: emptyAccessGrant })
-  viewAccess: AccessGrant;
-}
-
-export const RecipientGrantsSchema = SchemaFactory.createForClass(RecipientGrants);
-
-export const emptyRecipientGrants = (): RecipientGrants => ({
-  editAccess: emptyAccessGrant(),
-  viewAccess: emptyAccessGrant(),
-});

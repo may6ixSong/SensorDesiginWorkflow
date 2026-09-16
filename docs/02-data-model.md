@@ -127,15 +127,10 @@ Artifact {
   externalUrl: string | null          // 레거시 — C가 수동 링크만 갖던 시절의 필드. 이제 버전별
                                        // 경로는 versions[].hpcPath로 온다(07장 §4.1)
 
-  // --- 권한: A/B/C 전부 SIREN이 보관하지 않는다(04장 §3) ---
+  // --- 권한: artifact는 권한을 전혀 들고 있지 않는다(04장 §3) ---
   // recipient는 여기 두지 않는다. workflow마다 달라질 수 있어서 Block.recipients(§4)에
-  // 저장한다 — 01장 §4.1 참조. (구 설계는 B/C/D를 여기 editAccess/viewAccess로 뒀었다 —
-  // 폐기했다.)
-
-  // --- D Tier 전용 ★신규★ ---
-  expectedGiver: { departments: string[], users: string[] }
-  // 권한이 아니라 "누가 줄 것으로 기대되는지" 표시용 메타데이터일 뿐이다(04장 §6.4).
-  // D는 검증할 시스템이 없어 SIREN이 강제할 방법도 없다 — 그 외 tier는 항상 비워둔다.
+  // 저장한다 — 01장 §4.1 참조. A/B/C/D 전부 공통이다. (구 설계는 B/C/D를 여기
+  // editAccess/viewAccess/expectedGiver로 뒀었다 — 전부 폐기했다.)
 
   // --- publish 이력 ---
   versions: [ArtifactVersion]         // 최신이 index 0
@@ -162,14 +157,11 @@ ArtifactVersion {
 
 ### 규칙
 
-- **`tier === 'A'` 이면 `editAccess`/`viewAccess` 를 쓰지 않는다.** 값이 들어와도 BE가 무시하고,
-  응답에서도 비운다. A의 권한은 전적으로 그 서비스가 판정한다. recipient는 artifact가 아니라
-  block에 있다(§4).
-- **`tier !== 'A'` 이면 `recipients` 개념은 `viewAccess` 에서 파생한다.** 별도 필드를 두지 않고,
-  DTO 조립 시 `recipients = viewAccess` 로 채워 내려주되 **편집은 막는다**(단일 진실은 `viewAccess`).
+- **`recipients`는 artifact가 아니라 항상 `Block.recipients`에 있다(A/B/C/D 공통, §4).**
+  artifact는 `editAccess`/`viewAccess`/`expectedGiver` 같은 권한 필드를 전혀 갖지 않는다.
 - `versions[0].tier` 가 그 산출물의 "현재 tier"이며, `artifact.tier` 는 그 값을 캐시한 것이다.
-- **버전 가시성** — `isPublished: false` 인 엔트리는 그 산출물의 giver(=`editAccess` 해당자,
-  A는 서비스 판정)에게만 응답에 담긴다. 그 외 전원은 published만 본다.
+- **버전 가시성** — `isPublished: false` 인 엔트리는 그 산출물의 giver(A/B/C는 그 서비스가
+  판정하는 canEdit, D는 `createdBy`)에게만 응답에 담긴다. 그 외 전원은 published만 본다.
 - **Mapping 범위 — 같은 과제(project)만.** workflow의 block을 어떤 artifact에 매핑할 때, 후보는
   **그 workflow와 `projectId`가 같은 artifact로 한정**한다. 같은 `code`라도 `revision`이 다르면
   다른 project이므로(01장·02장 §1) 자동으로 후보에서 빠진다. Admin이 여러 과제를 동시에 볼 수
@@ -217,13 +209,11 @@ Block {
   layout: { x, y, w, h }
   intent: 'own' | 'received'    // "새 Artifact 추가" 다이얼로그 첫 질문. 생성 후 불변(04장 §6)
 
-  // A/B/C(OA Service/File Artifacts/HPC Service) artifact가 매핑된 block에서 의미가 있다.
-  // workflow마다 독립이라 여기, block에 둔다 — 01장 §4.1/§4.4. (구 설계는 B/C/D를 항상
-  // 비워두고 artifact.viewAccess에서 recipient를 파생시켰다 — 04장 §3에서 폐기했다.)
-  recipients: {
-    editAccess: { departments: string[], users: string[] }
-    viewAccess: { departments: string[], users: string[] }
-  }
+  // artifact가 매핑된 block에서 의미가 있다 — A/B/C/D 전부 공통이다. workflow마다
+  // 독립이라 여기, block에 둔다 — 01장 §4.1/§4.4. edit/view로 나뉘지 않는 단일 grant다.
+  // (구 설계는 B/C/D를 artifact.editAccess/viewAccess/expectedGiver로 뒀었다 — 전부
+  // 폐기했다.)
+  recipients: { departments: string[], users: string[] }
 
   createdBy: string
   isMock: boolean
@@ -232,7 +222,7 @@ Block {
 
 - `series` / `seriesIdx` / `seriesTotal` 은 **유지**한다(반복 릴리스 일정 개념은 그대로).
 - `recvDept` / `recvContact` / `recvWorkflowId` / `sourceDept` / `sourceContact` 는 **제거**한다 —
-  수신 대상은 이제 block의 `recipients`가 유일한 진실이다(A/B/C 공통).
+  수신 대상은 이제 block의 `recipients`가 유일한 진실이다(A/B/C/D 공통).
 - `versions` 는 제거하고 `artifactId` 참조로 대체한다.
 - `recipients` 편집 권한은 그 workflow의 **Edit Access**다(04장 §3.3). recipient에 속하는 것과
   recipient를 편집할 수 있는 것은 별개다(01장 §4.2).
@@ -376,7 +366,7 @@ ReleaseItem {
 | Method | Path | 비고 |
 |---|---|---|
 | `GET` | `/artifacts/:id` | 열람 권한(01장 §4.2) 없으면 403. 버전은 권한에 따라 마스킹 |
-| `PUT` | `/workflows/:wfId/blocks/:blockId/recipients` | **A/B/C(OA Service/File Artifacts/HPC Service) block 공통.** `{ editAccess, viewAccess }`. workflow Edit Access 필요. (구 `PUT /artifacts/:id/access`는 제거 — B/C/D artifact 단위 권한 자체가 폐기됐다) |
+| `PATCH` | `/workflows/:wfId/blocks/:blockId/recipients` | **A/B/C/D block 공통.** `{ departments, users }`(단일 grant). workflow Edit Access 필요. (구 `PUT /artifacts/:id/access`는 제거 — artifact 단위 권한 자체가 완전히 폐기됐다) |
 | `GET` | `/workflows/:wfId/artifact-candidates` | `?source=live\|file\|hpc&intent=own\|received&serviceKey=&code=&revision=` — pickable까지 판정된 후보 목록 (04장 §6.2). code/revision은 그 workflow가 속한 project에서 그대로 채운다 — 사전 링크 단계 없음(04장 §6.3) |
 | `POST` | `/workflows/:wfId/blocks` | `{ name, phaseId, layout, intent, artifactId? \| newArtifact? }` — newArtifact가 있으면 find-or-create 후 매핑 (04장 §6.7) |
 | `PATCH` | `/blocks/:id` | `{ name?, artifactId? \| newArtifact? }` — 재매핑. 이전 값과 다르면 block.recipients 초기화 (04장 §6.6) |

@@ -1,7 +1,6 @@
 import { Box } from '@mui/material';
-import { AccessGrant, ArtifactIntent } from '@/types/domain';
+import { ArtifactIntent } from '@/types/domain';
 import { Field } from '@/components/common/Panel';
-import { AccessGrantEditor } from '@/components/dialogs/AccessGrantEditor';
 import { CalypsoArtifactPicker } from '@/components/artifact/CalypsoArtifactPicker';
 import { OAServiceArtifactPicker } from '@/components/artifact/OAServiceArtifactPicker';
 import { CURSOR_POINTER, R, T } from '@/theme/tokens';
@@ -20,7 +19,6 @@ export interface ArtifactSourceState {
   serviceKey: string;
   liveArtifactId: string;
   calypsoArtifactId: string;
-  expectedGiver: AccessGrant;
 }
 
 export const emptySourceState = (): ArtifactSourceState => ({
@@ -28,7 +26,6 @@ export const emptySourceState = (): ArtifactSourceState => ({
   serviceKey: '',
   liveArtifactId: '',
   calypsoArtifactId: '',
-  expectedGiver: { departments: [], users: [] },
 });
 
 interface Props {
@@ -54,7 +51,7 @@ interface Props {
  *   `source` prop만 바꿔 그대로 재사용한다.
  */
 export function ArtifactSourcePicker({
-  workflowId, projectId, intent, departmentOptions,
+  workflowId, projectId, intent,
   state, onChange, onSelectName,
 }: Props) {
   const options: ArtifactSourceKind[] = intent === 'own' ? ['live', 'file', 'hpc'] : ['live', 'file', 'hpc', 'attested'];
@@ -107,16 +104,6 @@ export function ArtifactSourcePicker({
           intent={intent}
         />
       )}
-
-      {state.source === 'attested' && (
-        <Field label="Who is expected to give this? — informational only, not an access grant">
-          <AccessGrantEditor
-            value={state.expectedGiver}
-            onChange={(v) => onChange({ ...state, expectedGiver: v })}
-            departmentOptions={departmentOptions}
-          />
-        </Field>
-      )}
     </>
   );
 }
@@ -125,7 +112,7 @@ export function ArtifactSourcePicker({
 export function resolveNewArtifact(
   state: ArtifactSourceState,
   name: string,
-): { source: 'live' | 'file' | 'hpc' | 'attested'; name: string; serviceKey?: string; externalArtifactId?: string; expectedGiver?: AccessGrant } | null {
+): { source: 'live' | 'file' | 'hpc' | 'attested'; name: string; serviceKey?: string; externalArtifactId?: string } | null {
   if ((state.source === 'live' || state.source === 'hpc') && state.serviceKey && state.liveArtifactId) {
     return { source: state.source, name, serviceKey: state.serviceKey, externalArtifactId: state.liveArtifactId };
   }
@@ -133,7 +120,7 @@ export function resolveNewArtifact(
     return { source: 'file', name, externalArtifactId: state.calypsoArtifactId };
   }
   if (state.source === 'attested') {
-    return { source: 'attested', name, expectedGiver: state.expectedGiver };
+    return { source: 'attested', name };
   }
   return null;
 }
