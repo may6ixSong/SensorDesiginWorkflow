@@ -165,7 +165,15 @@ function attachInstanceMethods(doc: AnyDoc, store: Map<string, AnyDoc>): AnyDoc 
   return doc;
 }
 
-type QueryKind = 'find' | 'findOne' | 'findById' | 'findByIdAndDelete' | 'updateOne' | 'deleteMany' | 'countDocuments';
+type QueryKind =
+  | 'find'
+  | 'findOne'
+  | 'findById'
+  | 'findByIdAndDelete'
+  | 'updateOne'
+  | 'findOneAndUpdate'
+  | 'deleteMany'
+  | 'countDocuments';
 
 class FakeQuery<T> implements PromiseLike<T> {
   private sortSpec: Record<string, 1 | -1> | null = null;
@@ -246,6 +254,21 @@ class FakeQuery<T> implements PromiseLike<T> {
           for (const [k, v] of Object.entries(update.$set)) setByPath(doc, k, v);
         }
         return { acknowledged: true, matchedCount: doc ? 1 : 0, modifiedCount: doc ? 1 : 0 };
+      }
+      // 지금 이 저장소에서 실제로 쓰는 건 releases.service.ts의 원자적 seq 증가
+      // (`$inc` + `{new:true}`) 하나뿐이다 - 그 용도만 지원한다.
+      case 'findOneAndUpdate': {
+        const doc = this.resolveMatches()[0] ?? null;
+        const { update } = this.extra as { update?: { $set?: AnyDoc; $inc?: AnyDoc } };
+        if (doc && update?.$set) {
+          for (const [k, v] of Object.entries(update.$set)) setByPath(doc, k, v);
+        }
+        if (doc && update?.$inc) {
+          for (const [k, v] of Object.entries(update.$inc)) {
+            setByPath(doc, k, (getByPath(doc, k) ?? 0) + (v as number));
+          }
+        }
+        return this.populateOne(doc);
       }
       case 'deleteMany': {
         const docs = this.resolveMatches();
