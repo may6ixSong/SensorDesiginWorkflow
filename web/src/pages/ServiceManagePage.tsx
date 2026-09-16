@@ -110,7 +110,7 @@ function ServiceSection({ tier, title, blurb }: { tier: RegisterTier; title: str
 }
 
 /** Service Manage 카드/폼에서 공유하는 favicon 렌더러 — 없거나 로드 실패 시 이니셜로 대체한다. */
-function ServiceIcon({ name, url, size = 40 }: { name: string; url: string; size?: number }) {
+function ServiceIcon({ name, url, size = 56 }: { name: string; url: string; size?: number }) {
   const [failed, setFailed] = useState(false);
   const showImg = !!url && !failed;
   return (
@@ -136,28 +136,38 @@ function ServiceIcon({ name, url, size = 40 }: { name: string; url: string; size
   );
 }
 
-/** token을 그대로 보여주는 한 줄 — 마스킹/1회 노출 같은 장치는 두지 않는다(사용자 결정). */
-function TokenRow({ label, value }: { label: string; value: string }) {
+/**
+ * token을 보여주는 한 줄 — 복사 버튼은 항상 **전체 값**을 클립보드에 담는다.
+ * `mask`가 true면 화면 표시만 앞 8자 + `****`로 가린다(사용자 요청, ServiceCard에서만
+ * 쓴다). RegisterDialog의 발급 직후 화면은 그 자리에서 개발자에게 그대로 건네줘야
+ * 하는 1회성 화면이라 `mask` 없이 그대로 둔다(기존 사용자 결정).
+ */
+function TokenRow({ label, value, mask = false }: { label: string; value: string; mask?: boolean }) {
+  const display = mask && value.length > 8 ? `${value.slice(0, 8)}****` : value;
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-      <Box sx={{ fontSize: 10.5, color: T.dm2, flex: '0 0 auto' }}>{label}</Box>
-      <Box
-        sx={{
-          fontFamily: FONT_MONO, fontSize: 11, color: T.tx, background: T.sf2,
-          border: `1px solid ${T.ln}`, borderRadius: '6px', padding: '3px 8px',
-          wordBreak: 'break-all', flex: '1 1 auto', minWidth: 0,
-        }}
-      >
-        {value}
+    <Box>
+      <Box sx={{ fontSize: 10.5, color: T.dm2, mb: '4px' }}>{label}</Box>
+      {/* value와 copy 버튼은 항상 같은 줄에 붙어 있어야 한다(사용자 요청) — label이 길어서
+          줄바꿈돼도 이 둘은 따로 떨어지지 않게 label과 별도 줄로 뺐다. */}
+      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+        <Box
+          sx={{
+            fontFamily: FONT_MONO, fontSize: 11, color: T.tx, background: T.sf2,
+            border: `1px solid ${T.ln}`, borderRadius: '6px', padding: '3px 8px',
+            wordBreak: 'break-all', flex: '1 1 auto', minWidth: 0,
+          }}
+        >
+          {display}
+        </Box>
+        <SirenButton
+          variant="ghost"
+          title="Copy"
+          onClick={() => { navigator.clipboard?.writeText(value); toast('Copied'); }}
+          sx={{ minWidth: 0, padding: '3px', flex: '0 0 auto' }}
+        >
+          <Icon name="copy" size={12} />
+        </SirenButton>
       </Box>
-      <SirenButton
-        variant="ghost"
-        title="Copy"
-        onClick={() => { navigator.clipboard?.writeText(value); toast('Copied'); }}
-        sx={{ minWidth: 0, padding: '3px' }}
-      >
-        <Icon name="copy" size={12} />
-      </SirenButton>
     </Box>
   );
 }
@@ -188,17 +198,10 @@ function ServiceCard({ service: s }: { service: HubService }) {
         background: T.sf, opacity: s.enabled ? 1 : 0.6,
       }}
     >
-      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+      {/* favicon을 이름보다 위쪽 줄에 — edit 버튼은 그 줄 오른쪽 끝에 그대로 둔다(사용자 요청). */}
+      <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
         <ServiceIcon name={s.name} url={s.icon} />
-        <Box sx={{ minWidth: 0, flex: 1 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-            <Box sx={{ fontSize: 13.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {s.name}
-            </Box>
-            {!s.enabled && <Badge color={T.dm} bg={T.sf2} borderColor={T.ln}>Disabled</Badge>}
-          </Box>
-          <Box sx={{ fontFamily: FONT_MONO, fontSize: 10.5, color: T.dm2, mt: '2px' }}>{s.key}</Box>
-        </Box>
+        <Box sx={{ flex: 1 }} />
         <SirenButton
           variant="ghost"
           title="Edit"
@@ -207,6 +210,15 @@ function ServiceCard({ service: s }: { service: HubService }) {
         >
           <Icon name="edit" size={14} />
         </SirenButton>
+      </Box>
+      <Box sx={{ minWidth: 0 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+          <Box sx={{ fontSize: 13.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {s.name}
+          </Box>
+          {!s.enabled && <Badge color={T.dm} bg={T.sf2} borderColor={T.ln}>Disabled</Badge>}
+        </Box>
+        <Box sx={{ fontFamily: FONT_MONO, fontSize: 10.5, color: T.dm2, mt: '2px' }}>{s.key}</Box>
       </Box>
 
       {s.baseUrl && (
@@ -227,24 +239,28 @@ function ServiceCard({ service: s }: { service: HubService }) {
       )}
 
       {s.enabled && (
-        <TokenRow label="Bearer token — shared by this baseURL" value={s.token ?? '(none)'} />
+        <TokenRow label="Bearer token — shared by this baseURL" value={s.token ?? '(none)'} mask />
       )}
 
       <Box>
         <Box sx={{ fontSize: 10.5, color: T.dm2, mb: '6px' }}>
           Artifact type{s.artifactTypes.length === 1 ? '' : 's'} ({s.artifactTypes.length})
         </Box>
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
           {s.artifactTypes.map((t) => (
             <Box
               key={t.key}
-              title={t.description || t.key}
+              title={t.description || undefined}
               sx={{
-                fontSize: 11.5, fontWeight: 600, padding: '4px 9px', borderRadius: '999px',
+                display: 'flex', alignItems: 'baseline', gap: '7px', flexWrap: 'wrap',
+                fontSize: 11.5, fontWeight: 600, padding: '4px 9px', borderRadius: '8px',
                 background: T.sf2, border: `1px solid ${T.ln}`,
               }}
             >
-              {t.name}
+              <Box component="span">{t.name}</Box>
+              <Box component="span" sx={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 500, color: T.dm2 }}>
+                {t.key}
+              </Box>
             </Box>
           ))}
         </Box>
