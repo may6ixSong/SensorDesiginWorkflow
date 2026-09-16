@@ -284,6 +284,9 @@ export function BoardPage() {
                           s.setNodes(s.nodes.filter((n) => n.id !== openBlock.id));
                           s.setEdges(s.edges.filter((e) => e.from !== openBlock.id && e.to !== openBlock.id));
                           closeSlide();
+                          // 지워진 block이 선택된 채로 남아 다른 block들이 계속 blur 처리되던
+                          // 버그(사용자 지적) — 선택/flow 하이라이트도 함께 해제한다.
+                          if (s.sel === openBlock.id || s.hlSet) s.select(null, null);
                           toast('Removed from canvas');
                         },
                         onError: () => toast('Failed to remove'),
