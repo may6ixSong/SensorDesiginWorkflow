@@ -194,6 +194,22 @@ export class ArtifactsService {
     }
   }
 
+  /**
+   * 등록 시점엔 이름만 받고 콘텐츠 종류(File/OA-link/HPC-path)를 아직 안 정했을 수
+   * 있다(설계서 04장 §2.2, §6.4 — "새 Artifact 추가" 다이얼로그가 아니라 이 artifact의
+   * contents 화면에서 첫 버전을 추가할 때 정한다). **그 첫 버전 추가 시점에 network가
+   * 확정되고, 그 뒤로는 바뀌지 않는다.** File로 정해지는 경우는 `network`가 계속
+   * null이라 별도로 할 것이 없다.
+   */
+  private lockNetworkOnFirstVersion(
+    a: ArtifactDocument,
+    input: { viewUrl?: string | null; hpcPath?: string | null },
+  ): void {
+    if (a.versions.length > 0) return;
+    if (input.viewUrl) a.network = 'OA';
+    else if (input.hpcPath) a.network = 'HPC';
+  }
+
   /** 업로드 = minor +1. 아직 릴리스가 아니다 (작업중). */
   async addVersion(
     id: string,
@@ -208,6 +224,7 @@ export class ArtifactsService {
   ) {
     const a = await this.findOrThrow(id);
     this.assertCanEdit(a, actor);
+    this.lockNetworkOnFirstVersion(a, input);
     this.assertContentMatchesNetwork(a, input);
 
     const latest = a.versions[0];

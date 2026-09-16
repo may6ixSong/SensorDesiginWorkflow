@@ -141,16 +141,16 @@ export class CalypsoProxyController {
     return this.relay(result);
   }
 
-  @Get(':id/download/:versionRef/:storageKey')
+  /** 파일이 하나면 그대로, 여러 개면 zip으로 묶여서 온다 — Calypso가 그 판정을 한다(§3.9). */
+  @Get(':id/download/:versionRef')
   async download(
     @Param('id') id: string,
     @Param('versionRef') versionRef: string,
-    @Param('storageKey') storageKey: string,
     @Query('projectId') projectId: string,
     @CurrentActor() me: Actor,
   ): Promise<StreamableFile> {
     const { departments, isAdmin } = await this.resolveContext(projectId, me);
-    const result = await this.calypso.downloadVersion(id, versionRef, storageKey, me.knoxId, departments, isAdmin);
+    const result = await this.calypso.downloadVersion(id, versionRef, me.knoxId, departments, isAdmin);
     if (!result) {
       throw new BadGatewayException('Could not reach the file service (Calypso). Check that it is running.');
     }

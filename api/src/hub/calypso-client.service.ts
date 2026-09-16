@@ -360,13 +360,13 @@ export class CalypsoClientService {
    * 07장 §2 "파일 전체를 메모리에 버퍼링하지 않는다"). 컨트롤러가 이 스트림을
    * StreamableFile로 그대로 클라이언트에 흘려보낸다.
    *
-   * ★ 한 버전이 여러 파일을 가질 수 있게 되면서(§3.9) `storageKey`로 그중 하나를
-   *   특정한다.
+   * ★ 한 버전이 여러 파일을 가질 수 있다(§3.9, 사용자 결정) — **Calypso가 파일 개수를
+   *   보고 하나면 그대로, 여러 개면 zip으로 묶어서 내려준다.** 여기서는 그 결정에
+   *   관여하지 않고 응답을 그대로 스트리밍만 한다.
    */
   async downloadVersion(
     externalArtifactId: string,
     versionRef: string,
-    storageKey: string,
     knoxId: string,
     departments: string[],
     isAdmin: boolean,
@@ -378,8 +378,7 @@ export class CalypsoClientService {
     const timer = setTimeout(() => controller.abort(), TRANSFER_TIMEOUT_MS);
     try {
       const res = await fetch(
-        `${this.baseUrl}/artifacts/${encodeURIComponent(externalArtifactId)}/download/`
-          + `${encodeURIComponent(versionRef)}/${encodeURIComponent(storageKey)}`,
+        `${this.baseUrl}/artifacts/${encodeURIComponent(externalArtifactId)}/download/${encodeURIComponent(versionRef)}`,
         { signal: controller.signal, headers: this.actorHeaders(knoxId, departments, isAdmin) },
       );
       if (!res.ok || !res.body) {

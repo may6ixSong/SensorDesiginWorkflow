@@ -18,6 +18,7 @@ import {
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { ConfigService } from '@nestjs/config';
+import { ZipArchive } from 'archiver';
 import { CurrentActor } from '../common/current-actor.decorator';
 import { Actor } from '../common/actor';
 import { SirenCallerGuard } from '../common/siren-caller.guard';
@@ -188,14 +189,14 @@ export class ArtifactsController {
    * 자기 데이터의 문지기다(Hub 설계서 §7.1). view 등급은 released 버전만 받을 수 있다 —
    * 목록/상세와 같은 마스킹 규칙(사용자 요청).
    *
-   * ★ 한 버전이 여러 파일을 가질 수 있게 되면서(§3.9) `storageKey`로 그중 하나를
-   *   특정한다 — versionRef만으로는 더 이상 파일 하나를 가리킬 수 없다.
+   * ★ 한 버전이 여러 파일을 가질 수 있다(§3.9, 사용자 결정) — **파일이 하나면 그대로
+   *   내려주고, 여러 개면 zip으로 묶어서 하나로 내려준다.** 호출부는 파일 개수를
+   *   미리 몰라도 되고, 이 라우트 하나만 부르면 된다.
    */
-  @Get(':id/download/:versionRef/:storageKey')
+  @Get(':id/download/:versionRef')
   async download(
     @Param('id') id: string,
     @Param('versionRef') versionRef: string,
-    @Param('storageKey') storageKey: string,
     @CurrentActor() me: Actor,
   ): Promise<StreamableFile> {
     const a = await this.artifacts.findVisibleOrThrow(id, me);
@@ -205,15 +206,28 @@ export class ArtifactsController {
     if (access !== 'edit' && !version.isReleased) {
       throw new ForbiddenException('Only released versions are available at your access level.');
     }
-    const decodedKey = decodeURIComponent(storageKey);
-    const file = (version.files ?? []).find((f) => f.storageKey === decodedKey);
-    if (!file) throw new NotFoundException('This version has no such file.');
+    const files = version.files ?? [];
+    if (!files.length) throw new BadRequestException('This version has no stored file.');
 
-    const body = await this.storage.download(file.storageKey);
-    if (!body) throw new NotFoundException('The stored file could not be found.');
-    return new StreamableFile(body, {
-      type: 'application/octet-stream',
-      disposition: `attachment; filename="${encodeURIComponent(file.fileName)}"`,
+    if (files.length === 1) {
+      const body = await this.storage.download(files[0].storageKey);
+      if (!body) throw new NotFoundException('The stored file could not be found.');
+      return new StreamableFile(body, {
+        type: 'application/octet-stream',
+        disposition: `attachment; filename="${encodeURIComponent(files[0].fileName)}"`,
+      });
+    }
+
+    const buffers = await Promise.all(files.map((f) => this.storage.download(f.storageKey)));
+    const archive = new ZipArchive({ zlib: { level: 9 } });
+    files.forEach((f, i) => {
+      const buf = buffers[i];
+      if (buf) archive.append(buf, { name: f.fileName });
+    });
+    void archive.finalize();
+    return new StreamableFile(archive, {
+      type: 'application/zip',
+      disposition: `attachment; filename="${encodeURIComponent(a.name)}-${version.major}.${version.minor}.zip"`,
     });
   }
 

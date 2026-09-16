@@ -88,17 +88,24 @@ export async function createCalypsoArtifact(input: {
 }
 
 /**
- * File 콘텐츠(network===null)용 업로드 — 지금 FE는 한 번에 파일 하나만 고르지만,
- * 백엔드 필드명은 여러 개를 받을 수 있는 `files`다(설계서 04장 §2, §6).
- *
- * TODO: OA/HPC 콘텐츠(viewUrl/hpcPath 텍스트만 있는 등록)를 위한 업로드 함수와,
- *   한 번에 여러 파일을 고르는 UI는 이번 변경 범위 밖이다.
+ * 새 버전 추가 — 콘텐츠는 그 artifact의 `network`로 정해진다(설계서 04장 §2.2):
+ *   network===null(File) → `files`(1개 이상, 한 버전에 여러 파일을 묶을 수 있다)
+ *   network==='OA'       → `viewUrl`
+ *   network==='HPC'      → `hpcPath`
+ * versionCount===0(아직 첫 버전이 없는 새 artifact)이면 이 호출이 network를 그대로
+ * 확정한다 — "새 Artifact 추가" 다이얼로그가 아니라 여기서 콘텐츠 종류를 고른다
+ * (04장 §6.4).
  */
-export async function uploadCalypsoVersion(
-  id: string, projectId: string, file: File, note: string,
+export async function addCalypsoVersion(
+  id: string,
+  projectId: string,
+  input: { files?: File[]; viewUrl?: string; hpcPath?: string },
+  note: string,
 ): Promise<CalypsoArtifact> {
   const form = new FormData();
-  form.append('files', file);
+  (input.files ?? []).forEach((f) => form.append('files', f));
+  if (input.viewUrl) form.append('viewUrl', input.viewUrl);
+  if (input.hpcPath) form.append('hpcPath', input.hpcPath);
   form.append('note', note);
   const { data } = await apiClient.post<ApiEnvelope<CalypsoArtifact>>(
     `/calypso-artifacts/${id}/versions`, form, { params: { projectId } },
@@ -113,15 +120,22 @@ export async function releaseCalypsoArtifact(id: string, projectId: string, note
   return data.data;
 }
 
-/** storageKey로 그 버전의 여러 파일 중 하나를 특정한다(설계서 04장 §2, §6). */
+/**
+ * 파일이 하나면 그대로, 여러 개면 zip으로 묶여서 내려온다 — Calypso가 그 판정을 한다
+ * (설계서 04장 §2, §6). 파일명은 응답의 `Content-Disposition`에서 그대로 읽는다 —
+ * 단일 파일이면 원래 이름, zip이면 Calypso가 붙인 `{artifact명}-{major}.{minor}.zip`이다.
+ */
 export async function downloadCalypsoVersion(
-  id: string, projectId: string, versionRef: string, storageKey: string,
-): Promise<Blob> {
-  const { data } = await apiClient.get<Blob>(
-    `/calypso-artifacts/${id}/download/${encodeURIComponent(versionRef)}/${encodeURIComponent(storageKey)}`,
+  id: string, projectId: string, versionRef: string,
+): Promise<{ blob: Blob; filename: string | null }> {
+  const res = await apiClient.get<Blob>(
+    `/calypso-artifacts/${id}/download/${encodeURIComponent(versionRef)}`,
     { params: { projectId }, responseType: 'blob' },
   );
-  return data;
+  const disposition = res.headers['content-disposition'] as string | undefined;
+  const match = disposition?.match(/filename="?([^";]+)"?/);
+  const filename = match ? decodeURIComponent(match[1]) : null;
+  return { blob: res.data, filename };
 }
 
 export async function addCalypsoEditor(id: string, projectId: string, grant: CalypsoGrantInput): Promise<CalypsoArtifact> {

@@ -230,10 +230,4 @@ export class ArtifactSourceService {
     }
   }
 
-  // TODO(Tier D → B 통합, 설계서 04장 §2·§6): "새 Artifact 추가" 다이얼로그를 지금의
-  // OA Service/File Artifacts/HPC Service 3버튼에서, admin이 등록한 OA/HPC Service와
-  // Calypso 산출물을 한데 합친 단일 목록으로 바꾸는 작업이 남아 있다. 그리고
-  // fileArtifactCandidates()/listArtifacts()는 Calypso가 File(복수 파일)/OA-link/
-  // HPC-path 세 콘텐츠 종류를 갖게 되면 그 종류·network 값을 후보 목록에 함께 실어야
-  // 한다 — 지금은 File 콘텐츠만 있다고 가정한 모양 그대로다.
 }

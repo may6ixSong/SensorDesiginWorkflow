@@ -354,16 +354,19 @@ code/revision을 쓸 수 있는 경우)는 이제 **그 서비스 쪽이 필터�
   (SIREN이 대신 새 artifact를 만들어주지 않는다), "새로" 만드는 경로는 File Artifacts뿐이다.
 - give 쪽에서 새로 등록하면 등록자가 Calypso `editors`에 자동으로 들어간다(등록자·Admin은
   항상 edit, `calypso/src/artifacts/artifacts.service.ts`의 `computeAccess()`).
-- receive 쪽에서 새로 등록(매핑용 placeholder)해도 **지금은 같은 규칙을 그대로 탄다** — 등록자가
+- receive 쪽에서 새로 등록(매핑용 placeholder)해도 **같은 규칙을 그대로 탄다** — 등록자가
   자동으로 편집 가능해진다. 원래는 이 경우 편집 권한을 주지 않기로 했었으나(받는 쪽은 실제로
-  그 산출물을 만드는 쪽이 아니므로), 이번 라운드에서는 구분 없이 단순하게 두기로 했다(사용자
-  결정) — TODO로 남겨둔다(README §4 T14).
-  ```ts
-  // TODO(calypso/src/artifacts/artifacts.service.ts#create): 받는 쪽이 매핑용으로 생성한
-  //       placeholder는 원래 편집 권한을 주지 않기로 했었다 — 나중에 이 grant를 제거하는
-  //       정책으로 갈 것.
-  ```
-- 두 case 모두 **신규 생성만 할 뿐, 아직 어떤 draft version도 없고 실제 데이터도 없는 상태**다.
+  그 산출물을 만드는 쪽이 아니므로), 구분 없이 단순하게 두기로 **확정했다**(사용자 결정,
+  README §4 T14) — 별도로 막는 로직은 만들지 않는다.
+- 두 case 모두 **등록 시점엔 이름(과 give 쪽이면 department)만 받는다** — 콘텐츠 종류(File/
+  OA-link/HPC-path)는 아직 안 정한다. 아직 어떤 draft version도 없고 실제 데이터도 없는
+  빈 artifact 상태로 캔버스에 매핑된다.
+- **콘텐츠 종류는 "새 Artifact 추가" 다이얼로그가 아니라, 그 artifact의 contents 화면에서
+  첫 버전을 추가하는 순간 정해진다** — File(파일 업로드, 여러 개 가능) / Link(OA) / Path(HPC)
+  중 하나를 고르면 그게 그 artifact의 `network`로 고정된다(§2.2, `lockNetworkOnFirstVersion`).
+  이 화면(`web/src/components/artifact/ArtifactVersionContents.tsx`)은 SIREN 슬라이드의
+  `CalypsoInlinePanel`과 Calypso 독립 페이지(`ArtifactDetailPage`)가 공유한다 — 둘 중
+  어디서 첫 버전을 추가해도 같다.
 
 ### 6.5 한 workflow 안에서 같은 artifact 중복 금지
 
@@ -400,12 +403,11 @@ PATCH /blocks/:id                        { name?, artifactId? | newArtifact? }
   그 artifact의 전체 버전 이력을 한 번 라이브로 pull해 온다(§6.3, 07장 §3).
 ```
 
-> **TODO(README §4 T13)** — 지금 다이얼로그는 여전히 OA Service/File Artifacts/HPC Service
-> 3버튼으로 source를 먼저 고르는 구조다. 목표는 admin이 등록한 OA/HPC Service와 Calypso
-> 산출물을 **한데 합친 단일 목록**으로 보여주는 것이다 — OA/HPC Service 항목을 고르면 그
-> 서비스의 실시간 후보를(§6.3 2단계 그대로), Calypso 항목을 고르면 바로 매핑한다. 이번
-> 변경(Tier D 폐기·File Artifacts 확장)에서는 `ArtifactSourceService`에 TODO만 남기고
-> 다이얼로그 UI는 손대지 않았다.
+> **완료(README §4 T13)** — `ArtifactSourcePicker.tsx`가 admin이 등록한 OA/HPC Service와
+> Calypso 산출물을 **한 목록**으로 보여준다. Service 항목을 펼치면 그 서비스의 실시간 후보가
+> 안에 뜨고(§6.3 2단계 그대로), Calypso 항목은 바로 선택된다. 목록 맨 아래 "새로 등록"은
+> 이름만 받아 빈 Calypso artifact를 만든다 — 콘텐츠 종류는 §6.4에서 설명한 대로 contents
+> 화면에서 첫 버전을 추가할 때 정한다.
 
 ---
 

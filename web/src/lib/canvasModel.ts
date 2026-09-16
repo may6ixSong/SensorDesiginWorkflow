@@ -36,9 +36,8 @@ export interface CanvasNode {
   tier: Tier | null;
   net: 'OA' | 'HPC' | null;
   /**
-   * 지금은 새 block을 항상 'own'으로만 만들지만(TODO T2), v3 이전에 'received'로
-   * 만들어진 block이 DB에 이미 있다 — 그런 block을 캔버스에서 구별해 보여준다
-   * (사용자 요청).
+   * "새 Artifact 추가" 다이얼로그의 첫 질문(주는/받는, 설계서 04장 §6.1)이 그대로
+   * 온다 — 캔버스는 받는(received) block을 배경색으로 구별해 보여준다.
    */
   intent: 'own' | 'received';
 
@@ -46,8 +45,8 @@ export interface CanvasNode {
   publishState: PublishState;
 
   /**
-   * A Tier에서만 값이 있다 — 같은 artifact라도 workflow마다 recipient가 다를 수 있어
-   * block에 붙는다. B/C/D는 null이고 수신 부서는 artifact 쪽에서 온다.
+   * A/B/C 전부 공통이다 — 같은 artifact라도 workflow마다 recipient가 다를 수 있어
+   * artifact가 아니라 block에 붙는다(설계서 04장 §3.2).
    */
   recipientDepartments: string[];
 
