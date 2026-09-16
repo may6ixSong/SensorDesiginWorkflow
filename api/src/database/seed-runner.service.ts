@@ -12,6 +12,7 @@ import { MemoDocument } from '../memos/schemas/memo.schema';
 import { EdgeDocument } from '../edges/schemas/edge.schema';
 import { ReleaseDocument } from '../releases/schemas/release.schema';
 import { ArtifactServiceDocument } from '../hub/schemas/artifact-service.schema';
+import { VersionIdBackfillService } from './version-id-backfill.service';
 
 const MOCK_FILTER = { isMock: true };
 
@@ -43,6 +44,7 @@ export class SeedRunnerService implements OnModuleInit {
     @Inject(getModelToken('Edge')) private readonly edgeModel: Model<EdgeDocument>,
     @Inject(getModelToken('Release')) private readonly releaseModel: Model<ReleaseDocument>,
     @Inject(getModelToken('ArtifactService')) private readonly artifactServiceModel: Model<ArtifactServiceDocument>,
+    private readonly versionIdBackfill: VersionIdBackfillService,
   ) {}
 
   /** 목업 시드가 문서를 만드는 컬렉션 전체. auditlogs는 시드 대상이 아니라 제외한다. */
@@ -68,6 +70,7 @@ export class SeedRunnerService implements OnModuleInit {
           ? `MOCKUP_ENABLED=false - 목업 문서 ${removed}건을 삭제했습니다 (${mode} 모드). 실제 데이터는 그대로입니다.`
           : `MOCKUP_ENABLED=false - 목업 데이터를 쓰지 않습니다 (${mode} 모드).`,
       );
+      await this.versionIdBackfill.run();
       return;
     }
 
@@ -77,6 +80,7 @@ export class SeedRunnerService implements OnModuleInit {
         `목업 문서 ${existing}건이 이미 있어 시드를 건너뜁니다 (${mode} 모드). ` +
           '처음 상태로 되돌리려면 MOCKUP_ENABLED=false로 한 번 띄워 정리한 뒤 true로 되돌리세요.',
       );
+      await this.versionIdBackfill.run();
       return;
     }
 
@@ -99,6 +103,8 @@ export class SeedRunnerService implements OnModuleInit {
       this.logger.error(
         `목업 시드에 실패했습니다 - 목업 없이 계속 진행합니다: ${err instanceof Error ? err.message : String(err)}`,
       );
+      // 방금 시드된 목업 버전(_id 없음)이든, 이미 있던 실제 데이터의 옛 버전이든 여기서 채운다.
+      await this.versionIdBackfill.run();
     }
   }
 
