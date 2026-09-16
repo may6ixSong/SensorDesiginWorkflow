@@ -144,6 +144,8 @@ export interface WorkflowDto {
  * ------------------------------------------------------------------ */
 
 export interface ArtifactVersionDto {
+  /** 이 버전을 안정적으로 참조하기 위한 식별자 (예: Comment의 versionId). */
+  id: string | null;
   tier: Tier;
   versionLabel: string;
   /**
@@ -198,6 +200,19 @@ export interface ArtifactDto {
 
 export const isMaskedArtifact = (a: ArtifactDto | MaskedArtifactDto | null): a is MaskedArtifactDto =>
   !!a && (a as MaskedArtifactDto).masked === true;
+
+/** Artifact 댓글 — 특정 버전에 대한 것이면 versionId/versionLabelSnapshot이 채워진다. */
+export interface CommentDto {
+  id: string;
+  artifactId: string;
+  versionId: string | null;
+  versionLabelSnapshot: string;
+  /** 대댓글이면 부모 comment의 id. */
+  parentCommentId: string | null;
+  text: string;
+  createdBy: string;
+  createdAt: string;
+}
 
 /* ------------------------------------------------------------------ *
  * Block (캔버스 위의 자리)
