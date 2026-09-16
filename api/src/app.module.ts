@@ -8,6 +8,7 @@ import { WorkflowsModule } from './workflows/workflows.module';
 import { ArtifactsModule } from './artifacts/artifacts.module';
 import { BlocksModule } from './blocks/blocks.module';
 import { MemosModule } from './memos/memos.module';
+import { CommentsModule } from './comments/comments.module';
 import { EdgesModule } from './edges/edges.module';
 import { CanvasModule } from './canvas/canvas.module';
 import { ReleasesModule } from './releases/releases.module';
@@ -25,6 +26,7 @@ import { HubModule } from './hub/hub.module';
     ArtifactsModule,
     BlocksModule,
     MemosModule,
+    CommentsModule,
     EdgesModule,
     CanvasModule,
     ReleasesModule,
