@@ -11,6 +11,8 @@ import { AccessLevel } from '../../common/access';
 
 /** 버전 하나의 공개 모양. */
 export interface ArtifactVersionDto {
+  /** 이 버전을 안정적으로 참조하기 위한 식별자 (예: Comment의 versionId). */
+  id: string | null;
   tier: string;
   versionLabel: string;
   isPublished: boolean;
@@ -46,6 +48,7 @@ export interface ArtifactDto {
 
 export function toVersionDto(v: ArtifactVersion): ArtifactVersionDto {
   return {
+    id: v._id?.toString() ?? null,
     tier: v.tier,
     versionLabel: v.versionLabel,
     isPublished: v.isPublished,
