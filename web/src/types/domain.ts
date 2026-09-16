@@ -11,15 +11,20 @@
 /** 이 사람이 그 대상에 대해 갖는 실효 권한. null이면 접근할 수 없다. */
 export type AccessLevel = 'edit' | 'view' | null;
 
-/** 통합 신뢰도 티어 — A→D 신뢰도 내림차순(설계서 04장 §2). */
-export type Tier = 'A' | 'B' | 'C' | 'D';
+/**
+ * 통합 신뢰도 티어 — A→C 신뢰도 내림차순(설계서 04장 §2).
+ *
+ * ★ Tier D(External/Attested)는 폐기했다 — File Artifacts(B, Calypso)가 OA-link/HPC-path
+ *   참조형 콘텐츠까지 갖도록 넓어지면서 D의 역할을 대체했다.
+ */
+export type Tier = 'A' | 'B' | 'C';
 
 /** 망 구분. tier와 직교하는 별개 축이다 — HPC면 실물 파일 대신 경로 문자열만 갖는다. */
 export type NetworkKind = 'OA' | 'HPC';
 
 /**
  * 권한 한 벌 — **부서 다중 + 개별 사용자 다중**(설계서 01장 §3.3).
- * workflow, artifact(B/C/D), block.recipients(A) 전부 이 모양을 쓴다.
+ * workflow의 editAccess/viewAccess, block.recipients 전부 이 모양을 쓴다.
  */
 export interface AccessGrant {
   departments: string[];
@@ -238,7 +243,7 @@ export interface BlockDto {
   /** 열람 권한이 없으면 masked 형태로 온다. 미매핑이면 null. */
   artifact: ArtifactDto | MaskedArtifactDto | null;
   publishState: PublishState;
-  /** artifact가 매핑된 block에서만 값이 있다 — A/B/C/D 전부 공통이다(설계서 04장 §3.2). */
+  /** artifact가 매핑된 block에서만 값이 있다 — A/B/C 전부 공통이다(설계서 04장 §3.2). */
   recipients: AccessGrant | null;
   series: string | null;
   seriesIdx: number;
@@ -277,7 +282,7 @@ export interface EdgeDto {
 export type ArtifactIntent = 'own' | 'received';
 
 /** 사용자에게 보이는 이름. Tier 글자는 화면에 절대 노출하지 않는다. */
-export type ArtifactSourceKind = 'live' | 'file' | 'hpc' | 'attested';
+export type ArtifactSourceKind = 'live' | 'file' | 'hpc';
 
 export interface ArtifactCandidateDto {
   externalArtifactId: string;

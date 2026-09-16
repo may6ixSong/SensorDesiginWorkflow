@@ -142,7 +142,7 @@
   block(자리)과 artifact(실체)가 분리되어 있어(04장 §1) 매핑을 바꾸는 것 자체는 자유롭다.
   단 intent는 block 생성 시 확정되며 변경 시에도 바뀌지 않는다.
 - **후보 선택 가능 범위·pickability·중복 매핑 금지 정책은 04장 §6에 있다.** Tier 글자는
-  화면에 노출하지 않고 OA Service/File Artifacts/HPC Service(+받는 전용 External/Attested)로만
+  화면에 노출하지 않고 OA Service/File Artifacts/HPC Service로만
   보여준다.
 
 ### 5.3 Flow 편집
@@ -172,7 +172,7 @@ flow 삭제 confirm 문구:
   숨기지 않는 이유는 flow 구조가 끊겨 보이면 안 되기 때문이다.
 - 다중 선택 가능하며, 선택 해제하면 전체로 돌아온다.
 - 후보는 그 과제에 등록된 부서(`Project.departments`).
-- **recipient 판정**은 A/B/C/D 전부 공통이다(04장 §3) — **그 block**의
+- **recipient 판정**은 A/B/C 전부 공통이다(04장 §3) — **그 block**의
   `recipients.departments`(workflow마다 다를 수 있다. artifact는 recipient를 전혀 갖지
   않는다).
 - 편집 모드에서도 필터는 쓸 수 있다(§4.3).

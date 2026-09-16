@@ -12,11 +12,11 @@ import {
   Post,
   Query,
   StreamableFile,
-  UploadedFile,
+  UploadedFiles,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { FilesInterceptor } from '@nestjs/platform-express';
 import { ConfigService } from '@nestjs/config';
 import { CurrentActor } from '../common/current-actor.decorator';
 import { Actor } from '../common/actor';
@@ -135,36 +135,43 @@ export class ArtifactsController {
   }
 
   /**
-   * 업로드 = minor +1. 바이트를 받아 Calypso 몫의 오브젝트 스토리지에 올린다 -
-   * SIREN 본체와 다른 S3_FOLDER를 쓰므로 네임스페이스가 분리된다(Hub 설계서 §3.7).
+   * 업로드 = minor +1. **network에 따라 콘텐츠가 갈린다**(§3.9):
+   *   - File(network===null) — 바이트를 받아 Calypso 몫의 오브젝트 스토리지에 올린다.
+   *     SIREN 본체와 다른 S3_FOLDER를 쓰므로 네임스페이스가 분리된다(Hub 설계서 §3.7).
+   *     한 번에 여러 파일을 올릴 수 있다 — 전부 이번 버전 하나에 묶인다.
+   *   - OA/HPC — 파일 없이 `viewUrl`/`hpcPath` 텍스트만 body로 받는다.
    */
   @Post(':id/versions')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FilesInterceptor('files'))
   async addVersion(
     @Param('id') id: string,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFiles() files: Express.Multer.File[] | undefined,
     @Body() dto: AddVersionDto,
     @CurrentActor() me: Actor,
   ) {
-    if (!file) throw new BadRequestException('A file is required (multipart form field "file").');
     const a = await this.artifacts.findOrThrow(id);
     // 스토리지에 올리기 전에 권한부터 본다 — 권한 없는 업로드가 먼저 파일을 써버리는 걸 막는다.
     if (this.artifacts.computeAccess(a, me) !== 'edit') {
       throw new ForbiddenException('You do not have edit access to this artifact.');
     }
-    const storageKey = this.storage.buildStorageKey(
-      a.projectId,
-      a._id.toString(),
-      this.artifacts.nextVersionLabel(a),
-      file.originalname,
-    );
-    await this.storage.upload(storageKey, file.buffer, {
-      originalname: file.originalname,
-      uploader: me.knoxId,
-    });
+
+    if (a.network === null) {
+      if (!files?.length) throw new BadRequestException('At least one file is required (multipart form field "files").');
+      const nextLabel = this.artifacts.nextVersionLabel(a);
+      const uploaded = await Promise.all(
+        files.map(async (file) => {
+          const storageKey = this.storage.buildStorageKey(a.projectId, a._id.toString(), nextLabel, file.originalname);
+          await this.storage.upload(storageKey, file.buffer, { originalname: file.originalname, uploader: me.knoxId });
+          return { fileName: file.originalname, storageKey };
+        }),
+      );
+      const saved = await this.artifacts.addVersion(id, { files: uploaded, note: dto.note, dept: dto.dept ?? null }, me);
+      return { data: toArtifactDto(saved, 'edit') };
+    }
+
     const saved = await this.artifacts.addVersion(
       id,
-      { fileName: file.originalname, storageKey, note: dto.note, dept: dto.dept ?? null },
+      { viewUrl: dto.viewUrl, hpcPath: dto.hpcPath, note: dto.note, dept: dto.dept ?? null },
       me,
     );
     return { data: toArtifactDto(saved, 'edit') };
@@ -180,11 +187,15 @@ export class ArtifactsController {
    * 다운로드. **실물 파일에 대한 접근 판정은 여기서 한다** - SIREN이 아니라 이 서비스가
    * 자기 데이터의 문지기다(Hub 설계서 §7.1). view 등급은 released 버전만 받을 수 있다 —
    * 목록/상세와 같은 마스킹 규칙(사용자 요청).
+   *
+   * ★ 한 버전이 여러 파일을 가질 수 있게 되면서(§3.9) `storageKey`로 그중 하나를
+   *   특정한다 — versionRef만으로는 더 이상 파일 하나를 가리킬 수 없다.
    */
-  @Get(':id/download/:versionRef')
+  @Get(':id/download/:versionRef/:storageKey')
   async download(
     @Param('id') id: string,
     @Param('versionRef') versionRef: string,
+    @Param('storageKey') storageKey: string,
     @CurrentActor() me: Actor,
   ): Promise<StreamableFile> {
     const a = await this.artifacts.findVisibleOrThrow(id, me);
@@ -194,13 +205,15 @@ export class ArtifactsController {
     if (access !== 'edit' && !version.isReleased) {
       throw new ForbiddenException('Only released versions are available at your access level.');
     }
-    if (!version.storageKey) throw new BadRequestException('This version has no stored file.');
+    const decodedKey = decodeURIComponent(storageKey);
+    const file = (version.files ?? []).find((f) => f.storageKey === decodedKey);
+    if (!file) throw new NotFoundException('This version has no such file.');
 
-    const body = await this.storage.download(version.storageKey);
+    const body = await this.storage.download(file.storageKey);
     if (!body) throw new NotFoundException('The stored file could not be found.');
     return new StreamableFile(body, {
       type: 'application/octet-stream',
-      disposition: `attachment; filename="${encodeURIComponent(version.fileName)}"`,
+      disposition: `attachment; filename="${encodeURIComponent(file.fileName)}"`,
     });
   }
 

@@ -28,6 +28,11 @@ export class CreateCalypsoArtifactDto {
   @MaxLength(500)
   description?: string;
 
+  /** 생략하면 File(실물을 Calypso가 들고 있다). 'OA'/'HPC'면 각 버전이 viewUrl/hpcPath만 갖는다. */
+  @IsOptional()
+  @IsIn(['OA', 'HPC'])
+  network?: 'OA' | 'HPC';
+
   @IsOptional()
   @IsBoolean()
   restrictView?: boolean;
@@ -43,6 +48,16 @@ export class CalypsoAddVersionDto {
   @IsOptional()
   @IsString()
   note?: string;
+
+  /** network==='OA'인 artifact에만. */
+  @IsOptional()
+  @IsString()
+  viewUrl?: string;
+
+  /** network==='HPC'인 artifact에만. */
+  @IsOptional()
+  @IsString()
+  hpcPath?: string;
 }
 
 export class CalypsoReleaseDto {

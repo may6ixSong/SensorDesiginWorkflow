@@ -9,7 +9,7 @@ import { ArtifactHtmlView, ArtifactIntent, ArtifactVersionDto, BlockDto } from '
  * 라이브 흐름이다(설계서 04장 §2, §6.2, §6.3).
  */
 export interface NewArtifactSourceInput {
-  source: 'live' | 'file' | 'hpc' | 'attested';
+  source: 'live' | 'file' | 'hpc';
   name: string;
   serviceKey?: string;
   externalArtifactId?: string;
@@ -138,7 +138,7 @@ export function useDeleteBlock(workflowId: string) {
 }
 
 /**
- * **block의 recipient 교체** (설계서 04장 §3.2, §3.3) — A/B/C/D 전부 공통이다.
+ * **block의 recipient 교체** (설계서 04장 §3.2, §3.3) — A/B/C 전부 공통이다.
  *
  * ★ 편집 권한은 그 workflow의 Edit Access다. recipient에 **속하는 것**과 recipient를
  *   **편집하는 것**은 별개라, 자기를 넣지 않으면 고쳐놓고도 그 slide를 못 열 수 있다.

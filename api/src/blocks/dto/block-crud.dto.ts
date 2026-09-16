@@ -4,12 +4,12 @@ import { AccessGrantDto } from '../../workflows/dto/workflow-crud.dto';
 
 /**
  * "새 Artifact 추가" 다이얼로그가 기존 artifact를 재사용하지 않고 그 자리에서 출처를
- * 확정할 때 보낸다(설계서 04장 §6). live/file/hpc(OA Service/File Artifacts/HPC Service)는
- * 서버가 pickable을 재검증한 뒤 find-or-create 하고, attested(D)는 검증 없이 새로 만든다.
+ * 확정할 때 보낸다(설계서 04장 §6) — live/file/hpc(OA Service/File Artifacts/HPC Service)
+ * 전부 서버가 pickable을 재검증한 뒤 find-or-create 한다.
  */
 export class NewArtifactSourceDto {
-  @IsIn(['live', 'file', 'hpc', 'attested'])
-  source: 'live' | 'file' | 'hpc' | 'attested';
+  @IsIn(['live', 'file', 'hpc'])
+  source: 'live' | 'file' | 'hpc';
 
   @IsString()
   @MinLength(1)
@@ -93,5 +93,5 @@ export class UpdateBlockDto {
   newArtifact?: NewArtifactSourceDto;
 }
 
-/** block의 recipient 교체 — A/B/C/D 전부 공통이다(설계서 04장 §3.2). */
+/** block의 recipient 교체 — A/B/C 전부 공통이다(설계서 04장 §3.2). */
 export class ReplaceRecipientsDto extends AccessGrantDto {}

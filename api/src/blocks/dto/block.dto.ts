@@ -25,7 +25,7 @@ export interface BlockDto {
   /** 열람 권한이 없으면 masked 형태로만 온다. 미매핑이면 null. */
   artifact: ArtifactDto | MaskedArtifactDto | null;
   publishState: PublishState;
-  /** artifact가 매핑된 block에서만 값이 있다 — A/B/C/D 전부 공통이다(설계서 04장 §3). */
+  /** artifact가 매핑된 block에서만 값이 있다 — A/B/C 전부 공통이다(설계서 04장 §3). */
   recipients: { departments: string[]; users: string[] } | null;
   series: string | null;
   seriesIdx: number;

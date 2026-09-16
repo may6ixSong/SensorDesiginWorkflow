@@ -12,11 +12,21 @@ import { apiClient, ApiEnvelope } from './client';
  *   필요 없어 제거했다.
  */
 
+export interface CalypsoFile {
+  fileName: string;
+  storageKey: string;
+}
+
 export interface CalypsoVersionView {
   versionLabel: string;
   isReleased: boolean;
   versionRef: string;
-  fileName: string;
+  /** network===null(File)일 때만 채워진다 — 한 버전에 여러 파일이 있을 수 있다. */
+  files: CalypsoFile[];
+  /** network==='OA'일 때만. */
+  viewUrl: string | null;
+  /** network==='HPC'일 때만. */
+  hpcPath: string | null;
   note: string;
   createdBy: string;
   createdAt: string;
@@ -40,6 +50,8 @@ export interface CalypsoArtifact {
   department: string;
   name: string;
   description: string;
+  /** null(File) | 'OA' | 'HPC' — 등록 시 한 번 정해지면 바뀌지 않는다(설계서 04장 §2). */
+  network: 'OA' | 'HPC' | null;
   createdBy: string;
   /** 'edit'이면 업로드/릴리스/권한관리 가능, 'view'면 released 버전만 열람. */
   myAccess: 'edit' | 'view';
@@ -75,11 +87,18 @@ export async function createCalypsoArtifact(input: {
   return data.data;
 }
 
+/**
+ * File 콘텐츠(network===null)용 업로드 — 지금 FE는 한 번에 파일 하나만 고르지만,
+ * 백엔드 필드명은 여러 개를 받을 수 있는 `files`다(설계서 04장 §2, §6).
+ *
+ * TODO: OA/HPC 콘텐츠(viewUrl/hpcPath 텍스트만 있는 등록)를 위한 업로드 함수와,
+ *   한 번에 여러 파일을 고르는 UI는 이번 변경 범위 밖이다.
+ */
 export async function uploadCalypsoVersion(
   id: string, projectId: string, file: File, note: string,
 ): Promise<CalypsoArtifact> {
   const form = new FormData();
-  form.append('file', file);
+  form.append('files', file);
   form.append('note', note);
   const { data } = await apiClient.post<ApiEnvelope<CalypsoArtifact>>(
     `/calypso-artifacts/${id}/versions`, form, { params: { projectId } },
@@ -94,9 +113,12 @@ export async function releaseCalypsoArtifact(id: string, projectId: string, note
   return data.data;
 }
 
-export async function downloadCalypsoVersion(id: string, projectId: string, versionRef: string): Promise<Blob> {
+/** storageKey로 그 버전의 여러 파일 중 하나를 특정한다(설계서 04장 §2, §6). */
+export async function downloadCalypsoVersion(
+  id: string, projectId: string, versionRef: string, storageKey: string,
+): Promise<Blob> {
   const { data } = await apiClient.get<Blob>(
-    `/calypso-artifacts/${id}/download/${encodeURIComponent(versionRef)}`,
+    `/calypso-artifacts/${id}/download/${encodeURIComponent(versionRef)}/${encodeURIComponent(storageKey)}`,
     { params: { projectId }, responseType: 'blob' },
   );
   return data;

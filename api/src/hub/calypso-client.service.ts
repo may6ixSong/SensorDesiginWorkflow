@@ -272,7 +272,14 @@ export class CalypsoClientService {
   }
 
   async createArtifact(
-    input: { projectId: string; department: string; name: string; description?: string; restrictView?: boolean },
+    input: {
+      projectId: string;
+      department: string;
+      name: string;
+      description?: string;
+      network?: 'OA' | 'HPC';
+      restrictView?: boolean;
+    },
     knoxId: string,
     departments: string[],
     isAdmin: boolean,
@@ -298,15 +305,21 @@ export class CalypsoClientService {
   }
 
   /**
-   * 업로드 = 파일 그대로 multipart로 Calypso에 재전송한다. 이 프로세스는 Multer가 이미
-   * 메모리에 올려준 `file.buffer` 하나만 들고 있고, 그걸 그대로 한 번 더 포워딩할 뿐
-   * 디스크에 쓰거나 추가로 복제하지 않는다 — 브라우저 → SIREN BE → Calypso 두 홉을
-   * 스트림처럼 다루되, multipart 인코딩 자체는 native FormData/Blob에 맡긴다.
+   * 업로드 = File 콘텐츠면 파일들을 그대로 multipart로 Calypso에 재전송하고(§3.9,
+   * 여러 개 가능), OA/HPC 콘텐츠면 파일 없이 viewUrl/hpcPath 텍스트만 보낸다. 이
+   * 프로세스는 Multer가 이미 메모리에 올려준 `file.buffer`들만 들고 있고, 그걸 그대로
+   * 한 번 더 포워딩할 뿐 디스크에 쓰거나 추가로 복제하지 않는다 — 브라우저 → SIREN BE →
+   * Calypso 두 홉을 스트림처럼 다루되, multipart 인코딩 자체는 native FormData/Blob에
+   * 맡긴다.
    */
   async uploadVersion(
     externalArtifactId: string,
-    file: { buffer: Buffer; originalname: string; mimetype?: string },
-    note: string | undefined,
+    input: {
+      files?: { buffer: Buffer; originalname: string; mimetype?: string }[];
+      viewUrl?: string;
+      hpcPath?: string;
+      note?: string;
+    },
     knoxId: string,
     departments: string[],
     isAdmin: boolean,
@@ -316,12 +329,16 @@ export class CalypsoClientService {
     const timer = setTimeout(() => controller.abort(), TRANSFER_TIMEOUT_MS);
     try {
       const form = new FormData();
-      form.append(
-        'file',
-        new Blob([file.buffer as unknown as BlobPart], { type: file.mimetype || 'application/octet-stream' }),
-        file.originalname,
-      );
-      if (note) form.append('note', note);
+      for (const file of input.files ?? []) {
+        form.append(
+          'files',
+          new Blob([file.buffer as unknown as BlobPart], { type: file.mimetype || 'application/octet-stream' }),
+          file.originalname,
+        );
+      }
+      if (input.note) form.append('note', input.note);
+      if (input.viewUrl) form.append('viewUrl', input.viewUrl);
+      if (input.hpcPath) form.append('hpcPath', input.hpcPath);
       const res = await fetch(`${this.baseUrl}/artifacts/${encodeURIComponent(externalArtifactId)}/versions`, {
         method: 'POST',
         signal: controller.signal,
@@ -342,10 +359,14 @@ export class CalypsoClientService {
    * 다운로드 — 응답 바디를 Buffer로 모으지 않고 Node Readable로 그대로 넘긴다(설계서
    * 07장 §2 "파일 전체를 메모리에 버퍼링하지 않는다"). 컨트롤러가 이 스트림을
    * StreamableFile로 그대로 클라이언트에 흘려보낸다.
+   *
+   * ★ 한 버전이 여러 파일을 가질 수 있게 되면서(§3.9) `storageKey`로 그중 하나를
+   *   특정한다.
    */
   async downloadVersion(
     externalArtifactId: string,
     versionRef: string,
+    storageKey: string,
     knoxId: string,
     departments: string[],
     isAdmin: boolean,
@@ -357,7 +378,8 @@ export class CalypsoClientService {
     const timer = setTimeout(() => controller.abort(), TRANSFER_TIMEOUT_MS);
     try {
       const res = await fetch(
-        `${this.baseUrl}/artifacts/${encodeURIComponent(externalArtifactId)}/download/${encodeURIComponent(versionRef)}`,
+        `${this.baseUrl}/artifacts/${encodeURIComponent(externalArtifactId)}/download/`
+          + `${encodeURIComponent(versionRef)}/${encodeURIComponent(storageKey)}`,
         { signal: controller.signal, headers: this.actorHeaders(knoxId, departments, isAdmin) },
       );
       if (!res.ok || !res.body) {

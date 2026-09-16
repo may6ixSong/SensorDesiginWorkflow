@@ -2,32 +2,21 @@
  * 통합 신뢰도 티어 (설계서 04장 §2). 산출물이 아니라 **버전 엔트리마다** 붙는다 —
  * 나중에 실연동이 붙어도 과거 수동 기록을 고치지 않고 다음 엔트리가 다른 tier로 찍힌다.
  *
+ * ★ Tier D(External/Attested)는 폐기했다 — project 공유 Artifact로서의 존재 가치는
+ *   있었지만(여러 workflow가 give/receive로 재사용), 실제 접근 통제·버전 이력을 가질
+ *   근거가 없다는 점 때문에 결국 File Artifacts(B, Calypso)로 흡수했다. Calypso가
+ *   File(실물 업로드, 여러 개 가능) 외에 OA-link/HPC-path 참조형 콘텐츠도 갖도록
+ *   확장하는 것으로 D의 용도를 대체한다(설계서 04장 §2, §6).
+ *
  * SOURCE OF TRUTH: docs/04-artifact-and-publish.md §2
- * web/src/shared/constants/tier.ts 에도 동일하게 중복 정의한다 — 함께 수정할 것.
+ * web/src/types/domain.ts 의 `Tier` 타입에도 동일하게 중복 정의한다 — 함께 수정할 것.
  */
-export const TIERS = ['A', 'B', 'C', 'D'] as const;
+export const TIERS = ['A', 'B', 'C'] as const;
 export type Tier = (typeof TIERS)[number];
 
-/**
- * A/B/C(OA Service/File Artifacts/HPC Service)는 그 서비스가 게이트 2(canView/canEdit)를
- * 판정한다. D(External/Attested)만 물어볼 서비스가 없다(설계서 04장 §3).
- *
- * recipient(누가 볼 수 있는가)는 A/B/C/D 전부 공통으로 block 단위로 SIREN이 저장한다 —
- * artifact 단위로 SIREN이 editAccess/viewAccess를 직접 보관하던 옛 모델은 폐기했다.
- *
- * ★ v3 설계 도중 한 번 뒤집힌 결정이다 — 원래는 A만 여기 해당했다. 여러 workflow가 하나의
- *   artifact를 공유할 때 artifact 단위 권한이 workflow 경계를 넘어 꼬이는 문제와, HPC
- *   Service는 HPC망 안에서 권한 자체가 무의미하다는 점 때문에 B/C까지 넓혔다. 이름은
- *   그대로 유지한다 — A/B/C 전부 여전히 "그 서비스가 권한을 판정한다"는 뜻이기 때문이다.
- */
-export function isServiceGovernedTier(tier: Tier): boolean {
-  return tier !== 'D';
-}
-
-/** D 전용 — 물어볼 서비스가 없다(common/access.ts의 attestedLevel 참고). */
-export function isSirenGovernedTier(tier: Tier): boolean {
-  return !isServiceGovernedTier(tier);
-}
+// isServiceGovernedTier/isSirenGovernedTier(D 전용 분기 판정)는 D 폐기와 함께 제거했다 —
+// A/B/C 전부 그 서비스가 게이트 2(canView/canEdit)를 판정하므로 더 이상 분기가 필요 없다
+// (설계서 04장 §3). 아무 데서도 호출되지 않던 죽은 헬퍼였다.
 
 export function isValidTier(value: unknown): value is Tier {
   return typeof value === 'string' && (TIERS as readonly string[]).includes(value);

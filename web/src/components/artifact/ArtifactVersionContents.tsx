@@ -96,21 +96,26 @@ export function ArtifactVersionContents({
 
               <Box sx={{ mt: '20px', paddingTop: '16px', borderTop: `1px solid ${T.ln}` }}>
                 <Box sx={{ fontFamily: FONT_MONO, fontSize: 10, letterSpacing: '.15em', textTransform: 'uppercase', color: T.dm2, mb: '9px' }}>
-                  File
+                  {/* 한 버전이 여러 파일을 가질 수 있다(설계서 04장 §2, §6) — 목록으로 그린다.
+                      TODO: 여러 개 선택 다운로드/zip은 이번 변경 범위 밖이다. */}
+                  Files
                 </Box>
-                <Box
-                  sx={{
-                    display: 'flex', alignItems: 'center', gap: '8px',
-                    fontFamily: FONT_MONO, fontSize: 11.5, color: T.tx,
-                    background: T.sf2, border: `1px solid ${T.ln}`, borderRadius: '7px',
-                    padding: '9px 11px', wordBreak: 'break-all',
-                  }}
-                >
-                  <Icon name="word" size={14} />
-                  {v.fileName}
-                </Box>
+                {v.files.map((f) => (
+                  <Box
+                    key={f.storageKey}
+                    sx={{
+                      display: 'flex', alignItems: 'center', gap: '8px',
+                      fontFamily: FONT_MONO, fontSize: 11.5, color: T.tx,
+                      background: T.sf2, border: `1px solid ${T.ln}`, borderRadius: '7px',
+                      padding: '9px 11px', wordBreak: 'break-all', mb: '6px',
+                    }}
+                  >
+                    <Icon name="word" size={14} />
+                    {f.fileName}
+                  </Box>
+                ))}
                 <Box sx={{ mt: '11px' }}>
-                  <SirenButton onClick={() => onDownload(v)}>
+                  <SirenButton onClick={() => onDownload(v)} disabled={!v.files.length}>
                     <Icon name="dn" /> Download
                   </SirenButton>
                 </Box>

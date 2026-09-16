@@ -194,8 +194,8 @@ export class ArtifactSourceService {
 
   /**
    * 이미 있는 artifact를 **재사용**할 때의 재검증(설계서 01장 §5) — block 생성/재매핑
-   * 양쪽에서 쓴다. 새로 만드는 경로(resolveLiveOrFile/resolveAttested)와 판정 기준은
-   * 같지만, 이미 SIREN에 존재하는 artifact라 tier로 분기해서 다시 확인한다.
+   * 양쪽에서 쓴다. 새로 만드는 경로(resolveLiveOrFile)와 판정 기준은 같지만, 이미
+   * SIREN에 존재하는 artifact라 tier로 분기해서 다시 확인한다.
    */
   async assertReusePickable(
     project: ProjectDocument,
@@ -204,13 +204,6 @@ export class ArtifactSourceService {
     intent: CandidateIntent,
   ): Promise<void> {
     if (actor.isAdmin) return;
-
-    if (artifact.tier === 'D') {
-      if (intent !== 'received') {
-        throw new ForbiddenException('External/Attested can only be used for artifacts this workflow receives.');
-      }
-      return;
-    }
 
     let level: AccessLevel;
     const isAdmin = actor.isAdmin && !actor.isImpersonating;
@@ -237,16 +230,10 @@ export class ArtifactSourceService {
     }
   }
 
-  /** D Tier(받는 전용) — 검증할 시스템이 없으므로 그냥 새로 만든다(설계서 04장 §6.4). */
-  async resolveAttested(
-    project: ProjectDocument,
-    actor: Actor,
-    intent: CandidateIntent,
-    input: { name: string },
-  ): Promise<ArtifactDocument> {
-    if (intent !== 'received') {
-      throw new BadRequestException('Tier D can only be used for artifacts this workflow receives.');
-    }
-    return this.artifacts.createAttested(project._id as Types.ObjectId, input, actor);
-  }
+  // TODO(Tier D → B 통합, 설계서 04장 §2·§6): "새 Artifact 추가" 다이얼로그를 지금의
+  // OA Service/File Artifacts/HPC Service 3버튼에서, admin이 등록한 OA/HPC Service와
+  // Calypso 산출물을 한데 합친 단일 목록으로 바꾸는 작업이 남아 있다. 그리고
+  // fileArtifactCandidates()/listArtifacts()는 Calypso가 File(복수 파일)/OA-link/
+  // HPC-path 세 콘텐츠 종류를 갖게 되면 그 종류·network 값을 후보 목록에 함께 실어야
+  // 한다 — 지금은 File 콘텐츠만 있다고 가정한 모양 그대로다.
 }

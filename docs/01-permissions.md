@@ -11,7 +11,7 @@ Admin ────────────────────────�
   │    ├─ Workflow  Owner / Edit / View 인가?    ← app bar 노출 · 캔버스 편집 판정
   │    │
   │    └─ Artifact  A/B/C(OA Service/File Artifacts/HPC Service): recipient(게이트) → 서비스 권한(게이트)
-  │                 D(External/Attested): 이번 범위 밖              ← 상세 slide · 버전 열람 판정
+  │                 (예외 없음 — 셋 다 같은 2단 게이트)              ← 상세 slide · 버전 열람 판정
 ```
 
 ---
@@ -193,18 +193,20 @@ UI에서도 양쪽에 동시에 표시하고, 경고를 띄우지 않는다.
 
 ### 4.1 Tier별 소유권
 
-★ **이 절은 v3 설계 도중 두 번 뒤집혔다.** 최초 설계는 "A만 서비스가 권한을 관리하고 B/C/D는
+★ **이 절은 v3 설계 도중 세 번 뒤집혔다.** 최초 설계는 "A만 서비스가 권한을 관리하고 B/C/D는
 SIREN이 artifact 단위로 보관한다"였는데, 여러 workflow가 하나의 artifact를 공유할 때 한
 workflow의 수정이 다른 workflow까지 번지는 문제, 그리고 HPC Service는 HPC망 안에서 사실상
 권한 자체가 무의미하다는 점 때문에 **A/B/C(OA Service/File Artifacts/HPC Service) 전부 A의
 방식으로 통일**했다(04장 §3). 이어서 D(External/Attested)의 artifact 단위 SIREN 보관 권한
-(editAccess/viewAccess/expectedGiver)도 완전히 폐기하고, **recipient는 A/B/C/D 전부 block
-단위**로 통일했다 — artifact는 이제 권한을 전혀 들고 있지 않는다.
+(editAccess/viewAccess/expectedGiver)도 완전히 폐기하고 recipient를 block 단위로 통일했다.
+**마지막으로 D 자체를 폐기했다** — 실제 접근 통제·버전 이력을 가질 근거가 없던 tier를 두는
+대신, File Artifacts(B, Calypso)가 OA-link/HPC-path 참조형 콘텐츠까지 갖도록 넓혀 그 역할을
+대체했다(04장 §2, §6). 그 결과 recipient는 이제 **A/B/C 전부 예외 없이 block 단위**다 —
+artifact는 권한을 전혀 들고 있지 않는다.
 
 | Tier | 실제 Edit/View를 누가 판정하나 | Recipient |
 |---|---|---|
 | **A/B/C** (OA Service/File Artifacts/HPC Service) | **그 서비스**가 관리. SIREN은 관여하지 않는다 | SIREN이 **block(=workflow 안의 자리) 단위로 저장**. 같은 artifact도 workflow마다 recipient 구성이 다를 수 있다 |
-| **D** (External/Attested) | `artifact.createdBy`(+Admin) — 물어볼 서비스가 없어 잠정 고정. 이번 범위에서 더 정교화하지 않는다 | A/B/C와 동일하게 block 단위 |
 
 recipient를 **그 workflow의 block에** 붙이는 이유는, 권한을 그 서비스가 관리하고 SIREN은 알
 방법이 없기 때문이다 — 같은 artifact라도 workflow X에서는 AA·BB 부서가 받고, workflow Y에서는
@@ -212,22 +214,15 @@ CC 부서만 받는 식으로 **workflow마다 구성이 다를 수 있다.**
 
 ### 4.2 상세 slide 열람 판정
 
-**A/B/C(OA Service/File Artifacts/HPC Service) 전부 2단 게이트다.** SIREN이 관리하는
-recipient를 먼저 통과해야 하고, 그다음 그 서비스 자신의 권한을 다시 통과해야 한다. 어느
-한쪽이라도 없으면 막힌다 — **workflow Edit Access가 있어도 recipient가 아니면 막힌다.**
-(예전 설계에서 "workflow Edit Access는 항상 통과"였던 규칙은 폐지한다.) D는 물어볼 서비스가
-없으므로 게이트 2 대신 `createdBy`로 edit을 고정한다.
+**A/B/C(OA Service/File Artifacts/HPC Service) 전부 2단 게이트다, 예외 없이.** SIREN이
+관리하는 recipient를 먼저 통과해야 하고, 그다음 그 서비스 자신의 권한을 다시 통과해야 한다.
+어느 한쪽이라도 없으면 막힌다 — **workflow Edit Access가 있어도 recipient가 아니면 막힌다.**
+(예전 설계에서 "workflow Edit Access는 항상 통과"였던 규칙은 폐지한다.)
 
 ```ts
 canOpenArtifactSlide(user, block, artifact, workflow, project):
   if (isAdmin) return true
   if (!canAccessProject(user, project)) return false
-
-  if (artifact.tier === 'D') {
-    // 물어볼 서비스가 없다 — recipient면 view, createdBy면 edit (이번 범위 최종 형태)
-    if (artifact.createdBy === user.knoxId) return true
-    return matches(user, block.recipients, project)
-  }
 
   // A / B / C 공통 — 게이트 1: SIREN이 관리하는 recipient (그 workflow의 block에 저장, §4.1)
   if (!matches(user, block.recipients, project)) return false   // 여기서 막히면 그 아래는 물어보지도 않는다
@@ -258,7 +253,7 @@ canOpenArtifactSlide(user, block, artifact, workflow, project):
 | 부서 | `Project.departments`. **다중** |
 | 개별 사용자 | **전사 검색**. **다중** |
 
-workflow와 동일한 규칙이다(§3.3). A/B/C/D 전부 block별 `recipients`(부서 다중 + 사용자 다중
+workflow와 동일한 규칙이다(§3.3). A/B/C 전부 block별 `recipients`(부서 다중 + 사용자 다중
 단일 grant) 모양을 따른다.
 
 - **편집 권한**(누가 이 recipient 목록을 고칠 수 있는가)은 여기서 다루는 "recipient에 속하는
@@ -268,7 +263,7 @@ workflow와 동일한 규칙이다(§3.3). A/B/C/D 전부 block별 `recipients`(
 
 | Tier | 공유 범위 |
 |---|---|
-| A/B/C/D의 `recipients` | **block(=그 workflow 안의 자리)에 붙는다.** 같은 artifact가 여러 workflow에 놓이면 각 workflow가 **독립된 recipient 구성**을 갖는다(§4.1). 실제 Edit/View 권한은 SIREN이 아니라 그 서비스가(A/B/C) 또는 `createdBy`가(D) 판정하므로 여기서 "공유"할 것 자체가 없다 |
+| A/B/C의 `recipients` | **block(=그 workflow 안의 자리)에 붙는다.** 같은 artifact가 여러 workflow에 놓이면 각 workflow가 **독립된 recipient 구성**을 갖는다(§4.1). 실제 Edit/View 권한은 SIREN이 아니라 그 서비스가 판정하므로 여기서 "공유"할 것 자체가 없다 |
 
 ---
 

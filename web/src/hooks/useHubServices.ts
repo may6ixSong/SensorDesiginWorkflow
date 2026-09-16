@@ -17,7 +17,7 @@ export interface HubService {
   icon: string;
   contractVersion: string;
   /** 'A' = OA Service, 'C' = HPC Service. Calypso(File Artifacts, 'B')는 이 레지스트리에 없다. */
-  defaultTier: 'A' | 'B' | 'C' | 'D';
+  defaultTier: 'A' | 'B' | 'C';
   transport: 'http' | 'none';
   baseUrl: string | null;
   isBuiltIn: boolean;

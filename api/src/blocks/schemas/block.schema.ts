@@ -24,7 +24,7 @@ export type BlockDocument = Block & Document;
 
 /**
  * 캔버스 위의 **자리(placement)**다 — 산출물 그 자체가 아니다(설계서 04장 §1).
- * 버전도, B/C/D의 권한도 갖지 않는다. 전부 Artifact로 옮겼다.
+ * 버전도, A/B/C의 권한도 갖지 않는다. 전부 Artifact로 옮겼다.
  *
  * 구 `deliverables` 컬렉션이 이것과 `artifacts` 둘로 쪼개진 결과물이다.
  */
@@ -58,26 +58,25 @@ export class Block {
   layout: Layout;
 
   /**
-   * 지금은 항상 'own'이다 — "새 Artifact 추가" 버튼이 하나로 통합되어 내가 주는 산출물만
-   * 만든다(설계서 03장 §5.2). 받는 산출물 UX는 TODO T2에서 되살릴 예정이라 필드는 남겨둔다.
+   * "새 Artifact 추가" 다이얼로그의 첫 질문이다(설계서 03장 §5.2, 04장 §6) — 내가 주는
+   * 산출물(own)인지 받는 산출물(received)인지. 생성 후에는 바뀌지 않는다.
    *
-   * TODO(T2): 받는 산출물 UI를 붙일 때 이 필드를 다시 쓴다. 그때의 선택 가능 범위 규칙은
-   *   이미 확정되어 있다(설계서 04장 §6) — A는 그 서비스의 view 권한, B/C는 주는 쪽
-   *   편집 권한자가 view 권한을 준 것만, D는 자유.
+   * 선택 가능 범위 규칙(설계서 04장 §6.2) — A/C는 그 서비스의 edit(own)/view(received)
+   * 권한, B(File Artifacts)는 Calypso의 myAccess가 그대로 같은 역할을 한다.
    */
   @Prop({ type: String, default: 'own', enum: ['own', 'received'] })
   intent: 'own' | 'received';
 
   /**
-   * artifact가 매핑된 block에서만 의미가 있다 — A/B/C/D 전부 공통이다(설계서 04장 §3).
+   * artifact가 매핑된 block에서만 의미가 있다 — A/B/C 전부 공통이다(설계서 04장 §3).
    *
    * SIREN은 여기서 "누가 이 자리의 산출물을 받는가"만 관리한다. 이 구성은
    * **workflow마다 독립**이다 — 같은 artifact가 workflow X와 Y에 놓여도 X는 AA·BB 부서에,
    * Y는 CC 부서에만 갈 수 있다. 그래서 artifact가 아니라 여기(block)에 붙는다.
    *
    * ★ edit/view로 나뉘지 않는다 — recipient는 오직 "볼 수 있는가"의 게이트 1일 뿐이고,
-   *   실제 edit 여부는 A/B/C는 그 서비스가, D는 artifact.createdBy가 최종 판정한다
-   *   (그래서 recipient를 편집하는 권한과 recipient에 속하는 것은 여전히 별개다).
+   *   실제 edit 여부는 그 서비스가 최종 판정한다(그래서 recipient를 편집하는 권한과
+   *   recipient에 속하는 것은 여전히 별개다).
    *
    * 이 목록은 release 알림 대상이자 **slide 열람의 첫 번째 게이트**다(설계서 04장 §4.1).
    */

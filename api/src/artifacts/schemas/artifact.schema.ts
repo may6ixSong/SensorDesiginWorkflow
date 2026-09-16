@@ -50,7 +50,7 @@ export class ArtifactVersion {
    * 산출물 단위가 아니라 엔트리 단위라서, 나중에 실연동이 붙어도 예전 수동 기록을
    * 지우거나 옮길 필요가 없다 - 다음 엔트리가 다른 tier로 찍힐 뿐이다.
    */
-  @Prop({ type: String, required: true, enum: TIERS, default: 'C' })
+  @Prop({ type: String, required: true, enum: TIERS })
   tier: Tier;
 
   /** 표시용 자유 문자열. major.minor 규칙은 SIREN이 직접 만드는 서비스에만 강제한다. */
@@ -90,7 +90,7 @@ export class ArtifactVersion {
   @Prop({ default: '' })
   note: string;
 
-  // --- C/D 티어 전용 (수동 기록) ---
+  // --- C 티어 전용 (수동 기록) ---
   @Prop({ type: String, default: null })
   assertedBy: string | null;
 
@@ -137,7 +137,7 @@ export class Artifact {
   name: string;
 
   /** versions[0].tier를 캐시한 값 — "현재 tier"다. */
-  @Prop({ type: String, required: true, enum: TIERS, default: 'D', index: true })
+  @Prop({ type: String, required: true, enum: TIERS, index: true })
   tier: Tier;
 
   @Prop({ type: String, required: true, enum: ['OA', 'HPC'], default: 'OA' })
@@ -161,8 +161,7 @@ export class Artifact {
 
   // 권한은 artifact가 들고 있지 않는다 — A/B/C(OA Service/File Artifacts/HPC Service)는
   // 그 서비스가 실시간으로 판정하고, recipient(누가 볼 수 있는지)는 workflow마다 달라질 수
-  // 있어 Block.recipients에 있다. D(External/Attested)도 이제 같은 규칙을 쓴다 — 이번
-  // 범위에서 "누가 새 버전을 등록/교체할 수 있는지"는 정교화하지 않았다(우선순위 낮음).
+  // 있어 Block.recipients에 있다.
 
   /** publish 이력. 최신 버전이 배열 앞(index 0)에 오도록 유지한다. */
   @Prop({ type: [ArtifactVersionSchema], default: [] })

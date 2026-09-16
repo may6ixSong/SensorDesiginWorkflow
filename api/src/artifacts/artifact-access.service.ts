@@ -5,7 +5,6 @@ import {
   ArtifactLike,
   BlockLike,
   ProjectLike,
-  attestedLevel,
   myDepartments,
   recipientLevel,
 } from '../common/access';
@@ -37,9 +36,9 @@ import { CALYPSO_SERVICE_KEY, CalypsoClientService } from '../hub/calypso-client
  *   한 workflow의 수정이 다른 workflow까지 번지는 문제와 HPC Service는 HPC망 안에서 권한
  *   자체가 무의미하다는 점 때문에 A/B/C를 이 2단 게이트로 통일했다.
  *
- * External/Attested(D)만 서비스가 없어 게이트 2가 없다 — block recipient면 view,
- * artifact.createdBy(+Admin)면 edit이다(attestedLevel, 이번 범위에서 더 정교화하지
- * 않기로 함).
+ * ★ External/Attested(D) — 서비스가 없어 게이트 2가 없던 tier — 는 폐기했다. File
+ *   Artifacts(B, Calypso)가 OA-link/HPC-path 참조형 콘텐츠까지 갖도록 넓어지면서 D의
+ *   역할을 대체했으므로, 지금은 A/B/C 전부 예외 없이 이 2단 게이트를 탄다.
  */
 @Injectable()
 export class ArtifactAccessService {
@@ -65,11 +64,6 @@ export class ArtifactAccessService {
     if (actor.isAdmin) return 'edit';
 
     const myDepts = myDepartments(actor, project);
-
-    if ((artifact.tier ?? 'D') === 'D') {
-      // External/Attested — 물어볼 서비스가 없다. block recipient(view) + createdBy(edit).
-      return attestedLevel(actor, block, artifact, myDepts);
-    }
 
     // --- A/B/C(OA Service/File Artifacts/HPC Service) 공통 ---
     // 게이트 1: SIREN recipient. 여기서 막히면 서비스 호출 자체를 하지 않는다.

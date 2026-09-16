@@ -28,33 +28,60 @@ project이므로 후보에 나오지 않는다(02장 §1). Admin이 여러 proje
 
 ## 2. Tier 정의
 
-★ **내부 값(DB에 저장되는 글자 A/B/C/D)과 사람이 보는 이름은 분리한다.** UI·문서·주석은 전부
+★ **내부 값(DB에 저장되는 글자 A/B/C)과 사람이 보는 이름은 분리한다.** UI·문서·주석은 전부
 아래 "이름" 열을 쓴다 — "Tier A"처럼 글자로 부르지 않는다. `Tier` 타입과 enum 값 자체는
 바꾸지 않는다(실데이터 마이그레이션이 아니라 표기 문제이기 때문).
+
+★ **Tier D(External / Attested)는 폐기했다.** 팀·회사 밖에서 생성돼 출처도 versioning도
+불가능한 산출물을 담던 tier였는데, 실제 접근 통제·버전 이력을 가질 근거가 없어 recipient도
+release 참여도 못 하는 반쪽짜리 tier로 남아 있었다. 대신 **File Artifacts(B, Calypso)를
+확장**해 그 역할을 대체했다 — 자세한 건 이 절 하단 참고. 내부 enum 값도 `'A'|'B'|'C'`로
+줄었다(`api/src/common/constants/tier.ts`, `web/src/types/domain.ts`).
 
 | 내부 값 | 이름 | 망 | SIREN이 아는 것 | 전형적 대상 |
 |---|---|---|---|---|
 | **A** | **OA Service** | OA | push event로 버전 메타 수신 + 야간 전체 재동기화(07장). canView/canEdit·html-view는 열람 시점에 그 서비스에 라이브로 묻는다 | 계약을 맞춘 RPM·SimHub 등 Hub 등록 서비스 |
-| **B** | **File Artifacts** | OA | 위와 동일한 event 기반 — 대상은 **Calypso 하나뿐**이고 SIREN 내장이라 Hub 레지스트리(Service Manage)에는 없다 | **Calypso**(SIREN 내장 파일형 산출물 등록) |
+| **B** | **File Artifacts** | **OA 또는 HPC, 또는 없음** — 아래 §2.2 참고 | 위와 동일한 event 기반 — 대상은 **Calypso 하나뿐**이고 SIREN 내장이라 Hub 레지스트리(Service Manage)에는 없다 | **Calypso**(SIREN 내장 산출물 등록 — 실물 파일뿐 아니라 OA-link/HPC-path 참조도 포함) |
 | **C** | **HPC Service** | HPC | 위와 동일한 event 기반 — 단 실제 설계 데이터·파일은 전송하지 않는다. 버전 메타(라벨·경로·발행자)만 오간다 | HPC망 경로형 산출물(양방향 API 연동) |
-| **D** | **External / Attested** | 없음 | 시스템 자체가 없음. 출처를 자유 텍스트로 기록 | 팀·회사 밖에서 생성. 이번 범위에서는 세부를 구체화하지 않는다(§6.4) |
 
-★ **UI에는 A/B/C/D 글자를 노출하지 않는다** — "새 Artifact 추가" 다이얼로그는 항상 위 표의
+★ **UI에는 A/B/C 글자를 노출하지 않는다** — "새 Artifact 추가" 다이얼로그는 항상 위 표의
 "이름" 열로만 보여준다(04장 §6). Calypso가 OA Service가 아니라 File Artifacts인 이유, Calypso가
 OA Service 목록에 없는 이유는 §3.1·§6.3 참고 — Calypso는 애초에 Hub 레지스트리 대상이
 아니다.
 
-- **망(`network: OA | HPC`)은 원래 tier와 직교하는 축으로 설계됐지만, 04장 §6의 3버튼 UI에서는
-  실질적으로 소스 선택이 network까지 함께 결정한다** — OA Service/File Artifacts는 OA,
-  HPC Service는 HPC로 만들어진다. 스키마 필드 자체는 그대로 두되(값을 자유롭게 못 바꾸는 것도
-  아니다), 지금 UI가 만드는 조합은 이 둘뿐이다.
 - **tier는 산출물이 아니라 버전 엔트리의 속성이다.** 나중에 실연동이 붙어도 과거 기록을
   고치거나 옮기지 않는다 — 다음 엔트리가 다른 tier로 찍힐 뿐이다. 따라서 tier 승격에
-  마이그레이션 로직이 필요 없다.
+  마이그레이션 로직이 필요 없다. (다른 tier로 옮겨가야 하는 경우도 "승격" 기능을 따로 만들지
+  않는다 — 새 tier로 정식 Artifact를 등록하고, 기존 block들이 §6.6의 재매핑으로 하나씩
+  갈아타면 된다. workflow마다 전환 시점이 달라도 무방하다.)
 - **HPC Service는 더 이상 "항상 잠김"이 아니다.** HPC망과의 양방향 API 연동이 확정되면서
   OA Service/File Artifacts와 같은 라이브 게이트·event 대상이 됐다(§6.2, §6.3, 07장). 다만
   실 설계 데이터·파일 자체는 여전히 전송하지 않는다 — 그 제약이 HPC Service를 OA Service와
   구분하는 유일한 축이다.
+
+### 2.2 File Artifacts(B)의 콘텐츠 종류 — Tier D를 흡수한 확장
+
+Calypso에 등록하는 순간 콘텐츠 종류를 하나 고르고, **그 artifact의 남은 삶 동안 바뀌지
+않는다** — 다른 종류가 필요하면 새 artifact를 등록하고 재매핑한다(§6.6).
+
+| 종류 | network | 버전이 담는 것 | 전형적 대상 |
+|---|---|---|---|
+| **File** | 없음(`null`) — 캔버스에 망 배지를 그리지 않는다 | 파일 여러 개(`files[]`). 실물 그 자체를 Calypso가 파일 하나가 아니라 하나의 버전에 여러 개 묶어 들고 있다 | 우리가 만드는 산출물. 정보 파일일 수도, 실제 설계 산출물일 수도 있다 — 그래서 network를 안 물어본다 |
+| **OA-link** | OA | 링크 하나(`viewUrl`) | 웹으로 접근 가능한 외부 산출물의 참조 |
+| **HPC-path** | HPC | 경로 하나(`hpcPath`) | HPC망 경로에 실물이 있는 산출물의 참조 — 대표자 한 명이 외부에서 받아 등록하는 case가 전형적이다 |
+
+- **network는 이 콘텐츠 종류에서 파생된다** — 캔버스·상세 slide의 OA/HPC 배지는 그 artifact에
+  등록된 값을 그대로 읽을 뿐, tier로 미리 정해두지 않는다(예전엔 "File Artifacts는 항상
+  OA"였는데 이제 아니다).
+- **OA-link/HPC-path는 Tier D가 하던 역할을 대체한다** — 물어볼 서비스도 실물도 없이 "어디
+  있는지"만 기록하던 산출물이 이제는 진짜 Calypso 산출물이 되어, 실제 governance(editors/
+  viewGrants), 진짜 버전(major.minor), recipient 게이트, release 참여를 전부 그대로 받는다.
+  Tier D 때 고민했던 "recipient가 없어야 하나", "release에서 빼야 하나" 같은 질문 자체가
+  없어진다 — File Artifacts는 이미 답이 정해진 tier이기 때문이다.
+- **give/receive 양쪽 모두 새 File Artifacts를 등록할 수 있다**(§6.1) — 회사 안에서 만든
+  산출물을 넘기는 give 쪽, 외부에서 받아 대표자가 등록하는 receive 쪽 둘 다 커버한다.
+- 스키마는 `calypso/src/artifacts/schemas/artifact.schema.ts`(`Artifact.network`,
+  `ArtifactVersion.files/viewUrl/hpcPath`) 참고.
 
 ### 2.1 OA Service/File Artifacts/HPC Service가 SIREN에 넘기는 버전 — "official"만
 
@@ -74,14 +101,16 @@ OA Service 목록에 없는 이유는 §3.1·§6.3 참고 — Calypso는 애초�
 
 ---
 
-## 3. 권한과 Recipient — 이제 전 tier가 같은 모델이다
+## 3. 권한과 Recipient — 전 tier가 같은 모델이다
 
-★ **이 장은 v3 설계 중 한 번 뒤집힌 결정이다.** 최초 설계는 "A만 서비스가 권한을 관리하고
+★ **이 장은 v3 설계 중 두 번 뒤집힌 결정이다.** 최초 설계는 "A만 서비스가 권한을 관리하고
 B/C/D는 SIREN이 artifact 단위로 보관한다"였다. 실제로 만들다 보니 (1) artifact 하나를 여러
 workflow가 공유하는데 그 권한을 한 군데(artifact)에 두면 한 workflow의 수정이 다른 workflow에도
 번져 꼬이는 문제, (2) HPC Service는 HPC망 안에서 사실상 누구나 만들고 볼 수 있어서 SIREN이 권한을
 따로 보관하는 의미가 없다는 점 때문에, **A/B/C(OA Service/File Artifacts/HPC Service) 전부
-A와 같은 모델로 통일**했다. External/Attested(D)만 이번 범위에서 제외한다(§3.6).
+A와 같은 모델로 통일**했다. 그다음엔 이 모델에서 제외돼 있던 External/Attested(D) 자체를
+폐기했다 — File Artifacts(B)가 OA-link/HPC-path 콘텐츠까지 갖도록 넓어지면서(§2.2), 지금은
+**예외 없이 A/B/C 전부** 이 장의 모델 하나만 쓴다.
 
 | | **OA Service / File Artifacts / HPC Service (A/B/C)** |
 |---|---|
@@ -111,11 +140,10 @@ recipient는 **release 알림 대상**이면서 동시에 **SIREN 쪽 slide 열�
 쓰인다(§4.1). "recipient = 알림 대상"과 "recipient = 그 서비스의 실제 권한"은 여전히 무관하다 —
 recipient에 들어 있어도 그 서비스에서 view 권한이 없으면 결국 slide는 막힌다.
 
-### 3.2 recipient는 block에 — A/B/C/D 공통, 단일 grant
+### 3.2 recipient는 block에 — A/B/C 공통, 단일 grant
 
 `Block.recipients`(02장 §4)에 저장하며, 부서 다중 + 사용자 다중의 **단일 grant**다.
-edit/view로 나뉘지 않는다 — 실제 edit 여부는 A/B/C는 그 서비스가(게이트 2), D는
-`Artifact.createdBy`가 최종 판정한다(§6.4).
+edit/view로 나뉘지 않는다 — 실제 edit 여부는 그 서비스가 최종 판정한다(게이트 2, §4.1).
 
 ```ts
 Block.recipients = { departments: string[], users: string[] }
@@ -128,8 +156,7 @@ Block.recipients = { departments: string[], users: string[] }
   실제로 view/edit 권한이 없는 사람을 recipient에 넣으면, 그 사람은 여전히 slide가 막힌다
   (§4.1 게이트 2). recipient 관리자가 이를 인지하고 구성해야 한다.
 - `Artifact.editAccess`/`viewAccess`/`expectedGiver`(`AccessGrant`) 필드는 완전히 제거했다 —
-  artifact는 더 이상 권한을 전혀 들고 있지 않는다. D도 이제 A/B/C와 같은 block 단위
-  recipient를 쓴다.
+  artifact는 더 이상 권한을 전혀 들고 있지 않는다.
 
 ### 3.3 Recipient 설정(편집) 권한
 
@@ -146,12 +173,11 @@ Block.recipients = { departments: string[], users: string[] }
 **부서는 어디서든 여러 개 넣을 수 있다.** recipient도, workflow의 edit/view도 전부
 `departments: string[]` 이다. 개별 사용자도 마찬가지로 다중이다.
 
-### 3.5 External / Attested (D) — 이번 범위 제외
+### 3.5 (폐기) External / Attested — File Artifacts(B)로 흡수됨
 
-D는 애초에 어떤 시스템에서도 나온 게 아니라서 출처도, versioning도 불가능하다. 이번 범위에서는
-받는 workflow가 comment 같은 걸 적을 수 있게만 하고, vwp path·version 같은 필드는 시스템에
-**등록된 날짜**로 대체한다(source version 개념 자체가 없다). 권한·recipient 모델은 이 문서에서
-구체화하지 않는다 — 별도로 다룬다.
+이 절이 다루던 tier(D)는 폐기했다. "출처도 versioning도 없는 산출물"이라는 문제는 이제
+File Artifacts(B)의 OA-link/HPC-path 콘텐츠(§2.2)가 해결한다 — recipient·게이트·release
+전부 A/B/C 공통 모델(§3, §4)을 그대로 쓰므로, 여기 따로 적을 예외가 없다.
 
 ---
 
@@ -159,7 +185,7 @@ D는 애초에 어떤 시스템에서도 나온 게 아니라서 출처도, vers
 
 판정 로직은 [01-permissions.md §4.2](01-permissions.md)에 있다. 화면 관점에서 다시 정리한다.
 
-### 4.1 OA Service / File Artifacts / HPC Service — 2단 게이트 (A/B/C 공통)
+### 4.1 OA Service / File Artifacts / HPC Service — 2단 게이트 (A/B/C 공통, 예외 없음)
 
 ```
 게이트 1 (SIREN)   그 block의 recipients(edit 또는 view)에 속하는가?
@@ -180,10 +206,9 @@ D는 애초에 어떤 시스템에서도 나온 게 아니라서 출처도, vers
   File Artifacts(Calypso)는 SIREN BE가 대신 물어보되(FE는 직접 호출하지 않는다, 07장 §2),
   판정 로직 자체는 같다.
 
-### 4.2 External / Attested (D)
+### 4.2 (폐기) External / Attested — §4.1로 흡수됨
 
-이번 범위에서 세부를 구체화하지 않는다(§3.5). 물어볼 서비스가 없으므로 게이트 2 자체가
-존재하지 않는다는 점만 다른 tier와 다르다.
+D가 없어지면서 "게이트 2가 없는 tier"라는 예외 자체가 없어졌다. §4.1이 A/B/C 전부를 커버한다.
 
 ### 4.3 "권한 없음" 과 "아직 publish 없음" 은 다른 화면이다
 
@@ -210,7 +235,7 @@ artifact 상세 slide 안의 탭 하나로 둔다.
 
 | 열람자 | 표시 |
 |---|---|
-| workflow Edit Access (A/B/C/D 공통) | 편집 가능 — `block.recipients`에 부서·사용자 추가·삭제 (§3.2) |
+| workflow Edit Access (A/B/C 공통) | 편집 가능 — `block.recipients`에 부서·사용자 추가·삭제 (§3.2) |
 | View 권한자 | **읽기 전용으로 노출.** 누가 받는지는 볼 수 있고, 추가/삭제 버튼이 없다 |
 | 미매핑 블록 | **탭 자체를 감춘다** |
 
@@ -237,21 +262,20 @@ Block(자리)과 Artifact(실체)가 분리되어 있으므로(§1) 매핑을 �
 1. **주는지 받는지 고른다** — 이후 모든 pickability 판정이 이 값을 따른다. block 생성 후에는
    바꾸지 않는다("변경"은 무엇을 매핑할지만 바꾸지, own/received 방향 자체는 안 바꾼다).
 2. Name, Phase — 기존과 동일.
-3. **출처를 고른다.** Tier 글자(A/B/C/D)는 화면 어디에도 노출하지 않는다:
+3. **출처를 고른다.** Tier 글자(A/B/C)는 화면 어디에도 노출하지 않는다:
 
    | 화면 표시 | 내부 Tier | 주는 쪽에 나오는가 | 받는 쪽에 나오는가 |
    |---|---|---|---|
    | **OA Service** | A | O | O |
    | **File Artifacts** | B | O | O |
    | **HPC Service** | C | O | O |
-   | **External / Attested** | D | **X** | O |
 
    - **HPC Service(C)는 더 이상 잠겨 있지 않다** — HPC망과의 양방향 API 연동이 확정되면서
      OA Service(A)와 동일하게 라이브 pickability 판정을 받는다(§6.2, §6.3).
-   - **External/Attested(D)는 받는 쪽에서만 나온다.** 줘야 하는 artifact를 D로 등록하는
-     흐름은 아직 구체화되지 않은 미래 인터페이스로 남겨둔다(§6.4).
-4. 고른 출처에 맞는 후보 목록에서 실제 artifact를 고르거나(OA Service/File Artifacts),
-   D면 "누가 줄 것으로 기대되는지"만 입력한다.
+   - **give/receive 양쪽 다 이 3개뿐이다** — Tier D 폐기 후 받는 쪽 전용 4번째 옵션이 없어졌다.
+     File Artifacts(B)로 등록하면(§2.2) OA-link/HPC-path 콘텐츠도 고를 수 있어, 예전에 D가
+     받던 case(출처도 실물도 없는 산출물)도 이 3개 안에서 커버된다.
+4. 고른 출처에 맞는 후보 목록에서 실제 artifact를 고른다.
 
 ### 6.2 Pickability — 대칭 규칙
 
@@ -263,7 +287,6 @@ artifact만 고를 수 있다.** SIREN이 아니라 항상 그 서비스가 최�
 | **A**(OA Service) | 그 서비스 `canEdit`(라이브 조회) | 그 서비스 `canView`(라이브 조회) |
 | **B**(File Artifacts) | Calypso `myAccess === 'edit'`(SIREN BE가 대신 물어봄, 07장 §2) | Calypso `myAccess`가 edit 또는 view — `restrictView`가 꺼진(기본) artifact는 project 멤버 전원이 view라 사실상 전부 후보에 뜬다 |
 | **C**(HPC Service) | 그 서비스 `canEdit`(라이브 조회) — **더 이상 항상 잠겨 있지 않다** | 그 서비스 `canView`(라이브 조회) |
-| **D**(External/Attested) | 해당 없음(옵션 자체가 없다) | 자유(검증할 시스템이 없다) |
 
 - 후보 목록에는 고를 수 없는 것도 **보여주되 흐리게 표시하고 이유를 붙인다** — "view only,
   edit 권한 필요" 처럼. 조용히 숨기면 "내가 왜 저건 못 고르지"라는 질문에 답을 못 준다.
@@ -310,27 +333,37 @@ code/revision을 쓸 수 있는 경우)는 이제 **그 서비스 쪽이 필터�
   - **열람·recipient 관리도 Calypso 자체 권한(`editors`/`viewGrants`)이 유일한 진실이다** —
     §3에서 정리했듯 SIREN은 B의 권한을 따로 보관하지 않는다. 매핑 확정 직후 같은 방식으로
     Calypso의 전체 버전 이력을 한 번 pull해 온다.
+  - **콘텐츠 종류(File/OA-link/HPC-path, §2.2)는 이 후보 목록에서 상관없다** — 이미 등록된
+    artifact를 고르는 문제일 뿐이라, 종류와 무관하게 같은 흐름을 탄다. 종류를 정하는 건
+    "새로" 등록할 때뿐이다.
 - **HPC Service(C)** — OA Service(A)와 **동일한 흐름**이다. HPC망과의 양방향 API 연동이
   확정되면서 더 이상 mock(`HpcPathMock`)이나 "항상 잠김"이 아니다 — 서비스 목록에서 고르고,
   code+revision으로 후보를 받고, canEdit/canView를 라이브로 물어보고, 매핑 즉시 버전 이력을
   pull한다. 유일한 차이는 응답에 실 설계 데이터·파일이 없고 경로(vwp path)만 있다는 것뿐이다
   (07장).
-- **External/Attested(D)** — 후보 목록 자체가 없다. 이름만 입력하면 바로 새 D Tier artifact가
-  만들어진다. 등록자(`createdBy`)가 자동으로 그 artifact의 사실상 유일한 편집자가 된다(§6.4).
 
-### 6.4 D Tier — 받는 전용, 그리고 남겨둔 TODO
+### 6.4 (폐기) D Tier 등록 — File Artifacts(B) 신규 등록으로 대체
 
-- **D는 이번 라운드에서 받는 쪽에서만 만든다.** 권한은 A/B/C와 같은 block 단위 recipient를
-  쓰고(§3.2), 실제 edit(새 버전 등록/교체)은 물어볼 서비스가 없어 `Artifact.createdBy`
-  (+Admin)로 잠정 고정했다 — 이 이상은 이번 범위에서 정교화하지 않는다(사용자 결정).
-  이전에 있던 "누가 줄 것으로 기대되는지"(`expectedGiver`) 표시용 메타데이터는 제거했다.
-- **줘야 하는 쪽의 D는 아직 구체화되지 않았다.** 장차 어떤 외부 interface를 통해 값이 들어오면
-  SIREN(Hub)이 그 메시지를 받아 그 workflow 안에서 자체적으로 versioning하는 방식을 생각하고
-  있다 — 지금은 그 인터페이스가 없으므로 옵션 자체를 주는 쪽 다이얼로그에서 뺀다.
+이 절이 다루던 "받는 전용, 출처 검증 없이 새로 만든다"는 흐름은 폐기했다. 지금은 give/receive
+양쪽 다 **File Artifacts(B)로 새 Calypso artifact를 등록**할 수 있고(§2.2), 등록 시 콘텐츠
+종류(File/OA-link/HPC-path)를 고른다 — 예전 D가 "받는 쪽에서만, 검증 없이" 만들던 것과 달리
+이제는 실제 Calypso governance(editors/viewGrants) 안에서 만들어진다.
+
+- 리스트에 원하는 artifact가 없으면 **새로 등록**할 수 있고, 이 경우 항상 Calypso artifact로
+  할당된다 — OA Service/HPC Service는 그 서비스 안에 실제로 존재하는 것만 고를 수 있으므로
+  (SIREN이 대신 새 artifact를 만들어주지 않는다), "새로" 만드는 경로는 File Artifacts뿐이다.
+- give 쪽에서 새로 등록하면 등록자가 Calypso `editors`에 자동으로 들어간다(등록자·Admin은
+  항상 edit, `calypso/src/artifacts/artifacts.service.ts`의 `computeAccess()`).
+- receive 쪽에서 새로 등록(매핑용 placeholder)해도 **지금은 같은 규칙을 그대로 탄다** — 등록자가
+  자동으로 편집 가능해진다. 원래는 이 경우 편집 권한을 주지 않기로 했었으나(받는 쪽은 실제로
+  그 산출물을 만드는 쪽이 아니므로), 이번 라운드에서는 구분 없이 단순하게 두기로 했다(사용자
+  결정) — TODO로 남겨둔다(README §4 T14).
   ```ts
-  // TODO: 줘야 하는 쪽 D Tier 인터페이스가 붙으면, 그 메시지를 받는 엔드포인트와
-  //       그 workflow 자체 버전 관리 로직을 여기에 연결한다.
+  // TODO(calypso/src/artifacts/artifacts.service.ts#create): 받는 쪽이 매핑용으로 생성한
+  //       placeholder는 원래 편집 권한을 주지 않기로 했었다 — 나중에 이 grant를 제거하는
+  //       정책으로 갈 것.
   ```
+- 두 case 모두 **신규 생성만 할 뿐, 아직 어떤 draft version도 없고 실제 데이터도 없는 상태**다.
 
 ### 6.5 한 workflow 안에서 같은 artifact 중복 금지
 
@@ -360,12 +393,19 @@ GET /workflows/:workflowId/artifact-candidates
 
 POST /workflows/:workflowId/blocks       { name, phaseId, layout, intent, artifactId? | newArtifact? }
 PATCH /blocks/:id                        { name?, artifactId? | newArtifact? }
-→ newArtifact = { source: 'live'|'file'|'hpc'|'attested', name, serviceKey?, externalArtifactId? }
+→ newArtifact = { source: 'live'|'file'|'hpc', name, serviceKey?, externalArtifactId? }
   둘 다 §6.2를 서버가 다시 검증하고(§6.5의 중복 금지 포함), find-or-create 또는 신규 생성 후
   block에 매핑한다. 최종 식별은 (serviceKey, externalArtifactId) 조합이다 — externalArtifactId는
   그 서비스 전체에서(project를 넘나들어) 유일해야 한다(07장 §3). 매핑이 확정되는 순간 SIREN이
   그 artifact의 전체 버전 이력을 한 번 라이브로 pull해 온다(§6.3, 07장 §3).
 ```
+
+> **TODO(README §4 T13)** — 지금 다이얼로그는 여전히 OA Service/File Artifacts/HPC Service
+> 3버튼으로 source를 먼저 고르는 구조다. 목표는 admin이 등록한 OA/HPC Service와 Calypso
+> 산출물을 **한데 합친 단일 목록**으로 보여주는 것이다 — OA/HPC Service 항목을 고르면 그
+> 서비스의 실시간 후보를(§6.3 2단계 그대로), Calypso 항목을 고르면 바로 매핑한다. 이번
+> 변경(Tier D 폐기·File Artifacts 확장)에서는 `ArtifactSourceService`에 TODO만 남기고
+> 다이얼로그 UI는 손대지 않았다.
 
 ---
 

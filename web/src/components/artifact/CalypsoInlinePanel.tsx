@@ -65,12 +65,16 @@ export function CalypsoInlinePanel({ artifactId, projectId, blockId, releases, o
     onError: (e: any) => toast(e?.response?.data?.message ?? 'Publish failed'),
   });
   const handleDownload = async (v: CalypsoVersionView) => {
+    // TODO: 지금은 첫 번째 파일만 내려받는다 — 한 버전이 여러 파일을 가질 수 있게 되면서
+    // (설계서 04장 §2, §6) 파일별 개별 다운로드/전체 zip UI가 필요한데, 이번 변경 범위 밖이다.
+    const file = v.files[0];
+    if (!file) return;
     try {
-      const blob = await downloadCalypsoVersion(artifactId, projectId, v.versionRef);
+      const blob = await downloadCalypsoVersion(artifactId, projectId, v.versionRef, file.storageKey);
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = v.fileName || `${artifactId}-v${v.versionLabel}`;
+      link.download = file.fileName || `${artifactId}-v${v.versionLabel}`;
       document.body.appendChild(link);
       link.click();
       link.remove();

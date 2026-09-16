@@ -238,7 +238,7 @@ export class ReleasesService {
   }
 
   /**
-   * 이 산출물이 전달될 대상(설계서 05장 §6.2) — 그 **block**의 recipients. A/B/C/D 전부
+   * 이 산출물이 전달될 대상(설계서 05장 §6.2) — 그 **block**의 recipients. A/B/C 전부
    * 공통이다(같은 workflow마다 다를 수 있다). artifact 단위로 SIREN이 따로 들고 있던
    * 옛 모델(viewAccess/editAccess)은 폐기했다.
    */
