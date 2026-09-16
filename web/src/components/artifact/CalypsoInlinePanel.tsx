@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Box } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  CalypsoVersionView, downloadCalypsoVersion, getCalypsoArtifact, releaseCalypsoArtifact, uploadCalypsoVersion,
+  CalypsoVersionView, addCalypsoVersion, downloadCalypsoVersion, getCalypsoArtifact, releaseCalypsoArtifact,
 } from '@/api/calypsoClient';
 import { queryKeys } from '@/api/queryKeys';
 import { ReleaseDto } from '@/types/domain';
@@ -55,9 +55,10 @@ export function CalypsoInlinePanel({ artifactId, projectId, blockId, releases, o
   };
 
   const upload = useMutation({
-    mutationFn: ({ file, note }: { file: File; note: string }) => uploadCalypsoVersion(artifactId, projectId, file, note),
-    onSuccess: () => { invalidate(); toast('Working copy uploaded'); },
-    onError: (e: any) => toast(e?.response?.data?.message ?? 'Upload failed'),
+    mutationFn: ({ input, note }: { input: { files?: File[]; viewUrl?: string; hpcPath?: string }; note: string }) =>
+      addCalypsoVersion(artifactId, projectId, input, note),
+    onSuccess: () => { invalidate(); toast('Version added'); },
+    onError: (e: any) => toast(e?.response?.data?.message ?? 'Could not add version'),
   });
   const release = useMutation({
     mutationFn: (note: string) => releaseCalypsoArtifact(artifactId, projectId, note),
@@ -66,11 +67,11 @@ export function CalypsoInlinePanel({ artifactId, projectId, blockId, releases, o
   });
   const handleDownload = async (v: CalypsoVersionView) => {
     try {
-      const blob = await downloadCalypsoVersion(artifactId, projectId, v.versionRef);
+      const { blob, filename } = await downloadCalypsoVersion(artifactId, projectId, v.versionRef);
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = v.fileName || `${artifactId}-v${v.versionLabel}`;
+      link.download = filename ?? `${artifactId}-v${v.versionLabel}`;
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -102,7 +103,7 @@ export function CalypsoInlinePanel({ artifactId, projectId, blockId, releases, o
           version={shown}
           canEdit={canEdit}
           onDownload={handleDownload}
-          onUpload={(file, note) => upload.mutate({ file, note })}
+          onAddVersion={(input, note) => upload.mutate({ input, note })}
           onRelease={(note) => release.mutate(note)}
           uploading={upload.isPending}
           releasing={release.isPending}

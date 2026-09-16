@@ -265,12 +265,12 @@ event 유실에 대비해, 작업이 없는 야간 시간대에 하루 한 번 �
   확정되면서 OA Service와 동일한 라이브 게이트·event 대상이 됐다(04장 §2, §6.2, §6.3).
 - **`Artifact.editAccess`/`viewAccess`(SIREN이 A/B/C 권한을 직접 보관하던 옛 모델)** —
   04장 §3 참고.
-- **`Artifact.editAccess`/`viewAccess`/`expectedGiver`(D 전용으로 마지막까지 남아 있던 옛
-  모델)** — recipient를 A/B/C처럼 `Block.recipients`(단일 grant, edit/view 구분 없음)로
-  옮겼다. D의 실제 edit은 `Artifact.createdBy`(+Admin)로 잠정 고정했다(01장 §4, 04장 §3).
+- **`Artifact.editAccess`/`viewAccess`/`expectedGiver`(한때 D 전용으로 마지막까지 남아 있던
+  옛 모델)** — recipient를 A/B/C처럼 `Block.recipients`(단일 grant, edit/view 구분 없음)로
+  옮겼다(01장 §4, 04장 §3). D 자체를 폐기한 뒤로는 이 문장이 가리키던 예외도 없다.
 
 ## 8. 명칭
 
-내부 tier 값(A/B/C/D)은 DB에 그대로 남지만, 사람이 보는 이름은 **OA Service(A) / File
-Artifacts(B) / HPC Service(C) / External·Attested(D)**로 통일한다. 이 문서와 앞으로 쓰는
-모든 문서는 이 이름을 쓴다. 기존 코드 주석의 일괄 치환은 별도 작업이다(README §4 T11).
+내부 tier 값(A/B/C)은 DB에 그대로 남지만, 사람이 보는 이름은 **OA Service(A) / File
+Artifacts(B) / HPC Service(C)**로 통일한다. 이 문서와 앞으로 쓰는 모든 문서는 이 이름을
+쓴다. (한때 있었던 External/Attested(D)는 폐기했다 — 04장 §2.)

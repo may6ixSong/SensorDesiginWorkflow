@@ -117,11 +117,11 @@ Artifact {
   _id
   projectId                     // 과제 단위 스코프 (가정 P3)
   name: string
-  tier: 'A' | 'B' | 'C' | 'D'
+  tier: 'A' | 'B' | 'C'
   network: 'OA' | 'HPC'
 
   // --- 출처 매핑 ---
-  serviceKey: string | null           // A/B/C는 필수(HPC Service도 이제 실연동). D는 null
+  serviceKey: string | null           // A/B/C 전부 필수(HPC Service도 이제 실연동, File Artifacts는 CALYPSO_SERVICE_KEY 고정)
   externalArtifactId: string | null   // 그 서비스 전체에서 유일해야 한다(07장 §4.3)
   artifactTypeKey: string | null      // Service Manage 등록 시 SIREN이 발급(07장 §3.2)
   externalUrl: string | null          // 레거시 — C가 수동 링크만 갖던 시절의 필드. 이제 버전별
@@ -129,7 +129,7 @@ Artifact {
 
   // --- 권한: artifact는 권한을 전혀 들고 있지 않는다(04장 §3) ---
   // recipient는 여기 두지 않는다. workflow마다 달라질 수 있어서 Block.recipients(§4)에
-  // 저장한다 — 01장 §4.1 참조. A/B/C/D 전부 공통이다. (구 설계는 B/C/D를 여기
+  // 저장한다 — 01장 §4.1 참조. A/B/C 전부 공통이다. (구 설계는 B/C를 여기
   // editAccess/viewAccess/expectedGiver로 뒀었다 — 전부 폐기했다.)
 
   // --- publish 이력 ---
@@ -140,7 +140,7 @@ Artifact {
 }
 
 ArtifactVersion {
-  tier: 'A'|'B'|'C'|'D'         // 엔트리 단위. 나중에 실연동이 붙어도 과거 기록을 고치지 않는다
+  tier: 'A'|'B'|'C'         // 엔트리 단위. 나중에 실연동이 붙어도 과거 기록을 고치지 않는다
   versionLabel: string          // 표시용 자유 문자열
   isPublished: boolean          // ★개명★ 구 isReleased. 가시성 판정은 오직 이 필드로만
   versionRef: string | null     // 그 서비스가 준 불변 참조
@@ -157,11 +157,15 @@ ArtifactVersion {
 
 ### 규칙
 
-- **`recipients`는 artifact가 아니라 항상 `Block.recipients`에 있다(A/B/C/D 공통, §4).**
+- **`recipients`는 artifact가 아니라 항상 `Block.recipients`에 있다(A/B/C 공통, §4).**
   artifact는 `editAccess`/`viewAccess`/`expectedGiver` 같은 권한 필드를 전혀 갖지 않는다.
 - `versions[0].tier` 가 그 산출물의 "현재 tier"이며, `artifact.tier` 는 그 값을 캐시한 것이다.
-- **버전 가시성** — `isPublished: false` 인 엔트리는 그 산출물의 giver(A/B/C는 그 서비스가
-  판정하는 canEdit, D는 `createdBy`)에게만 응답에 담긴다. 그 외 전원은 published만 본다.
+- **버전 가시성** — `isPublished: false` 인 엔트리는 그 산출물의 giver(그 서비스가 판정하는
+  canEdit)에게만 응답에 담긴다. 그 외 전원은 published만 본다.
+- **File Artifacts(B)의 콘텐츠 종류(File/OA-link/HPC-path)와 다중 파일은 Calypso 자기
+  스키마의 일이다** — SIREN의 `ArtifactVersion`은 이 필드들을 그대로 캐시하는
+  `viewUrl`/`hpcPath`(둘 다 이미 있음)로 충분하고, 파일 목록 자체는 여기 두지 않는다.
+  실물 열람·다운로드는 항상 그 서비스(Calypso)로 보낸다 — SIREN은 참조만 갖는다(04장 §2).
 - **Mapping 범위 — 같은 과제(project)만.** workflow의 block을 어떤 artifact에 매핑할 때, 후보는
   **그 workflow와 `projectId`가 같은 artifact로 한정**한다. 같은 `code`라도 `revision`이 다르면
   다른 project이므로(01장·02장 §1) 자동으로 후보에서 빠진다. Admin이 여러 과제를 동시에 볼 수
@@ -209,7 +213,7 @@ Block {
   layout: { x, y, w, h }
   intent: 'own' | 'received'    // "새 Artifact 추가" 다이얼로그 첫 질문. 생성 후 불변(04장 §6)
 
-  // artifact가 매핑된 block에서 의미가 있다 — A/B/C/D 전부 공통이다. workflow마다
+  // artifact가 매핑된 block에서 의미가 있다 — A/B/C 전부 공통이다. workflow마다
   // 독립이라 여기, block에 둔다 — 01장 §4.1/§4.4. edit/view로 나뉘지 않는 단일 grant다.
   // (구 설계는 B/C/D를 artifact.editAccess/viewAccess/expectedGiver로 뒀었다 — 전부
   // 폐기했다.)
@@ -222,7 +226,7 @@ Block {
 
 - `series` / `seriesIdx` / `seriesTotal` 은 **유지**한다(반복 릴리스 일정 개념은 그대로).
 - `recvDept` / `recvContact` / `recvWorkflowId` / `sourceDept` / `sourceContact` 는 **제거**한다 —
-  수신 대상은 이제 block의 `recipients`가 유일한 진실이다(A/B/C/D 공통).
+  수신 대상은 이제 block의 `recipients`가 유일한 진실이다(A/B/C 공통).
 - `versions` 는 제거하고 `artifactId` 참조로 대체한다.
 - `recipients` 편집 권한은 그 workflow의 **Edit Access**다(04장 §3.3). recipient에 속하는 것과
   recipient를 편집할 수 있는 것은 별개다(01장 §4.2).
@@ -276,7 +280,7 @@ ReleaseItem {
   blockId: string
   artifactId: string
   artifactName: string          // 그 시점 이름
-  tier: 'A'|'B'|'C'|'D'
+  tier: 'A'|'B'|'C'
   network: 'OA' | 'HPC'
   phaseId: string
   phaseName: string
@@ -366,7 +370,7 @@ ReleaseItem {
 | Method | Path | 비고 |
 |---|---|---|
 | `GET` | `/artifacts/:id` | 열람 권한(01장 §4.2) 없으면 403. 버전은 권한에 따라 마스킹 |
-| `PATCH` | `/workflows/:wfId/blocks/:blockId/recipients` | **A/B/C/D block 공통.** `{ departments, users }`(단일 grant). workflow Edit Access 필요. (구 `PUT /artifacts/:id/access`는 제거 — artifact 단위 권한 자체가 완전히 폐기됐다) |
+| `PATCH` | `/workflows/:wfId/blocks/:blockId/recipients` | **A/B/C block 공통.** `{ departments, users }`(단일 grant). workflow Edit Access 필요. (구 `PUT /artifacts/:id/access`는 제거 — artifact 단위 권한 자체가 완전히 폐기됐다) |
 | `GET` | `/workflows/:wfId/artifact-candidates` | `?source=live\|file\|hpc&intent=own\|received&serviceKey=&code=&revision=` — pickable까지 판정된 후보 목록 (04장 §6.2). code/revision은 그 workflow가 속한 project에서 그대로 채운다 — 사전 링크 단계 없음(04장 §6.3) |
 | `POST` | `/workflows/:wfId/blocks` | `{ name, phaseId, layout, intent, artifactId? \| newArtifact? }` — newArtifact가 있으면 find-or-create 후 매핑 (04장 §6.7) |
 | `PATCH` | `/blocks/:id` | `{ name?, artifactId? \| newArtifact? }` — 재매핑. 이전 값과 다르면 block.recipients 초기화 (04장 §6.6) |

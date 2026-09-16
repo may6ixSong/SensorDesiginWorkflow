@@ -11,9 +11,9 @@ import { useAuth } from '@/app/providers/AuthProvider';
 import { useProject } from '@/api/hooks/useProjects';
 import { queryKeys } from '@/api/queryKeys';
 import {
-  CalypsoGrantInput, CalypsoVersionView, addCalypsoEditor, addCalypsoViewGrant,
+  CalypsoGrantInput, CalypsoVersionView, addCalypsoEditor, addCalypsoVersion, addCalypsoViewGrant,
   downloadCalypsoVersion, getCalypsoArtifact, releaseCalypsoArtifact,
-  removeCalypsoEditor, removeCalypsoViewGrant, setCalypsoRestrictView, uploadCalypsoVersion,
+  removeCalypsoEditor, removeCalypsoViewGrant, setCalypsoRestrictView,
 } from '@/api/calypsoClient';
 import { toast } from '@/store/toastStore';
 import { T } from '@/theme/tokens';
@@ -55,9 +55,10 @@ export function ArtifactDetailPage() {
   };
 
   const upload = useMutation({
-    mutationFn: ({ file, note }: { file: File; note: string }) => uploadCalypsoVersion(id, projectId, file, note),
-    onSuccess: () => { invalidate(); toast('Working copy uploaded'); },
-    onError: (e: any) => toast(e?.response?.data?.message ?? 'Upload failed'),
+    mutationFn: ({ input, note }: { input: { files?: File[]; viewUrl?: string; hpcPath?: string }; note: string }) =>
+      addCalypsoVersion(id, projectId, input, note),
+    onSuccess: () => { invalidate(); toast('Version added'); },
+    onError: (e: any) => toast(e?.response?.data?.message ?? 'Could not add version'),
   });
   const release = useMutation({
     mutationFn: (note: string) => releaseCalypsoArtifact(id, projectId, note),
@@ -92,11 +93,11 @@ export function ArtifactDetailPage() {
 
   const handleDownload = async (v: CalypsoVersionView) => {
     try {
-      const blob = await downloadCalypsoVersion(id, projectId, v.versionRef);
+      const { blob, filename } = await downloadCalypsoVersion(id, projectId, v.versionRef);
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = v.fileName || `${id}-v${v.versionLabel}`;
+      link.download = filename ?? `${id}-v${v.versionLabel}`;
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -164,7 +165,7 @@ export function ArtifactDetailPage() {
               version={shown}
               canEdit={a.myAccess === 'edit'}
               onDownload={handleDownload}
-              onUpload={(file, note) => upload.mutate({ file, note })}
+              onAddVersion={(input, note) => upload.mutate({ input, note })}
               onRelease={(note) => release.mutate(note)}
               uploading={upload.isPending}
               releasing={release.isPending}

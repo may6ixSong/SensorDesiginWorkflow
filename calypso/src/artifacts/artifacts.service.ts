@@ -72,12 +72,23 @@ export class ArtifactsService {
     return a;
   }
 
+  /**
+   * ★ SIREN이 받는(received) 쪽 block을 위해 매핑용 placeholder로 이 엔드포인트를
+   * 호출하는 경우에도 지금은 이 경로 그대로다 — createdBy는 여전히 실제로 호출한
+   * 사용자로 기록되고, computeAccess()의 "createdBy는 항상 edit" 규칙도 그대로
+   * 적용된다. 즉 받는 쪽이 만든 placeholder도 지금은 그 등록자가 편집할 수 있다.
+   *
+   * TODO: 받는 쪽 등록에는 원래 편집 권한을 주지 않기로 했었다(SIREN 설계서 04장 §6.4
+   *   논의) — 나중에 이 grant를 제거하는 정책으로 갈 것. 지금은 단순함을 우선해
+   *   구분 없이 등록자에게 edit을 그대로 준다(사용자 결정).
+   */
   create(dto: CreateArtifactDto, actor: Actor) {
     return this.model.create({
       projectId: dto.projectId,
       department: dto.department,
       name: dto.name,
       description: dto.description ?? '',
+      network: dto.network ?? null,
       versions: [],
       createdBy: actor.knoxId,
       isMock: false,
@@ -165,14 +176,56 @@ export class ArtifactsService {
     return latest ? `${latest.major}.${latest.minor + 1}` : '0.1';
   }
 
+  /**
+   * §3.9 — network에 따라 정확히 한 콘텐츠만 받는다: File(network===null)은
+   * `files`(1개 이상), OA는 `viewUrl`, HPC는 `hpcPath`. 콘텐츠 종류는 그 artifact의
+   * network로 고정되어 있으므로 여기서 다시 고르지 않는다 — 맞지 않는 필드가 오면 400.
+   */
+  private assertContentMatchesNetwork(
+    a: ArtifactDocument,
+    input: { files?: { fileName: string; storageKey: string }[]; viewUrl?: string | null; hpcPath?: string | null },
+  ): void {
+    if (a.network === null) {
+      if (!input.files?.length) throw new BadRequestException('At least one file is required for this artifact.');
+    } else if (a.network === 'OA') {
+      if (!input.viewUrl) throw new BadRequestException('A link (viewUrl) is required for this OA artifact.');
+    } else {
+      if (!input.hpcPath) throw new BadRequestException('A path (hpcPath) is required for this HPC artifact.');
+    }
+  }
+
+  /**
+   * 등록 시점엔 이름만 받고 콘텐츠 종류(File/OA-link/HPC-path)를 아직 안 정했을 수
+   * 있다(설계서 04장 §2.2, §6.4 — "새 Artifact 추가" 다이얼로그가 아니라 이 artifact의
+   * contents 화면에서 첫 버전을 추가할 때 정한다). **그 첫 버전 추가 시점에 network가
+   * 확정되고, 그 뒤로는 바뀌지 않는다.** File로 정해지는 경우는 `network`가 계속
+   * null이라 별도로 할 것이 없다.
+   */
+  private lockNetworkOnFirstVersion(
+    a: ArtifactDocument,
+    input: { viewUrl?: string | null; hpcPath?: string | null },
+  ): void {
+    if (a.versions.length > 0) return;
+    if (input.viewUrl) a.network = 'OA';
+    else if (input.hpcPath) a.network = 'HPC';
+  }
+
   /** 업로드 = minor +1. 아직 릴리스가 아니다 (작업중). */
   async addVersion(
     id: string,
-    input: { fileName: string; storageKey: string; note?: string; dept?: string | null },
+    input: {
+      files?: { fileName: string; storageKey: string }[];
+      viewUrl?: string | null;
+      hpcPath?: string | null;
+      note?: string;
+      dept?: string | null;
+    },
     actor: Actor,
   ) {
     const a = await this.findOrThrow(id);
     this.assertCanEdit(a, actor);
+    this.lockNetworkOnFirstVersion(a, input);
+    this.assertContentMatchesNetwork(a, input);
 
     const latest = a.versions[0];
     const major = latest ? latest.major : 0;
@@ -183,8 +236,9 @@ export class ArtifactsService {
       minor,
       isReleased: false,
       versionRef: this.buildVersionRef(a, major, minor),
-      fileName: input.fileName,
-      storageKey: input.storageKey,
+      files: input.files ?? [],
+      viewUrl: input.viewUrl ?? null,
+      hpcPath: input.hpcPath ?? null,
       note: input.note ?? '',
       createdBy: actor.knoxId,
       createdByDept: input.dept ?? null,
@@ -208,8 +262,9 @@ export class ArtifactsService {
       minor: 0,
       isReleased: true,
       versionRef: this.buildVersionRef(a, major, 0),
-      fileName: latest.fileName,
-      storageKey: latest.storageKey,
+      files: latest.files,
+      viewUrl: latest.viewUrl,
+      hpcPath: latest.hpcPath,
       note: note ?? '',
       createdBy: actor.knoxId,
       createdByDept: latest.createdByDept,

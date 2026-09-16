@@ -1,14 +1,15 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 
-/** Hub 설계서 §5.1 - 통합 신뢰도 티어. */
-export const TIERS = ['A', 'B', 'C', 'D'] as const;
+/** Hub 설계서 §5.1 - 통합 신뢰도 티어. Hub 레지스트리에는 OA/HPC Service(A/C)만 등록되므로
+ * B(File Artifacts/Calypso)도 개념상 포함되지만 실제로 이 레지스트리에 오르진 않는다. */
+export const TIERS = ['A', 'B', 'C'] as const;
 export type Tier = (typeof TIERS)[number];
 
 /**
  * 전송 수단.
  * - http : Observer 계약 엔드포인트를 직접 호출 — OA Service/HPC Service(A/C) 전부 이것뿐이다
- * - none : 연동 없음 (D 전용)
+ * - none : 연동 없음
  *
  * ★ `shared-db`(HPC-OA 공용 DB 주기 동기화)는 폐기했다 — HPC망과 양방향 API로 직접
  *   연동하기로 결정이 바뀌면서(설계서 04장 §2) 더 이상 쓰지 않는다.

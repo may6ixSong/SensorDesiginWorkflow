@@ -12,10 +12,10 @@ import {
   Post,
   Query,
   StreamableFile,
-  UploadedFile,
+  UploadedFiles,
   UseInterceptors,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { FilesInterceptor } from '@nestjs/platform-express';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { CurrentActor } from '../common/decorators/current-actor.decorator';
@@ -116,21 +116,32 @@ export class CalypsoProxyController {
     return this.relay(result);
   }
 
+  /**
+   * File 콘텐츠는 파일 하나 이상(multipart `files`), OA/HPC 콘텐츠는 파일 없이
+   * dto.viewUrl/hpcPath만 온다 — 어느 쪽인지는 Calypso가 그 artifact의 network로
+   * 판정하므로 여기서는 둘 다 그대로 전달할 뿐 검증하지 않는다.
+   */
   @Post(':id/versions')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FilesInterceptor('files'))
   async addVersion(
     @Param('id') id: string,
     @Query('projectId') projectId: string,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFiles() files: Express.Multer.File[] | undefined,
     @Body() dto: CalypsoAddVersionDto,
     @CurrentActor() me: Actor,
   ) {
-    if (!file) throw new HttpException('A file is required (multipart form field "file").', 400);
     const { departments, isAdmin } = await this.resolveContext(projectId, me);
-    const result = await this.calypso.uploadVersion(id, file, dto.note, me.knoxId, departments, isAdmin);
+    const result = await this.calypso.uploadVersion(
+      id,
+      { files, viewUrl: dto.viewUrl, hpcPath: dto.hpcPath, note: dto.note },
+      me.knoxId,
+      departments,
+      isAdmin,
+    );
     return this.relay(result);
   }
 
+  /** 파일이 하나면 그대로, 여러 개면 zip으로 묶여서 온다 — Calypso가 그 판정을 한다(§3.9). */
   @Get(':id/download/:versionRef')
   async download(
     @Param('id') id: string,

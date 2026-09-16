@@ -29,6 +29,14 @@ export class CreateArtifactDto {
   @MaxLength(500)
   description?: string;
 
+  /**
+   * 생략하면 null(File — 실물을 이 서비스가 들고 있다). 'OA'/'HPC'면 실물이 없고
+   * 각 버전의 viewUrl/hpcPath가 위치만 가리킨다(§3.9). 등록 후에는 바뀌지 않는다.
+   */
+  @IsOptional()
+  @IsIn(['OA', 'HPC'])
+  network?: 'OA' | 'HPC';
+
   /** 생략하면 false(view 기본 개방) — 사용자 요청. */
   @IsOptional()
   @IsBoolean()
@@ -65,6 +73,16 @@ export class AddVersionDto {
   @IsOptional()
   @IsString()
   dept?: string;
+
+  /** network==='OA'인 artifact에만. */
+  @IsOptional()
+  @IsString()
+  viewUrl?: string;
+
+  /** network==='HPC'인 artifact에만. */
+  @IsOptional()
+  @IsString()
+  hpcPath?: string;
 }
 
 export class ReleaseDto {
@@ -116,6 +134,7 @@ export function toArtifactDto(a: ArtifactDocument, access: Exclude<AccessLevel, 
     department: a.department,
     name: a.name,
     description: a.description ?? '',
+    network: a.network,
     createdBy: a.createdBy,
     myAccess: access,
     versionCount: visible.length,
@@ -132,7 +151,9 @@ export function toVersionView(v: ArtifactVersion) {
     versionLabel: `${v.major}.${v.minor}`,
     isReleased: v.isReleased === true,
     versionRef: v.versionRef,
-    fileName: v.fileName,
+    files: (v.files ?? []).map((f) => ({ fileName: f.fileName, storageKey: f.storageKey })),
+    viewUrl: v.viewUrl ?? null,
+    hpcPath: v.hpcPath ?? null,
     note: v.note ?? '',
     createdBy: v.createdBy,
     createdAt: v.createdAt instanceof Date ? v.createdAt.toISOString() : String(v.createdAt),

@@ -12,12 +12,13 @@ import {
   Post,
   Query,
   StreamableFile,
-  UploadedFile,
+  UploadedFiles,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { FilesInterceptor } from '@nestjs/platform-express';
 import { ConfigService } from '@nestjs/config';
+import { ZipArchive } from 'archiver';
 import { CurrentActor } from '../common/current-actor.decorator';
 import { Actor } from '../common/actor';
 import { SirenCallerGuard } from '../common/siren-caller.guard';
@@ -135,36 +136,43 @@ export class ArtifactsController {
   }
 
   /**
-   * 업로드 = minor +1. 바이트를 받아 Calypso 몫의 오브젝트 스토리지에 올린다 -
-   * SIREN 본체와 다른 S3_FOLDER를 쓰므로 네임스페이스가 분리된다(Hub 설계서 §3.7).
+   * 업로드 = minor +1. **network에 따라 콘텐츠가 갈린다**(§3.9):
+   *   - File(network===null) — 바이트를 받아 Calypso 몫의 오브젝트 스토리지에 올린다.
+   *     SIREN 본체와 다른 S3_FOLDER를 쓰므로 네임스페이스가 분리된다(Hub 설계서 §3.7).
+   *     한 번에 여러 파일을 올릴 수 있다 — 전부 이번 버전 하나에 묶인다.
+   *   - OA/HPC — 파일 없이 `viewUrl`/`hpcPath` 텍스트만 body로 받는다.
    */
   @Post(':id/versions')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FilesInterceptor('files'))
   async addVersion(
     @Param('id') id: string,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFiles() files: Express.Multer.File[] | undefined,
     @Body() dto: AddVersionDto,
     @CurrentActor() me: Actor,
   ) {
-    if (!file) throw new BadRequestException('A file is required (multipart form field "file").');
     const a = await this.artifacts.findOrThrow(id);
     // 스토리지에 올리기 전에 권한부터 본다 — 권한 없는 업로드가 먼저 파일을 써버리는 걸 막는다.
     if (this.artifacts.computeAccess(a, me) !== 'edit') {
       throw new ForbiddenException('You do not have edit access to this artifact.');
     }
-    const storageKey = this.storage.buildStorageKey(
-      a.projectId,
-      a._id.toString(),
-      this.artifacts.nextVersionLabel(a),
-      file.originalname,
-    );
-    await this.storage.upload(storageKey, file.buffer, {
-      originalname: file.originalname,
-      uploader: me.knoxId,
-    });
+
+    if (a.network === null) {
+      if (!files?.length) throw new BadRequestException('At least one file is required (multipart form field "files").');
+      const nextLabel = this.artifacts.nextVersionLabel(a);
+      const uploaded = await Promise.all(
+        files.map(async (file) => {
+          const storageKey = this.storage.buildStorageKey(a.projectId, a._id.toString(), nextLabel, file.originalname);
+          await this.storage.upload(storageKey, file.buffer, { originalname: file.originalname, uploader: me.knoxId });
+          return { fileName: file.originalname, storageKey };
+        }),
+      );
+      const saved = await this.artifacts.addVersion(id, { files: uploaded, note: dto.note, dept: dto.dept ?? null }, me);
+      return { data: toArtifactDto(saved, 'edit') };
+    }
+
     const saved = await this.artifacts.addVersion(
       id,
-      { fileName: file.originalname, storageKey, note: dto.note, dept: dto.dept ?? null },
+      { viewUrl: dto.viewUrl, hpcPath: dto.hpcPath, note: dto.note, dept: dto.dept ?? null },
       me,
     );
     return { data: toArtifactDto(saved, 'edit') };
@@ -180,6 +188,10 @@ export class ArtifactsController {
    * 다운로드. **실물 파일에 대한 접근 판정은 여기서 한다** - SIREN이 아니라 이 서비스가
    * 자기 데이터의 문지기다(Hub 설계서 §7.1). view 등급은 released 버전만 받을 수 있다 —
    * 목록/상세와 같은 마스킹 규칙(사용자 요청).
+   *
+   * ★ 한 버전이 여러 파일을 가질 수 있다(§3.9, 사용자 결정) — **파일이 하나면 그대로
+   *   내려주고, 여러 개면 zip으로 묶어서 하나로 내려준다.** 호출부는 파일 개수를
+   *   미리 몰라도 되고, 이 라우트 하나만 부르면 된다.
    */
   @Get(':id/download/:versionRef')
   async download(
@@ -194,13 +206,28 @@ export class ArtifactsController {
     if (access !== 'edit' && !version.isReleased) {
       throw new ForbiddenException('Only released versions are available at your access level.');
     }
-    if (!version.storageKey) throw new BadRequestException('This version has no stored file.');
+    const files = version.files ?? [];
+    if (!files.length) throw new BadRequestException('This version has no stored file.');
 
-    const body = await this.storage.download(version.storageKey);
-    if (!body) throw new NotFoundException('The stored file could not be found.');
-    return new StreamableFile(body, {
-      type: 'application/octet-stream',
-      disposition: `attachment; filename="${encodeURIComponent(version.fileName)}"`,
+    if (files.length === 1) {
+      const body = await this.storage.download(files[0].storageKey);
+      if (!body) throw new NotFoundException('The stored file could not be found.');
+      return new StreamableFile(body, {
+        type: 'application/octet-stream',
+        disposition: `attachment; filename="${encodeURIComponent(files[0].fileName)}"`,
+      });
+    }
+
+    const buffers = await Promise.all(files.map((f) => this.storage.download(f.storageKey)));
+    const archive = new ZipArchive({ zlib: { level: 9 } });
+    files.forEach((f, i) => {
+      const buf = buffers[i];
+      if (buf) archive.append(buf, { name: f.fileName });
+    });
+    void archive.finalize();
+    return new StreamableFile(archive, {
+      type: 'application/zip',
+      disposition: `attachment; filename="${encodeURIComponent(a.name)}-${version.major}.${version.minor}.zip"`,
     });
   }
 

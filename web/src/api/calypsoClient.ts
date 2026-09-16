@@ -12,11 +12,21 @@ import { apiClient, ApiEnvelope } from './client';
  *   필요 없어 제거했다.
  */
 
+export interface CalypsoFile {
+  fileName: string;
+  storageKey: string;
+}
+
 export interface CalypsoVersionView {
   versionLabel: string;
   isReleased: boolean;
   versionRef: string;
-  fileName: string;
+  /** network===null(File)일 때만 채워진다 — 한 버전에 여러 파일이 있을 수 있다. */
+  files: CalypsoFile[];
+  /** network==='OA'일 때만. */
+  viewUrl: string | null;
+  /** network==='HPC'일 때만. */
+  hpcPath: string | null;
   note: string;
   createdBy: string;
   createdAt: string;
@@ -40,6 +50,8 @@ export interface CalypsoArtifact {
   department: string;
   name: string;
   description: string;
+  /** null(File) | 'OA' | 'HPC' — 등록 시 한 번 정해지면 바뀌지 않는다(설계서 04장 §2). */
+  network: 'OA' | 'HPC' | null;
   createdBy: string;
   /** 'edit'이면 업로드/릴리스/권한관리 가능, 'view'면 released 버전만 열람. */
   myAccess: 'edit' | 'view';
@@ -75,11 +87,25 @@ export async function createCalypsoArtifact(input: {
   return data.data;
 }
 
-export async function uploadCalypsoVersion(
-  id: string, projectId: string, file: File, note: string,
+/**
+ * 새 버전 추가 — 콘텐츠는 그 artifact의 `network`로 정해진다(설계서 04장 §2.2):
+ *   network===null(File) → `files`(1개 이상, 한 버전에 여러 파일을 묶을 수 있다)
+ *   network==='OA'       → `viewUrl`
+ *   network==='HPC'      → `hpcPath`
+ * versionCount===0(아직 첫 버전이 없는 새 artifact)이면 이 호출이 network를 그대로
+ * 확정한다 — "새 Artifact 추가" 다이얼로그가 아니라 여기서 콘텐츠 종류를 고른다
+ * (04장 §6.4).
+ */
+export async function addCalypsoVersion(
+  id: string,
+  projectId: string,
+  input: { files?: File[]; viewUrl?: string; hpcPath?: string },
+  note: string,
 ): Promise<CalypsoArtifact> {
   const form = new FormData();
-  form.append('file', file);
+  (input.files ?? []).forEach((f) => form.append('files', f));
+  if (input.viewUrl) form.append('viewUrl', input.viewUrl);
+  if (input.hpcPath) form.append('hpcPath', input.hpcPath);
   form.append('note', note);
   const { data } = await apiClient.post<ApiEnvelope<CalypsoArtifact>>(
     `/calypso-artifacts/${id}/versions`, form, { params: { projectId } },
@@ -94,12 +120,22 @@ export async function releaseCalypsoArtifact(id: string, projectId: string, note
   return data.data;
 }
 
-export async function downloadCalypsoVersion(id: string, projectId: string, versionRef: string): Promise<Blob> {
-  const { data } = await apiClient.get<Blob>(
+/**
+ * 파일이 하나면 그대로, 여러 개면 zip으로 묶여서 내려온다 — Calypso가 그 판정을 한다
+ * (설계서 04장 §2, §6). 파일명은 응답의 `Content-Disposition`에서 그대로 읽는다 —
+ * 단일 파일이면 원래 이름, zip이면 Calypso가 붙인 `{artifact명}-{major}.{minor}.zip`이다.
+ */
+export async function downloadCalypsoVersion(
+  id: string, projectId: string, versionRef: string,
+): Promise<{ blob: Blob; filename: string | null }> {
+  const res = await apiClient.get<Blob>(
     `/calypso-artifacts/${id}/download/${encodeURIComponent(versionRef)}`,
     { params: { projectId }, responseType: 'blob' },
   );
-  return data;
+  const disposition = res.headers['content-disposition'] as string | undefined;
+  const match = disposition?.match(/filename="?([^";]+)"?/);
+  const filename = match ? decodeURIComponent(match[1]) : null;
+  return { blob: res.data, filename };
 }
 
 export async function addCalypsoEditor(id: string, projectId: string, grant: CalypsoGrantInput): Promise<CalypsoArtifact> {

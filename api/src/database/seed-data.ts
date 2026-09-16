@@ -6,8 +6,7 @@
  *   - 산출물의 **실체(Artifact)**와 캔버스 위의 **자리(Block)**가 분리되어 있다.
  *   - Artifact는 과제 단위로 스코프되고, 같은 artifact가 여러 workflow에 놓일 수 있다.
  *   - Artifact는 권한을 들고 있지 않는다 — recipient(누가 볼 수 있는지)는 항상
- *     **block마다** 따로 붙는다(A/B/C/D 공통). A/B/C는 실제 edit/view를 그 서비스가
- *     판정하고, D는 artifact.createdBy가 edit을 판정한다.
+ *     **block마다** 따로 붙는다(A/B/C 공통). 실제 edit/view는 그 서비스가 판정한다.
  *   - Release는 부서별 배송 기록이며 캔버스 스냅샷을 담지 않는다.
  *
  * 이 시드는 아래 상황을 일부러 만들어 둔다 — 화면에서 바로 확인할 수 있게:
@@ -207,7 +206,7 @@ interface MockArtifact {
   key: string;
   project: 'p1' | 'p2';
   name: string;
-  tier: 'A' | 'B' | 'C' | 'D';
+  tier: 'A' | 'B' | 'C';
   network: 'OA' | 'HPC';
   serviceKey?: string | null;
   externalArtifactId?: string | null;
@@ -249,12 +248,14 @@ const MOCK_ARTIFACTS: MockArtifact[] = [
     externalUrl: 'https://docs.local/cis-a7/adc-ar', giver: 'u4',
     versions: [['v2.1', false, '2026-04-02 09:30', 'Added action items'], ['v2.0', true, '2026-03-18 14:00', '2nd release']] },
 
-  /* ── D Tier — 시스템 자체가 없다. 출처를 자유 텍스트로 기록 ── */
-  { key: 'd_bgr_meas', project: 'p1', name: 'BGR Measurement Report (vendor)', tier: 'D', network: 'OA',
-    giver: 'u2',
+  /* ── B Tier — File Artifacts(Calypso), 외부에서 받아 등록한 것. Tier D(External/Attested)
+   * 폐기 후 이 두 산출물이 흡수된 자리다 — bgr_meas는 두 workflow(LDO_CORE, BGR_REF)가
+   * 공유하는 예시로 남긴다(같은 artifact를 여러 workflow가 재사용하는 case). ── */
+  { key: 'b_bgr_meas', project: 'p1', name: 'BGR Measurement Report (vendor)', tier: 'B', network: 'OA',
+    serviceKey: CALYPSO_SERVICE_KEY, externalArtifactId: 'calypso-bgr-meas', giver: 'u2',
     versions: [['rev.B', true, '2026-05-02 16:40', 'From vendor']] },
-  { key: 'd_cmp_note', project: 'p1', name: 'Comparator Hand Calc', tier: 'D', network: 'OA',
-    giver: 'u6',
+  { key: 'b_cmp_note', project: 'p1', name: 'Comparator Hand Calc', tier: 'B', network: 'OA',
+    serviceKey: CALYPSO_SERVICE_KEY, externalArtifactId: 'calypso-cmp-note', giver: 'u6',
     versions: [] }, // publish된 적 없음 — 캔버스에서 "미발행" 배지로 보인다
 
   /* ── 두 번째 과제 ── */
@@ -272,7 +273,7 @@ interface MockBlock {
   /** artifact를 가리키지 않는 "정상 빈 상태"면 생략. 그 경우 name이 표시된다. */
   artifact?: string;
   name: string;
-  /** artifact가 매핑된 block에서만 의미가 있다 — A/B/C/D 공통, workflow마다 독립인 recipient. */
+  /** artifact가 매핑된 block에서만 의미가 있다 — A/B/C 공통, workflow마다 독립인 recipient. */
   recipients?: { departments?: string[]; users?: UserKey[] };
   series?: string;
   seriesIdx?: number;
@@ -301,7 +302,7 @@ const MOCK_BLOCKS: MockBlock[] = [
   { key: 'k10', workflow: 'wf2', phase: 'ph_ldo_a', row: 0, artifact: 'b_ldo_spec', name: 'LDO Spec Data',
     recipients: { departments: ['PI/PD', 'Solution'] } },
   { key: 'k11', workflow: 'wf2', phase: 'ph_ldo_b', row: 0, name: 'LDO Schematic Review' },
-  { key: 'k12', workflow: 'wf2', phase: 'ph_ldo_c', row: 0, artifact: 'd_bgr_meas', name: 'BGR Measurement Report (vendor)',
+  { key: 'k12', workflow: 'wf2', phase: 'ph_ldo_c', row: 0, artifact: 'b_bgr_meas', name: 'BGR Measurement Report (vendor)',
     recipients: { departments: ['PTE'] } },
 
   /* ── ADC_RAMP ── */
@@ -312,7 +313,7 @@ const MOCK_BLOCKS: MockBlock[] = [
   { key: 'k22', workflow: 'wf3', phase: 'ph_adc_ml3', row: 0, name: 'Ramp Linearity Report' },
 
   /* ── BGR_REF ── */
-  { key: 'k30', workflow: 'wf4', phase: 'ph_bgr_ml1', row: 0, artifact: 'd_bgr_meas', name: 'BGR Measurement Report (vendor)',
+  { key: 'k30', workflow: 'wf4', phase: 'ph_bgr_ml1', row: 0, artifact: 'b_bgr_meas', name: 'BGR Measurement Report (vendor)',
     recipients: { departments: ['PTE'] } },
   { key: 'k31', workflow: 'wf4', phase: 'ph_bgr_ml2', row: 0, name: 'BGR Corner Summary' },
 
@@ -322,7 +323,7 @@ const MOCK_BLOCKS: MockBlock[] = [
   { key: 'k41', workflow: 'wf5', phase: 'ph_tg_mid', row: 0, name: 'TG Driver Sizing' },
 
   /* ── COMP_BLOCK — 유실 상태 두 개 ── */
-  { key: 'k50', workflow: 'wf6', phase: 'ph_cmp_ko', row: 0, artifact: 'd_cmp_note', name: 'Comparator Hand Calc',
+  { key: 'k50', workflow: 'wf6', phase: 'ph_cmp_ko', row: 0, artifact: 'b_cmp_note', name: 'Comparator Hand Calc',
     recipients: { departments: ['Analog'] } },
   { key: 'k51', workflow: 'wf6', phase: ORPHAN_PHASE_ID, row: 0, name: 'Comparator Layout DB' },
   { key: 'k52', workflow: 'wf6', phase: ORPHAN_PHASE_ID, row: 1, name: 'Comparator Offset Sim' },
@@ -477,8 +478,8 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
         viewUrl: a.externalUrl ?? null,
         hpcPath: a.network === 'HPC' ? (a.hpcPath ?? null) : null,
         note,
-        assertedBy: a.tier === 'C' || a.tier === 'D' ? KNOX[a.giver] : null,
-        assertedAt: a.tier === 'C' || a.tier === 'D' ? at(when) : null,
+        assertedBy: a.tier === 'C' ? KNOX[a.giver] : null,
+        assertedAt: a.tier === 'C' ? at(when) : null,
         observedAt: a.tier === 'A' || a.tier === 'B' ? at(when) : null,
         publishedAt: isPublished ? at(when) : null,
         createdAt: at(when),

@@ -57,9 +57,6 @@ export class BlocksService {
   ): Promise<ArtifactDocument | null | undefined> {
     if (input.newArtifact) {
       const na = input.newArtifact;
-      if (na.source === 'attested') {
-        return this.sources.resolveAttested(project, actor, intent, { name: na.name });
-      }
       if (!na.externalArtifactId) {
         throw new BadRequestException('externalArtifactId is required for this source.');
       }
@@ -197,9 +194,8 @@ export class BlocksService {
   }
 
   /**
-   * block의 recipient 교체 — A/B/C/D 전부 공통이다(설계서 04장 §3.2). SIREN은 여기서
-   * "누가 볼 수 있는지"만 보관하고, 실제 edit 여부는 A/B/C는 그 서비스가, D는
-   * artifact.createdBy가 판정한다(common/access.ts의 attestedLevel).
+   * block의 recipient 교체 — A/B/C 전부 공통이다(설계서 04장 §3.2). SIREN은 여기서
+   * "누가 볼 수 있는지"만 보관하고, 실제 edit 여부는 그 서비스가 판정한다.
    *
    * ★ 편집 권한은 그 workflow의 Edit Access다 — 컨트롤러가 이미 검증하고 들어온다.
    *   recipient에 **속하는 것**과 recipient를 **편집하는 것**은 별개다(설계서 01장 §4.2).

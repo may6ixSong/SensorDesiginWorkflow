@@ -1,12 +1,36 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 
+/** Calypso가 지금 지원하는 network 값 — null이면 File(파일 업로드)이라 망 구분이 없다
+ * (SIREN 설계서 04장 §2, §6 — Tier D 폐기 후 이 서비스가 그 역할을 흡수했다). */
+export type CalypsoNetwork = 'OA' | 'HPC' | null;
+
+/** File 콘텐츠의 파일 한 개. 한 버전이 여러 개를 가질 수 있다(§3.9). */
+@Schema({ _id: false, timestamps: false })
+export class ArtifactFile {
+  @Prop({ required: true })
+  fileName: string;
+
+  /** 오브젝트 스토리지 키. Calypso의 S3_FOLDER 아래에 있다 (§3.7). */
+  @Prop({ required: true })
+  storageKey: string;
+}
+export const ArtifactFileSchema = SchemaFactory.createForClass(ArtifactFile);
+
 /**
- * Calypso가 소유하는 버전. **여기가 실물의 집이다** - SIREN은 이 값을 참조로만
- * 관측한다(Hub 설계서 §1.2).
+ * Calypso가 소유하는 버전. **여기가 실물(또는 참조)의 집이다** - SIREN은 이 값을
+ * 참조로만 관측한다(Hub 설계서 §1.2).
  *
  * 우리가 직접 만드는 서비스이므로 major.minor 규칙을 그대로 강제한다(§6.1):
  * 업로드 = minor +1(최초 0.1), Release = major +1 · minor 0.
+ *
+ * ★ §3.9 — Artifact.network에 따라 이 버전이 들고 있는 콘텐츠 필드가 갈린다(셋 중
+ *   정확히 하나만 채워진다는 불변식은 서비스 계층이 지킨다, 스키마는 강제하지 않는다):
+ *     network === null   → `files`(여러 개 가능, §3.9)
+ *     network === 'OA'   → `viewUrl`(링크 하나)
+ *     network === 'HPC'  → `hpcPath`(경로 하나)
+ *   이 확장 전에는 fileName/storageKey 단수 필드였다 — Tier D(External/Attested) 폐기와
+ *   함께 그 역할(경로/링크만 있고 실물이 없는 산출물)을 이 서비스가 흡수하면서 넓어졌다.
  */
 @Schema({ _id: false, timestamps: false })
 export class ArtifactVersion {
@@ -24,12 +48,17 @@ export class ArtifactVersion {
   @Prop({ required: true, unique: false })
   versionRef: string;
 
-  @Prop({ required: true })
-  fileName: string;
+  /** network === null(File)일 때만. 한 버전에 여러 파일을 묶을 수 있다(§3.9). */
+  @Prop({ type: [ArtifactFileSchema], default: [] })
+  files: ArtifactFile[];
 
-  /** 오브젝트 스토리지 키. Calypso의 S3_FOLDER 아래에 있다 (§3.7). */
+  /** network === 'OA'일 때만 — 그 산출물이 실제로 있는 곳의 웹 링크. */
   @Prop({ type: String, default: null })
-  storageKey: string | null;
+  viewUrl: string | null;
+
+  /** network === 'HPC'일 때만 — 그 산출물이 실제로 있는 HPC망 경로. */
+  @Prop({ type: String, default: null })
+  hpcPath: string | null;
 
   @Prop({ default: '' })
   note: string;
@@ -97,6 +126,15 @@ export class Artifact {
 
   @Prop({ default: '' })
   description: string;
+
+  /**
+   * null(기본) = File — 실물을 이 서비스가 들고 있다(여러 개 가능, §3.9). 'OA'/'HPC'면
+   * 실물이 없고 각 버전의 viewUrl/hpcPath가 "어디 있는지"만 가리킨다. 등록 시점에
+   * 한 번 정해지면 그 artifact의 남은 삶 동안 바뀌지 않는다 — 다른 콘텐츠 종류가
+   * 필요하면 새 artifact를 등록하고 SIREN 쪽에서 재매핑한다(설계서 04장 §6.6).
+   */
+  @Prop({ type: String, enum: ['OA', 'HPC', null], default: null })
+  network: CalypsoNetwork;
 
   @Prop({ type: [ArtifactVersionSchema], default: [] })
   versions: ArtifactVersion[];

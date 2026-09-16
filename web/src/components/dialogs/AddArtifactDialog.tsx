@@ -33,7 +33,7 @@ interface Props {
 
 /**
  * "새 Artifact 추가" — 캔버스에 자리(block)를 놓는 동시에 실제 산출물 출처까지 그 자리에서
- * 확정한다(설계서 04장 §6). Tier 글자(A/B/C/D)는 화면 어디에도 노출하지 않는다.
+ * 확정한다(설계서 04장 §6). Tier 글자(A/B/C)는 화면 어디에도 노출하지 않는다.
  *
  * ★ intent(주는/받는)가 첫 질문이다 — 이후 후보 목록의 pickable 판정(edit-only vs
  *   edit-or-view)이 이 값에 따라 갈린다. 생성 후에는 바꾸지 않는다.
@@ -53,8 +53,6 @@ export function AddArtifactDialog({
 
   const changeIntent = (next: ArtifactIntent) => {
     setIntent(next);
-    // attested는 받는 전용이다 — 주는 쪽으로 바꾸면 그 선택은 더 이상 유효하지 않다.
-    if (src.source === 'attested' && next === 'own') setSrc(emptySourceState());
   };
 
   const submit = () => {

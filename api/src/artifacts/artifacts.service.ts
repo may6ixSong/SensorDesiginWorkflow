@@ -142,18 +142,6 @@ export class ArtifactsService {
   }
 
   /**
-   * D Tier(Attested) — 검증할 시스템이 없으므로 그냥 새로 만든다. edit은 등록자
-   * (createdBy)로 고정된다 — attestedLevel(common/access.ts)이 그 값을 그대로 쓴다.
-   */
-  async createAttested(
-    projectId: Types.ObjectId,
-    input: { name: string },
-    actor: Actor,
-  ): Promise<ArtifactDocument> {
-    return this.create(projectId, { name: input.name, tier: 'D', network: 'OA' }, actor);
-  }
-
-  /**
    * 버전 엔트리를 통째로 갱신한다 — A/B Tier의 라이브 조회 결과를 반영할 때 쓴다.
    * 최신이 index 0이라는 불변식을 여기서 지킨다.
    *
@@ -172,7 +160,7 @@ export class ArtifactsService {
   }
 
   /**
-   * C/D 티어의 수동 버전 기록. 시스템이 확인한 값이 아니라 담당자가 주장한 값이라는 사실이
+   * C 티어의 수동 버전 기록. 시스템이 확인한 값이 아니라 담당자가 주장한 값이라는 사실이
    * assertedBy/assertedAt으로 남는다.
    */
   async assertVersion(
