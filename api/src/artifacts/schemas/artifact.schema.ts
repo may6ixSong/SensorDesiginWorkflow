@@ -40,8 +40,11 @@ export const SourceRefSchema = SchemaFactory.createForClass(SourceRef);
  *     `isPublished:false`만 지키면 되고(그러면 giver에게만 보인다), 이전엔 `latest+`라는
  *     이름을 쓰도록 권했지만 그 관례는 없앴다.
  */
-@Schema({ _id: false, timestamps: false })
+@Schema({ _id: true, timestamps: false })
 export class ArtifactVersion {
+  /** Comment 등 외부에서 이 버전을 안정적으로 참조하기 위한 식별자. */
+  _id: Types.ObjectId;
+  
   /**
    * 이 엔트리를 SIREN이 얼마나 자동으로·검증 가능하게 알았는지 (설계서 04장 §2).
    * 산출물 단위가 아니라 엔트리 단위라서, 나중에 실연동이 붙어도 예전 수동 기록을
