@@ -92,7 +92,14 @@ function ServiceSection({ tier, title, blurb }: { tier: RegisterTier; title: str
           No {title} is registered yet.
         </Box>
       ) : (
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        // Confluence 매크로 피커/MCP 서버 목록처럼 카드를 그리드로 늘어놓는다(사용자 요청).
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+            gap: '12px',
+          }}
+        >
           {inSection.map((s) => <ServiceCard key={s.key} service={s} />)}
         </Box>
       )}
@@ -155,8 +162,15 @@ function TokenRow({ label, value }: { label: string; value: string }) {
   );
 }
 
+/**
+ * Confluence 매크로 피커/MCP 서버 카드처럼 — 아이콘 + 이름을 크게, 설명은 짧게,
+ * 세부 정보(token/artifact types)는 카드 안에 그대로 접어 넣는다(사용자 요청).
+ * 연필 아이콘으로 그 자리에서 바로 수정할 수 있다 — name/description/favicon/baseURL
+ * 전부(설계서상 baseURL은 원래 불변이어야 하지만, 사용자 결정으로 우선 열어 둔다).
+ */
 function ServiceCard({ service: s }: { service: HubService }) {
   const qc = useQueryClient();
+  const [editOpen, setEditOpen] = useState(false);
   const toggle = useMutation({
     mutationFn: () => apiClient.patch(`/hub/services/${s.key}`, { enabled: !s.enabled }),
     onSuccess: () => {
@@ -184,18 +198,33 @@ function ServiceCard({ service: s }: { service: HubService }) {
             {!s.enabled && <Badge color={T.dm} bg={T.sf2} borderColor={T.ln}>Disabled</Badge>}
           </Box>
           <Box sx={{ fontFamily: FONT_MONO, fontSize: 10.5, color: T.dm2, mt: '2px' }}>{s.key}</Box>
-          {s.baseUrl && (
-            <Box sx={{ fontFamily: FONT_MONO, fontSize: 10.5, color: T.dm2, mt: '2px', wordBreak: 'break-all' }}>
-              {s.baseUrl}
-            </Box>
-          )}
         </Box>
-        <SirenButton onClick={() => toggle.mutate()} disabled={toggle.isPending} sx={{ flex: '0 0 auto' }}>
-          {s.enabled ? 'Disable' : 'Enable'}
+        <SirenButton
+          variant="ghost"
+          title="Edit"
+          onClick={() => setEditOpen(true)}
+          sx={{ flex: '0 0 auto', minWidth: 0, padding: '5px' }}
+        >
+          <Icon name="edit" size={14} />
         </SirenButton>
       </Box>
 
-      {s.description && <Box sx={{ fontSize: 12, color: T.dm, lineHeight: 1.5 }}>{s.description}</Box>}
+      {s.baseUrl && (
+        <Box sx={{ fontFamily: FONT_MONO, fontSize: 10.5, color: T.dm2, wordBreak: 'break-all' }}>
+          {s.baseUrl}
+        </Box>
+      )}
+
+      {s.description && (
+        <Box
+          sx={{
+            fontSize: 12, color: T.dm, lineHeight: 1.5,
+            display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+          }}
+        >
+          {s.description}
+        </Box>
+      )}
 
       {s.enabled && (
         <TokenRow label="Bearer token — shared by this baseURL" value={s.token ?? '(none)'} />
@@ -205,24 +234,104 @@ function ServiceCard({ service: s }: { service: HubService }) {
         <Box sx={{ fontSize: 10.5, color: T.dm2, mb: '6px' }}>
           Artifact type{s.artifactTypes.length === 1 ? '' : 's'} ({s.artifactTypes.length})
         </Box>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
           {s.artifactTypes.map((t) => (
             <Box
               key={t.key}
+              title={t.description || t.key}
               sx={{
-                display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap',
-                fontSize: 12, padding: '6px 9px', borderRadius: '8px',
+                fontSize: 11.5, fontWeight: 600, padding: '4px 9px', borderRadius: '999px',
                 background: T.sf2, border: `1px solid ${T.ln}`,
               }}
             >
-              <Box sx={{ fontWeight: 600 }}>{t.name}</Box>
-              <Box sx={{ fontFamily: FONT_MONO, fontSize: 10.5, color: T.dm2 }}>{t.key}</Box>
-              {t.description && <Box sx={{ fontSize: 11, color: T.dm, flex: '1 1 100%' }}>{t.description}</Box>}
+              {t.name}
             </Box>
           ))}
         </Box>
       </Box>
+
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <SirenButton onClick={() => toggle.mutate()} disabled={toggle.isPending}>
+          {s.enabled ? 'Disable' : 'Enable'}
+        </SirenButton>
+      </Box>
+
+      {editOpen && <EditServiceDialog service={s} onClose={() => setEditOpen(false)} />}
     </Box>
+  );
+}
+
+/**
+ * 카드 수정 다이얼로그 — name/description/favicon/baseURL을 즉시 PATCH한다.
+ * key/token/tier/artifactTypes는 여기서 안 다룬다(설계서상 불변이거나 별도 경로).
+ * baseURL은 원래 등록 후 불변이어야 맞지만(dedup 키이자 토큰 발급 기준), 지금 당장
+ * 고칠 수 있게 열어 달라는 사용자 결정에 따라 막지 않는다 — 대신 그 위험을 한 줄로 알린다.
+ */
+function EditServiceDialog({ service: s, onClose }: { service: HubService; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [name, setName] = useState(s.name);
+  const [description, setDescription] = useState(s.description);
+  const [baseUrl, setBaseUrl] = useState(s.baseUrl ?? '');
+  const [icon, setIcon] = useState(s.icon);
+  const [nameErr, setNameErr] = useState(false);
+
+  const mutation = useMutation({
+    mutationFn: () =>
+      apiClient.patch(`/hub/services/${s.key}`, {
+        name: name.trim(),
+        description: description.trim(),
+        baseUrl: baseUrl.trim(),
+        icon,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['hub'] });
+      toast('Service updated');
+      onClose();
+    },
+    onError: (e: any) => toast(e?.response?.data?.message ?? 'Failed to save'),
+  });
+
+  const submit = () => {
+    if (!name.trim()) { setNameErr(true); return; }
+    mutation.mutate();
+  };
+
+  return (
+    <ModalShell
+      open
+      onClose={onClose}
+      width={460}
+      header={
+        <>
+          <Box sx={{ fontSize: 11, color: T.dm2, textTransform: 'uppercase', letterSpacing: '.05em' }}>{s.key}</Box>
+          <Box sx={{ fontSize: 16, fontWeight: 700, mt: '2px' }}>Edit service</Box>
+        </>
+      }
+      footer={
+        <SirenButton variant="primary" disabled={mutation.isPending} onClick={submit}>
+          <Icon name="check" /> {mutation.isPending ? 'Saving…' : 'Save'}
+        </SirenButton>
+      }
+    >
+      <Field label="Service — display name">
+        <TextInput
+          value={name}
+          onChange={(v) => { setName(v); setNameErr(false); }}
+          error={nameErr}
+        />
+      </Field>
+      <Field label="Description — optional">
+        <TextArea value={description} onChange={setDescription} rows={2} />
+      </Field>
+      <Field label="BaseURL — that service's API base address">
+        <TextInput value={baseUrl} onChange={setBaseUrl} placeholder="https://…" />
+      </Field>
+      <Box sx={{ fontSize: 11, color: T.warn, lineHeight: 1.6, mb: '4px' }}>
+        Changing this takes effect immediately — every live call to this service (candidate lookups,
+        access checks, html-view) starts hitting the new address right away.
+      </Box>
+      <FaviconField name={name} icon={icon} onChange={setIcon} />
+    </ModalShell>
   );
 }
 
