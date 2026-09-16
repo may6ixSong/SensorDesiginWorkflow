@@ -8,12 +8,14 @@ import {
 } from '@/types/domain';
 import { SlidePanel } from '@/components/common/SlidePanel';
 import { SirenButton, Badge } from '@/components/common/SirenButton';
-import { Card, Ey } from '@/components/common/Panel';
+import { Card, Ey, SelectInput, TextArea } from '@/components/common/Panel';
 import { TabPanel, Tabs } from '@/components/common/Tabs';
 import { Icon, IconName } from '@/components/common/Icon';
 import { UserAvatar } from '@/components/common/Avatar';
 import { useDirectory } from '@/app/providers/DirectoryProvider';
 import { NewArtifactSourceInput, useHtmlView, useLiveVersions } from '@/api/hooks/useBlocks';
+import { useComments, useCreateComment } from '@/api/hooks/useComments';
+import { CommentDto } from '@/types/domain';
 import { AccessGrantEditor } from '@/components/dialogs/AccessGrantEditor';
 import { ChangeArtifactDialog } from '@/components/dialogs/ChangeArtifactDialog';
 import { CalypsoInlinePanel } from '@/components/artifact/CalypsoInlinePanel';
@@ -28,7 +30,7 @@ import { CURSOR_POINTER, FONT_MONO, R, T, TIER_COLOR, TIER_LABEL, TNUM } from '@
  * - 두 칸 사이 gap을 뺀 2/3. CalypsoInlinePanel의 왼쪽 칸과 같은 폭으로 맞춘다. */
 const HTML_VIEW_MAX_WIDTH = 560;
 
-type Tab = 'overview' | 'recipients';
+type Tab = 'overview' | 'recipients' | 'comments';
 
 /** Published/Working 배지가 기본 Badge 크기(8px)로는 너무 작다는 지적(사용자) — 여기서만 키운다. */
 const STATUS_BADGE_SX = { fontSize: 10.5, padding: '2px 7px', fontWeight: 700 };
@@ -152,6 +154,10 @@ export function ArtifactSlide({
   const requestedVersion = versionsForHtmlHook.find((v) => v.versionLabel === requestedVersionLabel);
   const htmlView = useHtmlView(block?.workflowId, block?.id, requestedVersionLabel, !!requestedVersion?.hasHtmlView);
 
+  /** 탭 배지 숫자용 — CommentsTab이 같은 queryKey로 다시 불러도 캐시를 재사용할 뿐 추가
+   * 네트워크 요청은 없다. */
+  const comments = useComments(block?.workflowId, block?.id);
+  
   useEffect(() => {
     setSelectedVersionLabel(undefined);
   }, [block?.id]);
@@ -315,6 +321,7 @@ export function ArtifactSlide({
         tabs={[
           { key: 'overview' as Tab, label: 'Overview' },
           { key: 'recipients' as Tab, label: t('artifact.recipients') },
+          { key: 'comments' as Tab, label: 'Comments', badge: comments.data?.length || undefined },
         ]}
         value={tab}
         onChange={setTab}
@@ -352,6 +359,8 @@ export function ArtifactSlide({
             saving={saving}
           />
         )}
+
+        {tab === 'comments' && <CommentsTab block={block} versions={effectiveVersions} />}
       </TabPanel>
     </SlidePanel>
   );
@@ -723,6 +732,168 @@ function RecipientsTab({
             <Icon name="check" /> {saving ? 'Saving…' : 'Save'}
           </SirenButton>
         </Box>
+      )}
+    </>
+  );
+}
+
+/**
+ * 댓글 — Artifact 전체 또는 특정 버전에 대해 남긴다. Recipients/Access와 달리 BoardPage까지
+ * 상태를 올릴 필요가 없는 독립 기능이라 여기서 직접 훅을 호출하고 toast도 바로 처리한다.
+ */
+function CommentsTab({ block, versions }: { block: BlockDto; versions: ArtifactVersionDto[] }) {
+  const { resolveUser } = useDirectory();
+  const comments = useComments(block.workflowId, block.id);
+  const create = useCreateComment(block.workflowId, block.id);
+
+  const [text, setText] = useState('');
+  const [versionId, setVersionId] = useState('');
+  const [replyTo, setReplyTo] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState('');
+
+  const versionOptions = useMemo(
+    () => versions.filter((v) => v.id).map((v) => ({ value: v.id as string, label: v.versionLabel })),
+    [versions],
+  );
+
+  // "General(버전 없음)" 댓글은 지원하지 않는다 - 항상 실제 버전 하나를 가리켜야 하므로
+  // 후보가 있으면 기본으로 최신 버전(0번)을 골라 둔다.
+  useEffect(() => {
+    setVersionId(versionOptions[0]?.value ?? '');
+  }, [block.id, versionOptions]);
+
+  const submit = () => {
+    const body = text.trim();
+    if (!body || !versionId) return;
+    create.mutate(
+      { text: body, versionId },
+      {
+        onSuccess: () => setText(''),
+        onError: (e: any) => toast(e?.response?.data?.message ?? 'Failed to post comment'),
+      },
+    );
+  };
+
+  const submitReply = (parentCommentId: string) => {
+    const body = replyText.trim();
+    if (!body) return;
+    create.mutate(
+      { text: body, parentCommentId },
+      {
+        onSuccess: () => { setReplyText(''); setReplyTo(null); },
+        onError: (e: any) => toast(e?.response?.data?.message ?? 'Failed to post reply'),
+      },
+    );
+  };
+
+  /** parentCommentId('' = 최상위)별로 묶어 둔다 — 백엔드가 항상 createdAt 오름차순으로
+   * 내려주므로(comments.service.ts) 그룹 안 순서도 그대로 최신순 아님/작성순이 유지된다. */
+  const byParent = useMemo(() => {
+    const map = new Map<string, CommentDto[]>();
+    for (const c of comments.data ?? []) {
+      const key = c.parentCommentId ?? '';
+      const list = map.get(key) ?? [];
+      list.push(c);
+      map.set(key, list);
+    }
+    return map;
+  }, [comments.data]);
+
+  const renderNode = (c: CommentDto, depth: number) => {
+    const by = resolveUser(c.createdBy);
+    const children = byParent.get(c.id) ?? [];
+    return (
+      <Box key={c.id} sx={{ ml: depth ? `${depth * 20}px` : 0 }}>
+        <Card sx={{ padding: '10px 12px', mb: '8px' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: '7px', flexWrap: 'wrap' }}>
+            <UserAvatar user={by} size={19} />
+            <Box sx={{ fontSize: 12, fontWeight: 600 }}>{by?.name ?? c.createdBy}</Box>
+            {c.versionLabelSnapshot && (
+              <Badge color={T.pr} bg={T.prSoft} borderColor={T.prLine}>{c.versionLabelSnapshot}</Badge>
+            )}
+            <Box sx={{ flex: 1 }} />
+            <Box sx={{ fontSize: 11, color: T.dm2, ...TNUM }}>{fmtAt(c.createdAt)}</Box>
+          </Box>
+          <Box sx={{ fontSize: 12.5, color: T.tx2, mt: '6px', lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>
+            {c.text}
+          </Box>
+          {canComment && (
+            <Box sx={{ mt: '6px' }}>
+              <SirenButton
+                variant="ghost"
+                sx={{ fontSize: 11, padding: '2px 6px' }}
+                onClick={() => { setReplyTo(replyTo === c.id ? null : c.id); setReplyText(''); }}
+              >
+                Reply
+              </SirenButton>
+            </Box>
+          )}
+          {replyTo === c.id && (
+            <Box sx={{ mt: '8px' }}>
+              <TextArea value={replyText} onChange={setReplyText} rows={2} />
+              <Box sx={{ display: 'flex', gap: '6px', mt: '6px' }}>
+                <SirenButton
+                  variant="primary"
+                  onClick={() => submitReply(c.id)}
+                  disabled={create.isPending || !replyText.trim()}
+                >
+                  <Icon name="send" size={12} /> Reply
+                </SirenButton>
+                <SirenButton variant="ghost" onClick={() => { setReplyTo(null); setReplyText(''); }}>
+                  Cancel
+                </SirenButton>
+              </Box>
+            </Box>
+          )}
+        </Card>
+        {children.map((child) => renderNode(child, depth + 1))}
+      </Box>
+    );
+  };
+
+  const topLevel = byParent.get('') ?? [];
+  /** 실제 등록된(= id가 있는) 버전이 하나도 없으면 댓글 자체를 남길 수 없다 — "일반" 댓글도
+   * 예외 없다. 기존에(버전이 있던 시절) 남겨진 댓글이 있다면 목록은 그대로 보여준다. */
+  const canComment = versionOptions.length > 0;
+
+  return (
+    <>
+      <Card sx={{ mb: '14px' }}>
+        {canComment ? (
+          <>
+            <Ey sx={{ mb: '8px' }}>New comment</Ey>
+            <TextArea value={text} onChange={setText} rows={3} />
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', mt: '8px' }}>
+              <Box sx={{ width: 200 }}>
+                <SelectInput
+                  value={versionId}
+                  onChange={setVersionId}
+                  options={versionOptions}
+                />
+              </Box>
+              <Box sx={{ flex: 1 }} />
+              <SirenButton variant="primary" onClick={submit} disabled={create.isPending || !text.trim() || !versionId}>
+                <Icon name="send" size={12} /> Post
+              </SirenButton>
+            </Box>
+          </>
+        ) : (
+          <Box sx={{ fontSize: 12.5, color: T.dm2, lineHeight: 1.6 }}>
+            Comments open up once this artifact has at least one registered version.
+          </Box>
+        )}
+      </Card>
+
+      {comments.isLoading ? (
+        <Box sx={{ padding: '32px 8px', textAlign: 'center', color: T.dm2, fontSize: 12.5 }}>
+          Loading comments…
+        </Box>
+      ) : topLevel.length === 0 ? (
+        <Box sx={{ padding: '32px 8px', textAlign: 'center', color: T.dm2, fontSize: 12.5 }}>
+          No comments yet.
+        </Box>
+      ) : (
+        topLevel.map((c) => renderNode(c, 0))
       )}
     </>
   );
