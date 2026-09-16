@@ -312,6 +312,8 @@ export function createFakeModel<T = AnyDoc>(name: string, schema: Schema, popula
     findById: (id: unknown) => new FakeQuery(store, 'findById', null, id, populateRefs),
     findByIdAndDelete: (id: unknown) => new FakeQuery(store, 'findByIdAndDelete', null, id, populateRefs),
     updateOne: (filter: AnyDoc, update: AnyDoc) => new FakeQuery(store, 'updateOne', filter, update, populateRefs),
+    findOneAndUpdate: (filter: AnyDoc, update: AnyDoc, options?: AnyDoc) =>
+      new FakeQuery(store, 'findOneAndUpdate', filter, { update, options }, populateRefs),
     deleteMany: (filter?: AnyDoc) => new FakeQuery(store, 'deleteMany', filter ?? null, null, populateRefs),
     countDocuments: (filter?: AnyDoc) => new FakeQuery(store, 'countDocuments', filter ?? null, null, populateRefs),
     distinct: async (field: string, filter?: AnyDoc) => {
