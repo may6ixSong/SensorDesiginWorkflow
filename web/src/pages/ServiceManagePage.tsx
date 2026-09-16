@@ -198,10 +198,17 @@ function ServiceCard({ service: s }: { service: HubService }) {
         background: T.sf, opacity: s.enabled ? 1 : 0.6,
       }}
     >
-      {/* favicon을 이름보다 위쪽 줄에 — edit 버튼은 그 줄 오른쪽 끝에 그대로 둔다(사용자 요청). */}
-      <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
         <ServiceIcon name={s.name} url={s.icon} />
-        <Box sx={{ flex: 1 }} />
+        <Box sx={{ minWidth: 0, flex: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+            <Box sx={{ fontSize: 13.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {s.name}
+            </Box>
+            {!s.enabled && <Badge color={T.dm} bg={T.sf2} borderColor={T.ln}>Disabled</Badge>}
+          </Box>
+          <Box sx={{ fontFamily: FONT_MONO, fontSize: 10.5, color: T.dm2, mt: '2px' }}>{s.key}</Box>
+        </Box>
         <SirenButton
           variant="ghost"
           title="Edit"
@@ -210,15 +217,6 @@ function ServiceCard({ service: s }: { service: HubService }) {
         >
           <Icon name="edit" size={14} />
         </SirenButton>
-      </Box>
-      <Box sx={{ minWidth: 0 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-          <Box sx={{ fontSize: 13.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {s.name}
-          </Box>
-          {!s.enabled && <Badge color={T.dm} bg={T.sf2} borderColor={T.ln}>Disabled</Badge>}
-        </Box>
-        <Box sx={{ fontFamily: FONT_MONO, fontSize: 10.5, color: T.dm2, mt: '2px' }}>{s.key}</Box>
       </Box>
 
       {s.baseUrl && (
@@ -252,15 +250,29 @@ function ServiceCard({ service: s }: { service: HubService }) {
               key={t.key}
               title={t.description || undefined}
               sx={{
-                display: 'flex', alignItems: 'baseline', gap: '7px', flexWrap: 'wrap',
-                fontSize: 11.5, fontWeight: 600, padding: '4px 9px', borderRadius: '8px',
+                display: 'flex', alignItems: 'center', gap: '7px',
+                fontSize: 11.5, fontWeight: 600, padding: '4px 6px 4px 9px', borderRadius: '8px',
                 background: T.sf2, border: `1px solid ${T.ln}`,
               }}
             >
-              <Box component="span">{t.name}</Box>
-              <Box component="span" sx={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 500, color: T.dm2 }}>
+              <Box component="span" sx={{ flex: '0 0 auto' }}>{t.name}</Box>
+              <Box
+                component="span"
+                sx={{
+                  fontFamily: FONT_MONO, fontSize: 10, fontWeight: 500, color: T.dm2,
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flex: '1 1 auto',
+                }}
+              >
                 {t.key}
               </Box>
+              <SirenButton
+                variant="ghost"
+                title="Copy artifactTypeKey"
+                onClick={() => { navigator.clipboard?.writeText(t.key); toast('Copied'); }}
+                sx={{ minWidth: 0, padding: '3px', flex: '0 0 auto' }}
+              >
+                <Icon name="copy" size={11} />
+              </SirenButton>
             </Box>
           ))}
         </Box>
@@ -329,6 +341,7 @@ function EditServiceDialog({ service: s, onClose }: { service: HubService; onClo
         </SirenButton>
       }
     >
+      <FaviconField name={name} icon={icon} onChange={setIcon} />
       <Field label="Service — display name">
         <TextInput
           value={name}
@@ -346,7 +359,6 @@ function EditServiceDialog({ service: s, onClose }: { service: HubService; onClo
         Changing this takes effect immediately — every live call to this service (candidate lookups,
         access checks, html-view) starts hitting the new address right away.
       </Box>
-      <FaviconField name={name} icon={icon} onChange={setIcon} />
     </ModalShell>
   );
 }
@@ -510,6 +522,7 @@ function RegisterDialog({ tier, title, onClose }: { tier: RegisterTier; title: s
         </SirenButton>
       }
     >
+      <FaviconField name={name} icon={icon} onChange={setIcon} />
       <Field label="Service — display name">
         <TextInput
           value={name}
@@ -537,7 +550,6 @@ function RegisterDialog({ tier, title, onClose }: { tier: RegisterTier; title: s
           placeholder="https://…"
         />
       </Field>
-      <FaviconField name={name} icon={icon} onChange={setIcon} />
       <Box sx={{ fontSize: 11, color: T.dm2, lineHeight: 1.6 }}>
         If this baseURL is already registered, the existing Service name and token are kept — this just
         adds a new artifact type under it.
