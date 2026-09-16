@@ -97,6 +97,10 @@ export class SeedRunnerService implements OnModuleInit {
         Release: this.releaseModel,
       });
       this.logger.log('목업 시드 완료. (isMock:true로 표시되어 있어 플래그를 false로 바꾸면 일괄 삭제됩니다.)');
+      // 인메모리 드라이버는 Mongoose와 달리 서브다큐먼트 배열에 _id를 자동으로 채우지
+      // 않는다(in-memory-driver.ts) — 방금 심은 목업 버전에도 여기서 채워야 Comment가
+      // versionId로 참조할 수 있다.
+      await this.versionIdBackfill.run();
     } catch (err) {
       // 시드 실패로 앱 부팅 자체를 막지는 않는다 - 실제 데이터가 이미 있는 DB에서
       // code 중복(projects.code unique) 같은 충돌이 날 수 있기 때문이다.

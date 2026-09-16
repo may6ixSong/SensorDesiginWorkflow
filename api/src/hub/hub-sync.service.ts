@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { Artifact, ArtifactDocument, ArtifactVersion } from '../artifacts/schemas/artifact.schema';
 import { Tier } from '../common/constants/tier';
 import { HubService } from './hub.service';
@@ -45,6 +45,10 @@ export class HubSyncService {
    * 갱신 뒤 `observedAt` 내림차순으로 재정렬해 index 0 = 최신 불변식을 유지한다
    * (event가 순서 없이 도착해도 안전하다). **여기서 `.save()`는 하지 않는다** — 호출부가
    * 트랜잭션 경계를 정한다.
+   *
+   * ★ 기존 엔트리를 갱신할 때는 그 `_id`를 반드시 그대로 물려받는다 — Comment가 versionId로
+   *   이 값을 참조하므로(ArtifactsService.replaceVersions와 동일한 이유), 새 `_id`로
+   *   바뀌면 이미 달린 댓글이 조용히 고아가 된다.
    */
   upsertVersionEntry(artifact: ArtifactDocument, tier: Tier, input: NormalizedVersionInput): void {
     const versions = artifact.versions ?? [];
@@ -53,6 +57,7 @@ export class HubSyncService {
     // 이미 채워둔 note를 지우지 않게, 안 준 경우엔 기존 값을 그대로 이어받는다.
     const note = input.note ?? versions[idx]?.note ?? '';
     const entry = {
+      _id: idx >= 0 ? versions[idx]._id : new Types.ObjectId(),
       tier,
       versionLabel: input.versionLabel,
       isPublished: input.isPublished,
