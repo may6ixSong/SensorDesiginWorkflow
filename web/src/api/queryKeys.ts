@@ -15,6 +15,7 @@ export const queryKeys = {
   htmlView: (workflowId: string, blockId: string, versionLabel: string) =>
     ['workflows', workflowId, 'blocks', blockId, 'html-view', versionLabel] as const,
   memos: (workflowId: string) => ['workflows', workflowId, 'memos'] as const,
+  comments: (workflowId: string, blockId: string) => ['workflows', workflowId, 'blocks', blockId, 'comments'] as const,
   edges: (workflowId: string) => ['workflows', workflowId, 'edges'] as const,
 
   /** Release — workflow별 목록, 미리보기, 부서별 필터 뷰, 산출물별 타임라인. */
