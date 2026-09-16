@@ -163,7 +163,9 @@ export class ArtifactsService {
     artifact: ArtifactDocument,
     versions: Partial<ArtifactVersion>[],
   ): Promise<ArtifactDocument> {
-    artifact.versions = versions as ArtifactVersion[];
+    // Comment가 versionId로 참조하므로, 들어오는 엔트리마다 안정적인 _id가 있어야 한다 -
+    // 라이브 동기화가 새로 만든 엔트리는 _id가 없을 수 있어 여기서 채워준다.
+    artifact.versions = versions.map((v) => ({ ...v, _id: v._id ?? new Types.ObjectId() })) as ArtifactVersion[];
     if (versions.length > 0 && versions[0].tier) artifact.tier = versions[0].tier;
     await artifact.save();
     return artifact;
@@ -181,6 +183,7 @@ export class ArtifactsService {
     const artifact = await this.findOrThrow(artifactId);
     const now = new Date();
     const entry: Partial<ArtifactVersion> = {
+      _id: new Types.ObjectId(),
       tier: artifact.tier,
       versionLabel: input.versionLabel.trim(),
       isPublished: input.isPublished,
