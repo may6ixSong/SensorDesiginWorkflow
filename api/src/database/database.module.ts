@@ -12,6 +12,7 @@ import { ArtifactServiceSchema } from '../hub/schemas/artifact-service.schema';
 import { HubSyncCheckpointSchema } from '../hub/schemas/hub-sync-checkpoint.schema';
 import { isUsingRealDb, ModelDef, registerModels } from './model-registration';
 import { SeedRunnerService } from './seed-runner.service';
+import { VersionIdBackfillService } from './version-id-backfill.service';
 
 const logger = new Logger('DatabaseModule');
 
@@ -47,7 +48,7 @@ const ALL_MODELS: ModelDef[] = [
       : []),
     registerModels(ALL_MODELS),
   ],
-  providers: [SeedRunnerService],
+  providers: [SeedRunnerService, VersionIdBackfillService],
 })
 export class DatabaseModule {
   constructor() {
