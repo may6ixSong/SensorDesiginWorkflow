@@ -56,6 +56,35 @@ const radioSx = (sel: boolean) => ({
   background: sel ? T.pr : 'transparent',
 });
 
+/**
+ * T.select(캔버스 select/flow 전용 청록)는 soft/line 짝이 없어 color-mix로 그 자리에서
+ * 만든다 — HPC Service 칩 하나에만 쓰는 색이라 tokens.ts에 전용 짝을 새로 추가할 만큼은
+ * 아니다(사용자 요청 — Edit/OA/HPC/OA Service/HPC Service 5개 칩이 전부 다른 색이어야 한다).
+ */
+const HPC_SERVICE_SOFT_BG = 'color-mix(in srgb, var(--s-select) 16%, transparent)';
+const HPC_SERVICE_SOFT_LINE = 'color-mix(in srgb, var(--s-select) 45%, transparent)';
+
+/** Edit 권한이 있을 때만 — view는 이미 각 행의 캡션("view only — …")이 따로 설명한다. */
+function EditChip({ level }: { level: 'edit' | 'view' | null }) {
+  if (level !== 'edit') return null;
+  return <Badge color={T.pr} bg={T.prSoft} borderColor={T.prLine}>EDIT</Badge>;
+}
+
+/** network가 정해진 것에 대해서만(File인 Tier B는 아직 null이라 안 뜬다). */
+function NetworkChip({ network }: { network: 'OA' | 'HPC' | null | undefined }) {
+  if (!network) return null;
+  return network === 'HPC'
+    ? <Badge color={T.warn} bg={T.warnSoft} borderColor={T.warnLine}>HPC</Badge>
+    : <Badge color={T.ok} bg={T.okSoft} borderColor={T.okLine}>OA</Badge>;
+}
+
+/** admin이 등록한 실제 OA/HPC Service(Tier A/C)에서 온 후보에만 — Calypso(File Artifacts)는 해당 없다. */
+function ServiceChip({ source }: { source: 'live' | 'hpc' }) {
+  return source === 'hpc'
+    ? <Badge color={T.select} bg={HPC_SERVICE_SOFT_BG} borderColor={HPC_SERVICE_SOFT_LINE}>HPC SERVICE</Badge>
+    : <Badge color={T.info} bg={T.infoSoft} borderColor={T.infoLine}>OA SERVICE</Badge>;
+}
+
 /** OA/HPC Service 한 줄 — 펼치면 그 서비스의 실시간 후보가 아래에 뜬다(설계서 04장 §6.3 2단계). */
 function ServiceRow({
   workflowId, source, intent, serviceKey, name, expanded, onToggle, selectedId, onPick,
@@ -78,9 +107,7 @@ function ServiceRow({
         <Box sx={{ flex: 1, fontSize: 12.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {name}
         </Box>
-        <Badge color={T.dm} bg={T.sf3} borderColor={T.ln}>
-          {source === 'live' ? 'OA SERVICE' : 'HPC SERVICE'}
-        </Badge>
+        <ServiceChip source={source} />
       </Box>
       {expanded && (
         <Box sx={{ padding: '8px 10px', borderTop: `1px solid ${T.ln}`, display: 'flex', flexDirection: 'column', gap: '5px' }}>
@@ -117,15 +144,11 @@ function ServiceRow({
                       </Box>
                     )}
                   </Box>
-                  {c.level && (
-                    <Badge
-                      color={c.level === 'edit' ? T.pr : T.dm}
-                      bg={c.level === 'edit' ? T.prSoft : T.sf2}
-                      borderColor={c.level === 'edit' ? T.prLine : T.ln}
-                    >
-                      {c.level === 'edit' ? 'EDIT' : 'VIEW'}
-                    </Badge>
-                  )}
+                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', flex: '0 0 auto' }}>
+                    <EditChip level={c.level} />
+                    <NetworkChip network={source === 'hpc' ? 'HPC' : 'OA'} />
+                    <ServiceChip source={source} />
+                  </Box>
                 </Box>
               );
             })
@@ -202,76 +225,26 @@ export function ArtifactSourcePicker({
       qc.invalidateQueries({ queryKey: queryKeys.calypsoArtifacts(projectId as string) });
       pickCalypso(created);
       setNewName('');
-      toast('File Artifact created — add its first version from the artifact detail once it\'s on the canvas.');
+      toast('Artifact created — add its first version from the artifact detail once it\'s on the canvas.');
     },
     onError: (e: any) => toast(e?.response?.data?.message ?? 'Could not create the artifact'),
   });
 
+  const loadingRow = (label: string) => (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 0', fontSize: 12, color: T.dm2 }}>
+      <CircularProgress size={13} /> {label}
+    </Box>
+  );
+
   return (
-    <Field label="Where does it come from?">
+    <Field label="Artifact Source">
       <TextInput value={query} onChange={setQuery} placeholder="Search services or file artifacts" />
       <Box sx={{ mt: '8px', maxHeight: 320, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-        {loadingServices || loadingCalypso ? (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 0', fontSize: 12, color: T.dm2 }}>
-            <CircularProgress size={13} /> Loading…
-          </Box>
-        ) : (
-          <>
-            {services.map((s) => {
-              const source: 'live' | 'hpc' = s.defaultTier === 'C' ? 'hpc' : 'live';
-              return (
-                <ServiceRow
-                  key={s.key}
-                  workflowId={workflowId}
-                  source={source}
-                  intent={intent}
-                  serviceKey={s.key}
-                  name={s.name}
-                  expanded={expandedService === s.key}
-                  onToggle={() => setExpandedService(expandedService === s.key ? null : s.key)}
-                  selectedId={state.source === source && state.serviceKey === s.key ? state.liveArtifactId : ''}
-                  onPick={(id, name) => pickLive(s.key, source, id, name)}
-                />
-              );
-            })}
-
-            {calypsoList.map((a) => {
-              const sel = state.source === 'file' && state.calypsoArtifactId === a.id;
-              const pickable = intent !== 'own' || a.myAccess === 'edit';
-              return (
-                <Box key={a.id} onClick={() => { if (pickable) pickCalypso(a); }} sx={rowSx(sel, pickable)}>
-                  <Box sx={radioSx(sel)} />
-                  <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Box sx={{ fontSize: 12.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {a.name}
-                    </Box>
-                    <Box sx={{ fontFamily: FONT_MONO, fontSize: 10, color: T.dm2, mt: '2px' }}>
-                      {departmentName(a.department)}
-                      {!pickable ? ' · view only — needs edit access to give this' : ''}
-                    </Box>
-                  </Box>
-                  <Badge
-                    color={a.myAccess === 'edit' ? T.pr : T.dm}
-                    bg={a.myAccess === 'edit' ? T.prSoft : T.sf2}
-                    borderColor={a.myAccess === 'edit' ? T.prLine : T.ln}
-                  >
-                    {a.myAccess === 'edit' ? 'EDIT' : 'VIEW'}
-                  </Badge>
-                </Box>
-              );
-            })}
-
-            {!services.length && !calypsoList.length && (
-              <Box sx={{ fontSize: 11.5, color: T.dm, background: T.sf2, border: `1px solid ${T.ln}`, borderRadius: '8px', padding: '8px 10px', lineHeight: 1.6 }}>
-                No match for that search.
-              </Box>
-            )}
-          </>
-        )}
-
+        {/* Tier B가 이제 File 전용이 아니게 되면서(OA-link/HPC-path도 등록 가능) 맨 위로
+            올려 뒀다(사용자 요청) — 목록 맨 아래에 묻혀 있으면 그 사실이 눈에 안 띈다. */}
         {creating ? (
           <Box sx={{ border: `1px solid ${T.ln}`, borderRadius: '8px', padding: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <Box sx={{ fontSize: 11.5, fontWeight: 700 }}>New File Artifact</Box>
+            <Box sx={{ fontSize: 11.5, fontWeight: 700 }}>New Artifact</Box>
             <TextInput value={newName} onChange={setNewName} placeholder="Name" autoFocus />
             {needsDeptPicker && (
               <SelectInput
@@ -306,7 +279,58 @@ export function ArtifactSourcePicker({
               padding: '8px 10px', cursor: CURSOR_POINTER, '&:hover': { background: T.prSoft },
             }}
           >
-            <Icon name="plus" size={12} /> Create new File Artifact
+            <Icon name="plus" size={12} /> Create new Artifact
+          </Box>
+        )}
+
+        {/* OA/HPC Service와 File Artifacts(Calypso)를 독립된 로딩으로 그린다 — 하나가
+            느리거나 응답을 못 받아도(예: Calypso가 내려가 있음) 이미 도착한 다른 쪽까지
+            같이 숨어버리면 안 된다(사용자가 실제로 겪은 문제 — 후자가 안 끝나서 전체가
+            계속 "Loading…"에 멈춰 있었다). */}
+        {loadingServices ? loadingRow('Loading services…') : services.map((s) => {
+          const source: 'live' | 'hpc' = s.defaultTier === 'C' ? 'hpc' : 'live';
+          return (
+            <ServiceRow
+              key={s.key}
+              workflowId={workflowId}
+              source={source}
+              intent={intent}
+              serviceKey={s.key}
+              name={s.name}
+              expanded={expandedService === s.key}
+              onToggle={() => setExpandedService(expandedService === s.key ? null : s.key)}
+              selectedId={state.source === source && state.serviceKey === s.key ? state.liveArtifactId : ''}
+              onPick={(id, name) => pickLive(s.key, source, id, name)}
+            />
+          );
+        })}
+
+        {loadingCalypso ? loadingRow('Loading file artifacts…') : calypsoList.map((a) => {
+          const sel = state.source === 'file' && state.calypsoArtifactId === a.id;
+          const pickable = intent !== 'own' || a.myAccess === 'edit';
+          return (
+            <Box key={a.id} onClick={() => { if (pickable) pickCalypso(a); }} sx={rowSx(sel, pickable)}>
+              <Box sx={radioSx(sel)} />
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Box sx={{ fontSize: 12.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {a.name}
+                </Box>
+                <Box sx={{ fontFamily: FONT_MONO, fontSize: 10, color: T.dm2, mt: '2px' }}>
+                  {departmentName(a.department)}
+                  {!pickable ? ' · view only — needs edit access to give this' : ''}
+                </Box>
+              </Box>
+              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', flex: '0 0 auto' }}>
+                <EditChip level={a.myAccess} />
+                <NetworkChip network={a.network} />
+              </Box>
+            </Box>
+          );
+        })}
+
+        {!loadingServices && !loadingCalypso && !services.length && !calypsoList.length && (
+          <Box sx={{ fontSize: 11.5, color: T.dm, background: T.sf2, border: `1px solid ${T.ln}`, borderRadius: '8px', padding: '8px 10px', lineHeight: 1.6 }}>
+            No match for that search.
           </Box>
         )}
       </Box>

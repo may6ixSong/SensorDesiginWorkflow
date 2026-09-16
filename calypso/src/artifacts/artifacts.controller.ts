@@ -156,7 +156,12 @@ export class ArtifactsController {
       throw new ForbiddenException('You do not have edit access to this artifact.');
     }
 
-    if (a.network === null) {
+    // 첫 버전(a.versions.length===0)은 아직 network가 잠기기 전이라 a.network===null만으로는
+    // "File인지"를 알 수 없다 — 이 호출이 files를 보냈는지로 판단해야 한다(그래야
+    // lockNetworkOnFirstVersion이 viewUrl/hpcPath로 OA/HPC를 잠글 기회를 얻는다). 이미
+    // File로 잠긴 뒤(2번째 버전부터)는 종전처럼 a.network===null이 곧 "파일 필수"다.
+    const wantsFiles = a.network === null && (a.versions.length > 0 || Boolean(files?.length));
+    if (wantsFiles) {
       if (!files?.length) throw new BadRequestException('At least one file is required (multipart form field "files").');
       const nextLabel = this.artifacts.nextVersionLabel(a);
       const uploaded = await Promise.all(
