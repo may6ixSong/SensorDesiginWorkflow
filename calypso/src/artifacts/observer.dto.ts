@@ -25,6 +25,12 @@ export function toVersionRecord(a: ArtifactDocument, v: ArtifactVersion, publicB
     // (계약상 선택 필드다 - Hub 설계서 §17.1)
     sourceRefs: [] as unknown[],
     viewUrl: `${publicBaseUrl.replace(/\/$/, '')}/artifacts/${a._id.toString()}`,
+    /**
+     * 계약 확장 필드 — SIREN(hub-sync.service.ts)이 자신의 Artifact.network 캐시를
+     * 갱신하는 데 쓴다. Tier D 폐기 후 Calypso가 File/OA-link/HPC-path를 함께 지원하게
+     * 되면서 SIREN 쪽에도 이 값이 필요해졌다. 이 필드를 모르는 기존 소비자는 그냥 무시한다.
+     */
+    network: a.network,
   };
 }
 

@@ -18,7 +18,7 @@ export interface ReleasePreviewItem {
   artifactId: string;
   artifactName: string;
   tier: string;
-  network: string;
+  network: string | null;
   phaseId: string;
   phaseName: string;
   published: ReleasedVersion | null;

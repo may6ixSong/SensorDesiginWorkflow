@@ -69,8 +69,9 @@ export class ReleaseItem {
   @Prop({ type: String, required: true, enum: TIERS })
   tier: Tier;
 
-  @Prop({ type: String, required: true, enum: ['OA', 'HPC'], default: 'OA' })
-  network: string;
+  /** File(B) 콘텐츠는 network가 없다(null) — artifact.schema.ts의 NetworkKind와 같은 뜻이다. */
+  @Prop({ type: String, enum: ['OA', 'HPC', null], default: null })
+  network: string | null;
 
   @Prop({ required: true })
   phaseId: string;

@@ -174,7 +174,7 @@ export class CalypsoClientService {
    * artifacts.controller.ts) 그걸 그대로 부른다.
    */
   async versions(externalArtifactId: string, knoxId: string): Promise<
-    { versionLabel: string; isReleased: boolean; giverKnoxId: string | null; viewUrl: string | null }[]
+    { versionLabel: string; isReleased: boolean; giverKnoxId: string | null; viewUrl: string | null; network: 'OA' | 'HPC' | null }[]
   > {
     if (!this.baseUrl) return [];
     const controller = new AbortController();
@@ -195,6 +195,7 @@ export class CalypsoClientService {
         isReleased: v.isReleased === true,
         giverKnoxId: v.giver?.knoxId ?? null,
         viewUrl: v.viewUrl ?? null,
+        network: v.network ?? null,
       }));
     } catch (e) {
       this.logger.warn(`Calypso versions error for ${externalArtifactId} — ${(e as Error).message}`);

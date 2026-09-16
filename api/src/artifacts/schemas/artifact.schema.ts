@@ -4,7 +4,7 @@ import { Document, Types, SchemaTypes } from 'mongoose';
 // Mongoose가 Mixed 경로를 만들고, Mixed는 캐스팅을 하지 않아 문자열 id 필터가 전부 0건이 된다.
 import { TIERS, Tier } from '../../common/constants/tier';
 
-export type NetworkKind = 'OA' | 'HPC';
+export type NetworkKind = 'OA' | 'HPC' | null;
 
 /** lineage - 이 버전이 무엇으로부터 만들어졌는가 (observer 계약 §4.1). */
 @Schema({ _id: false })
@@ -140,7 +140,11 @@ export class Artifact {
   @Prop({ type: String, required: true, enum: TIERS, index: true })
   tier: Tier;
 
-  @Prop({ type: String, required: true, enum: ['OA', 'HPC'], default: 'OA' })
+  /**
+   * B(File Artifacts)의 File 콘텐츠는 network가 없다(null) — Calypso 쪽 원본과 같은 뜻이다
+   * (calypso/src/artifacts/schemas/artifact.schema.ts). A는 항상 'OA', C는 항상 'HPC'다.
+   */
+  @Prop({ type: String, enum: ['OA', 'HPC', null], default: null })
   network: NetworkKind;
 
   // --- 출처 매핑 ---

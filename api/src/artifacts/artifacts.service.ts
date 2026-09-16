@@ -74,7 +74,7 @@ export class ArtifactsService {
     input: {
       name: string;
       tier: Tier;
-      network?: 'OA' | 'HPC';
+      network?: 'OA' | 'HPC' | null;
       serviceKey?: string | null;
       externalArtifactId?: string | null;
       artifactTypeKey?: string | null;
@@ -123,7 +123,9 @@ export class ArtifactsService {
         {
           name: input.name,
           tier: input.tier,
-          network: input.tier === 'C' ? 'HPC' : 'OA',
+          // B(File Artifacts)는 Calypso와 마찬가지로 첫 버전을 추가하기 전까지 콘텐츠
+          // 종류가 정해지지 않는다 — null(File 잠정)로 두고, hub-sync가 실제 값으로 갱신한다.
+          network: input.tier === 'C' ? 'HPC' : input.tier === 'B' ? null : 'OA',
           serviceKey: input.serviceKey,
           externalArtifactId: input.externalArtifactId,
         },

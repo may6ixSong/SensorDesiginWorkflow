@@ -35,7 +35,7 @@ export interface ArtifactDto {
   projectId: string;
   name: string;
   tier: string;
-  network: string;
+  network: string | null;
   serviceKey: string | null;
   externalArtifactId: string | null;
   artifactTypeKey: string | null;
@@ -111,7 +111,7 @@ export interface MaskedArtifactDto {
   id: string;
   name: string;
   tier: string;
-  network: string;
+  network: string | null;
   myAccess: null;
   masked: true;
 }

@@ -20,7 +20,7 @@ export type AccessLevel = 'edit' | 'view' | null;
 export type Tier = 'A' | 'B' | 'C';
 
 /** 망 구분. tier와 직교하는 별개 축이다 — HPC면 실물 파일 대신 경로 문자열만 갖는다. */
-export type NetworkKind = 'OA' | 'HPC';
+export type NetworkKind = 'OA' | 'HPC' | null;
 
 /**
  * 권한 한 벌 — **부서 다중 + 개별 사용자 다중**(설계서 01장 §3.3).
