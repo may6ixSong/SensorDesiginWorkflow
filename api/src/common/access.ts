@@ -174,11 +174,12 @@ export interface BlockLike {
  * recipient는 더 이상 edit/view로 나뉘지 않는다 — 속하면 'view'(=볼 자격이 있다)이고,
  * 실제 edit 여부는 그 서비스(게이트 2)가 최종 판정한다.
  *
- * ★ workflow Edit Access가 있어도 recipient가 아니면 null이다. 예전 설계의
- *   "workflow Edit Access는 항상 통과" 규칙은 폐지되었다(설계서 04장 §4.1).
- *   그래서 workflow를 만든 사람이 자기가 등록한 산출물의 slide를 못 여는 상황이
- *   생길 수 있는데, **의도된 동작**이다 — recipient를 편집하는 권한과 recipient에
- *   속하는 것은 별개다.
+ * ★ workflow Edit Access가 있어도 recipient가 아니면 null이다 — "workflow Edit Access는
+ *   항상 통과"라는 예전의 넓은 규칙은 폐지된 그대로다. 다만 **그 artifact 자신의
+ *   owner/editor**(게이트 2가 canEdit이라고 답하는 경우)는 이 게이트 자체를 아예 거치지
+ *   않는다 — ArtifactAccessService.levelFor()가 게이트 1보다 먼저 그 판정을 본다(사용자
+ *   결정, 04장 §4.1 갱신). 그래서 이 함수 자체는 여전히 "recipient가 아니면 null"이라는
+ *   원래 뜻 그대로다 — owner 예외는 이 함수가 아니라 그걸 부르는 쪽의 책임이다.
  */
 export function recipientLevel(
   actor: Actor,

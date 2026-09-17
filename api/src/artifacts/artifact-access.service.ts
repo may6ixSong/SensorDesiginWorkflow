@@ -66,17 +66,20 @@ export class ArtifactAccessService {
     const myDepts = myDepartments(actor, project);
 
     // --- A/B/C(OA Service/File Artifacts/HPC Service) 공통 ---
-    // 게이트 1: SIREN recipient. 여기서 막히면 서비스 호출 자체를 하지 않는다.
+    // 게이트 2(그 서비스의 실제 권한)를 게이트 1보다 먼저 본다 — 그 서비스가 "이 사람은
+    // 이 artifact의 owner/editor"(canEdit)라고 답하면 이 workflow의 recipient 구성과
+    // 무관하게 항상 연다(사용자 결정 — Calypso는 등록자에게 항상 edit을 주는데, 그게
+    // workflow마다 다른 recipient 설정에 막혀 자기 산출물도 못 여는 상황이 생기면 안
+    // 된다). owner가 아니면(canEdit이 아니면) 원래대로 게이트 1(recipient)부터 통과해야
+    // 한다 — service가 project 전체에 view를 열어둬도, 이 workflow에서 볼 자격이 있는
+    // 사람으로 좁히는 것이 recipient의 역할이다.
+    const serviceAccess = await this.serviceAccess(actor, artifact, myDepts);
+    if (serviceAccess.canEdit) return 'edit';
+
     const gate1 = recipientLevel(actor, block, myDepts);
     if (gate1 === null) return null;
 
-    // 게이트 2: 그 서비스의 실제 권한.
-    const serviceAccess = await this.serviceAccess(actor, artifact, myDepts);
-    if (!serviceAccess.canView) return null;
-
-    // 버전 트리 깊이는 **최종적으로 그 서비스의 응답**이 결정한다 — recipient에 edit으로
-    // 들어 있어도 서비스에서 edit이 아니면 working 버전은 안 보인다(설계서 04장 §7).
-    return serviceAccess.canEdit ? 'edit' : 'view';
+    return serviceAccess.canView ? 'view' : null;
   }
 
   /** 열 수 없으면 403. 컨트롤러에서 한 줄로 쓰기 위한 래퍼다. */

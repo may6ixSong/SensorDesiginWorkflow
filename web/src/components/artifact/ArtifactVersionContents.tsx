@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { Box } from '@mui/material';
+import DOMPurify from 'dompurify';
 import { CalypsoArtifact, CalypsoVersionView } from '@/api/calypsoClient';
 import { useDirectory } from '@/app/providers/DirectoryProvider';
 import { UserAvatar } from '@/components/common/Avatar';
 import { SirenButton, Badge } from '@/components/common/SirenButton';
 import { Field, TextInput } from '@/components/common/Panel';
+import { RichTextEditor, isRichTextEmpty } from '@/components/common/RichTextEditor';
 import { Icon } from '@/components/common/Icon';
 import { toast } from '@/store/toastStore';
 import { CURSOR_POINTER, FONT_DISPLAY, FONT_MONO, R, T } from '@/theme/tokens';
@@ -48,6 +50,10 @@ export function ArtifactVersionContents({
   const [files, setFiles] = useState<File[]>([]);
   const [link, setLink] = useState('');
   const [path, setPath] = useState('');
+  // 아직 버전이 하나도 없으면(콘텐츠 종류를 지금 처음 정해야 함) 펼친 채로 시작한다 —
+  // 이미 하나 이상 있으면 표지(문서면)와 겹쳐 보이지 않게 접어 둔다(사용자 요청: 표지랑
+  // "새 버전 추가"를 같은 화면에 늘 펼쳐 두지 말고 구분할 것).
+  const [addOpen, setAddOpen] = useState(() => a.versionCount === 0);
   const accent = v?.isReleased ? T.pr : T.warn;
   // "WORKING"은 지금 보이는 버전이 실제 latest일 때만 — 사용자가 버전 트리에서 과거의
   // 미발행 버전을 눌러 봐도 그게 "지금 작업 중인 것"처럼 보이면 안 된다(사용자 지적,
@@ -61,7 +67,7 @@ export function ArtifactVersionContents({
     : null;
   const kind = fixedKind ?? pickedKind;
 
-  const resetForm = () => { setNote(''); setFiles([]); setLink(''); setPath(''); setPickedKind(null); };
+  const resetForm = () => { setNote(''); setFiles([]); setLink(''); setPath(''); setPickedKind(null); setAddOpen(false); };
 
   const submit = () => {
     if (kind === 'file') {
@@ -126,16 +132,22 @@ export function ArtifactVersionContents({
                 </Box>
               </Box>
 
-              {v.note && (
+              {!isRichTextEmpty(v.note) && (
                 <Box
+                  // note는 HTML로 저장된다(가벼운 서식 에디터, 사용자 요청) — 그대로 꽂기
+                  // 전에 반드시 sanitize한다. 이 화면 밖(예: 과거 API 직접 호출, 마이그레이션
+                  // 스크립트)에서 들어온 값일 수도 있어 "우리 에디터가 만들었으니 안전하다"는
+                  // 가정을 하지 않는다.
+                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(v.note) }}
                   sx={{
                     mt: '18px', padding: '13px 15px', borderRadius: '9px', background: T.sf2,
                     border: `1px solid ${T.ln}`, borderLeft: `3px solid ${accent}`,
-                    fontSize: 13, lineHeight: 1.75, color: T.tx, whiteSpace: 'pre-wrap',
+                    fontSize: 13, lineHeight: 1.75, color: T.tx,
+                    '& p': { margin: '0 0 6px 0' }, '& p:last-child': { mb: 0 },
+                    '& ul, & ol': { paddingLeft: '20px', margin: '4px 0' },
+                    '& a': { color: T.pr },
                   }}
-                >
-                  {v.note}
-                </Box>
+                />
               )}
 
               <Box sx={{ mt: '20px', paddingTop: '16px', borderTop: `1px solid ${T.ln}` }}>
@@ -229,9 +241,23 @@ export function ArtifactVersionContents({
         )}
 
         {canEdit && (
-          <Box sx={{ background: T.sf, border: `1px solid ${T.ln}`, borderRadius: '12px', padding: '18px 20px' }}>
-            <Box sx={{ fontSize: 13, fontWeight: 700, mb: '12px' }}>Add a new version</Box>
-
+          <Box sx={{ background: T.sf, border: `1px solid ${T.ln}`, borderRadius: '12px', overflow: 'hidden' }}>
+            {/* 표지(문서면)와 늘 같이 펼쳐 두지 않는다(사용자 요청) — 접었다 펴는 헤더로
+                분리해서, 이미 있는 버전을 보러 온 것뿐일 때는 폼이 화면을 안 차지한다. */}
+            <Box
+              component="button"
+              type="button"
+              onClick={() => setAddOpen((o) => !o)}
+              sx={{
+                width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '16px 20px', background: 'transparent', border: 'none', cursor: CURSOR_POINTER,
+                fontSize: 13, fontWeight: 700, color: T.tx, fontFamily: 'inherit', textAlign: 'left',
+              }}
+            >
+              Add a new version
+              <Icon name={addOpen ? 'up' : 'dn'} size={12} />
+            </Box>
+            {addOpen && <Box sx={{ padding: '0 20px 20px' }}>
             {!kind ? (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: '8px', mb: '12px' }}>
                 <Box sx={{ fontSize: 11.5, color: T.dm2 }}>
@@ -279,7 +305,7 @@ export function ArtifactVersionContents({
                   </Field>
                 )}
                 <Field label="Note">
-                  <TextInput value={note} onChange={setNote} placeholder="What changed in this version" />
+                  <RichTextEditor value={note} onChange={setNote} placeholder="What changed in this version" minHeight={110} />
                 </Field>
                 <Box sx={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                   <SirenButton variant="primary" disabled={uploading} onClick={submit}>
@@ -298,6 +324,7 @@ export function ArtifactVersionContents({
                 </Box>
               </>
             )}
+            </Box>}
           </Box>
         )}
       </Box>
