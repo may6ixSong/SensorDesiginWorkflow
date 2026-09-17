@@ -67,10 +67,14 @@ export class CommentsService {
       versionLabelSnapshot = parent.versionLabelSnapshot;
     } else {
       // 최상위 댓글은 "General(버전 없음)"을 지원하지 않는다 - 항상 실제 등록된 버전을
-      // 하나 가리켜야 한다(답글은 부모의 버전을 그대로 물려받으므로 예외).
+      // 하나 가리켜야 한다(답글은 부모의 버전을 그대로 물려받으므로 예외). 그리고 그
+      // 버전은 publish된 것이어야 한다 - working(미발행) 버전에는 달 수 없다.
       if (!dto.versionId) throw new BadRequestException('versionId is required.');
       const version = (artifact.versions ?? []).find((v) => v._id?.toString() === dto.versionId);
       if (!version) throw new BadRequestException('versionId does not belong to this artifact.');
+      if (!version.isPublished) {
+        throw new BadRequestException('Comments can only be added to a published version.');
+      }
       versionId = version._id;
       versionLabelSnapshot = version.versionLabel;
     }

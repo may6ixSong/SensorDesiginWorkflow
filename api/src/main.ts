@@ -20,13 +20,17 @@ async function bootstrap() {
    *
    * allowedHeaders는 '*' 대신 명시한다 - credentials와 와일드카드를 함께 쓰면
    * 브라우저가 preflight를 거부하므로, 실제로 쓰는 헤더만 나열한다(X-Knox-Id 포함).
+   *
+   * web/src/api/client.ts의 요청 인터셉터가 보내는 커스텀 헤더 전부가 여기 있어야 한다 -
+   * 하나라도 빠지면 브라우저가 preflight 단계에서 요청을 막아 화면이 통째로 빈다(curl은
+   * CORS를 적용하지 않으므로 이 증상이 api 단독 테스트에서는 재현되지 않는다).
    */
   const corsOrigin = config.get<string>('corsOrigin')?.trim() ?? '';
   app.enableCors({
     origin: !corsOrigin || corsOrigin === '*' ? true : corsOrigin.split(',').map((o) => o.trim()),
     credentials: true,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-    allowedHeaders: 'Content-Type, Accept, X-Knox-Id',
+    allowedHeaders: 'Content-Type, Accept, X-Knox-Id, X-User-Group, X-Acting-As',
   });
 
   // TLS는 앞단(IIS/nginx)에서 종료한다 - api는 평문 HTTP로만 리스닝한다.

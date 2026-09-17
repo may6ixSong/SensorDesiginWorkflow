@@ -742,8 +742,12 @@ function CommentsTab({ block, versions }: { block: BlockDto; versions: ArtifactV
   const [replyTo, setReplyTo] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
 
+  // 버전에 댓글을 달려면 실제 등록된(id 있음) + publish된 버전이어야 한다 - working(미발행)
+  // 버전에는 댓글을 달 수 없다(사용자 지적).
   const versionOptions = useMemo(
-    () => versions.filter((v) => v.id).map((v) => ({ value: v.id as string, label: v.versionLabel })),
+    () => versions
+      .filter((v) => v.id && v.isPublished)
+      .map((v) => ({ value: v.id as string, label: v.versionLabel })),
     [versions],
   );
 
@@ -870,7 +874,7 @@ function CommentsTab({ block, versions }: { block: BlockDto; versions: ArtifactV
           </>
         ) : (
           <Box sx={{ fontSize: 12.5, color: T.dm2, lineHeight: 1.6 }}>
-            Comments open up once this artifact has at least one registered version.
+            Comments open up once this artifact has at least one published version.
           </Box>
         )}
       </Card>
