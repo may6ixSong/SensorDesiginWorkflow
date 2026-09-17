@@ -37,4 +37,5 @@ export const queryKeys = {
   /** Calypso api를 직접 호출한다 — SIREN이 소유한 캐시가 아니라 원격 데이터 캐시다. */
   calypsoArtifacts: (projectId: string) => ['calypso', 'artifacts', projectId] as const,
   calypsoArtifact: (id: string) => ['calypso', 'artifacts', 'detail', id] as const,
+  calypsoDepartmentRoster: (projectId: string) => ['calypso', 'department-roster', projectId] as const,
 };

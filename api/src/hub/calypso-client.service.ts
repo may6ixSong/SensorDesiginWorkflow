@@ -438,6 +438,36 @@ export class CalypsoClientService {
     }
   }
 
+  /**
+   * Access 패널의 부서/멤버 로스터 — 일부러 Calypso를 한 번 거친다(사용자 결정,
+   * `calypso/src/siren-common/siren-common.service.ts`의 반대편 절반). Calypso가
+   * 자기 `/common/departments`에서 SIREN 자신의 `/hub/common`을 다시 불러 답한
+   * 값을 그대로 relay한다.
+   */
+  async getDepartmentRoster(
+    projectId: string,
+    knoxId: string,
+    departments: string[],
+    isAdmin: boolean,
+  ): Promise<{ status: number; body: any } | null> {
+    if (!this.baseUrl) return null;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    try {
+      const res = await fetch(
+        `${this.baseUrl}/common/departments?projectId=${encodeURIComponent(projectId)}`,
+        { signal: controller.signal, headers: this.actorHeaders(knoxId, departments, isAdmin) },
+      );
+      const body = await res.json().catch(() => null);
+      return { status: res.status, body };
+    } catch (e) {
+      this.logger.warn(`Calypso getDepartmentRoster error for project ${projectId} — ${(e as Error).message}`);
+      return null;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   /** view 기본 개방(false) ↔ viewGrants로만 제한(true) 전환. */
   async setRestrictView(
     externalArtifactId: string,

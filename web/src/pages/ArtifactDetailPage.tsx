@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Box, CircularProgress, Stack } from '@mui/material';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -11,7 +11,6 @@ import { PublishVersionDialog } from '@/components/artifact/PublishVersionDialog
 import { Badge, SirenButton } from '@/components/common/SirenButton';
 import { Icon } from '@/components/common/Icon';
 import { useAuth } from '@/app/providers/AuthProvider';
-import { useProject } from '@/api/hooks/useProjects';
 import { queryKeys } from '@/api/queryKeys';
 import {
   CalypsoGrantInput, CalypsoVersionView, addCalypsoEditor, addCalypsoVersion, addCalypsoViewGrant,
@@ -43,14 +42,6 @@ export function ArtifactDetailPage() {
   useEffect(() => {
     if (forbidden) toast('You do not have view access to this artifact.');
   }, [forbidden]);
-
-  // department는 더 이상 여기서 직접 계산해 싣지 않는다 — SIREN BE가 projectId로
-  // 대신 계산한다(설계서 07장 §2). project는 화면 표시(부서 후보 등)에만 쓴다.
-  const { data: project } = useProject(projectId);
-  const myDepartments = useMemo(
-    () => project?.members.find((m) => m.knoxId === user?.KnoxID)?.departments ?? [],
-    [project?.members, user?.KnoxID],
-  );
 
   useEffect(() => setPicked(null), [id]);
 
@@ -190,8 +181,7 @@ export function ArtifactDetailPage() {
             {a.myAccess === 'edit' && (
               <ArtifactAccessPanel
                 artifact={a}
-                myDepartments={myDepartments}
-                allDepartments={project?.departments ?? []}
+                projectId={projectId}
                 onAddEditor={(g) => addEditor.mutate(g)}
                 onRemoveEditor={(g) => removeEditor.mutate(g)}
                 onAddViewGrant={(g) => addViewGrant.mutate(g)}
@@ -213,6 +203,7 @@ export function ArtifactDetailPage() {
       )}
       {publishing && (
         <PublishVersionDialog
+          a={a}
           version={publishing}
           submitting={release.isPending}
           onConfirm={(versionNote, description) => release.mutate({ versionNote, description, sourceVersionRef: publishing.versionRef })}

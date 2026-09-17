@@ -178,6 +178,22 @@ export async function removeCalypsoViewGrant(id: string, projectId: string, gran
   return data.data;
 }
 
+export interface CalypsoDepartmentRoster {
+  departments: string[];
+  members: { knoxId: string; departments: string[] }[];
+}
+
+/**
+ * Access 패널의 부서/멤버 로스터 — 일부러 Calypso를 한 번 거쳐 SIREN에게 되묻는다
+ * (사용자 결정, Calypso가 나중에 독립 서비스로 분리될 때를 대비한 경로).
+ */
+export async function getCalypsoDepartmentRoster(projectId: string): Promise<CalypsoDepartmentRoster> {
+  const { data } = await apiClient.get<ApiEnvelope<CalypsoDepartmentRoster>>(
+    '/calypso-artifacts/department-roster', { params: { projectId } },
+  );
+  return data.data;
+}
+
 export async function setCalypsoRestrictView(id: string, projectId: string, restrictView: boolean): Promise<CalypsoArtifact> {
   const { data } = await apiClient.patch<ApiEnvelope<CalypsoArtifact>>(
     `/calypso-artifacts/${id}/restrict-view`, { restrictView }, { params: { projectId } },

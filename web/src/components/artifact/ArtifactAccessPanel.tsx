@@ -1,22 +1,23 @@
-import { useState } from 'react';
-import { Box } from '@mui/material';
-import { CalypsoArtifact, CalypsoGrant, CalypsoGrantInput } from '@/api/calypsoClient';
+import { useMemo, useState } from 'react';
+import { Box, CircularProgress } from '@mui/material';
+import { useQuery } from '@tanstack/react-query';
+import { CalypsoArtifact, CalypsoGrant, CalypsoGrantInput, getCalypsoDepartmentRoster } from '@/api/calypsoClient';
+import { queryKeys } from '@/api/queryKeys';
+import { useAuth } from '@/app/providers/AuthProvider';
 import { UserSearchDialog } from '@/components/dialogs/UserSearchDialog';
 import { useDirectory } from '@/app/providers/DirectoryProvider';
 import { UserAvatar } from '@/components/common/Avatar';
 import { SirenButton, Badge } from '@/components/common/SirenButton';
-import { Card, Ey, SelectInput } from '@/components/common/Panel';
+import { Card, Ey } from '@/components/common/Panel';
 import { Icon } from '@/components/common/Icon';
 import { departmentName } from '@/shared/constants/departments';
-import { T } from '@/theme/tokens';
+import { CURSOR_POINTER, T } from '@/theme/tokens';
 
 interface Props {
   artifact: CalypsoArtifact;
-  /** 부서 단위 edit 부여를 고를 때의 후보 — 서버가 "본인 소속 부서로만" 강제하므로
-   * 여기서도 그 부서들만 보여준다(사용자 요청). */
-  myDepartments: string[];
-  /** 부서 단위 view 부여를 고를 때의 후보 — 이 project에 속한 어떤 부서든 가능. */
-  allDepartments: string[];
+  /** SIREN project id — 부서/멤버 로스터를 여기서 직접 읽지 않고 Calypso를 거쳐
+   * 되묻는다(사용자 결정, `getCalypsoDepartmentRoster` 참고). */
+  projectId: string;
   onAddEditor: (g: CalypsoGrantInput) => void;
   onRemoveEditor: (g: CalypsoGrantInput) => void;
   onAddViewGrant: (g: CalypsoGrantInput) => void;
@@ -33,29 +34,53 @@ function grantInput(g: CalypsoGrant): CalypsoGrantInput {
 }
 
 /**
- * Artifact별 독립 ACL 관리 — 등록자/Admin 외에 추가로 edit·view 권한을 부여/회수한다.
+ * Artifact별 독립 ACL 관리 — 등록자/Admin 외에 추가로 Editor·Viewer 권한을 부여/회수한다.
  * `myAccess==='edit'`인 사람만 호출부에서 이 패널을 띄운다(서버도 같은 조건으로 재검증).
  *
  * 워크플로우 상세 패널(DeliverableDialog)과 독립 Artifact detail page 양쪽에서 그대로
  * 재사용한다 — 권한 데이터는 Calypso 하나뿐이고 진입점만 두 개다(사용자 요청).
  *
- * ★ view는 기본적으로 이 project의 누구나 가능하다(사용자 요청) — "Can view" 목록은
- *   `restrictView`를 켰을 때만 실제로 걸러내는 역할을 한다. 꺼져 있을 땐 미리 목록을
- *   만들어 둘 수는 있지만 아직 아무도 걸러지지 않는다는 걸 배너로 알려준다.
+ * ★ Viewer 목록은 `restrictView`를 켰을 때만 보여준다(사용자 요청) — 꺼져 있으면 이
+ *   project 누구나 볼 수 있으니 목록 자체가 의미가 없다.
  */
 export function ArtifactAccessPanel({
-  artifact, myDepartments, allDepartments, onAddEditor, onRemoveEditor, onAddViewGrant, onRemoveViewGrant,
-  onSetRestrictView,
+  artifact, projectId, onAddEditor, onRemoveEditor, onAddViewGrant, onRemoveViewGrant, onSetRestrictView,
 }: Props) {
+  const { user } = useAuth();
+  const { data: roster, isLoading: loadingRoster } = useQuery({
+    queryKey: queryKeys.calypsoDepartmentRoster(projectId),
+    queryFn: () => getCalypsoDepartmentRoster(projectId),
+    enabled: !!projectId,
+    staleTime: 60_000,
+  });
+
+  const membersByDept = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    for (const m of roster?.members ?? []) {
+      for (const d of m.departments) {
+        (map[d] ??= []).push(m.knoxId);
+      }
+    }
+    return map;
+  }, [roster]);
+
+  const myDepartments = useMemo(
+    () => roster?.members.find((m) => m.knoxId === user?.KnoxID)?.departments ?? [],
+    [roster, user?.KnoxID],
+  );
+  const allDepartments = roster?.departments ?? [];
+
   return (
     <Card>
       <Ey sx={{ mb: '9px' }}>Access</Ey>
       <GrantList
-        label="Can edit"
+        label="Editor"
         grants={artifact.editors}
         registrant={artifact.createdBy}
         deptOptions={myDepartments}
-        deptHint={myDepartments.length ? undefined : 'You have no department in this project to grant edit to.'}
+        membersByDept={membersByDept}
+        loadingDepts={loadingRoster}
+        deptHint={loadingRoster || myDepartments.length ? undefined : 'You have no department in this project to grant edit to.'}
         onAdd={onAddEditor}
         onRemove={onRemoveEditor}
       />
@@ -87,36 +112,55 @@ export function ArtifactAccessPanel({
           <Box sx={{ fontWeight: 600, color: T.tx, mb: '2px' }}>Restrict view access</Box>
           {artifact.restrictView
             ? 'Only the registrant, editors, and people/departments listed below can view this file.'
-            : 'Off — anyone in this project can view this file by default. Turn this on to limit view access to the list below instead.'}
+            : 'Off — anyone in this project can view this file by default. Turn this on to limit view access to a specific list instead.'}
         </Box>
       </Box>
 
-      <GrantList
-        label="Can view"
-        grants={artifact.viewGrants}
-        deptOptions={allDepartments}
-        onAdd={onAddViewGrant}
-        onRemove={onRemoveViewGrant}
-      />
+      {artifact.restrictView && (
+        <GrantList
+          label="Viewer"
+          grants={artifact.viewGrants}
+          deptOptions={allDepartments}
+          membersByDept={membersByDept}
+          loadingDepts={loadingRoster}
+          onAdd={onAddViewGrant}
+          onRemove={onRemoveViewGrant}
+        />
+      )}
     </Card>
   );
 }
 
 function GrantList({
-  label, grants, registrant, deptOptions, deptHint, onAdd, onRemove,
+  label, grants, registrant, deptOptions, membersByDept, loadingDepts, deptHint, onAdd, onRemove,
 }: {
   label: string;
   grants: CalypsoGrant[];
   /** 등록자는 목록에 없어도 항상 이 등급이라 별도 chip으로 보여준다(edit 목록에서만). */
   registrant?: string;
   deptOptions: string[];
+  /** 부서 → 그 부서 소속 knoxId 목록 — 펼쳤을 때만 실명 조회에 쓴다. */
+  membersByDept: Record<string, string[]>;
+  loadingDepts?: boolean;
   deptHint?: string;
   onAdd: (g: CalypsoGrantInput) => void;
   onRemove: (g: CalypsoGrantInput) => void;
 }) {
   const { resolveUser } = useDirectory();
   const [userSearchOpen, setUserSearchOpen] = useState(false);
-  const [dept, setDept] = useState('');
+  const [deptPickerOpen, setDeptPickerOpen] = useState(false);
+  const [expandedDepts, setExpandedDepts] = useState<Set<string>>(new Set());
+
+  const grantedDepts = new Set(grants.filter((g) => g.type === 'department').map((g) => g.department));
+  const pickableDepts = deptOptions.filter((d) => !grantedDepts.has(d));
+
+  const toggleExpanded = (d: string) => {
+    setExpandedDepts((prev) => {
+      const next = new Set(prev);
+      if (next.has(d)) next.delete(d); else next.add(d);
+      return next;
+    });
+  };
 
   return (
     <Box>
@@ -155,30 +199,71 @@ function GrantList({
         <SirenButton onClick={() => setUserSearchOpen(true)}>
           <Icon name="search" /> Add person
         </SirenButton>
-        {deptOptions.length > 0 && (
-          <>
-            <Box sx={{ minWidth: 150 }}>
-              <SelectInput
-                value={dept}
-                onChange={setDept}
-                options={[
-                  { value: '', label: 'Add department…' },
-                  ...deptOptions.map((d) => ({ value: d, label: departmentName(d) })),
-                ]}
-              />
-            </Box>
-            <SirenButton
-              disabled={!dept}
-              onClick={() => { if (dept) { onAdd({ type: 'department', department: dept }); setDept(''); } }}
-            >
-              <Icon name="plus" /> Add
-            </SirenButton>
-          </>
+        {loadingDepts ? (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 11, color: T.dm2 }}>
+            <CircularProgress size={11} /> Loading departments…
+          </Box>
+        ) : pickableDepts.length > 0 && (
+          <SirenButton onClick={() => setDeptPickerOpen((o) => !o)}>
+            <Icon name="plus" /> Add department
+          </SirenButton>
         )}
-        {deptHint && deptOptions.length === 0 && (
+        {deptHint && !pickableDepts.length && !loadingDepts && (
           <Box sx={{ fontSize: 11, color: T.dm2 }}>{deptHint}</Box>
         )}
       </Box>
+
+      {deptPickerOpen && pickableDepts.length > 0 && (
+        <Box sx={{ mt: '8px', border: `1px solid ${T.ln}`, borderRadius: '8px', overflow: 'hidden' }}>
+          {pickableDepts.map((d) => {
+            const members = membersByDept[d] ?? [];
+            const expanded = expandedDepts.has(d);
+            return (
+              <Box key={d} sx={{ borderBottom: `1px solid ${T.ln}`, '&:last-child': { borderBottom: 'none' } }}>
+                <Box
+                  onClick={() => toggleExpanded(d)}
+                  sx={{
+                    display: 'flex', alignItems: 'center', gap: '7px', padding: '7px 9px',
+                    cursor: CURSOR_POINTER, background: expanded ? T.sf2 : T.sf, '&:hover': { background: T.sf2 },
+                  }}
+                >
+                  <Icon name={expanded ? 'up' : 'dn'} size={10} />
+                  <Box sx={{ flex: 1, fontSize: 12, fontWeight: 600 }}>{departmentName(d)}</Box>
+                  <Box sx={{ fontSize: 10, color: T.dm2 }}>{members.length} member{members.length === 1 ? '' : 's'}</Box>
+                  <SirenButton
+                    variant="ghost"
+                    onClick={(e: React.MouseEvent) => { e.stopPropagation(); onAdd({ type: 'department', department: d }); }}
+                    sx={{ minWidth: 0, padding: '3px' }}
+                    title="Add this department"
+                  >
+                    <Icon name="plus" size={12} />
+                  </SirenButton>
+                </Box>
+                {expanded && (
+                  <Box sx={{ padding: '8px 10px', display: 'flex', flexWrap: 'wrap', gap: '6px', borderTop: `1px solid ${T.ln}` }}>
+                    {/* resolveUser는 아직 캐시에 없는 knoxId를 보면 그때 SDPCommonAPI 조회를
+                        예약한다(useDirectory) — 그래서 이 목록을 실제로 펼쳤을 때만 실명
+                        조회가 일어난다(사용자 요청: member가 많은 부서라도 접혀 있으면
+                        비용이 없다). */}
+                    {members.length === 0 && (
+                      <Box sx={{ fontSize: 11, color: T.dm2 }}>No members found in this department.</Box>
+                    )}
+                    {members.map((knoxId) => {
+                      const u = resolveUser(knoxId);
+                      return (
+                        <Box key={knoxId} sx={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <UserAvatar user={u} size={16} />
+                          <Box sx={{ fontSize: 11 }}>{u.name}</Box>
+                        </Box>
+                      );
+                    })}
+                  </Box>
+                )}
+              </Box>
+            );
+          })}
+        </Box>
+      )}
 
       {userSearchOpen && (
         <UserSearchDialog

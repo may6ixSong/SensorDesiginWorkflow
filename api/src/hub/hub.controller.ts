@@ -1,9 +1,10 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { CurrentActor } from '../common/decorators/current-actor.decorator';
 import { Actor } from '../common/actor';
 import { HubService } from './hub.service';
 import { HubCommonService } from './hub-common.service';
 import { HubShowcaseService } from './hub-showcase.service';
+import { HubTokenGuard } from './guards/hub-token.guard';
 import {
   RegisterArtifactTypeDto,
   UpdateServiceDto,
@@ -52,8 +53,14 @@ export class HubController {
    * 이 API가 SIREN을 사실상 사내 신원·일정 공급자로 만든다. 각 산출물 서비스는 필요한
    * 것만 골라 쓰고, 응답을 짧게 캐시해 SIREN이 응답하지 않을 때 마지막 캐시로 동작해야
    * 한다 - SIREN 가용성이 각 서비스의 권한 화면을 막아서는 안 된다.
+   *
+   * ★ 등록된 서비스만 부를 수 있어야 한다 — `HubTokenGuard`로 그 서비스의 Bearer
+   *   token을 검증한다(version 이벤트 수신과 같은 가드). Calypso도 이제 자기 Access
+   *   패널의 부서/멤버 로스터를 위해 이 경로로 자기 토큰을 실어 부른다
+   *   (`calypso/src/siren-common/siren-common.service.ts`).
    */
   @Get('common')
+  @UseGuards(HubTokenGuard)
   async getCommon(@Query('projectId') projectId: string) {
     return { data: await this.common.build(projectId) };
   }

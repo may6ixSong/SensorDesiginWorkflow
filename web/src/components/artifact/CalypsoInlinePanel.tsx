@@ -139,6 +139,7 @@ export function CalypsoInlinePanel({ artifactId, projectId, blockId, releases, o
       )}
       {publishing && (
         <PublishVersionDialog
+          a={a}
           version={publishing}
           submitting={release.isPending}
           onConfirm={(versionNote, description) => release.mutate({ versionNote, description, sourceVersionRef: publishing.versionRef })}

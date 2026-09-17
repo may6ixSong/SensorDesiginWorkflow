@@ -5,6 +5,7 @@ import { ENV_FILE } from './config/env';
 import configuration from './config/configuration';
 import { isUsingRealDb } from './database/model-registration';
 import { ArtifactsModule } from './artifacts/artifacts.module';
+import { SirenCommonModule } from './siren-common/siren-common.module';
 
 /**
  * Calypso - SIREN Hub의 파일형 산출물 등록 창구.
@@ -26,6 +27,7 @@ import { ArtifactsModule } from './artifacts/artifacts.module';
         ]
       : []),
     ArtifactsModule,
+    SirenCommonModule,
   ],
 })
 export class AppModule {}

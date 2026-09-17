@@ -83,6 +83,18 @@ export class CalypsoProxyController {
     throw new HttpException(result.body ?? { message: 'File service request failed.' }, result.status);
   }
 
+  /**
+   * Access 패널의 부서/멤버 로스터. `resolveContext`(project 멤버십)로 게이트 1을 확인한
+   * 뒤 Calypso로 넘긴다 — Calypso가 다시 SIREN 자신의 `/hub/common`을 불러 답한다
+   * (`SirenCommonService` 참고, 사용자 결정으로 일부러 이 왕복을 거친다).
+   */
+  @Get('department-roster')
+  async departmentRoster(@Query('projectId') projectId: string, @CurrentActor() me: Actor) {
+    const { departments, isAdmin } = await this.resolveContext(projectId, me);
+    const result = await this.calypso.getDepartmentRoster(projectId, me.knoxId, departments, isAdmin);
+    return this.relay(result);
+  }
+
   @Get()
   async list(
     @Query('projectId') projectId: string,

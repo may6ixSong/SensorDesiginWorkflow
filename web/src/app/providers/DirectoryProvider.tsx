@@ -41,9 +41,21 @@ export function colorForKnoxId(knoxId: string): string {
   return AVATAR_COLORS[hash % AVATAR_COLORS.length];
 }
 
-function chunk<T>(items: T[], size: number): T[][] {
-  const out: T[][] = [];
-  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+/** SDPCommonAPI의 id 목록 파라미터는 100자 제한이다(콤마로 이어 붙인 문자열 기준) —
+ * knoxId 개수가 아니라 **글자 수**로 나눠야 한다(사용자 지적). */
+function chunkByLength(ids: string[], maxChars: number): string[][] {
+  const out: string[][] = [];
+  let cur: string[] = [];
+  for (const id of ids) {
+    const candidate = cur.length ? [...cur, id] : [id];
+    if (cur.length && candidate.join(',').length > maxChars) {
+      out.push(cur);
+      cur = [id];
+    } else {
+      cur = candidate;
+    }
+  }
+  if (cur.length) out.push(cur);
   return out;
 }
 
@@ -77,7 +89,7 @@ export function DirectoryProvider({ children }: { children: React.ReactNode }) {
     ids.forEach((id) => inFlightRef.current.add(id));
 
     Promise.all(
-      chunk(ids, 100).map((idChunk) =>
+      chunkByLength(ids, 100).map((idChunk) =>
         getEmployeesByIDs(idChunk.join(',')).catch(() => ({ employees: [] as Employee[] }))),
     ).then((responses) => {
       setCache((prev) => {

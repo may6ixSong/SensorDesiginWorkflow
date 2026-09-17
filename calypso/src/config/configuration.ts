@@ -52,6 +52,20 @@ export default () => ({
    *   무방하지만, 그 전제가 깨지면 이 가드의 적용 범위를 다시 나눠야 한다.
    */
   sirenCallerToken: process.env.SIREN_CALLER_TOKEN || '',
+  /**
+   * Calypso -> SIREN 역방향 호출(부서/멤버 로스터 조회, `SirenCommonService`)의 베이스
+   * URL — Calypso가 나중에 완전히 독립된 서비스로 분리돼도 그대로 쓸 수 있게, SIREN
+   * FE가 project 데이터를 직접 읽지 않고 이 왕복을 거치기로 했다(사용자 결정).
+   */
+  sirenBaseUrl: process.env.SIREN_BASE_URL || 'http://localhost:3000/api/v1',
+  /**
+   * 위 호출에 실어 보내는 Bearer 토큰 — SIREN의 `HubTokenGuard`가 Calypso의 등록
+   * 문서(`isBuiltIn:true`, seed-data.ts의 DEV_CALYPSO_EVENT_TOKEN)와 대조한다. 원래
+   * Calypso→SIREN version 이벤트용으로 마련해 둔 `CALYPSO_EVENT_TOKEN`을 그대로
+   * 재사용한다 — 아직 그 이벤트를 실제로 보내는 코드는 없지만 값 자체는 이미 문서화돼
+   * 있다.
+   */
+  calypsoEventToken: process.env.CALYPSO_EVENT_TOKEN || '',
   /** S3 호환 오브젝트 스토리지 (SFM_API files.service.ts와 동일한 키 구성). */
   storage: {
     uri: process.env.S3_URI ?? '',
