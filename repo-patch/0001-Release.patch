@@ -1,0 +1,1008 @@
+From 6bf296eb76bf7b7c377f18e3b68fe50eae8ece9a Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?=EC=9E=A5=EC=84=B8=EB=AF=BC/SE-MIN=20CHANG?=
+ <semin.chang@samsungds.net>
+Date: Thu, 17 Sep 2026 12:01:01 +0900
+Subject: [PATCH 1/3] =?UTF-8?q?Release=20=EC=9D=B4=EB=A0=A5=20=ED=8E=98?=
+ =?UTF-8?q?=EC=9D=B4=EC=A7=80=20=EC=83=9D=EC=84=B1?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+---
+ web/src/App.tsx                               |   3 +
+ web/src/components/dialogs/ArtifactSlide.tsx  |  11 +-
+ .../release/ReleaseHistoryDialog.tsx          | 250 --------
+ web/src/pages/BoardPage.tsx                   |  25 +-
+ web/src/pages/ReleaseHistoryPage.tsx          | 544 ++++++++++++++++++
+ web/src/store/canvasStore.ts                  |   8 +-
+ 6 files changed, 566 insertions(+), 275 deletions(-)
+ delete mode 100644 web/src/components/release/ReleaseHistoryDialog.tsx
+ create mode 100644 web/src/pages/ReleaseHistoryPage.tsx
+
+diff --git a/web/src/App.tsx b/web/src/App.tsx
+index 7c601cb..98b386d 100644
+--- a/web/src/App.tsx
++++ b/web/src/App.tsx
+@@ -11,6 +11,7 @@ import { ProjectMembersPage } from '@/pages/ProjectMembersPage';
+ import { ArtifactListPage } from '@/pages/ArtifactListPage';
+ import { ArtifactDetailPage } from '@/pages/ArtifactDetailPage';
+ import { BoardPage } from '@/pages/BoardPage';
++import { ReleaseHistoryPage } from '@/pages/ReleaseHistoryPage';
+ import { NoAccessPage } from '@/pages/NoAccessPage';
+ import { AccessDeniedPage } from '@/pages/AccessDeniedPage';
+ import { GuidePage } from '@/pages/GuidePage';
+@@ -54,6 +55,8 @@ export default function App() {
+         <Route path="/details" element={<DetailsRedirect />} />
+         <Route path="/details/:projectId" element={<DetailsRedirect />} />
+         <Route path="/details/:projectId/:workflowId" element={<BoardPage />} />
++        <Route path="/details/:projectId/:workflowId/releases" element={<ReleaseHistoryPage />} />
++        <Route path="/details/:projectId/:workflowId/releases/:releaseId" element={<ReleaseHistoryPage />} />
+         <Route path="/service-manage" element={<ServiceManagePage />} />
+         <Route path="/guide" element={<GuidePage />} />
+         <Route path="/no-access" element={<NoAccessPage />} />
+diff --git a/web/src/components/dialogs/ArtifactSlide.tsx b/web/src/components/dialogs/ArtifactSlide.tsx
+index 9865177..f209236 100644
+--- a/web/src/components/dialogs/ArtifactSlide.tsx
++++ b/web/src/components/dialogs/ArtifactSlide.tsx
+@@ -94,6 +94,8 @@ interface Props {
+   /** 이 workflow의 phase 목록 — Overview 탭의 Phase 카드(설계서 04장 §4.4 이전 표기 복원)에 쓴다. */
+   phases?: WorkflowPhase[];
+   onClose: () => void;
++  /** 처음 열릴 탭 — 지정 없으면 Overview(예: Release 이력 페이지의 Comments 칸에서 바로 열 때 씀). */
++  initialTab?: Tab;
+   /** block에 붙은 recipient를 교체한다 — A/B/C/D 전부 공통이다. */
+   onSaveRecipients: (p: AccessGrant) => void;
+   saving?: boolean;
+@@ -120,11 +122,11 @@ interface Props {
+  *   (설계서 04장 §4.3). 전자는 패널이 잠긴 상태, 후자는 열린 패널 안의 빈 목록이다.
+  */
+ export function ArtifactSlide({
+-  block, own, project, myDepartments, phases, onClose, onSaveRecipients, saving, onDelete,
++  block, own, project, myDepartments, phases, onClose, initialTab, onSaveRecipients, saving, onDelete,
+   onChangeArtifact, changingArtifact, releases, onOpenRelease,
+ }: Props) {
+   const { t } = useTranslation();
+-  const [tab, setTab] = useState<Tab>('overview');
++  const [tab, setTab] = useState<Tab>(initialTab ?? 'overview');
+   const [changeOpen, setChangeOpen] = useState(false);
+   /** 사용자가 Version history에서 다른 (hasHtmlView인) 버전을 직접 골랐으면 그 라벨 —
+    * 안 골랐으면 undefined이고, 그러면 latest 버전을 요청한다(사용자 요청: 최초 open시
+@@ -162,6 +164,11 @@ export function ArtifactSlide({
+     setSelectedVersionLabel(undefined);
+   }, [block?.id]);
+ 
++  // eslint-disable-next-line react-hooks/exhaustive-deps
++  useEffect(() => {
++    setTab(initialTab ?? 'overview');
++  }, [block?.id]);
++
+   if (!block) return null;
+   const artifact = block.artifact;
+ 
+diff --git a/web/src/components/release/ReleaseHistoryDialog.tsx b/web/src/components/release/ReleaseHistoryDialog.tsx
+deleted file mode 100644
+index f415cfc..0000000
+--- a/web/src/components/release/ReleaseHistoryDialog.tsx
++++ /dev/null
+@@ -1,250 +0,0 @@
+-import { useMemo, useState } from 'react';
+-import { Box } from '@mui/material';
+-import { useTranslation } from 'react-i18next';
+-import { ReleaseDto, ReleaseItemDto } from '@/types/domain';
+-import { ModalShell } from '@/components/common/ModalShell';
+-import { Badge } from '@/components/common/SirenButton';
+-import { Ey } from '@/components/common/Panel';
+-import { Icon } from '@/components/common/Icon';
+-import { UserAvatar } from '@/components/common/Avatar';
+-import { useDirectory } from '@/app/providers/DirectoryProvider';
+-import { fmtAt } from '@/lib/canvasModel';
+-import { canonicalDepartmentLabel } from '@/shared/constants/departments';
+-import { CURSOR_POINTER, FONT_MONO, R, T, TIER_COLOR, TIER_LABEL, TNUM } from '@/theme/tokens';
+-
+-interface Props {
+-  workflowName: string;
+-  releases: ReleaseDto[];
+-  /** 부서별 필터 뷰 후보 — 그 과제에 등록된 부서. */
+-  departmentOptions: string[];
+-  /** 산출물 상세의 release 마커를 눌러 들어왔을 때 — 그 release를 처음부터 골라서 연다. */
+-  initialSelectedId?: string | null;
+-  onClose: () => void;
+-  onOpenArtifact?: (blockId: string) => void;
+-}
+-
+-/**
+- * Release history (설계서 05장 §7).
+- *
+- * 세 가지 보기를 한 다이얼로그 안에 둔다:
+- *   ① workflow별 목록 → 그 시점의 **표**. 캔버스는 재현하지 않는다(스냅샷을 안 찍는다).
+- *   ② 부서별 필터 — "우리 부서가 받은 것"만 가로질러 본다.
+- *   ③ 산출물별 타임라인은 여기 없다 — 그건 산출물 상세의 버전 트리 위에 마커로 붙는다.
+- *
+- * ★ 마스킹은 **열람 시점 기준**이다 — 과거 release를 열어도 "지금 이 사람의 권한"으로
+- *   판정되어, 볼 수 없는 항목은 버전·링크가 비어서 온다(item.masked).
+- */
+-export function ReleaseHistoryDialog({
+-  workflowName, releases, departmentOptions, initialSelectedId, onClose, onOpenArtifact,
+-}: Props) {
+-  const { t } = useTranslation();
+-  const { resolveUser } = useDirectory();
+-  const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId ?? releases[0]?.id ?? null);
+-  /** null이면 전체. 고르면 그 부서가 받은 항목만 남긴다. */
+-  const [deptFilter, setDeptFilter] = useState<string | null>(null);
+-
+-  const selected = useMemo(
+-    () => releases.find((r) => r.id === selectedId) ?? null,
+-    [releases, selectedId],
+-  );
+-
+-  /** 부서 필터를 켜면 그 부서가 recipient로 잡힌 항목만 남는다. */
+-  const visibleItems = useMemo(() => {
+-    if (!selected) return [];
+-    if (!deptFilter) return selected.items;
+-    return selected.items.filter((i) => i.recipients.departments.includes(deptFilter));
+-  }, [selected, deptFilter]);
+-
+-  return (
+-    <ModalShell
+-      open
+-      onClose={onClose}
+-      width={940}
+-      header={
+-        <>
+-          <Ey>{t('release.history')}</Ey>
+-          <Box sx={{ fontSize: 17, fontWeight: 700, mt: '2px' }}>{workflowName}</Box>
+-        </>
+-      }
+-    >
+-      {releases.length === 0 ? (
+-        <Box sx={{ padding: '44px 16px', textAlign: 'center', color: T.dm2, fontSize: 13 }}>
+-          No release yet.
+-        </Box>
+-      ) : (
+-        <Box sx={{ display: 'flex', gap: '14px', height: 'min(72vh, 660px)' }}>
+-          {/* ① 목록 */}
+-          <Box sx={{ width: 220, flexShrink: 0, borderRight: `1px solid ${T.ln}`, pr: '12px', overflowY: 'auto', height: '100%' }}>
+-            {releases.map((r) => {
+-              const on = r.id === selectedId;
+-              const changedCount = r.items.filter((i) => i.changed).length;
+-              return (
+-                <Box
+-                  key={r.id}
+-                  component="button"
+-                  onClick={() => setSelectedId(r.id)}
+-                  sx={{
+-                    display: 'block', width: '100%', textAlign: 'left', fontFamily: 'inherit',
+-                    background: on ? T.prSoft : 'transparent',
+-                    border: `1px solid ${on ? T.prLine : 'transparent'}`,
+-                    borderRadius: `${R.sm}px`, padding: '9px 10px', mb: '5px', cursor: CURSOR_POINTER,
+-                    '&:hover': { background: on ? T.prSoft : T.sf2 },
+-                  }}
+-                >
+-                  <Box sx={{ display: 'flex', alignItems: 'baseline', gap: '7px' }}>
+-                    <Box sx={{ fontFamily: FONT_MONO, fontSize: 13, fontWeight: 700, color: on ? T.pr : T.tx, ...TNUM }}>
+-                      {r.label}
+-                    </Box>
+-                    <Box sx={{ fontSize: 11, color: T.dm2, ...TNUM }}>{fmtAt(r.releasedAt).slice(0, 10)}</Box>
+-                  </Box>
+-                  <Box sx={{ fontSize: 11, color: T.dm, mt: '3px', ...TNUM }}>
+-                    {r.items.length} artifacts
+-                    {changedCount > 0 && <Box component="span" sx={{ color: T.warn }}> · {changedCount} changed</Box>}
+-                  </Box>
+-                  {r.note && (
+-                    <Box
+-                      sx={{
+-                        fontSize: 11, color: T.dm2, mt: '3px',
+-                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+-                      }}
+-                    >
+-                      {r.note}
+-                    </Box>
+-                  )}
+-                </Box>
+-              );
+-            })}
+-          </Box>
+-
+-          {/* ② 상세 표 — 헤더/노트는 고정하고, 산출물 목록에만 스크롤을 건다. */}
+-          <Box sx={{ flex: 1, minWidth: 0, height: '100%', display: 'flex', flexDirection: 'column' }}>
+-            {selected && (
+-              <>
+-                <Box sx={{ flex: '0 0 auto', display: 'flex', alignItems: 'center', gap: '9px', mb: '10px', flexWrap: 'wrap' }}>
+-                  <Box sx={{ fontFamily: FONT_MONO, fontSize: 15, fontWeight: 700, color: T.pr, ...TNUM }}>
+-                    {selected.label}
+-                  </Box>
+-                  <Box sx={{ fontSize: 11.5, color: T.dm2, ...TNUM }}>{fmtAt(selected.releasedAt)}</Box>
+-                  <UserAvatar user={resolveUser(selected.releasedBy)} size={20} />
+-                  <Box sx={{ fontSize: 11.5, color: T.dm }}>
+-                    {resolveUser(selected.releasedBy)?.name ?? selected.releasedBy}
+-                  </Box>
+-
+-                  <Box sx={{ flex: 1 }} />
+-
+-                  {/* 부서별 필터 — "우리 부서가 받은 것"만 본다 */}
+-                  <Box
+-                    component="select"
+-                    value={deptFilter ?? ''}
+-                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setDeptFilter(e.target.value || null)}
+-                    sx={{
+-                      fontSize: 11.5, padding: '4px 8px', borderRadius: `${R.xs}px`,
+-                      border: `1px solid ${T.ln2}`, background: T.sf, color: T.tx,
+-                      cursor: CURSOR_POINTER, fontFamily: 'inherit',
+-                      '& option': { background: T.sf, color: T.tx },
+-                    }}
+-                  >
+-                    <option value="">All recipients</option>
+-                    {departmentOptions.map((d) => (
+-                      <option key={d} value={d}>{d}</option>
+-                    ))}
+-                  </Box>
+-                </Box>
+-
+-                {selected.note && (
+-                  <Box
+-                    sx={{
+-                      flex: '0 0 auto',
+-                      fontSize: 12.5, color: T.tx2, lineHeight: 1.6, background: T.sf2,
+-                      border: `1px solid ${T.ln}`, borderRadius: `${R.sm}px`, padding: '9px 11px', mb: '12px',
+-                    }}
+-                  >
+-                    {selected.note}
+-                  </Box>
+-                )}
+-
+-                <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+-                  {visibleItems.length === 0 ? (
+-                    <Box sx={{ padding: '28px', textAlign: 'center', color: T.dm2, fontSize: 12.5 }}>
+-                      Nothing went to {deptFilter} in this release.
+-                    </Box>
+-                  ) : (
+-                    visibleItems.map((item) => (
+-                      <HistoryRow key={item.blockId} item={item} onOpen={onOpenArtifact} />
+-                    ))
+-                  )}
+-                </Box>
+-              </>
+-            )}
+-          </Box>
+-        </Box>
+-      )}
+-    </ModalShell>
+-  );
+-}
+-
+-function HistoryRow({ item, onOpen }: { item: ReleaseItemDto; onOpen?: (blockId: string) => void }) {
+-  const { t } = useTranslation();
+-  const tier = TIER_COLOR[item.tier];
+-
+-  return (
+-    <Box
+-      onClick={() => onOpen?.(item.blockId)}
+-      sx={{
+-        background: item.changed ? T.changed : T.sf,
+-        border: `1px solid ${item.changed ? T.changedLine : T.ln}`,
+-        borderRadius: `${R.sm}px`, padding: '10px 12px', mb: '7px',
+-        cursor: onOpen ? CURSOR_POINTER : 'default',
+-        '&:hover': onOpen ? { borderColor: T.ln2 } : {},
+-      }}
+-    >
+-      <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+-        <Box sx={{ fontSize: 10, fontWeight: 700, color: tier.fg, background: tier.bg, padding: '2px 6px', borderRadius: `${R.xs}px` }}>
+-          {TIER_LABEL[item.tier]}
+-        </Box>
+-        <Box sx={{ fontSize: 13, fontWeight: 600, flex: 1, minWidth: 0 }}>{item.artifactName}</Box>
+-        {item.phaseName && <Box sx={{ fontSize: 10.5, color: T.dm2 }}>{item.phaseName}</Box>}
+-
+-        {/* 열람 권한이 없으면 버전·링크가 응답에서 빠져서 온다 — 그 사실을 그대로 보여준다. */}
+-        {item.masked ? (
+-          <Box sx={{ color: T.dm2, display: 'inline-flex' }} title={t('artifact.noAccess')}>
+-            <Icon name="lock" />
+-          </Box>
+-        ) : item.published ? (
+-          <Box sx={{ fontFamily: FONT_MONO, fontSize: 12, fontWeight: 600, ...TNUM }}>
+-            {item.published.versionLabel}
+-          </Box>
+-        ) : (
+-          <Badge color={T.dm2} bg={T.sf2} borderColor={T.ln}>{t('artifact.notPublished')}</Badge>
+-        )}
+-      </Box>
+-
+-      <Box sx={{ display: 'flex', alignItems: 'center', gap: '5px', mt: '7px', flexWrap: 'wrap' }}>
+-        <Box sx={{ fontSize: 10.5, color: T.dm2, fontWeight: 700 }}>TO</Box>
+-        {item.recipients.departments.map((d) => (
+-          <Box key={d} sx={{ fontSize: 10.5, color: T.dm, background: T.sf3, padding: '2px 7px', borderRadius: `${R.pill}px` }}>
+-            {canonicalDepartmentLabel(d)}
+-          </Box>
+-        ))}
+-        {!item.recipients.departments.length && (
+-          <Box sx={{ fontSize: 10.5, color: T.dm2 }}>No recipient</Box>
+-        )}
+-      </Box>
+-
+-      {item.sources.length > 0 && !item.masked && (
+-        <Box sx={{ mt: '7px', pt: '7px', borderTop: `1px dashed ${T.ln}` }}>
+-          {item.sources.map((s) => (
+-            <Box key={s.blockId} sx={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 11 }}>
+-              <Box sx={{ color: T.dm2, minWidth: 44 }}>FROM</Box>
+-              <Box sx={{ color: T.tx2, flex: 1, minWidth: 0 }}>{s.artifactName}</Box>
+-              <Box sx={{ fontFamily: FONT_MONO, color: s.selected ? T.tx2 : T.dm2, ...TNUM }}>
+-                {/* source가 미발행이면 받는 쪽에는 "아직 전달되지 않음"으로 보인다. */}
+-                {s.selected ? s.selected.versionLabel : t('release.notDelivered')}
+-              </Box>
+-            </Box>
+-          ))}
+-        </Box>
+-      )}
+-    </Box>
+-  );
+-}
+diff --git a/web/src/pages/BoardPage.tsx b/web/src/pages/BoardPage.tsx
+index 3eeeafc..4d2f73b 100644
+--- a/web/src/pages/BoardPage.tsx
++++ b/web/src/pages/BoardPage.tsx
+@@ -11,7 +11,6 @@ import { WorkflowSettingsDialog } from '@/components/dialogs/WorkflowSettingsDia
+ import { AddArtifactDialog } from '@/components/dialogs/AddArtifactDialog';
+ import { NoteDialog } from '@/components/dialogs/NoteDialog';
+ import { ReleaseDialog } from '@/components/release/ReleaseDialog';
+-import { ReleaseHistoryDialog } from '@/components/release/ReleaseHistoryDialog';
+ import { Toast } from '@/components/common/Toast';
+ import { useProject, useProjectWorkflows, useProjectMilestones, useProjects } from '@/api/hooks/useProjects';
+ import { useUpdateWorkflow, useReplaceWorkflowAccess, useWorkflow, useUpdateWorkflowPhases } from '@/api/hooks/useWorkflow';
+@@ -53,6 +52,7 @@ export function BoardPage() {
+   const nodes = useCanvasStore((s) => s.nodes);
+   const canvasMemos = useCanvasStore((s) => s.memos);
+   const openId = useCanvasStore((s) => s.openId);
++  const openInitialTab = useCanvasStore((s) => s.openInitialTab);
+   const noteDlg = useCanvasStore((s) => s.noteDlg);
+   const addDlg = useCanvasStore((s) => s.addDlg);
+   const phInfo = useCanvasStore((s) => s.phInfo);
+@@ -72,9 +72,6 @@ export function BoardPage() {
+   /** 수신 부서 필터 — 걸린 블록은 흐려질 뿐 사라지지 않는다(설계서 03장 §6.1). */
+   const [recipientFilter, setRecipientFilter] = useState<string[]>([]);
+   const [releaseOpen, setReleaseOpen] = useState(false);
+-  const [historyOpen, setHistoryOpen] = useState(false);
+-  /** artifact slide의 release 마커를 눌러 들어온 경우 — 그 release를 미리 골라둔다. */
+-  const [historyPreselect, setHistoryPreselect] = useState<string | null>(null);
+ 
+   /**
+    * preview는 연동 서비스에 라이브로 버전을 물어보므로 평소 조회보다 느리다 —
+@@ -229,7 +226,7 @@ export function BoardPage() {
+               st.getState().setWorkflowSettingsTab('details');
+             }}
+             onOpenRelease={() => setReleaseOpen(true)}
+-            onOpenHistory={() => { setHistoryPreselect(null); setHistoryOpen(true); }}
++            onOpenHistory={() => navigate(`/details/${projectId}/${workflowId}/releases`)}
+           />
+ 
+           <Canvas
+@@ -249,6 +246,7 @@ export function BoardPage() {
+               myDepartments={myDepartments}
+               phases={phaseList}
+               onClose={closeSlide}
++              initialTab={openInitialTab ?? undefined}
+               onChangeArtifact={(newArtifact) =>
+                 updateBlock.mutate(
+                   { id: openBlock.id, newArtifact },
+@@ -262,8 +260,7 @@ export function BoardPage() {
+               releases={releases.data ?? []}
+               onOpenRelease={(releaseId) => {
+                 closeSlide();
+-                setHistoryPreselect(releaseId);
+-                setHistoryOpen(true);
++                navigate(`/details/${projectId}/${workflowId}/releases/${releaseId}`);
+               }}
+               saving={replaceRecipients.isPending}
+               onSaveRecipients={(p) =>
+@@ -422,20 +419,6 @@ export function BoardPage() {
+             />
+           )}
+ 
+-          {historyOpen && (
+-            <ReleaseHistoryDialog
+-              workflowName={workflow.name}
+-              releases={releases.data ?? []}
+-              departmentOptions={project?.departments ?? []}
+-              initialSelectedId={historyPreselect}
+-              onClose={() => setHistoryOpen(false)}
+-              onOpenArtifact={(blockId) => {
+-                setHistoryOpen(false);
+-                st.getState().openDeliverable(blockId);
+-              }}
+-            />
+-          )}
+-
+           {noteDlg && (
+             <NoteDialog
+               text={canvasMemos.find((m) => m.id === noteDlg)?.text ?? ''}
+diff --git a/web/src/pages/ReleaseHistoryPage.tsx b/web/src/pages/ReleaseHistoryPage.tsx
+new file mode 100644
+index 0000000..02b0f8d
+--- /dev/null
++++ b/web/src/pages/ReleaseHistoryPage.tsx
+@@ -0,0 +1,544 @@
++import { useEffect, useMemo, useState } from 'react';
++import { useNavigate, useParams } from 'react-router-dom';
++import { Box, CircularProgress, Stack } from '@mui/material';
++import { AppShell } from '@/components/layout/AppShell';
++import { ArtifactSlide } from '@/components/dialogs/ArtifactSlide';
++import { Card, Ey } from '@/components/common/Panel';
++import { SirenButton } from '@/components/common/SirenButton';
++import { Icon } from '@/components/common/Icon';
++import { UserAvatar } from '@/components/common/Avatar';
++import { useDirectory } from '@/app/providers/DirectoryProvider';
++import { useAuth } from '@/app/providers/AuthProvider';
++import { useProject, useProjectWorkflows, useProjects } from '@/api/hooks/useProjects';
++import { useWorkflow } from '@/api/hooks/useWorkflow';
++import { useBlocks, useReplaceBlockRecipients } from '@/api/hooks/useBlocks';
++import { useReleases, useReleasePreview } from '@/api/hooks/useReleases';
++import { useArtifactServices } from '@/api/hooks/useHub';
++import { useComments } from '@/api/hooks/useComments';
++import { downloadCalypsoVersion } from '@/api/calypsoClient';
++import { toast } from '@/store/toastStore';
++import { fmtAt } from '@/lib/canvasModel';
++import { canEditWorkflow, myDepartments as myDeptsOf } from '@/lib/access';
++import { ArtifactDto, BlockDto, MaskedArtifactDto, ReleaseItemDto, isMaskedArtifact } from '@/types/domain';
++import { CURSOR_POINTER, FONT_MONO, R, T, TIER_COLOR, TIER_LABEL, TNUM } from '@/theme/tokens';
++
++type OpenTab = 'overview' | 'recipients' | 'comments';
++
++/**
++ * Release 이력 — 예전에는 팝업(ReleaseHistoryDialog)이었다. 페이지로 바꿔서 특정 release를
++ * URL로 공유할 수 있게 하고, artifact 목록을 OA/HPC 망으로 나눈 표로 다시 짰다(사용자 요청).
++ */
++export function ReleaseHistoryPage() {
++  const { projectId, workflowId, releaseId } = useParams<{ projectId: string; workflowId: string; releaseId?: string }>();
++  const navigate = useNavigate();
++  const { resolveUser } = useDirectory();
++  const { user: me, isAdmin } = useAuth();
++
++  const { data: projects } = useProjects();
++  const { data: project } = useProject(projectId);
++  const { data: workflows } = useProjectWorkflows(projectId);
++  const { data: workflow, isLoading: workflowLoading } = useWorkflow(workflowId);
++  const { data: blocks } = useBlocks(workflowId);
++  const releases = useReleases(workflowId);
++  const services = useArtifactServices();
++  const replaceRecipients = useReplaceBlockRecipients(workflowId ?? '');
++
++  const canEdit = canEditWorkflow(workflow, isAdmin);
++  /** Edit 권한자에게만 "Current"(최신 release 이후 지금 상태)를 보여준다 — 이 미리보기는
++   * release 실행과 같은 로직으로 계산되고, 서버도 edit 권한만 허용한다(설계서 05장 §4.4). */
++  const preview = useReleasePreview(workflowId, canEdit);
++
++  /** 이 페이지 안에서만 쓰는 slide 상태 — canvasStore(openId)를 안 쓴다. 캔버스로 이동하지
++   * 않고 그 자리에서 상세를 띄우고, 닫으면 이 Release 페이지 상태(선택된 release 등)가
++   * 그대로 유지되게 하기 위함(사용자 요청). */
++  const [openBlockId, setOpenBlockId] = useState<string | null>(null);
++  const [openTab, setOpenTab] = useState<OpenTab | undefined>(undefined);
++
++  const myDepartments = useMemo(
++    () => myDeptsOf(project, me?.KnoxID, isAdmin),
++    [project, me?.KnoxID, isAdmin],
++  );
++  const openBlock = useMemo(() => (blocks ?? []).find((b) => b.id === openBlockId) ?? null, [blocks, openBlockId]);
++
++  const blockById = useMemo(() => new Map((blocks ?? []).map((b) => [b.id, b])), [blocks]);
++  const serviceNameByKey = useMemo(
++    () => new Map((services.data ?? []).map((s) => [s.key, s.name])),
++    [services.data],
++  );
++
++  const sorted = useMemo(() => [...(releases.data ?? [])].sort((a, b) => b.seq - a.seq), [releases.data]);
++  /** URL이 'current'를 가리켜도 Edit 권한이 없으면 절대 보여주지 않는다 - 서버도 이 미리보기를
++   * edit 권한자에게만 허용하고(useReleasePreview의 enabled도 canEdit일 때만 켜진다), 렌더
++   * 조건도 항상 이 값 하나로만 판단해서 "권한 없어도 Current 화면 자체가 보이는" 구멍을
++   * 없앤다. */
++  const requestedCurrent = releaseId === 'current';
++  const showCurrent = requestedCurrent && canEdit;
++  const selected = !showCurrent && releaseId && releaseId !== 'current' ? sorted.find((r) => r.id === releaseId) ?? null : null;
++
++  // URL에 releaseId가 없으면 정규화한다 - Edit 권한자는 항상 Current를 기본으로 보고(사용자
++  // 요청), 그 외에는 최신 release로 보낸다. 이 페이지의 URL이 늘 특정 대상을 가리키게 해서
++  // (공유 가능) 팝업과 달리 페이지로 바꾼 실익을 살린다.
++  useEffect(() => {
++    if (releaseId || !projectId || !workflowId) return;
++    if (canEdit) {
++      navigate(`/details/${projectId}/${workflowId}/releases/current`, { replace: true });
++    } else if (sorted.length > 0) {
++      navigate(`/details/${projectId}/${workflowId}/releases/${sorted[0].id}`, { replace: true });
++    }
++  }, [releaseId, sorted, projectId, workflowId, canEdit, navigate]);
++
++  // Edit 권한 없이 /releases/current로 들어오면(URL 직접 입력·공유된 링크 등) 최신
++  // release로, 그것도 없으면 release 없는 기본 화면으로 되돌린다.
++  useEffect(() => {
++    if (!requestedCurrent || canEdit || !projectId || !workflowId) return;
++    if (sorted.length > 0) {
++      navigate(`/details/${projectId}/${workflowId}/releases/${sorted[0].id}`, { replace: true });
++    } else {
++      navigate(`/details/${projectId}/${workflowId}/releases`, { replace: true });
++    }
++  }, [requestedCurrent, canEdit, sorted, projectId, workflowId, navigate]);
++
++  const openArtifact = (blockId: string, tab?: OpenTab) => {
++    setOpenBlockId(blockId);
++    setOpenTab(tab);
++  };
++  const closeArtifact = () => {
++    setOpenBlockId(null);
++    setOpenTab(undefined);
++  };
++
++  if (workflowLoading) {
++    return (
++      <Stack alignItems="center" justifyContent="center" sx={{ height: '100vh' }}>
++        <CircularProgress />
++      </Stack>
++    );
++  }
++
++  // Current(미리보기)는 masked 개념이 없다 - 이 미리보기 자체가 edit 권한자에게만 오므로
++  // 항상 false로 채워 기존 ReleaseItemDto 파이프라인(표/행 컴포넌트)을 그대로 재사용한다.
++  const currentItems: ReleaseItemDto[] = (preview.data?.items ?? []).map((i) => ({ ...i, masked: false }));
++  const displayedItems = showCurrent ? currentItems : (selected?.items ?? []);
++
++  const oaItems = displayedItems
++    .filter((i) => i.network === 'OA')
++    .sort((a, b) => a.artifactName.localeCompare(b.artifactName));
++  const hpcItems = displayedItems
++    .filter((i) => i.network === 'HPC')
++    .sort((a, b) => a.artifactName.localeCompare(b.artifactName));
++
++  return (
++    <AppShell
++      projects={projects ?? []}
++      projectId={projectId}
++      onChangeProject={(id) => navigate(`/details/${id}`)}
++      workflows={workflows ?? []}
++      workflowId={workflowId}
++      onChangeIp={(id) => navigate(`/details/${projectId}/${id}`)}
++    >
++      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '20px 24px', overflow: 'hidden' }}>
++        <Box sx={{ display: 'flex', alignItems: 'center', gap: '12px', mb: '16px', flexShrink: 0 }}>
++          <SirenButton variant="ghost" onClick={() => navigate(`/details/${projectId}/${workflowId}`)}>
++            <Icon name="undo" size={13} /> Back to canvas
++          </SirenButton>
++          <Box sx={{ width: 1, height: 18, background: T.ln }} />
++          <Ey>Release History</Ey>
++          <Box sx={{ fontSize: 17, fontWeight: 700 }}>{workflow?.name}</Box>
++        </Box>
++
++        {sorted.length === 0 && !showCurrent ? (
++          <Box sx={{ padding: '44px 16px', textAlign: 'center', color: T.dm2, fontSize: 13 }}>
++            No release yet.
++          </Box>
++        ) : (
++          <Box sx={{ display: 'flex', gap: '18px', flex: 1, minHeight: 0 }}>
++            {/* 좌측 — release 목록 (Current는 Edit 권한자에게만, 맨 위에 고정) */}
++            <Box sx={{ width: 240, flexShrink: 0, overflowY: 'auto' }}>
++              {canEdit && (
++                <Box
++                  component="button"
++                  onClick={() => navigate(`/details/${projectId}/${workflowId}/releases/current`)}
++                  sx={{
++                    display: 'block', width: '100%', textAlign: 'left', fontFamily: 'inherit',
++                    background: showCurrent ? T.prSoft : T.sf2,
++                    border: `1px solid ${showCurrent ? T.prLine : T.ln}`,
++                    borderRadius: `${R.sm}px`, padding: '9px 10px', mb: '10px', cursor: CURSOR_POINTER,
++                    '&:hover': { background: showCurrent ? T.prSoft : T.sf3 },
++                  }}
++                >
++                  <Box sx={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
++                    <Box sx={{ width: 6, height: 6, borderRadius: '50%', background: T.ok, flexShrink: 0 }} />
++                    <Box sx={{ fontSize: 13, fontWeight: 700, color: showCurrent ? T.pr : T.tx }}>Current</Box>
++                  </Box>
++                  <Box sx={{ fontSize: 11, color: T.dm, mt: '3px' }}>
++                    Live state since {sorted[0]?.label ?? 'the start'}
++                    {(preview.data?.changedCount ?? 0) > 0 && (
++                      <Box component="span" sx={{ color: T.warn }}> · {preview.data?.changedCount} changed</Box>
++                    )}
++                  </Box>
++                </Box>
++              )}
++              {sorted.map((r) => {
++                const on = r.id === selected?.id;
++                const changedCount = r.items.filter((i) => i.changed).length;
++                return (
++                  <Box
++                    key={r.id}
++                    component="button"
++                    onClick={() => navigate(`/details/${projectId}/${workflowId}/releases/${r.id}`)}
++                    sx={{
++                      display: 'block', width: '100%', textAlign: 'left', fontFamily: 'inherit',
++                      background: on ? T.prSoft : 'transparent',
++                      border: `1px solid ${on ? T.prLine : 'transparent'}`,
++                      borderRadius: `${R.sm}px`, padding: '9px 10px', mb: '5px', cursor: CURSOR_POINTER,
++                      '&:hover': { background: on ? T.prSoft : T.sf2 },
++                    }}
++                  >
++                    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: '7px' }}>
++                      <Box sx={{ fontFamily: FONT_MONO, fontSize: 13, fontWeight: 700, color: on ? T.pr : T.tx, ...TNUM }}>
++                        {r.label}
++                      </Box>
++                      <Box sx={{ fontSize: 11, color: T.dm2, ...TNUM }}>{fmtAt(r.releasedAt).slice(0, 10)}</Box>
++                    </Box>
++                    <Box sx={{ fontSize: 11, color: T.dm, mt: '3px', ...TNUM }}>
++                      {r.items.length} artifacts
++                      {changedCount > 0 && <Box component="span" sx={{ color: T.warn }}> · {changedCount} changed</Box>}
++                    </Box>
++                    {r.note && (
++                      <Box sx={{ fontSize: 11, color: T.dm2, mt: '3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
++                        {r.note}
++                      </Box>
++                    )}
++                  </Box>
++                );
++              })}
++            </Box>
++
++            {/* 우측 — 선택된 release(또는 Current)의 artifact 표 */}
++            <Box sx={{ flex: 1, minWidth: 0, overflowY: 'auto' }}>
++              {showCurrent ? (
++                <Box
++                  sx={{
++                    display: 'flex', alignItems: 'center', gap: '8px', mb: '16px',
++                    fontSize: 12.5, color: T.dm, lineHeight: 1.6, background: T.okSoft,
++                    border: `1px solid ${T.okLine}`, borderRadius: `${R.sm}px`, padding: '9px 11px',
++                  }}
++                >
++                  <Box sx={{ width: 7, height: 7, borderRadius: '50%', background: T.ok, flexShrink: 0 }} />
++                  <Box>
++                    Not released yet — this is the live state of every artifact in this workflow right now,
++                    compared against {sorted[0]?.label ?? 'the last release'}.
++                  </Box>
++                </Box>
++              ) : selected && (
++                <>
++                  <Box sx={{ display: 'flex', alignItems: 'center', gap: '9px', mb: '10px', flexWrap: 'wrap' }}>
++                    <Box sx={{ fontFamily: FONT_MONO, fontSize: 15, fontWeight: 700, color: T.pr, ...TNUM }}>
++                      {selected.label}
++                    </Box>
++                    <Box sx={{ fontSize: 11.5, color: T.dm2, ...TNUM }}>{fmtAt(selected.releasedAt)}</Box>
++                    <UserAvatar user={resolveUser(selected.releasedBy)} size={20} />
++                    <Box sx={{ fontSize: 11.5, color: T.dm }}>
++                      {resolveUser(selected.releasedBy)?.name ?? selected.releasedBy}
++                    </Box>
++                  </Box>
++
++                  {selected.note && (
++                    <Box
++                      sx={{
++                        fontSize: 12.5, color: T.tx2, lineHeight: 1.6, background: T.sf2,
++                        border: `1px solid ${T.ln}`, borderRadius: `${R.sm}px`, padding: '9px 11px', mb: '16px',
++                      }}
++                    >
++                      {selected.note}
++                    </Box>
++                  )}
++                </>
++              )}
++
++              {(showCurrent || selected) && (
++                <>
++                  <ArtifactGroup
++                    title="OA"
++                    items={oaItems}
++                    blockById={blockById}
++                    serviceNameByKey={serviceNameByKey}
++                    workflowId={workflowId ?? ''}
++                    projectId={projectId ?? ''}
++                    onOpen={openArtifact}
++                  />
++                  <Box sx={{ height: '18px' }} />
++                  <ArtifactGroup
++                    title="HPC"
++                    items={hpcItems}
++                    blockById={blockById}
++                    serviceNameByKey={serviceNameByKey}
++                    workflowId={workflowId ?? ''}
++                    projectId={projectId ?? ''}
++                    onOpen={openArtifact}
++                  />
++                </>
++              )}
++            </Box>
++          </Box>
++        )}
++      </Box>
++
++      {openBlock && (
++        <ArtifactSlide
++          block={openBlock}
++          own={canEdit}
++          project={project}
++          myDepartments={myDepartments}
++          phases={workflow?.phases ?? []}
++          onClose={closeArtifact}
++          initialTab={openTab}
++          releases={releases.data ?? []}
++          onOpenRelease={(releaseId2) => {
++            closeArtifact();
++            navigate(`/details/${projectId}/${workflowId}/releases/${releaseId2}`);
++          }}
++          saving={replaceRecipients.isPending}
++          onSaveRecipients={(p) =>
++            replaceRecipients.mutate(
++              { blockId: openBlock.id, ...p },
++              {
++                onSuccess: () => toast('Recipients saved'),
++                onError: (e: any) => toast(e?.response?.data?.message ?? 'Failed to save recipients'),
++              },
++            )
++          }
++        />
++      )}
++    </AppShell>
++  );
++}
++
++function ArtifactGroup({
++  title, items, blockById, serviceNameByKey, workflowId, projectId, onOpen,
++}: {
++  title: string;
++  items: ReleaseItemDto[];
++  blockById: Map<string, BlockDto>;
++  serviceNameByKey: Map<string, string>;
++  workflowId: string;
++  projectId: string;
++  onOpen: (blockId: string, tab?: OpenTab) => void;
++}) {
++  return (
++    <Card>
++      <Ey sx={{ mb: '10px' }}>{title} ({items.length})</Ey>
++      {items.length === 0 ? (
++        <Box sx={{ padding: '14px 4px', color: T.dm2, fontSize: 12.5 }}>No artifacts.</Box>
++      ) : (
++        <Box sx={{ display: 'flex', flexDirection: 'column' }}>
++          <Box
++            sx={{
++              display: 'flex', gap: '10px', padding: '4px 8px', fontSize: 10.5, fontWeight: 700,
++              color: T.dm2, textTransform: 'uppercase', letterSpacing: '.05em',
++            }}
++          >
++            <Box sx={{ flex: '2 1 0', minWidth: 0 }}>Artifact</Box>
++            <Box sx={{ flex: '1 1 0', minWidth: 0 }}>Access</Box>
++            <Box sx={{ width: 80, flexShrink: 0 }}>Version</Box>
++            <Box sx={{ width: 130, flexShrink: 0 }}>Updated</Box>
++            <Box sx={{ flex: '2 1 0', minWidth: 0 }}>Comments</Box>
++          </Box>
++          {items.map((item) => (
++            <ArtifactRow
++              key={item.blockId}
++              item={item}
++              artifact={blockById.get(item.blockId)?.artifact}
++              serviceNameByKey={serviceNameByKey}
++              workflowId={workflowId}
++              projectId={projectId}
++              onOpen={onOpen}
++            />
++          ))}
++        </Box>
++      )}
++    </Card>
++  );
++}
++
++function ArtifactRow({
++  item, artifact, serviceNameByKey, workflowId, projectId, onOpen,
++}: {
++  item: ReleaseItemDto;
++  artifact: ArtifactDto | MaskedArtifactDto | null | undefined;
++  serviceNameByKey: Map<string, string>;
++  workflowId: string;
++  projectId: string;
++  onOpen: (blockId: string, tab?: OpenTab) => void;
++}) {
++  const tier = TIER_COLOR[item.tier];
++  const liveArtifact = artifact && !isMaskedArtifact(artifact) ? artifact : null;
++  const badgeLabel = item.tier === 'A' && liveArtifact?.serviceKey
++    ? (serviceNameByKey.get(liveArtifact.serviceKey) ?? TIER_LABEL[item.tier])
++    : TIER_LABEL[item.tier];
++
++  return (
++    <Box
++      onClick={() => onOpen(item.blockId)}
++      sx={{
++        display: 'flex', gap: '10px', alignItems: 'center', padding: '9px 8px',
++        // 직전 release 대비 바뀐 항목은 배경색으로 눈에 띄게 — 예전 팝업(HistoryRow)과 같은
++        // 표기(T.changed/T.changedLine)를 그대로 쓴다.
++        background: item.changed ? T.changed : 'transparent',
++        borderTop: `1px solid ${item.changed ? T.changedLine : T.ln}`,
++        cursor: CURSOR_POINTER,
++        '&:hover': { background: item.changed ? T.changed : T.sf2 },
++      }}
++    >
++      <Box sx={{ flex: '2 1 0', minWidth: 0, display: 'flex', alignItems: 'center', gap: '7px' }}>
++        {item.masked ? (
++          <Box sx={{ color: T.dm2, display: 'inline-flex', flexShrink: 0 }} title="No access">
++            <Icon name="lock" size={12} />
++          </Box>
++        ) : (
++          <Box
++            sx={{
++              fontSize: 10, fontWeight: 700, color: tier.fg, background: tier.bg,
++              padding: '2px 6px', borderRadius: `${R.xs}px`, flexShrink: 0, whiteSpace: 'nowrap',
++            }}
++          >
++            {badgeLabel}
++          </Box>
++        )}
++        <Box
++          sx={{
++            fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis',
++            whiteSpace: 'nowrap', color: item.masked ? T.dm2 : T.tx,
++          }}
++        >
++          {item.artifactName}
++        </Box>
++      </Box>
++
++      <Box sx={{ flex: '1 1 0', minWidth: 0 }} onClick={(e) => e.stopPropagation()}>
++        {!item.masked && <AccessCell item={item} artifact={liveArtifact} projectId={projectId} />}
++      </Box>
++
++      <Box sx={{ width: 80, flexShrink: 0, fontFamily: FONT_MONO, fontSize: 12, ...TNUM }}>
++        {item.published?.versionLabel ?? '—'}
++      </Box>
++
++      <Box sx={{ width: 130, flexShrink: 0, fontSize: 11.5, color: T.dm2, ...TNUM }}>
++        {item.published?.publishedAt ? fmtAt(item.published.publishedAt) : '—'}
++      </Box>
++
++      <Box sx={{ flex: '2 1 0', minWidth: 0 }} onClick={(e) => e.stopPropagation()}>
++        {!item.masked && (
++          <LatestCommentCell workflowId={workflowId} blockId={item.blockId} onOpen={() => onOpen(item.blockId, 'comments')} />
++        )}
++      </Box>
++    </Box>
++  );
++}
++
++/**
++ * 종류별 데이터 접근(사용자 요청): HPC path는 복사, Calypso가 관리하는 실제 파일은 다운로드,
++ * 그 외 URL은 새 창 링크. 우선순위는 ArtifactSlide의 VersionList와 동일하게 맞춘다.
++ */
++function AccessCell({ item, artifact, projectId }: { item: ReleaseItemDto; artifact: ArtifactDto | null; projectId: string }) {
++  const v = item.published;
++  const [downloading, setDownloading] = useState(false);
++
++  if (!v) return <Box sx={{ fontSize: 12, color: T.dm2 }}>—</Box>;
++
++  if (v.hpcPath) {
++    return (
++      <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: '5px', maxWidth: '100%' }}>
++        <Box
++          sx={{
++            fontFamily: FONT_MONO, fontSize: 11, color: T.dm2,
++            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
++          }}
++          title={v.hpcPath}
++        >
++          {v.hpcPath}
++        </Box>
++        <SirenButton
++          variant="ghost"
++          title="Copy path"
++          sx={{ minWidth: 0, padding: '2px', flexShrink: 0 }}
++          onClick={() => {
++            navigator.clipboard?.writeText(v.hpcPath as string);
++            toast('Path copied');
++          }}
++        >
++          <Icon name="copy" size={12} />
++        </SirenButton>
++      </Box>
++    );
++  }
++
++  const isCalypsoFile = artifact?.serviceKey === 'calypso' && !!artifact.externalArtifactId && !!v.versionRef;
++  if (isCalypsoFile) {
++    return (
++      <SirenButton
++        variant="ghost"
++        sx={{ fontSize: 11.5 }}
++        disabled={downloading}
++        onClick={async () => {
++          setDownloading(true);
++          try {
++            const blob = await downloadCalypsoVersion(artifact!.externalArtifactId as string, projectId, v.versionRef as string);
++            const url = URL.createObjectURL(blob);
++            const link = document.createElement('a');
++            link.href = url;
++            link.download = `${item.artifactName}-${v.versionLabel}`;
++            document.body.appendChild(link);
++            link.click();
++            link.remove();
++            URL.revokeObjectURL(url);
++          } catch {
++            toast('Download failed');
++          } finally {
++            setDownloading(false);
++          }
++        }}
++      >
++        <Icon name="dn" size={12} /> {downloading ? 'Downloading…' : 'Download'}
++      </SirenButton>
++    );
++  }
++
++  if (v.viewUrl) {
++    return (
++      <Box
++        component="a"
++        href={v.viewUrl}
++        target="_blank"
++        rel="noreferrer"
++        sx={{
++          display: 'inline-flex', alignItems: 'center', gap: '4px',
++          fontSize: 11.5, color: T.pr, textDecoration: 'none', fontWeight: 600,
++        }}
++      >
++        <Icon name="link" size={12} /> Open
++      </Box>
++    );
++  }
++
++  return <Box sx={{ fontSize: 12, color: T.dm2 }}>—</Box>;
++}
++
++function LatestCommentCell({ workflowId, blockId, onOpen }: { workflowId: string; blockId: string; onOpen: () => void }) {
++  const comments = useComments(workflowId, blockId);
++  const latest = comments.data && comments.data.length > 0 ? comments.data[comments.data.length - 1] : undefined;
++
++  return (
++    <Box
++      onClick={onOpen}
++      title={latest?.text}
++      sx={{
++        cursor: CURSOR_POINTER, fontSize: 12, color: latest ? T.tx2 : T.dm2,
++        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
++        '&:hover': { textDecoration: 'underline' },
++      }}
++    >
++      {latest ? latest.text : 'No comments yet.'}
++    </Box>
++  );
++}
+diff --git a/web/src/store/canvasStore.ts b/web/src/store/canvasStore.ts
+index 52ee403..0df9e1a 100644
+--- a/web/src/store/canvasStore.ts
++++ b/web/src/store/canvasStore.ts
+@@ -37,6 +37,9 @@ interface CanvasState {
+   snapshot: CanvasSnapshot | null;
+   /* dialog */
+   openId: string | null;
++  /** openDeliverable(id, tab)로 지정된 초기 탭 — 예: Release 이력 페이지의 Comments 칸
++   * 클릭이 ArtifactSlide를 Comments 탭으로 바로 열게 한다. */
++  openInitialTab: 'overview' | 'recipients' | 'comments' | null;
+   noteDlg: string | null;
+   addDlg: boolean;
+   /**
+@@ -94,7 +97,7 @@ interface CanvasState {
+   setLinkPos: (p: { x: number; y: number } | null) => void;
+   flash: (bnd: number | null) => void;
+ 
+-  openDeliverable: (id: string | null) => void;
++  openDeliverable: (id: string | null, tab?: 'overview' | 'recipients' | 'comments') => void;
+   setNoteDlg: (id: string | null) => void;
+   setAddDlg: (v: boolean, intent?: CanvasState['addDlgIntent']) => void;
+   setPhInfo: (id: string | null) => void;
+@@ -124,6 +127,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
+   flashBnd: null,
+   snapshot: null,
+   openId: null,
++  openInitialTab: null,
+   noteDlg: null,
+   addDlg: false,
+   addDlgIntent: 'own',
+@@ -198,7 +202,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
+   setLinkPos: (p) => set({ linkPos: p }),
+   flash: (bnd) => set({ flashBnd: bnd }),
+ 
+-  openDeliverable: (id) => set({ openId: id }),
++  openDeliverable: (id, tab) => set({ openId: id, openInitialTab: id ? (tab ?? null) : null }),
+   setNoteDlg: (id) => set({ noteDlg: id }),
+   setAddDlg: (v, intent) => set({ addDlg: v, addDlgIntent: intent ?? 'own' }),
+   setPhInfo: (id) => set({ phInfo: id }),
+-- 
+2.40.1.windows.1
+
