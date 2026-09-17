@@ -164,13 +164,19 @@ function GrantList({
 
   return (
     <Box>
-      <Box sx={{ fontSize: 11.5, fontWeight: 600, color: T.dm, mb: '7px' }}>{label}</Box>
-      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: '6px', mb: '9px' }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: '9px', mb: '9px' }}>
+        <Box sx={{ fontSize: 11.5, fontWeight: 600, color: T.dm }}>{label}</Box>
         {registrant && (
-          <Badge color={T.pr} bg={T.prSoft} borderColor={T.prLine}>{resolveUser(registrant).name} · registrant</Badge>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <UserAvatar user={resolveUser(registrant)} size={20} />
+            <Box sx={{ fontSize: 13.5, fontWeight: 700, color: T.tx }}>{resolveUser(registrant).name}</Box>
+            <Badge color={T.pr} bg={T.prSoft} borderColor={T.prLine}>OWNER</Badge>
+          </Box>
         )}
-        {grants.length === 0 && !registrant && (
-          <Box sx={{ fontSize: 12, color: T.dm2 }}>Nobody added yet.</Box>
+      </Box>
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: '6px', mb: '9px' }}>
+        {grants.length === 0 && (
+          <Box sx={{ fontSize: 12, color: T.dm2 }}>{registrant ? 'No additional editors yet.' : 'Nobody added yet.'}</Box>
         )}
         {grants.map((g) => (
           <Box

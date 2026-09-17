@@ -60,12 +60,13 @@ export default () => ({
   sirenBaseUrl: process.env.SIREN_BASE_URL || 'http://localhost:3000/api/v1',
   /**
    * 위 호출에 실어 보내는 Bearer 토큰 — SIREN의 `HubTokenGuard`가 Calypso의 등록
-   * 문서(`isBuiltIn:true`, seed-data.ts의 DEV_CALYPSO_EVENT_TOKEN)와 대조한다. 원래
-   * Calypso→SIREN version 이벤트용으로 마련해 둔 `CALYPSO_EVENT_TOKEN`을 그대로
-   * 재사용한다 — 아직 그 이벤트를 실제로 보내는 코드는 없지만 값 자체는 이미 문서화돼
-   * 있다.
+   * 문서(`isBuiltIn:true`)의 token과 대조한다. 개발/목업 시드(api/src/database/seed-data.ts)는
+   * 이 문서의 token을 `DEV_CALYPSO_EVENT_TOKEN`('mock-token-calypso')으로 고정해 두므로,
+   * 여기서도 같은 값을 기본값으로 쓴다 — 그래야 env를 안 맞춰도 로컬/목업 환경에서 바로
+   * 맞물린다(seed-data.ts에 이미 그렇게 문서화돼 있었다). 운영 배포에서는 반드시
+   * CALYPSO_EVENT_TOKEN을 실제 발급받은 값으로 덮어써야 한다.
    */
-  calypsoEventToken: process.env.CALYPSO_EVENT_TOKEN || '',
+  calypsoEventToken: process.env.CALYPSO_EVENT_TOKEN || 'mock-token-calypso',
   /** S3 호환 오브젝트 스토리지 (SFM_API files.service.ts와 동일한 키 구성). */
   storage: {
     uri: process.env.S3_URI ?? '',

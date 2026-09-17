@@ -496,6 +496,34 @@ export class CalypsoClientService {
     }
   }
 
+  /** network를 언제든 바꿀 수 있게 한다(사용자 요청) — edit 권한자만. */
+  async setNetwork(
+    externalArtifactId: string,
+    kind: 'file' | 'oa' | 'hpc',
+    knoxId: string,
+    departments: string[],
+    isAdmin: boolean,
+  ): Promise<{ status: number; body: any } | null> {
+    if (!this.baseUrl) return null;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    try {
+      const res = await fetch(`${this.baseUrl}/artifacts/${encodeURIComponent(externalArtifactId)}/network`, {
+        method: 'PATCH',
+        signal: controller.signal,
+        headers: { ...this.actorHeaders(knoxId, departments, isAdmin), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kind }),
+      });
+      const body = await res.json().catch(() => null);
+      return { status: res.status, body };
+    } catch (e) {
+      this.logger.warn(`Calypso setNetwork error for ${externalArtifactId} — ${(e as Error).message}`);
+      return null;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   /** editors 또는 viewGrants에 한 건 추가 — user/department 둘 다 받는다. */
   async addGrant(
     externalArtifactId: string,

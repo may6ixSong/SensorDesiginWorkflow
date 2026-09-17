@@ -30,6 +30,7 @@ import {
   GrantDto,
   ListArtifactsQuery,
   ReleaseDto,
+  SetNetworkDto,
   SetRestrictViewDto,
   toArtifactDto,
   toVersionView,
@@ -132,6 +133,13 @@ export class ArtifactsController {
   @Patch(':id/restrict-view')
   async setRestrictView(@Param('id') id: string, @Body() dto: SetRestrictViewDto, @CurrentActor() me: Actor) {
     const a = await this.artifacts.setRestrictView(id, dto.restrictView, me);
+    return { data: toArtifactDto(a, 'edit') };
+  }
+
+  /** network를 언제든 바꿀 수 있게 한다(사용자 요청) — edit 권한자만. */
+  @Patch(':id/network')
+  async setNetwork(@Param('id') id: string, @Body() dto: SetNetworkDto, @CurrentActor() me: Actor) {
+    const a = await this.artifacts.setNetwork(id, dto.kind, me);
     return { data: toArtifactDto(a, 'edit') };
   }
 

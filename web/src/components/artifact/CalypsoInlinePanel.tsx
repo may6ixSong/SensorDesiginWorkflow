@@ -3,6 +3,7 @@ import { Box } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   CalypsoVersionView, addCalypsoVersion, downloadCalypsoVersion, getCalypsoArtifact, releaseCalypsoArtifact,
+  setCalypsoNetwork,
 } from '@/api/calypsoClient';
 import { queryKeys } from '@/api/queryKeys';
 import { ReleaseDto } from '@/types/domain';
@@ -15,6 +16,7 @@ import { ArtifactVersionContents } from './ArtifactVersionContents';
 import { ArtifactVersionTree } from './ArtifactVersionTree';
 import { AddVersionDialog } from './AddVersionDialog';
 import { PublishVersionDialog } from './PublishVersionDialog';
+import { NetworkField } from './NetworkField';
 import { T } from '@/theme/tokens';
 
 interface Props {
@@ -73,6 +75,11 @@ export function CalypsoInlinePanel({ artifactId, projectId, blockId, releases, o
     onSuccess: () => { invalidate(); toast('Published'); setPublishing(null); },
     onError: (e: any) => toast(e?.response?.data?.message ?? 'Publish failed'),
   });
+  const network = useMutation({
+    mutationFn: (kind: 'file' | 'oa' | 'hpc') => setCalypsoNetwork(artifactId, projectId, kind),
+    onSuccess: () => { invalidate(); toast('Network changed'); },
+    onError: (e: any) => toast(e?.response?.data?.message ?? 'Could not change network'),
+  });
   const handleDownload = async (v: CalypsoVersionView) => {
     try {
       const { blob, filename } = await downloadCalypsoVersion(artifactId, projectId, v.versionRef);
@@ -110,6 +117,7 @@ export function CalypsoInlinePanel({ artifactId, projectId, blockId, releases, o
       </Box>
 
       <Box sx={{ flex: 1, minWidth: 0 }}>
+        <NetworkField a={a} canEdit={canEdit} changing={network.isPending} onChange={(kind) => network.mutate(kind)} />
         <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', mb: '10px' }}>
           <Ey sx={{ flex: 1, mb: 0 }}>Version history</Ey>
           {canEdit && (

@@ -49,6 +49,17 @@ export class SetRestrictViewDto {
   restrictView: boolean;
 }
 
+/**
+ * PATCH /artifacts/:id/network 몸체 — FE의 ContentKind('file'|'oa'|'hpc')와 같은 값을
+ * 그대로 쓴다. 원래는 첫 버전 추가 시점에 한 번 정해지면 안 바뀌는 값이었지만, 언제든
+ * admin/editor가 바꿀 수 있게 열어 달라는 사용자 요청에 따라 이 라우트를 새로 열었다 —
+ * 이미 있는 버전들의 콘텐츠(files/viewUrl/hpcPath)는 그대로 두고 표시 방식만 바뀐다.
+ */
+export class SetNetworkDto {
+  @IsIn(['file', 'oa', 'hpc'])
+  kind: 'file' | 'oa' | 'hpc';
+}
+
 export class ListArtifactsQuery {
   @IsOptional()
   @IsString()

@@ -24,7 +24,8 @@ import { canAccessProject, myDepartments } from '../common/access';
 import { Project, ProjectDocument } from '../projects/schemas/project.schema';
 import { CalypsoClientService } from './calypso-client.service';
 import {
-  CalypsoAddVersionDto, CalypsoGrantDto, CalypsoReleaseDto, CreateCalypsoArtifactDto, SetCalypsoRestrictViewDto,
+  CalypsoAddVersionDto, CalypsoGrantDto, CalypsoReleaseDto, CreateCalypsoArtifactDto,
+  SetCalypsoNetworkDto, SetCalypsoRestrictViewDto,
 } from './dto/calypso-proxy.dto';
 
 /**
@@ -246,6 +247,19 @@ export class CalypsoProxyController {
   ) {
     const { departments, isAdmin } = await this.resolveContext(projectId, me);
     const result = await this.calypso.setRestrictView(id, dto.restrictView, me.knoxId, departments, isAdmin);
+    return this.relay(result);
+  }
+
+  /** network를 언제든 바꿀 수 있게 한다(사용자 요청) — edit 권한자만. */
+  @Patch(':id/network')
+  async setNetwork(
+    @Param('id') id: string,
+    @Query('projectId') projectId: string,
+    @Body() dto: SetCalypsoNetworkDto,
+    @CurrentActor() me: Actor,
+  ) {
+    const { departments, isAdmin } = await this.resolveContext(projectId, me);
+    const result = await this.calypso.setNetwork(id, dto.kind, me.knoxId, departments, isAdmin);
     return this.relay(result);
   }
 }

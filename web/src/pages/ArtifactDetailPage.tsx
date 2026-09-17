@@ -8,14 +8,14 @@ import { ArtifactVersionContents } from '@/components/artifact/ArtifactVersionCo
 import { ArtifactAccessPanel } from '@/components/artifact/ArtifactAccessPanel';
 import { AddVersionDialog } from '@/components/artifact/AddVersionDialog';
 import { PublishVersionDialog } from '@/components/artifact/PublishVersionDialog';
+import { NetworkField } from '@/components/artifact/NetworkField';
 import { Badge, SirenButton } from '@/components/common/SirenButton';
 import { Icon } from '@/components/common/Icon';
-import { useAuth } from '@/app/providers/AuthProvider';
 import { queryKeys } from '@/api/queryKeys';
 import {
   CalypsoGrantInput, CalypsoVersionView, addCalypsoEditor, addCalypsoVersion, addCalypsoViewGrant,
   downloadCalypsoVersion, getCalypsoArtifact, releaseCalypsoArtifact,
-  removeCalypsoEditor, removeCalypsoViewGrant, setCalypsoRestrictView,
+  removeCalypsoEditor, removeCalypsoViewGrant, setCalypsoNetwork, setCalypsoRestrictView,
 } from '@/api/calypsoClient';
 import { toast } from '@/store/toastStore';
 import { T } from '@/theme/tokens';
@@ -23,7 +23,6 @@ import { T } from '@/theme/tokens';
 /** A(내용+업로드):B(버전 트리) = 3:1 — workflow 쪽 상세 패널과 같은 비율(사용자 요청). */
 export function ArtifactDetailPage() {
   const { id = '', projectId = '' } = useParams();
-  const { user } = useAuth();
   const qc = useQueryClient();
   const [picked, setPicked] = useState<CalypsoVersionView | null>(null);
   const [addOpen, setAddOpen] = useState(false);
@@ -88,6 +87,11 @@ export function ArtifactDetailPage() {
     onSuccess: invalidate,
     onError: (e: any) => toast(e?.response?.data?.message ?? 'Could not change view access'),
   });
+  const network = useMutation({
+    mutationFn: (kind: 'file' | 'oa' | 'hpc') => setCalypsoNetwork(id, projectId, kind),
+    onSuccess: () => { invalidate(); toast('Network changed'); },
+    onError: (e: any) => toast(e?.response?.data?.message ?? 'Could not change network'),
+  });
 
   const handleDownload = async (v: CalypsoVersionView) => {
     try {
@@ -149,9 +153,6 @@ export function ArtifactDetailPage() {
           <Box sx={{ display: 'flex', alignItems: 'center', gap: '10px', mt: '4px' }}>
             <Box sx={{ fontSize: 18, fontWeight: 700, letterSpacing: '-.01em' }}>{a.name}</Box>
             <Badge color={T.dm} bg={T.sf2} borderColor={T.ln}>{a.department}</Badge>
-            {a.createdBy === user?.KnoxID && (
-              <Badge color={T.pr} bg={T.prSoft} borderColor={T.prLine}>You registered this</Badge>
-            )}
             {a.myAccess === 'view' && <Badge color={T.dm} bg={T.sf2} borderColor={T.ln}>View only</Badge>}
           </Box>
         </Box>
@@ -162,6 +163,12 @@ export function ArtifactDetailPage() {
           </Box>
           <Box sx={{ flex: 1, minWidth: 320, background: T.sf2, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <Box>
+              <NetworkField
+                a={a}
+                canEdit={a.myAccess === 'edit'}
+                changing={network.isPending}
+                onChange={(kind) => network.mutate(kind)}
+              />
               <Box sx={{ display: 'flex', alignItems: 'center', gap: '10px', mb: '10px' }}>
                 <Box sx={{ fontSize: 12.5, fontWeight: 700, flex: 1 }}>Version history</Box>
                 {a.myAccess === 'edit' && (

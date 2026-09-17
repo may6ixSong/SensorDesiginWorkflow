@@ -44,6 +44,12 @@ export class SetCalypsoRestrictViewDto {
   restrictView: boolean;
 }
 
+/** PATCH /calypso-artifacts/:id/network 몸체 — FE의 ContentKind와 같은 값. */
+export class SetCalypsoNetworkDto {
+  @IsIn(['file', 'oa', 'hpc'])
+  kind: 'file' | 'oa' | 'hpc';
+}
+
 export class CalypsoAddVersionDto {
   /** 짧은 한 줄 메모 — 필수(사용자 요청). */
   @IsString()

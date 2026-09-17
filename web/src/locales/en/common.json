@@ -133,7 +133,11 @@
     "intentDeliverable": "Deliverable",
     "intentDeliverableTooltip": "Deliverable: this workflow provides this artifact to others downstream.",
     "intentPrerequisite": "Prerequisite",
-    "intentPrerequisiteTooltip": "Prerequisite: this workflow receives this artifact from elsewhere before it can proceed."
+    "intentPrerequisiteTooltip": "Prerequisite: this workflow receives this artifact from elsewhere before it can proceed.",
+    "networkChangeTitle": "Change network",
+    "networkChangeMessage": "Changing the network changes what this artifact's version screen looks like (File vs. Link vs. Path).",
+    "networkChangeWarning": "Existing versions keep their old content — only versions added after this change will use the new network.",
+    "networkChangeConfirm": "Change network"
   },
   "release": {
     "title": "Release",

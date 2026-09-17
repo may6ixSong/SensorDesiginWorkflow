@@ -53,7 +53,8 @@ export interface CalypsoArtifact {
   department: string;
   name: string;
   description: string;
-  /** null(File) | 'OA' | 'HPC' — 등록 시 한 번 정해지면 바뀌지 않는다(설계서 04장 §2). */
+  /** null(File) | 'OA' | 'HPC' — 언제든 edit 권한자가 바꿀 수 있다(사용자 요청,
+   * `setCalypsoNetwork`). 기존 버전들의 콘텐츠는 그대로 남는다. */
   network: 'OA' | 'HPC' | null;
   createdBy: string;
   /** 'edit'이면 업로드/릴리스/권한관리 가능, 'view'면 released 버전만 열람. */
@@ -84,7 +85,7 @@ export async function getCalypsoArtifact(id: string, projectId: string): Promise
 }
 
 export async function createCalypsoArtifact(input: {
-  projectId: string; department: string; name: string; description?: string;
+  projectId: string; department: string; name: string; description?: string; network?: 'OA' | 'HPC';
 }): Promise<CalypsoArtifact> {
   const { data } = await apiClient.post<ApiEnvelope<CalypsoArtifact>>('/calypso-artifacts', input);
   return data.data;
@@ -197,6 +198,18 @@ export async function getCalypsoDepartmentRoster(projectId: string): Promise<Cal
 export async function setCalypsoRestrictView(id: string, projectId: string, restrictView: boolean): Promise<CalypsoArtifact> {
   const { data } = await apiClient.patch<ApiEnvelope<CalypsoArtifact>>(
     `/calypso-artifacts/${id}/restrict-view`, { restrictView }, { params: { projectId } },
+  );
+  return data.data;
+}
+
+/**
+ * network를 언제든 바꿀 수 있게 한다(사용자 요청) — `kind`는 AddVersionDialog의
+ * ContentKind와 같은 값('file'|'oa'|'hpc'). 기존 버전들의 콘텐츠는 그대로 둔다 —
+ * 호출부가 변경 전에 그 영향을 경고한다.
+ */
+export async function setCalypsoNetwork(id: string, projectId: string, kind: 'file' | 'oa' | 'hpc'): Promise<CalypsoArtifact> {
+  const { data } = await apiClient.patch<ApiEnvelope<CalypsoArtifact>>(
+    `/calypso-artifacts/${id}/network`, { kind }, { params: { projectId } },
   );
   return data.data;
 }

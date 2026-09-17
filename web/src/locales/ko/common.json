@@ -133,7 +133,11 @@
     "intentDeliverable": "Deliverable",
     "intentDeliverableTooltip": "Deliverable(산출물 제공): 이 workflow가 다른 곳에 전달하는 산출물입니다.",
     "intentPrerequisite": "Prerequisite",
-    "intentPrerequisiteTooltip": "Prerequisite(선행 산출물): 이 workflow가 진행하기 전에 다른 곳으로부터 받아야 하는 산출물입니다."
+    "intentPrerequisiteTooltip": "Prerequisite(선행 산출물): 이 workflow가 진행하기 전에 다른 곳으로부터 받아야 하는 산출물입니다.",
+    "networkChangeTitle": "Network 변경",
+    "networkChangeMessage": "Network를 변경하면 이 artifact의 버전 화면 구성이 달라집니다(파일 / 링크 / 경로).",
+    "networkChangeWarning": "기존 버전은 이전 내용을 그대로 유지합니다 — 새 network는 이 변경 이후 추가되는 버전부터 적용됩니다.",
+    "networkChangeConfirm": "Network 변경"
   },
   "release": {
     "title": "Release",

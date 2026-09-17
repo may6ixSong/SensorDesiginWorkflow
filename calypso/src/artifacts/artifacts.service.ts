@@ -107,6 +107,21 @@ export class ArtifactsService {
     return a;
   }
 
+  /**
+   * network를 언제든 바꿀 수 있게 한다(사용자 요청) — 원래는 첫 버전에서 한 번 정해지면
+   * 고정이었지만, admin/editor가 필요하면 다시 고를 수 있어야 한다는 결정에 따라
+   * 잠금을 풀었다. 이미 있는 버전들의 콘텐츠(files/viewUrl/hpcPath)는 그대로 둔다 —
+   * 화면이 그중 새 network에 맞는 필드만 보여주는 것뿐이고, FE가 변경 전에 그 영향을
+   * 경고한다.
+   */
+  async setNetwork(id: string, kind: 'file' | 'oa' | 'hpc', actor: Actor) {
+    const a = await this.findOrThrow(id);
+    this.assertCanEdit(a, actor);
+    a.network = kind === 'file' ? null : kind === 'oa' ? 'OA' : 'HPC';
+    await a.save();
+    return a;
+  }
+
   private assertCanEdit(a: ArtifactDocument, actor: Actor): void {
     if (this.computeAccess(a, actor) !== 'edit') {
       throw new ForbiddenException('You do not have edit access to this artifact.');
