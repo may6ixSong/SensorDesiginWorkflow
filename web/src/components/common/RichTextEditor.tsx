@@ -10,6 +10,9 @@ interface Props {
   onChange: (html: string) => void;
   placeholder?: string;
   minHeight?: number;
+  /** 주면 그 높이에서 더 안 늘어나고 내부 스크롤이 생긴다(사용자 요청 — 다이얼로그
+   * 자체가 계속 커지지 않게). 안 주면 예전처럼 내용에 따라 계속 늘어난다. */
+  maxHeight?: number;
 }
 
 /**
@@ -19,7 +22,7 @@ interface Props {
  * Tiptap의 정해진 스키마 밖으로는 못 나가지만, 그 note가 나중에 다른 경로(API 직접
  * 호출 등)로 바뀔 수도 있으니 신뢰는 항상 렌더링 쪽에서 확인한다.
  */
-export function RichTextEditor({ value, onChange, placeholder, minHeight = 140 }: Props) {
+export function RichTextEditor({ value, onChange, placeholder, minHeight = 140, maxHeight }: Props) {
   const editor = useEditor({
     extensions: [
       StarterKit.configure({ heading: false, codeBlock: false, blockquote: false }),
@@ -79,6 +82,7 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 140 }
       <Box
         sx={{
           padding: '10px 12px', fontSize: 13, fontFamily: FONT_SANS, color: T.tx, lineHeight: 1.6,
+          ...(maxHeight ? { maxHeight, overflowY: 'auto' } : {}),
           '& .ProseMirror': { outline: 'none' },
           '& .ProseMirror p.is-editor-empty:first-of-type::before': {
             content: 'attr(data-placeholder)', color: T.dm2, float: 'left', height: 0, pointerEvents: 'none',

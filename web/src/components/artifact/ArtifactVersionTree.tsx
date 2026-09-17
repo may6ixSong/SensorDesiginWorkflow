@@ -1,17 +1,10 @@
 import { Box } from '@mui/material';
-import DOMPurify from 'dompurify';
 import { CalypsoVersionView } from '@/api/calypsoClient';
 import { useDirectory } from '@/app/providers/DirectoryProvider';
 import { Badge, SirenButton } from '@/components/common/SirenButton';
 import { Icon } from '@/components/common/Icon';
 import { CURSOR_POINTER, FONT_MONO, R, T } from '@/theme/tokens';
 import { ReleaseBadge } from '@/lib/releaseBadge';
-
-/** 트리 행은 좁아서 서식까지 그대로 그리면 줄바꿈이 어긋난다 — 태그만 벗겨 한 줄
- * 미리보기로 쓴다(본문 서식은 표지 카드에서 그대로 보여준다). */
-function notePreview(html: string): string {
-  return DOMPurify.sanitize(html, { ALLOWED_TAGS: [] }).trim();
-}
 
 const RAIL_W = 44;
 const TRUNK_X = 11;
@@ -154,7 +147,7 @@ export function ArtifactVersionTree({
                   </Box>
                 )}
               </Box>
-              {notePreview(v.note) && (
+              {v.versionNote && (
                 <Box
                   sx={{
                     fontSize: 12, color: T.tx, mt: '5px', lineHeight: 1.5,
@@ -162,7 +155,7 @@ export function ArtifactVersionTree({
                     WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
                   }}
                 >
-                  {notePreview(v.note)}
+                  {v.versionNote}
                 </Box>
               )}
               <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', mt: '5px' }}>

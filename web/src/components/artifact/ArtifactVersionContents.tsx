@@ -5,7 +5,7 @@ import { useDirectory } from '@/app/providers/DirectoryProvider';
 import { UserAvatar } from '@/components/common/Avatar';
 import { SirenButton, Badge } from '@/components/common/SirenButton';
 import { isRichTextEmpty } from '@/components/common/RichTextEditor';
-import { Icon } from '@/components/common/Icon';
+import { FileTypeIcon, Icon } from '@/components/common/Icon';
 import { toast } from '@/store/toastStore';
 import { CURSOR_POINTER, FONT_DISPLAY, FONT_MONO, T } from '@/theme/tokens';
 
@@ -83,17 +83,29 @@ export function ArtifactVersionContents({ a, version: v, onDownload }: Props) {
                 </Box>
               </Box>
 
-              {!isRichTextEmpty(v.note) && (
+              {v.versionNote && (
                 <Box
-                  // note는 HTML로 저장된다(가벼운 서식 에디터, 사용자 요청) — 그대로 꽂기
-                  // 전에 반드시 sanitize한다. 이 화면 밖(예: 과거 API 직접 호출, 마이그레이션
-                  // 스크립트)에서 들어온 값일 수도 있어 "우리 에디터가 만들었으니 안전하다"는
-                  // 가정을 하지 않는다.
-                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(v.note) }}
                   sx={{
                     mt: '18px', padding: '13px 15px', borderRadius: '9px', background: T.sf2,
                     border: `1px solid ${T.ln}`, borderLeft: `3px solid ${accent}`,
-                    fontSize: 13, lineHeight: 1.75, color: T.tx,
+                    fontSize: 13, lineHeight: 1.6, color: T.tx,
+                  }}
+                >
+                  {v.versionNote}
+                </Box>
+              )}
+
+              {!isRichTextEmpty(v.description) && (
+                <Box
+                  // description은 HTML로 저장된다(가벼운 서식 에디터, 사용자 요청) — 그대로
+                  // 꽂기 전에 반드시 sanitize한다. 이 화면 밖(예: 과거 API 직접 호출,
+                  // 마이그레이션 스크립트)에서 들어온 값일 수도 있어 "우리 에디터가
+                  // 만들었으니 안전하다"는 가정을 하지 않는다.
+                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(v.description) }}
+                  sx={{
+                    mt: '10px', padding: '13px 15px', borderRadius: '9px', background: T.sf2,
+                    border: `1px solid ${T.ln}`,
+                    fontSize: 13, lineHeight: 1.75, color: T.tx2,
                     '& p': { margin: '0 0 6px 0' }, '& p:last-child': { mb: 0 },
                     '& ul, & ol': { paddingLeft: '20px', margin: '4px 0' },
                     '& a': { color: T.pr },
@@ -121,7 +133,7 @@ export function ArtifactVersionContents({ a, version: v, onDownload }: Props) {
                           padding: '9px 11px', wordBreak: 'break-all', mb: '6px',
                         }}
                       >
-                        <Icon name="word" size={14} />
+                        <FileTypeIcon fileName={f.fileName} size={14} />
                         {f.fileName}
                       </Box>
                     ))}

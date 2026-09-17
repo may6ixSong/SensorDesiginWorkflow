@@ -61,14 +61,15 @@ export function CalypsoInlinePanel({ artifactId, projectId, blockId, releases, o
   };
 
   const upload = useMutation({
-    mutationFn: ({ input, note }: { input: { files?: File[]; viewUrl?: string; hpcPath?: string }; note: string }) =>
-      addCalypsoVersion(artifactId, projectId, input, note),
+    mutationFn: ({ input, versionNote, description }: {
+      input: { files?: File[]; viewUrl?: string; hpcPath?: string }; versionNote: string; description: string;
+    }) => addCalypsoVersion(artifactId, projectId, input, versionNote, description),
     onSuccess: () => { invalidate(); toast('Version added'); },
     onError: (e: any) => toast(e?.response?.data?.message ?? 'Could not add version'),
   });
   const release = useMutation({
-    mutationFn: ({ note, sourceVersionRef }: { note: string; sourceVersionRef?: string }) =>
-      releaseCalypsoArtifact(artifactId, projectId, note, sourceVersionRef),
+    mutationFn: ({ versionNote, description, sourceVersionRef }: { versionNote: string; description: string; sourceVersionRef?: string }) =>
+      releaseCalypsoArtifact(artifactId, projectId, versionNote, description, sourceVersionRef),
     onSuccess: () => { invalidate(); toast('Published'); setPublishing(null); },
     onError: (e: any) => toast(e?.response?.data?.message ?? 'Publish failed'),
   });
@@ -131,7 +132,7 @@ export function CalypsoInlinePanel({ artifactId, projectId, blockId, releases, o
       {addOpen && (
         <AddVersionDialog
           a={a}
-          onSubmit={(input, note) => upload.mutate({ input, note })}
+          onSubmit={(input, versionNote, description) => upload.mutate({ input, versionNote, description })}
           submitting={upload.isPending}
           onClose={() => setAddOpen(false)}
         />
@@ -140,7 +141,7 @@ export function CalypsoInlinePanel({ artifactId, projectId, blockId, releases, o
         <PublishVersionDialog
           version={publishing}
           submitting={release.isPending}
-          onConfirm={(note) => release.mutate({ note, sourceVersionRef: publishing.versionRef })}
+          onConfirm={(versionNote, description) => release.mutate({ versionNote, description, sourceVersionRef: publishing.versionRef })}
           onClose={() => setPublishing(null)}
         />
       )}

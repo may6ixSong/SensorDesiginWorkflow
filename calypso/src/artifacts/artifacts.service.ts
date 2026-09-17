@@ -217,7 +217,8 @@ export class ArtifactsService {
       files?: { fileName: string; storageKey: string }[];
       viewUrl?: string | null;
       hpcPath?: string | null;
-      note?: string;
+      versionNote: string;
+      description?: string;
       dept?: string | null;
     },
     actor: Actor,
@@ -239,7 +240,8 @@ export class ArtifactsService {
       files: input.files ?? [],
       viewUrl: input.viewUrl ?? null,
       hpcPath: input.hpcPath ?? null,
-      note: input.note ?? '',
+      versionNote: input.versionNote,
+      description: input.description ?? '',
       createdBy: actor.knoxId,
       createdByDept: input.dept ?? null,
       createdAt: new Date(),
@@ -257,7 +259,13 @@ export class ArtifactsService {
    * 최신(a.versions[0])의 major+1이다 — release가 몇 번째 minor의 데이터를 썼는지와
    * 무관하게 버전 번호 자체는 계속 앞으로만 나간다.
    */
-  async release(id: string, note: string | undefined, actor: Actor, sourceVersionRef?: string) {
+  async release(
+    id: string,
+    versionNote: string,
+    description: string | undefined,
+    actor: Actor,
+    sourceVersionRef?: string,
+  ) {
     const a = await this.findOrThrow(id);
     this.assertCanEdit(a, actor);
     const latest = a.versions[0];
@@ -278,7 +286,8 @@ export class ArtifactsService {
       files: source.files,
       viewUrl: source.viewUrl,
       hpcPath: source.hpcPath,
-      note: note ?? '',
+      versionNote,
+      description: description ?? '',
       createdBy: actor.knoxId,
       createdByDept: source.createdByDept,
       createdAt: new Date(),

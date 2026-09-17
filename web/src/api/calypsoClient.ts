@@ -27,7 +27,10 @@ export interface CalypsoVersionView {
   viewUrl: string | null;
   /** network==='HPC'일 때만. */
   hpcPath: string | null;
-  note: string;
+  /** 짧은 한 줄 메모 — 필수, 서식 없는 텍스트. */
+  versionNote: string;
+  /** 서식 있는(HTML) 긴 설명 — 선택. 렌더링 전 반드시 sanitize한다. */
+  description: string;
   createdBy: string;
   createdAt: string;
 }
@@ -100,13 +103,15 @@ export async function addCalypsoVersion(
   id: string,
   projectId: string,
   input: { files?: File[]; viewUrl?: string; hpcPath?: string },
-  note: string,
+  versionNote: string,
+  description?: string,
 ): Promise<CalypsoArtifact> {
   const form = new FormData();
   (input.files ?? []).forEach((f) => form.append('files', f));
   if (input.viewUrl) form.append('viewUrl', input.viewUrl);
   if (input.hpcPath) form.append('hpcPath', input.hpcPath);
-  form.append('note', note);
+  form.append('versionNote', versionNote);
+  if (description) form.append('description', description);
   const { data } = await apiClient.post<ApiEnvelope<CalypsoArtifact>>(
     `/calypso-artifacts/${id}/versions`, form, { params: { projectId } },
   );
@@ -119,10 +124,10 @@ export async function addCalypsoVersion(
  * 골라 publish하는 경로(사용자 요청).
  */
 export async function releaseCalypsoArtifact(
-  id: string, projectId: string, note: string, sourceVersionRef?: string,
+  id: string, projectId: string, versionNote: string, description?: string, sourceVersionRef?: string,
 ): Promise<CalypsoArtifact> {
   const { data } = await apiClient.post<ApiEnvelope<CalypsoArtifact>>(
-    `/calypso-artifacts/${id}/release`, { note, sourceVersionRef }, { params: { projectId } },
+    `/calypso-artifacts/${id}/release`, { versionNote, description, sourceVersionRef }, { params: { projectId } },
   );
   return data.data;
 }

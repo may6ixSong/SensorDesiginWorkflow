@@ -65,9 +65,16 @@ export class ListArtifactsQuery {
 }
 
 export class AddVersionDto {
+  /** 짧은 한 줄 메모 — 필수(사용자 요청). */
+  @IsString()
+  @MinLength(1)
+  @MaxLength(200)
+  versionNote: string;
+
+  /** 서식 있는(HTML) 긴 설명 — 선택. */
   @IsOptional()
   @IsString()
-  note?: string;
+  description?: string;
 
   /** SIREN 공용 데이터에서 고른 내 부서. giver.dept로 그대로 전달된다. */
   @IsOptional()
@@ -86,9 +93,16 @@ export class AddVersionDto {
 }
 
 export class ReleaseDto {
+  /** 짧은 한 줄 메모 — 필수(사용자 요청, 새 버전 추가와 동일한 규칙). */
+  @IsString()
+  @MinLength(1)
+  @MaxLength(200)
+  versionNote: string;
+
+  /** 서식 있는(HTML) 긴 설명 — 선택. */
   @IsOptional()
   @IsString()
-  note?: string;
+  description?: string;
 
   /**
    * 어느 minor를 승격할지 — 비우면 지금까지처럼 최신 minor를 쓴다. Calypso는 minor를
@@ -163,7 +177,8 @@ export function toVersionView(v: ArtifactVersion) {
     files: (v.files ?? []).map((f) => ({ fileName: f.fileName, storageKey: f.storageKey })),
     viewUrl: v.viewUrl ?? null,
     hpcPath: v.hpcPath ?? null,
-    note: v.note ?? '',
+    versionNote: v.versionNote ?? '',
+    description: v.description ?? '',
     createdBy: v.createdBy,
     createdAt: v.createdAt instanceof Date ? v.createdAt.toISOString() : String(v.createdAt),
   };

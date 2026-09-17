@@ -171,13 +171,17 @@ export class ArtifactsController {
           return { fileName: file.originalname, storageKey };
         }),
       );
-      const saved = await this.artifacts.addVersion(id, { files: uploaded, note: dto.note, dept: dto.dept ?? null }, me);
+      const saved = await this.artifacts.addVersion(
+        id,
+        { files: uploaded, versionNote: dto.versionNote, description: dto.description, dept: dto.dept ?? null },
+        me,
+      );
       return { data: toArtifactDto(saved, 'edit') };
     }
 
     const saved = await this.artifacts.addVersion(
       id,
-      { viewUrl: dto.viewUrl, hpcPath: dto.hpcPath, note: dto.note, dept: dto.dept ?? null },
+      { viewUrl: dto.viewUrl, hpcPath: dto.hpcPath, versionNote: dto.versionNote, description: dto.description, dept: dto.dept ?? null },
       me,
     );
     return { data: toArtifactDto(saved, 'edit') };
@@ -185,7 +189,7 @@ export class ArtifactsController {
 
   @Post(':id/release')
   async release(@Param('id') id: string, @Body() dto: ReleaseDto, @CurrentActor() me: Actor) {
-    const a = await this.artifacts.release(id, dto.note, me, dto.sourceVersionRef);
+    const a = await this.artifacts.release(id, dto.versionNote, dto.description, me, dto.sourceVersionRef);
     return { data: toArtifactDto(a, 'edit') };
   }
 

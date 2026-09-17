@@ -7,7 +7,7 @@ export type IconName =
   | 'up' | 'dn' | 'send' | 'shield' | 'users' | 'trash' | 'note' | 'copy'
   | 'pan' | 'grid' | 'undo' | 'expand' | 'fit' | 'hist' | 'link' | 'search' | 'list'
   | 'sun' | 'moon' | 'globe' | 'book' | 'info' | 'warn' | 'flag' | 'bell' | 'calendar' | 'inbox'
-  | 'artifact' | 'unlinked';
+  | 'artifact' | 'unlinked' | 'pdf';
 
 const P: Record<IconName, { d: string; s: number }> = {
   word: { s: 14, d: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/>' },
@@ -58,6 +58,9 @@ const P: Record<IconName, { d: string; s: number }> = {
   // 다른 tier 아이콘들과 확실히 구분되게 표시한다(사용자 요청: C/D의 link 아이콘과
   // 헷갈린다는 지적).
   unlinked: { s: 14, d: '<rect x="3" y="3" width="18" height="18" rx="3" stroke-dasharray="4 3.2"/>' },
+  // 파일 목록에서 확장자별로 구분해 쓴다(fileIconNameFor) — word와 같은 페이지 모양에
+  // 아래쪽 태그 박스를 더해 pdf임을 표시한다.
+  pdf: { s: 14, d: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><rect x="7" y="13" width="10" height="5" rx="1"/>' },
 };
 
 export function Icon({ name, size }: { name: IconName; size?: number }) {
@@ -83,6 +86,19 @@ export function Icon({ name, size }: { name: IconName; size?: number }) {
 export function DocIcon({ type, size }: { type: string; size?: number }) {
   const name: IconName = type === 'excel' ? 'excel' : type === 'path' ? 'path' : 'word';
   return <Icon name={name} size={size} />;
+}
+
+/** 파일명 확장자로 아이콘을 고른다 — pdf/xlsx·csv/docx만 구분하고 나머지는 일반
+ * 문서 아이콘(word)으로 폴백한다(사용자 요청). */
+export function fileIconNameFor(fileName: string): IconName {
+  const ext = fileName.split('.').pop()?.toLowerCase() ?? '';
+  if (ext === 'pdf') return 'pdf';
+  if (ext === 'xlsx' || ext === 'xls' || ext === 'csv') return 'excel';
+  return 'word';
+}
+
+export function FileTypeIcon({ fileName, size }: { fileName: string; size?: number }) {
+  return <Icon name={fileIconNameFor(fileName)} size={size} />;
 }
 
 /** 상단바 SIREN 로고 (목업 .mark SVG 그대로, 색상만 테마 변수로) */

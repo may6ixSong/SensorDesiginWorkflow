@@ -60,8 +60,21 @@ export class ArtifactVersion {
   @Prop({ type: String, default: null })
   hpcPath: string | null;
 
+  /**
+   * 짧은 한 줄 메모 — 이 버전에서 뭐가 바뀌었는지, 필수(사용자 요청: 버전을 올리거나
+   * publish할 때 항상 적어야 한다). 서식 없는 일반 텍스트다 — 서식 있는 긴 설명은
+   * `description`으로 분리했다.
+   *
+   * ★ 예전에는 이 자리(그때 이름은 `note`)가 서식 있는 HTML이었다 — 그 값은 이제
+   *   `description`으로 옮겨간다(마이그레이션 필요, 앱 차원에서는 여기서 더 신경쓰지
+   *   않는다). 새 문서는 전부 이 필드를 쓴다.
+   */
   @Prop({ default: '' })
-  note: string;
+  versionNote: string;
+
+  /** 서식 있는(HTML) 긴 설명 — 선택. 렌더링하는 쪽이 반드시 sanitize해야 한다. */
+  @Prop({ default: '' })
+  description: string;
 
   /** 이 버전을 올린 사람의 KnoxID = giver (§4.1). */
   @Prop({ required: true, trim: true })

@@ -319,7 +319,8 @@ export class CalypsoClientService {
       files?: { buffer: Buffer; originalname: string; mimetype?: string }[];
       viewUrl?: string;
       hpcPath?: string;
-      note?: string;
+      versionNote: string;
+      description?: string;
     },
     knoxId: string,
     departments: string[],
@@ -337,7 +338,8 @@ export class CalypsoClientService {
           file.originalname,
         );
       }
-      if (input.note) form.append('note', input.note);
+      form.append('versionNote', input.versionNote);
+      if (input.description) form.append('description', input.description);
       if (input.viewUrl) form.append('viewUrl', input.viewUrl);
       if (input.hpcPath) form.append('hpcPath', input.hpcPath);
       const res = await fetch(`${this.baseUrl}/artifacts/${encodeURIComponent(externalArtifactId)}/versions`, {
@@ -409,7 +411,8 @@ export class CalypsoClientService {
 
   async release(
     externalArtifactId: string,
-    note: string | undefined,
+    versionNote: string,
+    description: string | undefined,
     knoxId: string,
     departments: string[],
     isAdmin: boolean,
@@ -423,7 +426,7 @@ export class CalypsoClientService {
         method: 'POST',
         signal: controller.signal,
         headers: { ...this.actorHeaders(knoxId, departments, isAdmin), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ note, sourceVersionRef }),
+        body: JSON.stringify({ versionNote, description, sourceVersionRef }),
       });
       const body = await res.json().catch(() => null);
       return { status: res.status, body };

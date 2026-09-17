@@ -45,9 +45,16 @@ export class SetCalypsoRestrictViewDto {
 }
 
 export class CalypsoAddVersionDto {
+  /** 짧은 한 줄 메모 — 필수(사용자 요청). */
+  @IsString()
+  @MinLength(1)
+  @MaxLength(200)
+  versionNote: string;
+
+  /** 서식 있는(HTML) 긴 설명 — 선택. */
   @IsOptional()
   @IsString()
-  note?: string;
+  description?: string;
 
   /** network==='OA'인 artifact에만. */
   @IsOptional()
@@ -61,9 +68,16 @@ export class CalypsoAddVersionDto {
 }
 
 export class CalypsoReleaseDto {
+  /** 짧은 한 줄 메모 — 필수(사용자 요청, 새 버전 추가와 동일한 규칙). */
+  @IsString()
+  @MinLength(1)
+  @MaxLength(200)
+  versionNote: string;
+
+  /** 서식 있는(HTML) 긴 설명 — 선택. */
   @IsOptional()
   @IsString()
-  note?: string;
+  description?: string;
 
   /** 어느 minor를 승격할지 — 비우면 최신 minor. version tree에서 과거 작업본을 골라 publish할 때 쓴다. */
   @IsOptional()

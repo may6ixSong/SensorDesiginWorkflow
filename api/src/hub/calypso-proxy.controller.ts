@@ -133,7 +133,7 @@ export class CalypsoProxyController {
     const { departments, isAdmin } = await this.resolveContext(projectId, me);
     const result = await this.calypso.uploadVersion(
       id,
-      { files, viewUrl: dto.viewUrl, hpcPath: dto.hpcPath, note: dto.note },
+      { files, viewUrl: dto.viewUrl, hpcPath: dto.hpcPath, versionNote: dto.versionNote, description: dto.description },
       me.knoxId,
       departments,
       isAdmin,
@@ -171,7 +171,9 @@ export class CalypsoProxyController {
     @CurrentActor() me: Actor,
   ) {
     const { departments, isAdmin } = await this.resolveContext(projectId, me);
-    const result = await this.calypso.release(id, dto.note, me.knoxId, departments, isAdmin, dto.sourceVersionRef);
+    const result = await this.calypso.release(
+      id, dto.versionNote, dto.description, me.knoxId, departments, isAdmin, dto.sourceVersionRef,
+    );
     return this.relay(result);
   }
 
