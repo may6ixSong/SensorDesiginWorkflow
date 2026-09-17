@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Box, CircularProgress } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { LiveCandidateRow, useAllLiveCandidates, useArtifactServices } from '@/api/hooks/useHub';
+import { useArtifactCandidates, useArtifactServices } from '@/api/hooks/useHub';
 import { CalypsoArtifact, createCalypsoArtifact, listCalypsoArtifacts } from '@/api/calypsoClient';
 import { queryKeys } from '@/api/queryKeys';
 import { ArtifactIntent } from '@/types/domain';
@@ -58,52 +58,103 @@ const radioSx = (sel: boolean) => ({
 });
 
 /**
- * OA/HPC Service 후보 한 줄 — File Artifacts(Calypso) 행과 완전히 같은 자리에, 같은
- * 모양으로 선다(사용자 요청: 서비스별로 접어두지 말고 처음부터 하나의 목록으로 섞어
- * 보여줄 것). 큰 글자는 **그 artifact 자신의 이름**이고(서비스 이름이 아니다), 서비스
- * 이름은 부제목으로만 작게 붙는다.
+ * admin이 Service Manage에서 등록한 artifact 종류 하나(예: "RPM" 서비스 아래의
+ * "Readout Pattern") — 목록에 뜨는 큰 글자는 **이 등록된 종류 이름**이지, 서비스 자신의
+ * 이름이 아니다(사용자 지적: "service명: RPM, artifact명: Readout Pattern이면 Readout
+ * Pattern으로 보이게 하라"). 이 이름은 이미 로컬에 있는 값이라 목록을 그릴 때 서버를
+ * 부르지 않는다 — **이 행을 클릭했을 때 그제서야** 그 서비스의 실시간 후보를
+ * 조회한다(설계서 04장 §6.3 2단계) — project/code/revision으로 즉시 다 긁어와 펼치는
+ * 방식은 사용자가 명시적으로 반려했다.
  */
-function LiveCandidateItemRow({
-  candidate, selectedId, onPick,
+function ArtifactTypeRow({
+  workflowId, source, intent, serviceKey, typeName, expanded, onToggle, selectedId, onPick,
 }: {
-  candidate: LiveCandidateRow;
-  selectedId: string;
-  onPick: (id: string, name: string) => void;
+  workflowId: string; source: 'live' | 'hpc'; intent: ArtifactIntent; serviceKey: string; typeName: string;
+  expanded: boolean; onToggle: () => void; selectedId: string; onPick: (id: string, name: string) => void;
 }) {
-  const c = candidate;
-  const sel = selectedId === c.externalArtifactId;
+  const { data: result, isLoading } = useArtifactCandidates(workflowId, source, intent, serviceKey, expanded);
   return (
-    <Box onClick={() => { if (c.pickable) onPick(c.externalArtifactId, c.name); }} sx={rowSx(sel, c.pickable)}>
-      <Box sx={radioSx(sel)} />
-      <Box sx={{ flex: 1, minWidth: 0 }}>
-        <Box sx={{ fontSize: 12.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {c.name}
+    <Box sx={{ border: `1px solid ${T.ln}`, borderRadius: '8px', overflow: 'hidden' }}>
+      <Box
+        onClick={onToggle}
+        sx={{
+          display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px',
+          cursor: CURSOR_POINTER, background: expanded ? T.sf2 : T.sf,
+          '&:hover': { background: T.sf2 },
+        }}
+      >
+        <Icon name={expanded ? 'up' : 'dn'} size={11} />
+        <Box sx={{ flex: 1, fontSize: 12.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {typeName}
         </Box>
-        <Box sx={{ fontFamily: FONT_MONO, fontSize: 10, color: T.dm2, mt: '2px' }}>
-          {c.serviceName}{c.currentVersionLabel ? ` · ${c.currentVersionLabel}` : ''}
+        <NetworkChip network={source === 'hpc' ? 'HPC' : 'OA'} />
+        <ServiceChip source={source} />
+      </Box>
+      {expanded && (
+        <Box sx={{ padding: '8px 10px', borderTop: `1px solid ${T.ln}`, display: 'flex', flexDirection: 'column', gap: '5px' }}>
+          {isLoading ? (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 12, color: T.dm2 }}>
+              <CircularProgress size={13} /> Loading artifacts…
+            </Box>
+          ) : !result?.supported ? (
+            <Box sx={{ fontSize: 11.5, color: T.dm, lineHeight: 1.6 }}>
+              {result?.note ?? "This service doesn't support browsing artifacts within a project."}
+            </Box>
+          ) : !result.candidates.length ? (
+            <Box sx={{ fontSize: 11.5, color: T.dm }}>No artifacts found in that project.</Box>
+          ) : (
+            result.candidates.map((c) => {
+              const sel = selectedId === c.externalArtifactId;
+              return (
+                <Box
+                  key={c.externalArtifactId}
+                  onClick={() => { if (c.pickable) onPick(c.externalArtifactId, c.name); }}
+                  sx={rowSx(sel, c.pickable)}
+                >
+                  <Box sx={radioSx(sel)} />
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Box sx={{ fontSize: 12.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {c.name}
+                    </Box>
+                    {c.currentVersionLabel && (
+                      <Box sx={{ fontFamily: FONT_MONO, fontSize: 10, color: T.dm2, mt: '2px' }}>{c.currentVersionLabel}</Box>
+                    )}
+                    {!c.pickable && (
+                      <Box sx={{ fontSize: 10.5, color: T.dm2, mt: '2px' }}>
+                        {c.level === 'view' ? 'view only — needs edit access to give this' : 'no access'}
+                      </Box>
+                    )}
+                  </Box>
+                  <EditChip level={c.level} />
+                </Box>
+              );
+            })
+          )}
         </Box>
-        {!c.pickable && (
-          <Box sx={{ fontSize: 10.5, color: T.dm2, mt: '2px' }}>
-            {c.level === 'view' ? 'view only — needs edit access to give this' : 'no access'}
-          </Box>
-        )}
-      </Box>
-      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', flex: '0 0 auto' }}>
-        <EditChip level={c.level} />
-        <NetworkChip network={c.source === 'hpc' ? 'HPC' : 'OA'} />
-        <ServiceChip source={c.source} />
-      </Box>
+      )}
     </Box>
   );
 }
 
+interface ArtifactTypeEntry {
+  serviceKey: string;
+  source: 'live' | 'hpc';
+  typeKey: string;
+  typeName: string;
+}
+
+const typeRowKey = (e: ArtifactTypeEntry) => `${e.serviceKey}::${e.typeKey}`;
+
 /**
  * "새 Artifact 추가"와 "산출물 변경" 양쪽이 공유하는 소스 선택 UI(설계서 04장 §6) —
- * admin이 등록한 OA/HPC Service와 Calypso(File Artifacts) 산출물을 **처음부터 하나의
- * 평평한 목록**으로 섞어 보여준다(사용자 요청 — 예전에는 서비스 행을 펼쳐야만, 또는
- * 검색을 해야만 OA/HPC 후보가 보였다). 각 줄의 큰 글자는 **그 artifact 자신의 이름**이고
- * (서비스 이름이 아니다), 어느 서비스에서 왔는지는 작은 부제목으로만 붙는다. Tier
- * 글자는 절대 노출하지 않는다.
+ * admin이 등록한 OA/HPC Service와 Calypso(File Artifacts) 산출물을 하나의 목록으로
+ * 섞어 보여준다. 각 줄의 큰 글자는 **Service Manage에서 admin이 등록한 artifact 종류
+ * 이름**이다(예: 서비스명 "RPM"에 등록한 artifact명 "Readout Pattern"이면 "Readout
+ * Pattern"으로 뜬다) — 이 값은 이미 로컬에 다 있어서 목록을 그릴 때 서버를 부르지
+ * 않는다. 그 줄을 클릭해 펼쳐야 **그제서야** 그 서비스의 실시간 후보를 조회한다(§6.3
+ * 2단계) — 목록을 열자마자 모든 서비스에 실제 project/code/revision 검색을 날려
+ * 매칭되는 인스턴스를 전부 평평하게 보여주던 방식은 사용자가 반려했다. Tier 글자는
+ * 절대 노출하지 않는다.
  *
  * ★ Tier D(External/Attested)는 폐기했다 — File Artifacts로 새로 등록하면서
  *   OA-link/HPC-path 콘텐츠를 고를 수 있어(등록 자체는 이 목록 맨 위 "새로 등록"에서
@@ -120,6 +171,8 @@ export function ArtifactSourcePicker({
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState('');
   const [newDept, setNewDept] = useState('');
+  const [expandedKeys, setExpandedKeys] = useState<Set<string>>(() => new Set());
+  const didInitialExpand = useRef(false);
 
   const { data: allServices, isLoading: loadingServices } = useArtifactServices();
   const { data: calypsoArtifacts, isLoading: loadingCalypso } = useQuery({
@@ -128,26 +181,57 @@ export function ArtifactSourcePicker({
     queryFn: () => listCalypsoArtifacts({ projectId: projectId as string }),
   });
 
-  // 검색은 각 후보 자신의 이름(+ Calypso는 부서, live는 서비스 이름)으로 건다 — 그래서
-  // services 자체는 여기서 미리 걸러내지 않는다(그러면 후보를 펼쳐볼 기회도 없이 서비스
-  // 행째로 사라진다). live 후보 각각의 필터링은 렌더링 시점에 한다.
   const term = query.trim().toLowerCase();
   const services = useMemo(
     () => (allServices ?? []).filter((s) => s.transport === 'http'),
     [allServices],
   );
-  const { candidates: liveCandidates, loadingKeys: liveLoadingKeys } = useAllLiveCandidates(workflowId, intent, services);
-  const filteredLiveCandidates = useMemo(
-    () => liveCandidates.filter(
-      (c) => !term || c.name.toLowerCase().includes(term) || c.serviceName.toLowerCase().includes(term),
-    ),
-    [liveCandidates, term],
+  // 서비스 하나가 여러 artifact 종류를 등록할 수 있으므로(설계서 07장 §3.1) 종류별로
+  // 따로 한 줄씩 뽑는다 — 종류가 하나도 등록 안 된(레거시) 서비스는 서비스 자신의
+  // 이름으로 종류 하나인 것처럼 취급한다(스키마 주석과 동일한 규칙).
+  const typeEntries = useMemo<ArtifactTypeEntry[]>(() => {
+    const out: ArtifactTypeEntry[] = [];
+    for (const s of services) {
+      const source: 'live' | 'hpc' = s.defaultTier === 'C' ? 'hpc' : 'live';
+      if (s.artifactTypes.length) {
+        for (const t of s.artifactTypes) out.push({ serviceKey: s.key, source, typeKey: t.key, typeName: t.name });
+      } else {
+        out.push({ serviceKey: s.key, source, typeKey: s.key, typeName: s.name });
+      }
+    }
+    return out;
+  }, [services]);
+  const filteredTypeEntries = useMemo(
+    () => typeEntries.filter((e) => !term || e.typeName.toLowerCase().includes(term)),
+    [typeEntries, term],
   );
   const calypsoList = useMemo(
     () => (calypsoArtifacts ?? [])
       .filter((a) => !term || `${a.name} ${a.department}`.toLowerCase().includes(term)),
     [calypsoArtifacts, term],
   );
+
+  // 이미 live/hpc 산출물을 골라 둔 상태로 열렸으면(산출물 변경 등) 그 서비스에 속한
+  // 종류 행을 펼쳐서 현재 선택을 바로 보여준다 — 딱 한 번만, 그 뒤로는 사용자가
+  // 직접 펼치고 접는 대로 둔다.
+  useEffect(() => {
+    if (didInitialExpand.current) return;
+    if (state.source !== 'live' && state.source !== 'hpc') return;
+    if (!state.serviceKey || !typeEntries.length) return;
+    const matches = typeEntries.filter((e) => e.serviceKey === state.serviceKey).map(typeRowKey);
+    if (matches.length) {
+      setExpandedKeys(new Set(matches));
+      didInitialExpand.current = true;
+    }
+  }, [typeEntries, state.source, state.serviceKey]);
+
+  const toggleExpanded = (key: string) => {
+    setExpandedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
 
   const needsDeptPicker = myDepartments.length !== 1;
   const fallbackDept = departmentOptions[0] ?? myDepartments[0] ?? '';
@@ -231,21 +315,27 @@ export function ArtifactSourcePicker({
         {/* OA/HPC Service 후보와 File Artifacts(Calypso)를 독립된 로딩으로 그린다 — 하나가
             느리거나 응답을 못 받아도(예: Calypso가 내려가 있음) 이미 도착한 다른 쪽까지
             같이 숨어버리면 안 된다(사용자가 실제로 겪은 문제 — 후자가 안 끝나서 전체가
-            계속 "Loading…"에 멈춰 있었다). live 쪽은 등록된 서비스 개수만큼 병렬로
-            받아오므로(useAllLiveCandidates) 서비스 목록 자체를 못 받아왔을 때와
-            그 후보들을 아직 받는 중일 때를 각각 보여준다. */}
+            계속 "Loading…"에 멈춰 있었다). 여기서 뜨는 건 등록된 artifact 종류 이름뿐이라
+            서비스 목록만 오면 바로 그릴 수 있다 — 실시간 후보 조회는 각 행을 펼칠 때
+            ArtifactTypeRow 안에서 개별적으로 일어난다. */}
         {loadingServices ? loadingRow('Loading services…') : (
-          <>
-            {filteredLiveCandidates.map((c) => (
-              <LiveCandidateItemRow
-                key={c.externalArtifactId}
-                candidate={c}
-                selectedId={state.source === c.source && state.serviceKey === c.serviceKey ? state.liveArtifactId : ''}
-                onPick={(id, name) => pickLive(c.serviceKey, c.source, id, name)}
+          filteredTypeEntries.map((e) => {
+            const key = typeRowKey(e);
+            return (
+              <ArtifactTypeRow
+                key={key}
+                workflowId={workflowId}
+                source={e.source}
+                intent={intent}
+                serviceKey={e.serviceKey}
+                typeName={e.typeName}
+                expanded={expandedKeys.has(key)}
+                onToggle={() => toggleExpanded(key)}
+                selectedId={state.source === e.source && state.serviceKey === e.serviceKey ? state.liveArtifactId : ''}
+                onPick={(id, name) => pickLive(e.serviceKey, e.source, id, name)}
               />
-            ))}
-            {liveLoadingKeys.length > 0 && loadingRow(`Loading ${liveLoadingKeys.join(', ')}…`)}
-          </>
+            );
+          })
         )}
 
         {loadingCalypso ? loadingRow('Loading file artifacts…') : calypsoList.map((a) => {
@@ -271,7 +361,7 @@ export function ArtifactSourcePicker({
           );
         })}
 
-        {!loadingServices && !loadingCalypso && !liveLoadingKeys.length && !filteredLiveCandidates.length && !calypsoList.length && (
+        {!loadingServices && !loadingCalypso && !filteredTypeEntries.length && !calypsoList.length && (
           <Box sx={{ fontSize: 11.5, color: T.dm, background: T.sf2, border: `1px solid ${T.ln}`, borderRadius: '8px', padding: '8px 10px', lineHeight: 1.6 }}>
             No match for that search.
           </Box>

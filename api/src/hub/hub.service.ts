@@ -151,8 +151,9 @@ export class HubService {
 
   /**
    * key는 생성 후 바꿀 수 없다 - 산출물이 그 값으로 서비스를 참조하므로, 이름이 바뀌어도
-   * key는 유지한다. tier/transport/artifactTypes도 여기서 바꾸지 않는다 — tier는 등록
-   * 시점에 고정, artifactTypes는 registerArtifactType() 재호출로만 늘어난다.
+   * key는 유지한다. tier/transport는 여기서 바꾸지 않는다 — 등록 시점에 고정된다.
+   * artifactTypes는 **이미 있는 항목의 name/description만** dto.artifactTypes(key로 매칭)로
+   * 고칠 수 있다 — 새 종류 추가는 registerArtifactType() 재호출로만 늘어난다.
    */
   async update(key: string, dto: UpdateServiceDto, actor: Actor) {
     assertAdmin(actor);
@@ -161,6 +162,16 @@ export class HubService {
     if (dto.description !== undefined) svc.description = dto.description.trim();
     if (dto.icon !== undefined) svc.icon = dto.icon.trim();
     if (dto.baseUrl !== undefined) svc.baseUrl = this.normalizeBaseUrl(dto.baseUrl);
+
+    if (dto.artifactTypes !== undefined) {
+      for (const entry of dto.artifactTypes) {
+        const type = svc.artifactTypes.find((t) => t.key === entry.key);
+        if (!type) continue;
+        type.name = entry.name.trim();
+        type.description = entry.description?.trim() || '';
+      }
+      svc.markModified('artifactTypes');
+    }
 
     if (dto.enabled !== undefined && dto.enabled !== svc.enabled) {
       if (dto.enabled === false) {

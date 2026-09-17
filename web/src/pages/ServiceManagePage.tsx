@@ -302,6 +302,8 @@ function EditServiceDialog({ service: s, onClose }: { service: HubService; onClo
   const [baseUrl, setBaseUrl] = useState(s.baseUrl ?? '');
   const [icon, setIcon] = useState(s.icon);
   const [nameErr, setNameErr] = useState(false);
+  const [types, setTypes] = useState(s.artifactTypes.map((t) => ({ key: t.key, name: t.name, description: t.description })));
+  const [typeErrKeys, setTypeErrKeys] = useState<string[]>([]);
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -310,6 +312,7 @@ function EditServiceDialog({ service: s, onClose }: { service: HubService; onClo
         description: description.trim(),
         baseUrl: baseUrl.trim(),
         icon,
+        artifactTypes: types.map((t) => ({ key: t.key, name: t.name.trim(), description: t.description.trim() })),
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['hub'] });
@@ -320,7 +323,11 @@ function EditServiceDialog({ service: s, onClose }: { service: HubService; onClo
   });
 
   const submit = () => {
-    if (!name.trim()) { setNameErr(true); return; }
+    let ok = true;
+    if (!name.trim()) { setNameErr(true); ok = false; }
+    const emptyKeys = types.filter((t) => !t.name.trim()).map((t) => t.key);
+    if (emptyKeys.length) { setTypeErrKeys(emptyKeys); ok = false; }
+    if (!ok) return;
     mutation.mutate();
   };
 
@@ -355,10 +362,31 @@ function EditServiceDialog({ service: s, onClose }: { service: HubService; onClo
       <Field label="BaseURL — that service's API base address">
         <TextInput value={baseUrl} onChange={setBaseUrl} placeholder="https://…" />
       </Field>
-      <Box sx={{ fontSize: 11, color: T.warn, lineHeight: 1.6, mb: '4px' }}>
+      <Box sx={{ fontSize: 11, color: T.warn, lineHeight: 1.6, mb: '14px' }}>
         Changing this takes effect immediately — every live call to this service (candidate lookups,
         access checks, html-view) starts hitting the new address right away.
       </Box>
+
+      {types.length > 0 && (
+        <Field label={`Artifact type${types.length === 1 ? '' : 's'} — name shown when picking an artifact source`}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {types.map((t, i) => (
+              <Box key={t.key} sx={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <TextInput
+                  value={t.name}
+                  onChange={(v) => {
+                    setTypes((prev) => prev.map((p, j) => (j === i ? { ...p, name: v } : p)));
+                    setTypeErrKeys((prev) => prev.filter((k) => k !== t.key));
+                  }}
+                  error={typeErrKeys.includes(t.key)}
+                  placeholder="e.g. Readout Pattern"
+                />
+                <Box sx={{ fontFamily: FONT_MONO, fontSize: 10, color: T.dm2 }}>{t.key}</Box>
+              </Box>
+            ))}
+          </Box>
+        </Field>
+      )}
     </ModalShell>
   );
 }

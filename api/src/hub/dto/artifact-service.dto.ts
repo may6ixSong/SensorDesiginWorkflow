@@ -1,4 +1,14 @@
-import { IsBoolean, IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  IsArray,
+  IsBoolean,
+  IsIn,
+  IsOptional,
+  IsString,
+  MaxLength,
+  MinLength,
+  ValidateNested,
+} from 'class-validator';
 import { ArtifactServiceDocument, Tier } from '../schemas/artifact-service.schema';
 
 /**
@@ -40,7 +50,28 @@ export class RegisterArtifactTypeDto {
   icon?: string;
 }
 
-/** key/token/tier/artifactTypes는 없다 — 불변이거나(key) 별도 경로로만 바뀐다(token=폐기·재발급, artifactTypes=registerArtifactType 재호출). */
+/** artifactTypes 항목 하나의 name/description만 고칠 때 쓴다 — key로 기존 항목을 찾아 맞춘다(새로 추가/삭제는 안 됨). */
+export class UpdateArtifactTypeEntryDto {
+  @IsString()
+  @MinLength(1)
+  key: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(80)
+  name: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(240)
+  description?: string;
+}
+
+/**
+ * key/token/tier는 없다 — 불변이거나 별도 경로로만 바뀐다(token=폐기·재발급). artifactTypes는
+ * **이미 있는 항목의 name/description만** 여기서 고칠 수 있다(key로 매칭) — 새 종류 추가는
+ * registerArtifactType 재호출로만 한다.
+ */
 export class UpdateServiceDto {
   @IsOptional()
   @IsString()
@@ -66,6 +97,12 @@ export class UpdateServiceDto {
   @IsOptional()
   @IsBoolean()
   enabled?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => UpdateArtifactTypeEntryDto)
+  artifactTypes?: UpdateArtifactTypeEntryDto[];
 }
 
 /** 일반 사용자용 — "새 Artifact 추가" 다이얼로그의 서비스 드롭다운 등에서 쓴다. token은 뺀다. */
