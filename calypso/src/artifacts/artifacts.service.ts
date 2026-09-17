@@ -88,7 +88,7 @@ export class ArtifactsService {
       department: dto.department,
       name: dto.name,
       description: dto.description ?? '',
-      network: dto.network ?? null,
+      network: dto.network,
       versions: [],
       createdBy: actor.knoxId,
       isMock: false,
@@ -108,16 +108,14 @@ export class ArtifactsService {
   }
 
   /**
-   * network를 언제든 바꿀 수 있게 한다(사용자 요청) — 원래는 첫 버전에서 한 번 정해지면
-   * 고정이었지만, admin/editor가 필요하면 다시 고를 수 있어야 한다는 결정에 따라
-   * 잠금을 풀었다. 이미 있는 버전들의 콘텐츠(files/viewUrl/hpcPath)는 그대로 둔다 —
-   * 화면이 그중 새 network에 맞는 필드만 보여주는 것뿐이고, FE가 변경 전에 그 영향을
-   * 경고한다.
+   * network를 언제든 바꿀 수 있게 한다(사용자 요청) — 이미 있는 버전들의
+   * 콘텐츠(files/links/paths)는 그대로 둔다. 새로 추가되는 버전부터 이 network가
+   * 가리키는 배열(links vs paths)을 쓴다 — FE가 변경 전에 그 영향을 경고한다.
    */
-  async setNetwork(id: string, kind: 'file' | 'oa' | 'hpc', actor: Actor) {
+  async setNetwork(id: string, network: 'OA' | 'HPC', actor: Actor) {
     const a = await this.findOrThrow(id);
     this.assertCanEdit(a, actor);
-    a.network = kind === 'file' ? null : kind === 'oa' ? 'OA' : 'HPC';
+    a.network = network;
     await a.save();
     return a;
   }
@@ -192,37 +190,25 @@ export class ArtifactsService {
   }
 
   /**
-   * §3.9 — network에 따라 정확히 한 콘텐츠만 받는다: File(network===null)은
-   * `files`(1개 이상), OA는 `viewUrl`, HPC는 `hpcPath`. 콘텐츠 종류는 그 artifact의
-   * network로 고정되어 있으므로 여기서 다시 고르지 않는다 — 맞지 않는 필드가 오면 400.
+   * §3.9 — 파일/링크/경로는 서로 배타적이지 않다(사용자 요청): 파일은 network와
+   * 무관하게 항상 올릴 수 있고, 그 위에 network에 맞는 위치 정보(OA면 links, HPC면
+   * paths)도 몇 개든 같이 붙일 수 있다. 다만 완전히 빈 버전은 의미가 없으므로 파일
+   * 또는 (그 network에 맞는) 위치 항목 중 최소 하나는 있어야 한다.
    */
-  private assertContentMatchesNetwork(
+  private assertHasContent(
     a: ArtifactDocument,
-    input: { files?: { fileName: string; storageKey: string }[]; viewUrl?: string | null; hpcPath?: string | null },
+    input: {
+      files?: { fileName: string; storageKey: string }[];
+      links?: { url: string; label: string }[];
+      paths?: { path: string; label: string }[];
+    },
   ): void {
-    if (a.network === null) {
-      if (!input.files?.length) throw new BadRequestException('At least one file is required for this artifact.');
-    } else if (a.network === 'OA') {
-      if (!input.viewUrl) throw new BadRequestException('A link (viewUrl) is required for this OA artifact.');
-    } else {
-      if (!input.hpcPath) throw new BadRequestException('A path (hpcPath) is required for this HPC artifact.');
-    }
-  }
-
-  /**
-   * 등록 시점엔 이름만 받고 콘텐츠 종류(File/OA-link/HPC-path)를 아직 안 정했을 수
-   * 있다(설계서 04장 §2.2, §6.4 — "새 Artifact 추가" 다이얼로그가 아니라 이 artifact의
-   * contents 화면에서 첫 버전을 추가할 때 정한다). **그 첫 버전 추가 시점에 network가
-   * 확정되고, 그 뒤로는 바뀌지 않는다.** File로 정해지는 경우는 `network`가 계속
-   * null이라 별도로 할 것이 없다.
-   */
-  private lockNetworkOnFirstVersion(
-    a: ArtifactDocument,
-    input: { viewUrl?: string | null; hpcPath?: string | null },
-  ): void {
-    if (a.versions.length > 0) return;
-    if (input.viewUrl) a.network = 'OA';
-    else if (input.hpcPath) a.network = 'HPC';
+    if (input.files?.length) return;
+    if (a.network === 'OA' && input.links?.length) return;
+    if (a.network === 'HPC' && input.paths?.length) return;
+    throw new BadRequestException(
+      `Add at least one file or ${a.network === 'HPC' ? 'path' : 'link'}.`,
+    );
   }
 
   /** 업로드 = minor +1. 아직 릴리스가 아니다 (작업중). */
@@ -230,8 +216,8 @@ export class ArtifactsService {
     id: string,
     input: {
       files?: { fileName: string; storageKey: string }[];
-      viewUrl?: string | null;
-      hpcPath?: string | null;
+      links?: { url: string; label: string }[];
+      paths?: { path: string; label: string }[];
       versionNote: string;
       description?: string;
       dept?: string | null;
@@ -240,8 +226,7 @@ export class ArtifactsService {
   ) {
     const a = await this.findOrThrow(id);
     this.assertCanEdit(a, actor);
-    this.lockNetworkOnFirstVersion(a, input);
-    this.assertContentMatchesNetwork(a, input);
+    this.assertHasContent(a, input);
 
     const latest = a.versions[0];
     const major = latest ? latest.major : 0;
@@ -253,8 +238,8 @@ export class ArtifactsService {
       isReleased: false,
       versionRef: this.buildVersionRef(a, major, minor),
       files: input.files ?? [],
-      viewUrl: input.viewUrl ?? null,
-      hpcPath: input.hpcPath ?? null,
+      links: input.links ?? [],
+      paths: input.paths ?? [],
       versionNote: input.versionNote,
       description: input.description ?? '',
       createdBy: actor.knoxId,
@@ -299,8 +284,8 @@ export class ArtifactsService {
       isReleased: true,
       versionRef: this.buildVersionRef(a, major, 0),
       files: source.files,
-      viewUrl: source.viewUrl,
-      hpcPath: source.hpcPath,
+      links: source.links,
+      paths: source.paths,
       versionNote,
       description: description ?? '',
       createdBy: actor.knoxId,

@@ -73,7 +73,6 @@ export function PublishVersionDialog({ a, version, submitting, onConfirm, onClos
           variant="primary"
           disabled={submitting}
           onClick={submit}
-          sx={{ color: T.pr, borderColor: T.prLine }}
         >
           <Icon name="send" /> {submitting ? 'Publishing…' : 'Publish'}
         </SirenButton>

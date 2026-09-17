@@ -130,9 +130,9 @@ export class CalypsoProxyController {
   }
 
   /**
-   * File 콘텐츠는 파일 하나 이상(multipart `files`), OA/HPC 콘텐츠는 파일 없이
-   * dto.viewUrl/hpcPath만 온다 — 어느 쪽인지는 Calypso가 그 artifact의 network로
-   * 판정하므로 여기서는 둘 다 그대로 전달할 뿐 검증하지 않는다.
+   * 파일(multipart `files`)은 network와 무관하게 항상 올 수 있고, 그 위에
+   * linksJson(OA)/pathsJson(HPC)도 같이 올 수 있다(사용자 요청, §3.9) — 검증은
+   * Calypso가 한다.
    */
   @Post(':id/versions')
   @UseInterceptors(FilesInterceptor('files'))
@@ -146,7 +146,7 @@ export class CalypsoProxyController {
     const { departments, isAdmin } = await this.resolveContext(projectId, me);
     const result = await this.calypso.uploadVersion(
       id,
-      { files, viewUrl: dto.viewUrl, hpcPath: dto.hpcPath, versionNote: dto.versionNote, description: dto.description },
+      { files, linksJson: dto.linksJson, pathsJson: dto.pathsJson, versionNote: dto.versionNote, description: dto.description },
       me.knoxId,
       departments,
       isAdmin,
@@ -259,7 +259,7 @@ export class CalypsoProxyController {
     @CurrentActor() me: Actor,
   ) {
     const { departments, isAdmin } = await this.resolveContext(projectId, me);
-    const result = await this.calypso.setNetwork(id, dto.kind, me.knoxId, departments, isAdmin);
+    const result = await this.calypso.setNetwork(id, dto.network, me.knoxId, departments, isAdmin);
     return this.relay(result);
   }
 }

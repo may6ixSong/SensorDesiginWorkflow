@@ -6,57 +6,54 @@ import { ConfirmDialog } from '@/components/dialogs/ConfirmDialog';
 import { Badge } from '@/components/common/SirenButton';
 import { CURSOR_POINTER, T } from '@/theme/tokens';
 
-type ContentKind = 'file' | 'oa' | 'hpc';
-const KIND_LABEL: Record<ContentKind, string> = { file: 'File', oa: 'Link (OA)', hpc: 'Path (HPC)' };
-
-function kindOf(network: 'OA' | 'HPC' | null): ContentKind {
-  return network === 'OA' ? 'oa' : network === 'HPC' ? 'hpc' : 'file';
-}
+const NETWORK_OPTIONS: readonly ['OA', 'HPC'] = ['OA', 'HPC'];
 
 interface Props {
   a: CalypsoArtifact;
   canEdit: boolean;
-  onChange: (kind: ContentKind) => void;
+  onChange: (network: 'OA' | 'HPC') => void;
   changing: boolean;
 }
 
 /**
- * "새 Artifact 추가" 때는 network를 아예 안 물어봤고(콘텐츠 종류는 첫 버전에서 정한다는
- * 예전 설계), 정해진 뒤에는 바꿀 곳이 화면 어디에도 없었다(사용자 지적). Version
- * history 위쪽에 둔다 — edit 권한자는 언제든 바꿀 수 있되, 바꾸면 버전 화면 구성이
- * 달라진다는 걸 확인창으로 반드시 경고한다(사용자 요청, 시스템 언어에 맞춰).
+ * "새 Artifact 추가" 때는 network를 아예 안 물어봤고, 정해진 뒤에는 바꿀 곳이 화면
+ * 어디에도 없었다(사용자 지적). Version history 위쪽에 둔다 — edit 권한자는 언제든
+ * 바꿀 수 있되, 바꾸면 새 버전이 링크(OA)를 쓸지 경로(HPC)를 쓸지가 달라진다는 걸
+ * 확인창으로 반드시 경고한다(사용자 요청, 시스템 언어에 맞춰). File 업로드는 network와
+ * 무관하게 항상 가능하므로(사용자 요청) 여기서는 더 이상 "File"이라는 선택지가 없다 —
+ * OA/HPC 둘 중 하나만 고른다.
  */
 export function NetworkField({ a, canEdit, onChange, changing }: Props) {
   const { t } = useTranslation();
-  const current = kindOf(a.network);
-  const [pending, setPending] = useState<ContentKind | null>(null);
+  const current = a.network;
+  const [pending, setPending] = useState<'OA' | 'HPC' | null>(null);
 
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', mb: '12px', flexWrap: 'wrap' }}>
       <Box sx={{ fontSize: 11, fontWeight: 600, color: T.dm2 }}>Network</Box>
       {canEdit ? (
         <Box sx={{ display: 'flex', gap: '4px' }}>
-          {(Object.keys(KIND_LABEL) as ContentKind[]).map((k) => (
+          {NETWORK_OPTIONS.map((n) => (
             <Box
-              key={k}
+              key={n}
               component="button"
               type="button"
               disabled={changing}
-              onClick={() => { if (k !== current) setPending(k); }}
+              onClick={() => { if (n !== current) setPending(n); }}
               sx={{
                 fontSize: 11.5, fontWeight: 600, padding: '4px 9px', borderRadius: '999px',
                 cursor: changing ? 'default' : CURSOR_POINTER,
-                background: k === current ? T.pr : T.sf,
-                color: k === current ? '#fff' : T.dm,
-                border: `1px solid ${k === current ? T.pr : T.ln2}`,
+                background: n === current ? T.pr : T.sf,
+                color: n === current ? '#fff' : T.dm,
+                border: `1px solid ${n === current ? T.pr : T.ln2}`,
               }}
             >
-              {KIND_LABEL[k]}
+              {n}
             </Box>
           ))}
         </Box>
       ) : (
-        <Badge color={T.dm} bg={T.sf2} borderColor={T.ln}>{KIND_LABEL[current]}</Badge>
+        current && <Badge color={T.dm} bg={T.sf2} borderColor={T.ln}>{current}</Badge>
       )}
 
       {pending && (

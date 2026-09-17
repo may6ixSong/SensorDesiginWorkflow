@@ -7,7 +7,7 @@ import { SirenButton, Badge } from '@/components/common/SirenButton';
 import { isRichTextEmpty } from '@/components/common/RichTextEditor';
 import { FileTypeIcon, Icon } from '@/components/common/Icon';
 import { toast } from '@/store/toastStore';
-import { CURSOR_POINTER, FONT_DISPLAY, FONT_MONO, T } from '@/theme/tokens';
+import { FONT_DISPLAY, FONT_MONO, T } from '@/theme/tokens';
 
 function fmtAt(iso: string): string {
   if (!iso) return '';
@@ -145,47 +145,58 @@ export function ArtifactVersionContents({ a, version: v, onDownload }: Props) {
                   </>
                 )}
 
-                {v.viewUrl && (
+                {(v.links ?? []).length > 0 && (
                   <>
                     <Box sx={{ fontFamily: FONT_MONO, fontSize: 10, letterSpacing: '.15em', textTransform: 'uppercase', color: T.dm2, mb: '9px' }}>
-                      Link
+                      {v.links.length > 1 ? `Links (${v.links.length})` : 'Link'}
                     </Box>
-                    <Box
-                      component="a"
-                      href={v.viewUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      sx={{
-                        display: 'block', fontSize: 12.5, color: T.pr, wordBreak: 'break-all',
-                        background: T.sf2, border: `1px solid ${T.ln}`, borderRadius: '7px', padding: '9px 11px',
-                        mb: '11px', cursor: CURSOR_POINTER,
-                      }}
-                    >
-                      {v.viewUrl}
-                    </Box>
-                    <SirenButton onClick={() => window.open(v.viewUrl as string, '_blank', 'noopener')}>
-                      <Icon name="link" /> Open link
-                    </SirenButton>
+                    {v.links.map((l, i) => (
+                      <Box key={`${l.url}-${i}`} sx={{ mb: '11px' }}>
+                        {l.label && (
+                          <Box sx={{ fontSize: 11, color: T.dm, mb: '3px' }}>{l.label}</Box>
+                        )}
+                        {/* link 자신이 이미 hyperlink라 별도 "Open link" 버튼은 두지 않는다(사용자 요청). */}
+                        <Box
+                          component="a"
+                          href={l.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          sx={{
+                            display: 'block', fontSize: 12.5, color: T.pr, wordBreak: 'break-all',
+                            background: T.sf2, border: `1px solid ${T.ln}`, borderRadius: '7px', padding: '9px 11px',
+                          }}
+                        >
+                          {l.url}
+                        </Box>
+                      </Box>
+                    ))}
                   </>
                 )}
 
-                {v.hpcPath && (
+                {(v.paths ?? []).length > 0 && (
                   <>
                     <Box sx={{ fontFamily: FONT_MONO, fontSize: 10, letterSpacing: '.15em', textTransform: 'uppercase', color: T.dm2, mb: '9px' }}>
-                      HPC Path
+                      {v.paths.length > 1 ? `HPC Paths (${v.paths.length})` : 'HPC Path'}
                     </Box>
-                    <Box
-                      sx={{
-                        fontFamily: FONT_MONO, fontSize: 11.5, color: T.tx, wordBreak: 'break-all',
-                        background: T.sf2, border: `1px solid ${T.ln}`, borderRadius: '7px', padding: '9px 11px',
-                        mb: '11px',
-                      }}
-                    >
-                      {v.hpcPath}
-                    </Box>
-                    <SirenButton onClick={() => copyPath(v.hpcPath as string)}>
-                      <Icon name="copy" /> Copy path
-                    </SirenButton>
+                    {v.paths.map((p, i) => (
+                      <Box key={`${p.path}-${i}`} sx={{ mb: '11px' }}>
+                        {p.label && (
+                          <Box sx={{ fontSize: 11, color: T.dm, mb: '3px' }}>{p.label}</Box>
+                        )}
+                        <Box
+                          sx={{
+                            display: 'flex', alignItems: 'center', gap: '8px',
+                            fontFamily: FONT_MONO, fontSize: 11.5, color: T.tx, wordBreak: 'break-all',
+                            background: T.sf2, border: `1px solid ${T.ln}`, borderRadius: '7px', padding: '9px 11px',
+                          }}
+                        >
+                          <Box sx={{ flex: 1, minWidth: 0 }}>{p.path}</Box>
+                          <SirenButton variant="ghost" onClick={() => copyPath(p.path)} sx={{ minWidth: 0, padding: '4px', flex: '0 0 auto' }}>
+                            <Icon name="copy" size={13} />
+                          </SirenButton>
+                        </Box>
+                      </Box>
+                    ))}
                   </>
                 )}
               </Box>

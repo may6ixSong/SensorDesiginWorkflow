@@ -205,13 +205,14 @@ function RegisterDialog({
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [department, setDepartment] = useState('');
+  const [network, setNetwork] = useState<'OA' | 'HPC'>('OA');
   const [nameErr, setNameErr] = useState(false);
 
   const dept = needsPicker ? (department || fallbackDept) : autoDept;
 
   const mutation = useMutation({
     mutationFn: () => createCalypsoArtifact({
-      projectId: project._id, department: dept, name: name.trim(), description: description.trim(),
+      projectId: project._id, department: dept, name: name.trim(), description: description.trim(), network,
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.calypsoArtifacts(project._id) });
@@ -243,6 +244,27 @@ function RegisterDialog({
       </Field>
       <Field label="Description">
         <TextArea value={description} onChange={setDescription} rows={3} />
+      </Field>
+      <Field label="Network — can be changed later from the artifact detail">
+        <Box sx={{ display: 'flex', gap: '4px' }}>
+          {(['OA', 'HPC'] as const).map((n) => (
+            <Box
+              key={n}
+              component="button"
+              type="button"
+              onClick={() => setNetwork(n)}
+              sx={{
+                fontSize: 11.5, fontWeight: 600, padding: '4px 9px', borderRadius: '999px',
+                cursor: CURSOR_POINTER,
+                background: n === network ? T.pr : T.sf,
+                color: n === network ? '#fff' : T.dm,
+                border: `1px solid ${n === network ? T.pr : T.ln2}`,
+              }}
+            >
+              {n}
+            </Box>
+          ))}
+        </Box>
       </Field>
       {needsPicker ? (
         <Field label="Department">

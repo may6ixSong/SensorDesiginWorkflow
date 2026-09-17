@@ -135,9 +135,20 @@
     "intentPrerequisite": "Prerequisite",
     "intentPrerequisiteTooltip": "Prerequisite(선행 산출물): 이 workflow가 진행하기 전에 다른 곳으로부터 받아야 하는 산출물입니다.",
     "networkChangeTitle": "Network 변경",
-    "networkChangeMessage": "Network를 변경하면 이 artifact의 버전 화면 구성이 달라집니다(파일 / 링크 / 경로).",
+    "networkChangeMessage": "Network를 변경하면 새 버전에서 링크(OA)를 쓸지 경로(HPC)를 쓸지가 달라집니다.",
     "networkChangeWarning": "기존 버전은 이전 내용을 그대로 유지합니다 — 새 network는 이 변경 이후 추가되는 버전부터 적용됩니다.",
-    "networkChangeConfirm": "Network 변경"
+    "networkChangeConfirm": "Network 변경",
+    "addFiles": "파일 추가",
+    "noFilesYet": "아직 추가된 파일이 없습니다.",
+    "removeFile": "제거",
+    "addLink": "링크 추가",
+    "linkUrlPlaceholder": "https://…",
+    "linkLabelPlaceholder": "이 링크가 무엇을 가리키는지 (선택)",
+    "addPath": "경로 추가",
+    "pathValuePlaceholder": "/vwp/…",
+    "pathLabelPlaceholder": "이 경로가 무엇을 가리키는지 (선택)",
+    "removeEntry": "제거",
+    "setNetworkFirst": "버전을 추가하기 전에 위에서 이 artifact의 network(OA 또는 HPC)를 먼저 설정하세요."
   },
   "release": {
     "title": "Release",

@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Box } from '@mui/material';
-import { CalypsoArtifact } from '@/api/calypsoClient';
+import { useTranslation } from 'react-i18next';
+import { CalypsoArtifact, CalypsoLink, CalypsoPathEntry } from '@/api/calypsoClient';
 import { useAuth } from '@/app/providers/AuthProvider';
 import { useDirectory } from '@/app/providers/DirectoryProvider';
 import { UserAvatar } from '@/components/common/Avatar';
@@ -9,13 +10,7 @@ import { Field, TextInput } from '@/components/common/Panel';
 import { RichTextEditor } from '@/components/common/RichTextEditor';
 import { SirenButton } from '@/components/common/SirenButton';
 import { FileTypeIcon, Icon } from '@/components/common/Icon';
-import { CURSOR_POINTER, FONT_MONO, R, T } from '@/theme/tokens';
-
-/** 새 버전에 넣을 콘텐츠 종류. artifact에 버전이 하나도 없으면 여기서 처음 정해진다
- * (설계서 04장 §2.2, §6.4) — 그 뒤로는 `a.network`에 따라 고정된다. */
-type ContentKind = 'file' | 'oa' | 'hpc';
-
-const KIND_LABEL: Record<ContentKind, string> = { file: 'File', oa: 'Link (OA)', hpc: 'Path (HPC)' };
+import { FONT_MONO, T } from '@/theme/tokens';
 
 /** latestVersion.versionLabel("major.minor")에서 다음 minor를 계산한다 — 아직 버전이
  * 하나도 없으면 첫 버전은 항상 0.1이다(서비스 쪽 nextVersionLabel()과 동일한 규칙). */
@@ -29,50 +24,72 @@ function nextVersionLabel(a: CalypsoArtifact): string {
 
 interface Props {
   a: CalypsoArtifact;
-  onSubmit: (input: { files?: File[]; viewUrl?: string; hpcPath?: string }, versionNote: string, description: string) => void;
+  onSubmit: (
+    input: { files?: File[]; links?: CalypsoLink[]; paths?: CalypsoPathEntry[] },
+    versionNote: string,
+    description: string,
+  ) => void;
   submitting: boolean;
   onClose: () => void;
 }
 
 /**
- * "Add a new version" — 이제 표지 옆에 늘 펼쳐진 폼이 아니라 버튼을 눌러야 뜨는
- * Dialog다(사용자 요청: version history 위쪽 버튼으로 옮기고, 폼 자체는 여기로). 어떤
+ * "Add a new version" — 표지 옆에 늘 펼쳐진 폼이 아니라 버튼을 눌러야 뜨는 Dialog다
+ * (사용자 요청: version history 위쪽 버튼으로 옮기고, 폼 자체는 여기로). 어떤
  * artifact에 어느 버전 번호로, 누가 올리는지를 폼 위에서 바로 보여준다(사용자 요청).
+ *
+ * ★ 파일/링크/경로는 서로 배타적이지 않다(사용자 요청) — 파일은 network와 무관하게
+ *   항상 올릴 수 있고, 그 위에 network에 맞는 위치 정보(OA면 링크, HPC면 경로)도 몇
+ *   개든 같이 붙일 수 있다. 파일 선택 자체는 브라우저 기본 `<input type=file>`을 쓰지
+ *   않는다 — 그 버튼/안내 문구는 브라우저 자체 언어를 따라가서 앱의 언어 설정과
+ *   어긋날 수 있었다(사용자 지적). 대신 숨긴 input + 우리가 직접 그린 버튼/목록을 쓴다.
  */
 export function AddVersionDialog({ a, onSubmit, submitting, onClose }: Props) {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { resolveUser } = useDirectory();
   const me = resolveUser(user?.KnoxID);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [pickedKind, setPickedKind] = useState<ContentKind | null>(null);
   const [files, setFiles] = useState<File[]>([]);
-  const [link, setLink] = useState('');
-  const [path, setPath] = useState('');
+  const [links, setLinks] = useState<CalypsoLink[]>([]);
+  const [paths, setPaths] = useState<CalypsoPathEntry[]>([]);
   const [versionNote, setVersionNote] = useState('');
   const [description, setDescription] = useState('');
   const [noteErr, setNoteErr] = useState(false);
 
-  // 이미 버전이 하나라도 있으면 network가 고정돼 있다 — 그 콘텐츠 종류만 보여준다.
-  // 아직 하나도 없으면(=콘텐츠 종류를 이번에 처음 정한다) 사용자가 고른 것을 쓴다.
-  const fixedKind: ContentKind | null = a.versionCount > 0
-    ? (a.network === 'OA' ? 'oa' : a.network === 'HPC' ? 'hpc' : 'file')
-    : null;
-  const kind = fixedKind ?? pickedKind;
+  const network = a.network;
+  const hasContent = files.length > 0
+    || (network === 'OA' && links.some((l) => l.url.trim()))
+    || (network === 'HPC' && paths.some((p) => p.path.trim()));
+
+  const addFiles = (picked: FileList | null) => {
+    if (!picked?.length) return;
+    setFiles((prev) => [...prev, ...Array.from(picked)]);
+  };
+  const removeFile = (i: number) => setFiles((prev) => prev.filter((_, j) => j !== i));
+
+  const addLink = () => setLinks((prev) => [...prev, { url: '', label: '' }]);
+  const updateLink = (i: number, next: CalypsoLink) => setLinks((prev) => prev.map((l, j) => (j === i ? next : l)));
+  const removeLink = (i: number) => setLinks((prev) => prev.filter((_, j) => j !== i));
+
+  const addPath = () => setPaths((prev) => [...prev, { path: '', label: '' }]);
+  const updatePath = (i: number, next: CalypsoPathEntry) => setPaths((prev) => prev.map((p, j) => (j === i ? next : p)));
+  const removePath = (i: number) => setPaths((prev) => prev.filter((_, j) => j !== i));
 
   const submit = () => {
+    if (!network) return;
     if (!versionNote.trim()) { setNoteErr(true); return; }
-    if (kind === 'file') {
-      if (!files.length) return;
-      onSubmit({ files }, versionNote.trim(), description);
-    } else if (kind === 'oa') {
-      if (!link.trim()) return;
-      onSubmit({ viewUrl: link.trim() }, versionNote.trim(), description);
-    } else if (kind === 'hpc') {
-      if (!path.trim()) return;
-      onSubmit({ hpcPath: path.trim() }, versionNote.trim(), description);
-    } else {
-      return;
-    }
+    if (!hasContent) return;
+    onSubmit(
+      {
+        files,
+        links: network === 'OA' ? links.filter((l) => l.url.trim()).map((l) => ({ url: l.url.trim(), label: l.label.trim() })) : undefined,
+        paths: network === 'HPC' ? paths.filter((p) => p.path.trim()).map((p) => ({ path: p.path.trim(), label: p.label.trim() })) : undefined,
+      },
+      versionNote.trim(),
+      description,
+    );
     onClose();
   };
 
@@ -90,7 +107,7 @@ export function AddVersionDialog({ a, onSubmit, submitting, onClose }: Props) {
         </>
       }
       footer={
-        <SirenButton variant="primary" disabled={submitting || !kind} onClick={submit}>
+        <SirenButton variant="primary" disabled={submitting || !network || !hasContent} onClick={submit}>
           <Icon name="up" /> {submitting ? 'Adding…' : 'Add version'}
         </SirenButton>
       }
@@ -103,70 +120,107 @@ export function AddVersionDialog({ a, onSubmit, submitting, onClose }: Props) {
         </Box>
       </Box>
 
-      {!kind ? (
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <Box sx={{ fontSize: 11.5, color: T.dm2 }}>
-            This artifact has no version yet — pick what it will hold. This can&apos;t be changed afterwards.
-          </Box>
-          <Box sx={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-            {(Object.keys(KIND_LABEL) as ContentKind[]).map((k) => (
-              <Box
-                key={k}
-                component="button"
-                type="button"
-                onClick={() => setPickedKind(k)}
-                sx={{
-                  fontSize: 12.5, fontWeight: 600, padding: '7px 12px', borderRadius: `${R.sm}px`,
-                  cursor: CURSOR_POINTER, background: T.sf, border: `1px solid ${T.ln2}`, color: T.dm,
-                  '&:hover': { borderColor: T.pr, color: T.pr },
-                }}
-              >
-                {KIND_LABEL[k]}
-              </Box>
-            ))}
-          </Box>
-        </Box>
+      {!network ? (
+        <Box sx={{ fontSize: 12, color: T.warn, lineHeight: 1.6 }}>{t('artifact.setNetworkFirst')}</Box>
       ) : (
         <>
-          {kind === 'file' && (
-            <Field label="Files">
-              <Box
-                component="input"
-                type="file"
-                multiple
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFiles(Array.from(e.target.files ?? []))}
-                sx={{ fontSize: 12.5, width: '100%' }}
-              />
-              {files.length > 0 && (
-                <Box sx={{ mt: '9px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                  {files.map((f, i) => (
-                    <Box
-                      key={`${f.name}-${i}`}
-                      sx={{
-                        display: 'flex', alignItems: 'center', gap: '8px',
-                        fontFamily: FONT_MONO, fontSize: 11.5, color: T.tx,
-                        background: T.sf2, border: `1px solid ${T.ln}`, borderRadius: '7px',
-                        padding: '8px 10px', wordBreak: 'break-all',
-                      }}
-                    >
-                      <FileTypeIcon fileName={f.name} size={14} />
-                      {f.name}
-                    </Box>
-                  ))}
+          <Field label="Files">
+            <Box
+              component="input"
+              type="file"
+              multiple
+              ref={fileInputRef}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => { addFiles(e.target.files); e.target.value = ''; }}
+              sx={{ display: 'none' }}
+            />
+            <SirenButton onClick={() => fileInputRef.current?.click()}>
+              <Icon name="plus" size={12} /> {t('artifact.addFiles')}
+            </SirenButton>
+            <Box sx={{ mt: '9px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
+              {files.length === 0 ? (
+                <Box sx={{ fontSize: 11.5, color: T.dm2 }}>{t('artifact.noFilesYet')}</Box>
+              ) : files.map((f, i) => (
+                <Box
+                  key={`${f.name}-${i}`}
+                  sx={{
+                    display: 'flex', alignItems: 'center', gap: '8px',
+                    fontFamily: FONT_MONO, fontSize: 11.5, color: T.tx,
+                    background: T.sf2, border: `1px solid ${T.ln}`, borderRadius: '7px',
+                    padding: '8px 10px', wordBreak: 'break-all',
+                  }}
+                >
+                  <FileTypeIcon fileName={f.name} size={14} />
+                  <Box sx={{ flex: 1, minWidth: 0 }}>{f.name}</Box>
+                  <SirenButton variant="ghost" onClick={() => removeFile(i)} sx={{ minWidth: 0, padding: '3px' }} title={t('artifact.removeFile')}>
+                    <Icon name="x" size={12} />
+                  </SirenButton>
                 </Box>
-              )}
+              ))}
+            </Box>
+          </Field>
+
+          {network === 'OA' && (
+            <Field label="Links">
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: '8px', mb: '8px' }}>
+                {links.map((l, i) => (
+                  <Box key={i} sx={{ display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
+                    <Box sx={{ flex: '1 1 auto', minWidth: 0 }}>
+                      <TextInput
+                        value={l.url}
+                        onChange={(v) => updateLink(i, { ...l, url: v })}
+                        placeholder={t('artifact.linkUrlPlaceholder')}
+                      />
+                    </Box>
+                    <Box sx={{ flex: '1 1 auto', minWidth: 0 }}>
+                      <TextInput
+                        value={l.label}
+                        onChange={(v) => updateLink(i, { ...l, label: v })}
+                        placeholder={t('artifact.linkLabelPlaceholder')}
+                      />
+                    </Box>
+                    <SirenButton variant="ghost" onClick={() => removeLink(i)} sx={{ minWidth: 0, padding: '7px' }} title={t('artifact.removeEntry')}>
+                      <Icon name="x" size={13} />
+                    </SirenButton>
+                  </Box>
+                ))}
+              </Box>
+              <SirenButton onClick={addLink}>
+                <Icon name="plus" size={12} /> {t('artifact.addLink')}
+              </SirenButton>
             </Field>
           )}
-          {kind === 'oa' && (
-            <Field label="Link">
-              <TextInput value={link} onChange={setLink} placeholder="https://…" />
+
+          {network === 'HPC' && (
+            <Field label="Paths">
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: '8px', mb: '8px' }}>
+                {paths.map((p, i) => (
+                  <Box key={i} sx={{ display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
+                    <Box sx={{ flex: '1 1 auto', minWidth: 0 }}>
+                      <TextInput
+                        value={p.path}
+                        onChange={(v) => updatePath(i, { ...p, path: v })}
+                        placeholder={t('artifact.pathValuePlaceholder')}
+                      />
+                    </Box>
+                    <Box sx={{ flex: '1 1 auto', minWidth: 0 }}>
+                      <TextInput
+                        value={p.label}
+                        onChange={(v) => updatePath(i, { ...p, label: v })}
+                        placeholder={t('artifact.pathLabelPlaceholder')}
+                      />
+                    </Box>
+                    <SirenButton variant="ghost" onClick={() => removePath(i)} sx={{ minWidth: 0, padding: '7px' }} title={t('artifact.removeEntry')}>
+                      <Icon name="x" size={13} />
+                    </SirenButton>
+                  </Box>
+                ))}
+              </Box>
+              <SirenButton onClick={addPath}>
+                <Icon name="plus" size={12} /> {t('artifact.addPath')}
+              </SirenButton>
             </Field>
           )}
-          {kind === 'hpc' && (
-            <Field label="HPC path">
-              <TextInput value={path} onChange={setPath} placeholder="/vwp/…" />
-            </Field>
-          )}
+
           <Field label="Version Note — required, a short one-line summary">
             <TextInput
               value={versionNote}
@@ -184,11 +238,6 @@ export function AddVersionDialog({ a, onSubmit, submitting, onClose }: Props) {
               maxHeight={220}
             />
           </Field>
-          {!fixedKind && (
-            <Box sx={{ mt: '-6px', mb: '6px' }}>
-              <SirenButton onClick={() => setPickedKind(null)}>Back</SirenButton>
-            </Box>
-          )}
         </>
       )}
     </ModalShell>

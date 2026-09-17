@@ -17,16 +17,26 @@ export interface CalypsoFile {
   storageKey: string;
 }
 
+export interface CalypsoLink {
+  url: string;
+  label: string;
+}
+
+export interface CalypsoPathEntry {
+  path: string;
+  label: string;
+}
+
 export interface CalypsoVersionView {
   versionLabel: string;
   isReleased: boolean;
   versionRef: string;
-  /** network===null(File)일 때만 채워진다 — 한 버전에 여러 파일이 있을 수 있다. */
+  /** network와 무관하게 항상 올릴 수 있다 — 한 버전에 여러 파일이 있을 수 있다. */
   files: CalypsoFile[];
-  /** network==='OA'일 때만. */
-  viewUrl: string | null;
-  /** network==='HPC'일 때만. */
-  hpcPath: string | null;
+  /** network==='OA'인 artifact에서만 쓴다 — 여러 개 가능(사용자 요청). */
+  links: CalypsoLink[];
+  /** network==='HPC'인 artifact에서만 쓴다 — 여러 개 가능(사용자 요청). */
+  paths: CalypsoPathEntry[];
   /** 짧은 한 줄 메모 — 필수, 서식 없는 텍스트. */
   versionNote: string;
   /** 서식 있는(HTML) 긴 설명 — 선택. 렌더링 전 반드시 sanitize한다. */
@@ -53,8 +63,8 @@ export interface CalypsoArtifact {
   department: string;
   name: string;
   description: string;
-  /** null(File) | 'OA' | 'HPC' — 언제든 edit 권한자가 바꿀 수 있다(사용자 요청,
-   * `setCalypsoNetwork`). 기존 버전들의 콘텐츠는 그대로 남는다. */
+  /** 'OA' | 'HPC' — 언제든 edit 권한자가 바꿀 수 있다(사용자 요청, `setCalypsoNetwork`).
+   * 기존 버전들의 콘텐츠는 그대로 남는다. null은 마이그레이션 전의 예전 문서에만 남는다. */
   network: 'OA' | 'HPC' | null;
   createdBy: string;
   /** 'edit'이면 업로드/릴리스/권한관리 가능, 'view'면 released 버전만 열람. */
@@ -85,32 +95,28 @@ export async function getCalypsoArtifact(id: string, projectId: string): Promise
 }
 
 export async function createCalypsoArtifact(input: {
-  projectId: string; department: string; name: string; description?: string; network?: 'OA' | 'HPC';
+  projectId: string; department: string; name: string; description?: string; network: 'OA' | 'HPC';
 }): Promise<CalypsoArtifact> {
   const { data } = await apiClient.post<ApiEnvelope<CalypsoArtifact>>('/calypso-artifacts', input);
   return data.data;
 }
 
 /**
- * 새 버전 추가 — 콘텐츠는 그 artifact의 `network`로 정해진다(설계서 04장 §2.2):
- *   network===null(File) → `files`(1개 이상, 한 버전에 여러 파일을 묶을 수 있다)
- *   network==='OA'       → `viewUrl`
- *   network==='HPC'      → `hpcPath`
- * versionCount===0(아직 첫 버전이 없는 새 artifact)이면 이 호출이 network를 그대로
- * 확정한다 — "새 Artifact 추가" 다이얼로그가 아니라 여기서 콘텐츠 종류를 고른다
- * (04장 §6.4).
+ * 새 버전 추가 — 파일은 network와 무관하게 항상 올릴 수 있고, 그 위에 network에 맞는
+ * 위치 정보(OA면 links, HPC면 paths)도 몇 개든 같이 붙일 수 있다(사용자 요청, §3.9).
+ * links/paths는 파일 업로드와 같은 multipart 요청 안에 JSON 문자열로 실어 보낸다.
  */
 export async function addCalypsoVersion(
   id: string,
   projectId: string,
-  input: { files?: File[]; viewUrl?: string; hpcPath?: string },
+  input: { files?: File[]; links?: CalypsoLink[]; paths?: CalypsoPathEntry[] },
   versionNote: string,
   description?: string,
 ): Promise<CalypsoArtifact> {
   const form = new FormData();
   (input.files ?? []).forEach((f) => form.append('files', f));
-  if (input.viewUrl) form.append('viewUrl', input.viewUrl);
-  if (input.hpcPath) form.append('hpcPath', input.hpcPath);
+  if (input.links?.length) form.append('linksJson', JSON.stringify(input.links));
+  if (input.paths?.length) form.append('pathsJson', JSON.stringify(input.paths));
   form.append('versionNote', versionNote);
   if (description) form.append('description', description);
   const { data } = await apiClient.post<ApiEnvelope<CalypsoArtifact>>(
@@ -203,13 +209,12 @@ export async function setCalypsoRestrictView(id: string, projectId: string, rest
 }
 
 /**
- * network를 언제든 바꿀 수 있게 한다(사용자 요청) — `kind`는 AddVersionDialog의
- * ContentKind와 같은 값('file'|'oa'|'hpc'). 기존 버전들의 콘텐츠는 그대로 둔다 —
- * 호출부가 변경 전에 그 영향을 경고한다.
+ * network를 언제든 바꿀 수 있게 한다(사용자 요청) — 기존 버전들의 콘텐츠는 그대로
+ * 둔다, 호출부가 변경 전에 그 영향을 경고한다.
  */
-export async function setCalypsoNetwork(id: string, projectId: string, kind: 'file' | 'oa' | 'hpc'): Promise<CalypsoArtifact> {
+export async function setCalypsoNetwork(id: string, projectId: string, network: 'OA' | 'HPC'): Promise<CalypsoArtifact> {
   const { data } = await apiClient.patch<ApiEnvelope<CalypsoArtifact>>(
-    `/calypso-artifacts/${id}/network`, { kind }, { params: { projectId } },
+    `/calypso-artifacts/${id}/network`, { network }, { params: { projectId } },
   );
   return data.data;
 }

@@ -76,7 +76,7 @@ export function CalypsoInlinePanel({ artifactId, projectId, blockId, releases, o
     onError: (e: any) => toast(e?.response?.data?.message ?? 'Publish failed'),
   });
   const network = useMutation({
-    mutationFn: (kind: 'file' | 'oa' | 'hpc') => setCalypsoNetwork(artifactId, projectId, kind),
+    mutationFn: (network: 'OA' | 'HPC') => setCalypsoNetwork(artifactId, projectId, network),
     onSuccess: () => { invalidate(); toast('Network changed'); },
     onError: (e: any) => toast(e?.response?.data?.message ?? 'Could not change network'),
   });

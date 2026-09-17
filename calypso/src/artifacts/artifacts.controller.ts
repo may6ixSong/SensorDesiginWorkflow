@@ -32,6 +32,8 @@ import {
   ReleaseDto,
   SetNetworkDto,
   SetRestrictViewDto,
+  parseLinksJson,
+  parsePathsJson,
   toArtifactDto,
   toVersionView,
 } from './dto/artifact-crud.dto';
@@ -139,16 +141,14 @@ export class ArtifactsController {
   /** network를 언제든 바꿀 수 있게 한다(사용자 요청) — edit 권한자만. */
   @Patch(':id/network')
   async setNetwork(@Param('id') id: string, @Body() dto: SetNetworkDto, @CurrentActor() me: Actor) {
-    const a = await this.artifacts.setNetwork(id, dto.kind, me);
+    const a = await this.artifacts.setNetwork(id, dto.network, me);
     return { data: toArtifactDto(a, 'edit') };
   }
 
   /**
-   * 업로드 = minor +1. **network에 따라 콘텐츠가 갈린다**(§3.9):
-   *   - File(network===null) — 바이트를 받아 Calypso 몫의 오브젝트 스토리지에 올린다.
-   *     SIREN 본체와 다른 S3_FOLDER를 쓰므로 네임스페이스가 분리된다(Hub 설계서 §3.7).
-   *     한 번에 여러 파일을 올릴 수 있다 — 전부 이번 버전 하나에 묶인다.
-   *   - OA/HPC — 파일 없이 `viewUrl`/`hpcPath` 텍스트만 body로 받는다.
+   * 업로드 = minor +1. 파일은 network와 무관하게 항상 올릴 수 있고(오브젝트 스토리지,
+   * SIREN 본체와 다른 S3_FOLDER — Hub 설계서 §3.7), 그 위에 network에 맞는 위치
+   * 정보(OA면 링크, HPC면 경로)도 몇 개든 같이 붙일 수 있다(사용자 요청, §3.9).
    */
   @Post(':id/versions')
   @UseInterceptors(FilesInterceptor('files'))
@@ -164,32 +164,25 @@ export class ArtifactsController {
       throw new ForbiddenException('You do not have edit access to this artifact.');
     }
 
-    // 첫 버전(a.versions.length===0)은 아직 network가 잠기기 전이라 a.network===null만으로는
-    // "File인지"를 알 수 없다 — 이 호출이 files를 보냈는지로 판단해야 한다(그래야
-    // lockNetworkOnFirstVersion이 viewUrl/hpcPath로 OA/HPC를 잠글 기회를 얻는다). 이미
-    // File로 잠긴 뒤(2번째 버전부터)는 종전처럼 a.network===null이 곧 "파일 필수"다.
-    const wantsFiles = a.network === null && (a.versions.length > 0 || Boolean(files?.length));
-    if (wantsFiles) {
-      if (!files?.length) throw new BadRequestException('At least one file is required (multipart form field "files").');
-      const nextLabel = this.artifacts.nextVersionLabel(a);
-      const uploaded = await Promise.all(
-        files.map(async (file) => {
-          const storageKey = this.storage.buildStorageKey(a.projectId, a._id.toString(), nextLabel, file.originalname);
-          await this.storage.upload(storageKey, file.buffer, { originalname: file.originalname, uploader: me.knoxId });
-          return { fileName: file.originalname, storageKey };
-        }),
-      );
-      const saved = await this.artifacts.addVersion(
-        id,
-        { files: uploaded, versionNote: dto.versionNote, description: dto.description, dept: dto.dept ?? null },
-        me,
-      );
-      return { data: toArtifactDto(saved, 'edit') };
-    }
+    const nextLabel = this.artifacts.nextVersionLabel(a);
+    const uploaded = await Promise.all(
+      (files ?? []).map(async (file) => {
+        const storageKey = this.storage.buildStorageKey(a.projectId, a._id.toString(), nextLabel, file.originalname);
+        await this.storage.upload(storageKey, file.buffer, { originalname: file.originalname, uploader: me.knoxId });
+        return { fileName: file.originalname, storageKey };
+      }),
+    );
 
     const saved = await this.artifacts.addVersion(
       id,
-      { viewUrl: dto.viewUrl, hpcPath: dto.hpcPath, versionNote: dto.versionNote, description: dto.description, dept: dto.dept ?? null },
+      {
+        files: uploaded,
+        links: parseLinksJson(dto.linksJson),
+        paths: parsePathsJson(dto.pathsJson),
+        versionNote: dto.versionNote,
+        description: dto.description,
+        dept: dto.dept ?? null,
+      },
       me,
     );
     return { data: toArtifactDto(saved, 'edit') };

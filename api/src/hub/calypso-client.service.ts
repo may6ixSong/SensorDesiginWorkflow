@@ -306,10 +306,11 @@ export class CalypsoClientService {
   }
 
   /**
-   * 업로드 = File 콘텐츠면 파일들을 그대로 multipart로 Calypso에 재전송하고(§3.9,
-   * 여러 개 가능), OA/HPC 콘텐츠면 파일 없이 viewUrl/hpcPath 텍스트만 보낸다. 이
-   * 프로세스는 Multer가 이미 메모리에 올려준 `file.buffer`들만 들고 있고, 그걸 그대로
-   * 한 번 더 포워딩할 뿐 디스크에 쓰거나 추가로 복제하지 않는다 — 브라우저 → SIREN BE →
+   * 업로드 — 파일은 network와 무관하게 항상 multipart로 Calypso에 재전송한다(§3.9,
+   * 여러 개 가능). 그 위에 OA면 links, HPC면 paths도 몇 개든 같이 실어 보낼 수
+   * 있다(사용자 요청) — multipart 필드라 JSON 문자열로 그대로 전달한다. 이 프로세스는
+   * Multer가 이미 메모리에 올려준 `file.buffer`들만 들고 있고, 그걸 그대로 한 번 더
+   * 포워딩할 뿐 디스크에 쓰거나 추가로 복제하지 않는다 — 브라우저 → SIREN BE →
    * Calypso 두 홉을 스트림처럼 다루되, multipart 인코딩 자체는 native FormData/Blob에
    * 맡긴다.
    */
@@ -317,8 +318,8 @@ export class CalypsoClientService {
     externalArtifactId: string,
     input: {
       files?: { buffer: Buffer; originalname: string; mimetype?: string }[];
-      viewUrl?: string;
-      hpcPath?: string;
+      linksJson?: string;
+      pathsJson?: string;
       versionNote: string;
       description?: string;
     },
@@ -340,8 +341,8 @@ export class CalypsoClientService {
       }
       form.append('versionNote', input.versionNote);
       if (input.description) form.append('description', input.description);
-      if (input.viewUrl) form.append('viewUrl', input.viewUrl);
-      if (input.hpcPath) form.append('hpcPath', input.hpcPath);
+      if (input.linksJson) form.append('linksJson', input.linksJson);
+      if (input.pathsJson) form.append('pathsJson', input.pathsJson);
       const res = await fetch(`${this.baseUrl}/artifacts/${encodeURIComponent(externalArtifactId)}/versions`, {
         method: 'POST',
         signal: controller.signal,
@@ -499,7 +500,7 @@ export class CalypsoClientService {
   /** network를 언제든 바꿀 수 있게 한다(사용자 요청) — edit 권한자만. */
   async setNetwork(
     externalArtifactId: string,
-    kind: 'file' | 'oa' | 'hpc',
+    network: 'OA' | 'HPC',
     knoxId: string,
     departments: string[],
     isAdmin: boolean,
@@ -512,7 +513,7 @@ export class CalypsoClientService {
         method: 'PATCH',
         signal: controller.signal,
         headers: { ...this.actorHeaders(knoxId, departments, isAdmin), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kind }),
+        body: JSON.stringify({ network }),
       });
       const body = await res.json().catch(() => null);
       return { status: res.status, body };

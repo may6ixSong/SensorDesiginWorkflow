@@ -30,12 +30,12 @@ export class CreateArtifactDto {
   description?: string;
 
   /**
-   * 생략하면 null(File — 실물을 이 서비스가 들고 있다). 'OA'/'HPC'면 실물이 없고
-   * 각 버전의 viewUrl/hpcPath가 위치만 가리킨다(§3.9). 등록 후에는 바뀌지 않는다.
+   * 필수(사용자 요청) — 'OA' 또는 'HPC' 둘 중 하나. 파일 업로드는 어느 쪽이든 항상
+   * 가능하고, 이 값은 그 artifact의 버전들이 링크(OA)/경로(HPC) 중 어느 배열을 쓸지만
+   * 정한다. 언제든 admin/editor가 나중에 바꿀 수 있다(`setNetwork`).
    */
-  @IsOptional()
   @IsIn(['OA', 'HPC'])
-  network?: 'OA' | 'HPC';
+  network: 'OA' | 'HPC';
 
   /** 생략하면 false(view 기본 개방) — 사용자 요청. */
   @IsOptional()
@@ -50,14 +50,14 @@ export class SetRestrictViewDto {
 }
 
 /**
- * PATCH /artifacts/:id/network 몸체 — FE의 ContentKind('file'|'oa'|'hpc')와 같은 값을
- * 그대로 쓴다. 원래는 첫 버전 추가 시점에 한 번 정해지면 안 바뀌는 값이었지만, 언제든
- * admin/editor가 바꿀 수 있게 열어 달라는 사용자 요청에 따라 이 라우트를 새로 열었다 —
- * 이미 있는 버전들의 콘텐츠(files/viewUrl/hpcPath)는 그대로 두고 표시 방식만 바뀐다.
+ * PATCH /artifacts/:id/network 몸체 — 'OA' 또는 'HPC'. 언제든 admin/editor가 바꿀 수
+ * 있게 열어 달라는 사용자 요청에 따라 이 라우트를 열었다 — 이미 있는 버전들의
+ * 콘텐츠(files/links/paths)는 그대로 두고, 이후 새 버전이 쓸 배열(links vs paths)만
+ * 바뀐다.
  */
 export class SetNetworkDto {
-  @IsIn(['file', 'oa', 'hpc'])
-  kind: 'file' | 'oa' | 'hpc';
+  @IsIn(['OA', 'HPC'])
+  network: 'OA' | 'HPC';
 }
 
 export class ListArtifactsQuery {
@@ -92,15 +92,18 @@ export class AddVersionDto {
   @IsString()
   dept?: string;
 
-  /** network==='OA'인 artifact에만. */
+  /**
+   * 파일 업로드와 같은 multipart 요청 안에 실려 오므로 JSON 문자열로 받는다 —
+   * `JSON.stringify({url, label}[])`. network==='OA'인 artifact에만 쓴다.
+   */
   @IsOptional()
   @IsString()
-  viewUrl?: string;
+  linksJson?: string;
 
-  /** network==='HPC'인 artifact에만. */
+  /** 위와 같은 이유로 JSON 문자열 — `JSON.stringify({path, label}[])`. network==='HPC'인 artifact에만 쓴다. */
   @IsOptional()
   @IsString()
-  hpcPath?: string;
+  pathsJson?: string;
 }
 
 export class ReleaseDto {
@@ -186,11 +189,45 @@ export function toVersionView(v: ArtifactVersion) {
     isReleased: v.isReleased === true,
     versionRef: v.versionRef,
     files: (v.files ?? []).map((f) => ({ fileName: f.fileName, storageKey: f.storageKey })),
-    viewUrl: v.viewUrl ?? null,
-    hpcPath: v.hpcPath ?? null,
+    links: (v.links ?? []).map((l) => ({ url: l.url, label: l.label ?? '' })),
+    paths: (v.paths ?? []).map((p) => ({ path: p.path, label: p.label ?? '' })),
     versionNote: v.versionNote ?? '',
     description: v.description ?? '',
     createdBy: v.createdBy,
     createdAt: v.createdAt instanceof Date ? v.createdAt.toISOString() : String(v.createdAt),
   };
+}
+
+/**
+ * AddVersionDto.linksJson/pathsJson을 파싱한다 — multipart 필드라 JSON 문자열로 온다.
+ * 형식이 어긋나면(빈 문자열, 깨진 JSON, url/path가 빈 항목) 그냥 걸러낸다 — 여기서
+ * 400을 던지기보다는 "실수로 이상한 값이 섞였을 뿐 안전하게 무시해도 되는" 쪽으로
+ * 관대하게 처리한다.
+ */
+function parseLocationEntries(json: string | undefined, key: 'url' | 'path'): Record<string, string>[] {
+  if (!json) return [];
+  let raw: unknown;
+  try {
+    raw = JSON.parse(json);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(raw)) return [];
+  const out: Record<string, string>[] = [];
+  for (const entry of raw) {
+    if (!entry || typeof entry !== 'object') continue;
+    const value = String((entry as Record<string, unknown>)[key] ?? '').trim();
+    if (!value) continue;
+    const label = String((entry as Record<string, unknown>).label ?? '').trim();
+    out.push({ [key]: value, label });
+  }
+  return out;
+}
+
+export function parseLinksJson(json: string | undefined): { url: string; label: string }[] {
+  return parseLocationEntries(json, 'url') as { url: string; label: string }[];
+}
+
+export function parsePathsJson(json: string | undefined): { path: string; label: string }[] {
+  return parseLocationEntries(json, 'path') as { path: string; label: string }[];
 }

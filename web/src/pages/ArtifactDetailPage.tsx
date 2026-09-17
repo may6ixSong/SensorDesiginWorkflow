@@ -88,7 +88,7 @@ export function ArtifactDetailPage() {
     onError: (e: any) => toast(e?.response?.data?.message ?? 'Could not change view access'),
   });
   const network = useMutation({
-    mutationFn: (kind: 'file' | 'oa' | 'hpc') => setCalypsoNetwork(id, projectId, kind),
+    mutationFn: (network: 'OA' | 'HPC') => setCalypsoNetwork(id, projectId, network),
     onSuccess: () => { invalidate(); toast('Network changed'); },
     onError: (e: any) => toast(e?.response?.data?.message ?? 'Could not change network'),
   });

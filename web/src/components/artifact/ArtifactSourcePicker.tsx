@@ -57,9 +57,7 @@ const radioSx = (sel: boolean) => ({
   background: sel ? T.pr : 'transparent',
 });
 
-const NETWORK_KIND_OPTIONS: readonly (readonly ['file' | 'oa' | 'hpc', string])[] = [
-  ['file', 'File'], ['oa', 'Link (OA)'], ['hpc', 'Path (HPC)'],
-];
+const NETWORK_OPTIONS: readonly ['OA', 'HPC'] = ['OA', 'HPC'];
 
 /**
  * admin이 Service Manage에서 등록한 artifact 종류 하나(예: "RPM" 서비스 아래의
@@ -175,7 +173,7 @@ export function ArtifactSourcePicker({
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState('');
   const [newDept, setNewDept] = useState('');
-  const [newNetwork, setNewNetwork] = useState<'file' | 'oa' | 'hpc'>('file');
+  const [newNetwork, setNewNetwork] = useState<'OA' | 'HPC'>('OA');
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(() => new Set());
   const didInitialExpand = useRef(false);
 
@@ -258,13 +256,13 @@ export function ArtifactSourcePicker({
       projectId: projectId as string,
       department: effectiveDept,
       name: newName.trim(),
-      network: newNetwork === 'oa' ? 'OA' : newNetwork === 'hpc' ? 'HPC' : undefined,
+      network: newNetwork,
     }),
     onSuccess: (created) => {
       qc.invalidateQueries({ queryKey: queryKeys.calypsoArtifacts(projectId as string) });
       pickCalypso(created);
       setNewName('');
-      setNewNetwork('file');
+      setNewNetwork('OA');
       toast('Artifact created — add its first version from the artifact detail once it\'s on the canvas.');
     },
     onError: (e: any) => toast(e?.response?.data?.message ?? 'Could not create the artifact'),
@@ -296,21 +294,21 @@ export function ArtifactSourcePicker({
             <Box>
               <Box sx={{ fontSize: 10.5, color: T.dm2, mb: '5px' }}>Network — can be changed later from the artifact detail</Box>
               <Box sx={{ display: 'flex', gap: '4px' }}>
-                {NETWORK_KIND_OPTIONS.map(([k, label]) => (
+                {NETWORK_OPTIONS.map((n) => (
                   <Box
-                    key={k}
+                    key={n}
                     component="button"
                     type="button"
-                    onClick={() => setNewNetwork(k)}
+                    onClick={() => setNewNetwork(n)}
                     sx={{
                       fontSize: 11.5, fontWeight: 600, padding: '4px 9px', borderRadius: '999px',
                       cursor: CURSOR_POINTER,
-                      background: k === newNetwork ? T.pr : T.sf,
-                      color: k === newNetwork ? '#fff' : T.dm,
-                      border: `1px solid ${k === newNetwork ? T.pr : T.ln2}`,
+                      background: n === newNetwork ? T.pr : T.sf,
+                      color: n === newNetwork ? '#fff' : T.dm,
+                      border: `1px solid ${n === newNetwork ? T.pr : T.ln2}`,
                     }}
                   >
-                    {label}
+                    {n}
                   </Box>
                 ))}
               </Box>
@@ -323,7 +321,7 @@ export function ArtifactSourcePicker({
               >
                 {createMutation.isPending ? 'Creating…' : 'Create'}
               </SirenButton>
-              <SirenButton onClick={() => { setCreating(false); setNewName(''); setNewNetwork('file'); }}>Cancel</SirenButton>
+              <SirenButton onClick={() => { setCreating(false); setNewName(''); setNewNetwork('OA'); }}>Cancel</SirenButton>
             </Box>
             <Box sx={{ fontSize: 10.5, color: T.dm2, lineHeight: 1.6 }}>
               This only registers an empty artifact. Add its first version — matching the network above —

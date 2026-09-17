@@ -28,10 +28,10 @@ export class CreateCalypsoArtifactDto {
   @MaxLength(500)
   description?: string;
 
-  /** 생략하면 File(실물을 Calypso가 들고 있다). 'OA'/'HPC'면 각 버전이 viewUrl/hpcPath만 갖는다. */
-  @IsOptional()
+  /** 필수 — 'OA' 또는 'HPC'. 파일 업로드는 어느 쪽이든 항상 가능하고, 이 값은 그
+   * artifact의 버전들이 링크(OA)/경로(HPC) 중 어느 배열을 쓸지만 정한다. */
   @IsIn(['OA', 'HPC'])
-  network?: 'OA' | 'HPC';
+  network: 'OA' | 'HPC';
 
   @IsOptional()
   @IsBoolean()
@@ -44,10 +44,10 @@ export class SetCalypsoRestrictViewDto {
   restrictView: boolean;
 }
 
-/** PATCH /calypso-artifacts/:id/network 몸체 — FE의 ContentKind와 같은 값. */
+/** PATCH /calypso-artifacts/:id/network 몸체 — 'OA' 또는 'HPC'. */
 export class SetCalypsoNetworkDto {
-  @IsIn(['file', 'oa', 'hpc'])
-  kind: 'file' | 'oa' | 'hpc';
+  @IsIn(['OA', 'HPC'])
+  network: 'OA' | 'HPC';
 }
 
 export class CalypsoAddVersionDto {
@@ -62,15 +62,16 @@ export class CalypsoAddVersionDto {
   @IsString()
   description?: string;
 
-  /** network==='OA'인 artifact에만. */
+  /** 파일 업로드와 같은 multipart 요청 안에 실려 오므로 JSON 문자열로 받아 그대로
+   * 전달한다 — `JSON.stringify({url, label}[])`. network==='OA'인 artifact에만. */
   @IsOptional()
   @IsString()
-  viewUrl?: string;
+  linksJson?: string;
 
-  /** network==='HPC'인 artifact에만. */
+  /** 위와 같은 이유로 JSON 문자열 — `JSON.stringify({path, label}[])`. network==='HPC'인 artifact에만. */
   @IsOptional()
   @IsString()
-  hpcPath?: string;
+  pathsJson?: string;
 }
 
 export class CalypsoReleaseDto {

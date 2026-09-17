@@ -135,9 +135,20 @@
     "intentPrerequisite": "Prerequisite",
     "intentPrerequisiteTooltip": "Prerequisite: this workflow receives this artifact from elsewhere before it can proceed.",
     "networkChangeTitle": "Change network",
-    "networkChangeMessage": "Changing the network changes what this artifact's version screen looks like (File vs. Link vs. Path).",
+    "networkChangeMessage": "Changing the network changes whether new versions can add links or paths (OA vs. HPC).",
     "networkChangeWarning": "Existing versions keep their old content — only versions added after this change will use the new network.",
-    "networkChangeConfirm": "Change network"
+    "networkChangeConfirm": "Change network",
+    "addFiles": "Add files",
+    "noFilesYet": "No files added yet.",
+    "removeFile": "Remove",
+    "addLink": "Add link",
+    "linkUrlPlaceholder": "https://…",
+    "linkLabelPlaceholder": "What does this link point to? (optional)",
+    "addPath": "Add path",
+    "pathValuePlaceholder": "/vwp/…",
+    "pathLabelPlaceholder": "What does this path point to? (optional)",
+    "removeEntry": "Remove",
+    "setNetworkFirst": "Set this artifact's network (OA or HPC) above before adding a version."
   },
   "release": {
     "title": "Release",

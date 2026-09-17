@@ -1,8 +1,12 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 
-/** Calypso가 지금 지원하는 network 값 — null이면 File(파일 업로드)이라 망 구분이 없다
- * (SIREN 설계서 04장 §2, §6 — Tier D 폐기 후 이 서비스가 그 역할을 흡수했다). */
+/**
+ * Calypso가 지금 지원하는 network 값 — OA 또는 HPC 둘 중 하나다(사용자 요청: 예전에는
+ * null이 "File" 콘텐츠 종류를 뜻했지만, 이제 파일 업로드는 OA/HPC 어느 쪽이든 똑같이
+ * 할 수 있어서 network는 더 이상 콘텐츠 종류를 가리지 않는다 — 순수하게 "이 artifact가
+ * OA망 소속인지 HPC망 소속인지"만 뜻한다). null은 예전 문서(마이그레이션 전)에만 남아있다.
+ */
 export type CalypsoNetwork = 'OA' | 'HPC' | null;
 
 /** File 콘텐츠의 파일 한 개. 한 버전이 여러 개를 가질 수 있다(§3.9). */
@@ -17,6 +21,29 @@ export class ArtifactFile {
 }
 export const ArtifactFileSchema = SchemaFactory.createForClass(ArtifactFile);
 
+/** OA 콘텐츠 하나 — 링크와, 그 링크가 뭘 가리키는지 짧은 설명(사용자 요청: 여러 개
+ * 가능해야 하고 각각 뭘 지칭하는지 적을 수 있어야 한다). */
+@Schema({ _id: false, timestamps: false })
+export class ArtifactLink {
+  @Prop({ required: true })
+  url: string;
+
+  @Prop({ default: '', trim: true })
+  label: string;
+}
+export const ArtifactLinkSchema = SchemaFactory.createForClass(ArtifactLink);
+
+/** HPC 콘텐츠 하나 — 경로와, 그 경로가 뭘 가리키는지 짧은 설명. ArtifactLink와 같은 이유로 배열이다. */
+@Schema({ _id: false, timestamps: false })
+export class ArtifactPath {
+  @Prop({ required: true })
+  path: string;
+
+  @Prop({ default: '', trim: true })
+  label: string;
+}
+export const ArtifactPathSchema = SchemaFactory.createForClass(ArtifactPath);
+
 /**
  * Calypso가 소유하는 버전. **여기가 실물(또는 참조)의 집이다** - SIREN은 이 값을
  * 참조로만 관측한다(Hub 설계서 §1.2).
@@ -24,13 +51,11 @@ export const ArtifactFileSchema = SchemaFactory.createForClass(ArtifactFile);
  * 우리가 직접 만드는 서비스이므로 major.minor 규칙을 그대로 강제한다(§6.1):
  * 업로드 = minor +1(최초 0.1), Release = major +1 · minor 0.
  *
- * ★ §3.9 — Artifact.network에 따라 이 버전이 들고 있는 콘텐츠 필드가 갈린다(셋 중
- *   정확히 하나만 채워진다는 불변식은 서비스 계층이 지킨다, 스키마는 강제하지 않는다):
- *     network === null   → `files`(여러 개 가능, §3.9)
- *     network === 'OA'   → `viewUrl`(링크 하나)
- *     network === 'HPC'  → `hpcPath`(경로 하나)
- *   이 확장 전에는 fileName/storageKey 단수 필드였다 — Tier D(External/Attested) 폐기와
- *   함께 그 역할(경로/링크만 있고 실물이 없는 산출물)을 이 서비스가 흡수하면서 넓어졌다.
+ * ★ §3.9 — 파일/링크/경로는 서로 배타적이지 않다(사용자 요청) — 한 버전이 파일도
+ *   올리고, 그 위에 링크나 경로도 여러 개 같이 가질 수 있다. `links`는 network==='OA'인
+ *   artifact에서만 쓰고, `paths`는 'HPC'인 artifact에서만 쓴다 — 그 구분만 network가
+ *   한다. 최소한 파일 하나 또는 (그 network에 맞는) 링크/경로 하나는 있어야 한다는
+ *   불변식은 서비스 계층이 지킨다.
  */
 @Schema({ _id: false, timestamps: false })
 export class ArtifactVersion {
@@ -48,17 +73,17 @@ export class ArtifactVersion {
   @Prop({ required: true, unique: false })
   versionRef: string;
 
-  /** network === null(File)일 때만. 한 버전에 여러 파일을 묶을 수 있다(§3.9). */
+  /** 한 버전에 여러 파일을 묶을 수 있다(§3.9) — network와 무관하게 항상 올릴 수 있다. */
   @Prop({ type: [ArtifactFileSchema], default: [] })
   files: ArtifactFile[];
 
-  /** network === 'OA'일 때만 — 그 산출물이 실제로 있는 곳의 웹 링크. */
-  @Prop({ type: String, default: null })
-  viewUrl: string | null;
+  /** network==='OA'인 artifact에서만 쓴다 — 여러 개 가능(사용자 요청). */
+  @Prop({ type: [ArtifactLinkSchema], default: [] })
+  links: ArtifactLink[];
 
-  /** network === 'HPC'일 때만 — 그 산출물이 실제로 있는 HPC망 경로. */
-  @Prop({ type: String, default: null })
-  hpcPath: string | null;
+  /** network==='HPC'인 artifact에서만 쓴다 — 여러 개 가능(사용자 요청). */
+  @Prop({ type: [ArtifactPathSchema], default: [] })
+  paths: ArtifactPath[];
 
   /**
    * 짧은 한 줄 메모 — 이 버전에서 뭐가 바뀌었는지, 필수(사용자 요청: 버전을 올리거나
@@ -141,10 +166,11 @@ export class Artifact {
   description: string;
 
   /**
-   * null(기본) = File — 실물을 이 서비스가 들고 있다(여러 개 가능, §3.9). 'OA'/'HPC'면
-   * 실물이 없고 각 버전의 viewUrl/hpcPath가 "어디 있는지"만 가리킨다. 등록 시점에
-   * 한 번 정해지면 그 artifact의 남은 삶 동안 바뀌지 않는다 — 다른 콘텐츠 종류가
-   * 필요하면 새 artifact를 등록하고 SIREN 쪽에서 재매핑한다(설계서 04장 §6.6).
+   * 'OA' 또는 'HPC' — 등록 시점에 정해야 한다(사용자 요청). 언제든 admin/editor가
+   * 다시 고를 수 있다(`setNetwork`) — 파일 업로드는 어느 쪽이든 항상 가능하고, 이
+   * 값은 그 버전의 링크(OA)/경로(HPC) 중 어느 배열을 쓸지만 가른다. null은 이
+   * 구분이 생기기 전(예전엔 "File" 콘텐츠 종류였다) 문서에만 남아있다 — 마이그레이션
+   * 전까지는 그런 문서에 새 버전을 추가하기 전에 먼저 network를 설정해야 한다.
    */
   @Prop({ type: String, enum: ['OA', 'HPC', null], default: null })
   network: CalypsoNetwork;
