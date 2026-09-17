@@ -7,10 +7,11 @@ import { ProjectPageShell } from '@/components/project/ProjectPageShell';
 import { ModalShell } from '@/components/common/ModalShell';
 import { SirenButton, Badge } from '@/components/common/SirenButton';
 import { Field, SelectInput, TextInput, TextArea } from '@/components/common/Panel';
-import { Icon } from '@/components/common/Icon';
+import { Icon, IconName } from '@/components/common/Icon';
 import { useAuth } from '@/app/providers/AuthProvider';
 import { useDirectory } from '@/app/providers/DirectoryProvider';
 import { UserAvatar } from '@/components/common/Avatar';
+import { NetworkChip } from '@/components/artifact/ArtifactChips';
 import { queryKeys } from '@/api/queryKeys';
 import { CalypsoArtifact, createCalypsoArtifact, listCalypsoArtifacts } from '@/api/calypsoClient';
 import { toast } from '@/store/toastStore';
@@ -119,6 +120,21 @@ function ArtifactList({ project }: { project: ProjectDetailDto }) {
   );
 }
 
+/**
+ * 목록 아이콘 — 이 artifact가 지금 뭘 들고 있는지로 고른다(사용자 요청):
+ *   HPC              → path(경로)
+ *   File이 하나라도 있음 → word(지금까지 쓰던 아이콘)
+ *   OA(파일 없음)      → link — Calypso 자신의 OA 콘텐츠 표시(ArtifactVersionContents의
+ *                        "Open link" 버튼)와 같은 아이콘을 쓴다.
+ *   그 외(network 미정 + 파일도 없음) → pending(대기 중)
+ */
+function iconForCalypsoArtifact(a: CalypsoArtifact): IconName {
+  if (a.network === 'HPC') return 'path';
+  if ((a.latestVersion?.files?.length ?? 0) > 0) return 'word';
+  if (a.network === 'OA') return 'link';
+  return 'pending';
+}
+
 function ArtifactRow({ artifact: a, onOpen }: { artifact: CalypsoArtifact; onOpen: () => void }) {
   const { resolveUser } = useDirectory();
   const by = resolveUser(a.createdBy);
@@ -136,11 +152,16 @@ function ArtifactRow({ artifact: a, onOpen }: { artifact: CalypsoArtifact; onOpe
       }}
     >
       <Box component="span" sx={{ color: T.pr, flex: '0 0 auto' }}>
-        <Icon name="word" size={17} />
+        <Icon name={iconForCalypsoArtifact(a)} size={17} />
       </Box>
 
       <Box sx={{ flex: 1, minWidth: 0 }}>
-        <Box sx={{ fontSize: 13.5, fontWeight: 600 }}>{a.name}</Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+          <Box sx={{ fontSize: 13.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {a.name}
+          </Box>
+          <NetworkChip network={a.network} />
+        </Box>
         {a.description && (
           <Box sx={{ fontSize: 11.5, color: T.dm, mt: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {a.description}
