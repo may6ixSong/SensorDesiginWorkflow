@@ -77,7 +77,7 @@ function ServiceSection({ tier, title, blurb }: { tier: RegisterTier; title: str
         <Box sx={{ fontSize: 14, fontWeight: 700 }}>{title}</Box>
         <Box sx={{ flex: 1 }} />
         <SirenButton variant="primary" onClick={() => setRegisterOpen(true)}>
-          <Icon name="plus" /> Register artifact type
+          <Icon name="plus" /> Register artifact
         </SirenButton>
       </Box>
       <Box sx={{ fontSize: 11.5, color: T.dm2, mb: '14px' }}>{blurb}</Box>
@@ -242,7 +242,7 @@ function ServiceCard({ service: s }: { service: HubService }) {
 
       <Box>
         <Box sx={{ fontSize: 10.5, color: T.dm2, mb: '6px' }}>
-          Artifact type{s.artifactTypes.length === 1 ? '' : 's'} ({s.artifactTypes.length})
+          Artifact{s.artifactTypes.length === 1 ? '' : 's'} ({s.artifactTypes.length})
         </Box>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
           {s.artifactTypes.map((t) => (
@@ -368,7 +368,7 @@ function EditServiceDialog({ service: s, onClose }: { service: HubService; onClo
       </Box>
 
       {types.length > 0 && (
-        <Field label={`Artifact type${types.length === 1 ? '' : 's'} — name shown when picking an artifact source`}>
+        <Field label={`Artifact${types.length === 1 ? '' : 's'} — name shown when picking an artifact source`}>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {types.map((t, i) => (
               <Box key={t.key} sx={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -480,7 +480,7 @@ function RegisterDialog({ tier, title, onClose }: { tier: RegisterTier; title: s
       setResult(data);
       setDupeNotice(
         data.reusedExisting
-          ? `This baseURL was already registered as “${data.name}” — added this artifact type to that existing service and reused its token.`
+          ? `This baseURL was already registered as “${data.name}” — added this artifact to that existing service and reused its token.`
           : null,
       );
     },
@@ -523,7 +523,7 @@ function RegisterDialog({ tier, title, onClose }: { tier: RegisterTier; title: s
           events it sends to SIREN.
         </Box>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: '10px', mb: '18px' }}>
-          <TokenRow label="artifactTypeKey — this artifact type" value={result.artifactTypeKey} />
+          <TokenRow label="artifactTypeKey — this artifact" value={result.artifactTypeKey} />
           <TokenRow label="Bearer token — this service (shared by its baseURL)" value={result.token ?? '(none)'} />
         </Box>
         <SirenButton variant="primary" onClick={onClose}>
@@ -541,7 +541,7 @@ function RegisterDialog({ tier, title, onClose }: { tier: RegisterTier; title: s
       header={
         <>
           <Box sx={{ fontSize: 11, color: T.dm2, textTransform: 'uppercase', letterSpacing: '.05em' }}>{title}</Box>
-          <Box sx={{ fontSize: 16, fontWeight: 700, mt: '2px' }}>Register artifact type</Box>
+          <Box sx={{ fontSize: 16, fontWeight: 700, mt: '2px' }}>Register artifact</Box>
         </>
       }
       footer={
@@ -580,7 +580,7 @@ function RegisterDialog({ tier, title, onClose }: { tier: RegisterTier; title: s
       </Field>
       <Box sx={{ fontSize: 11, color: T.dm2, lineHeight: 1.6 }}>
         If this baseURL is already registered, the existing Service name and token are kept — this just
-        adds a new artifact type under it.
+        adds a new artifact under it.
       </Box>
     </ModalShell>
   );
