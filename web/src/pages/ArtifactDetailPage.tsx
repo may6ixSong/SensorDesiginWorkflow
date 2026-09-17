@@ -6,7 +6,10 @@ import { AppShell } from '@/components/layout/AppShell';
 import { ArtifactVersionTree } from '@/components/artifact/ArtifactVersionTree';
 import { ArtifactVersionContents } from '@/components/artifact/ArtifactVersionContents';
 import { ArtifactAccessPanel } from '@/components/artifact/ArtifactAccessPanel';
-import { Badge } from '@/components/common/SirenButton';
+import { AddVersionDialog } from '@/components/artifact/AddVersionDialog';
+import { PublishVersionDialog } from '@/components/artifact/PublishVersionDialog';
+import { Badge, SirenButton } from '@/components/common/SirenButton';
+import { Icon } from '@/components/common/Icon';
 import { useAuth } from '@/app/providers/AuthProvider';
 import { useProject } from '@/api/hooks/useProjects';
 import { queryKeys } from '@/api/queryKeys';
@@ -24,6 +27,8 @@ export function ArtifactDetailPage() {
   const { user } = useAuth();
   const qc = useQueryClient();
   const [picked, setPicked] = useState<CalypsoVersionView | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const [publishing, setPublishing] = useState<CalypsoVersionView | null>(null);
 
   const { data: a, isLoading, isError, error } = useQuery({
     queryKey: queryKeys.calypsoArtifact(id),
@@ -61,8 +66,9 @@ export function ArtifactDetailPage() {
     onError: (e: any) => toast(e?.response?.data?.message ?? 'Could not add version'),
   });
   const release = useMutation({
-    mutationFn: (note: string) => releaseCalypsoArtifact(id, projectId, note),
-    onSuccess: () => { invalidate(); toast('Published'); },
+    mutationFn: ({ note, sourceVersionRef }: { note: string; sourceVersionRef?: string }) =>
+      releaseCalypsoArtifact(id, projectId, note, sourceVersionRef),
+    onSuccess: () => { invalidate(); toast('Published'); setPublishing(null); },
     onError: (e: any) => toast(e?.response?.data?.message ?? 'Publish failed'),
   });
   const addEditor = useMutation({
@@ -160,21 +166,25 @@ export function ArtifactDetailPage() {
 
         <Box sx={{ flex: 1, minHeight: 0, display: 'flex' }}>
           <Box sx={{ flex: 3, minWidth: 0, display: 'flex', borderRight: `1px solid ${T.ln}` }}>
-            <ArtifactVersionContents
-              a={a}
-              version={shown}
-              canEdit={a.myAccess === 'edit'}
-              onDownload={handleDownload}
-              onAddVersion={(input, note) => upload.mutate({ input, note })}
-              onRelease={(note) => release.mutate(note)}
-              uploading={upload.isPending}
-              releasing={release.isPending}
-            />
+            <ArtifactVersionContents a={a} version={shown} onDownload={handleDownload} />
           </Box>
           <Box sx={{ flex: 1, minWidth: 320, background: T.sf2, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <Box>
-              <Box sx={{ fontSize: 12.5, fontWeight: 700, mb: '10px' }}>Version history</Box>
-              <ArtifactVersionTree versions={versions} selected={shown} onSelect={setPicked} />
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: '10px', mb: '10px' }}>
+                <Box sx={{ fontSize: 12.5, fontWeight: 700, flex: 1 }}>Version history</Box>
+                {a.myAccess === 'edit' && (
+                  <SirenButton onClick={() => setAddOpen(true)}>
+                    <Icon name="plus" size={12} /> Add a new version
+                  </SirenButton>
+                )}
+              </Box>
+              <ArtifactVersionTree
+                versions={versions}
+                selected={shown}
+                onSelect={setPicked}
+                canPublish={a.myAccess === 'edit'}
+                onPublish={setPublishing}
+              />
             </Box>
             {a.myAccess === 'edit' && (
               <ArtifactAccessPanel
@@ -191,6 +201,23 @@ export function ArtifactDetailPage() {
           </Box>
         </Box>
       </Box>
+
+      {addOpen && (
+        <AddVersionDialog
+          a={a}
+          onSubmit={(input, note) => upload.mutate({ input, note })}
+          submitting={upload.isPending}
+          onClose={() => setAddOpen(false)}
+        />
+      )}
+      {publishing && (
+        <PublishVersionDialog
+          version={publishing}
+          submitting={release.isPending}
+          onConfirm={(note) => release.mutate({ note, sourceVersionRef: publishing.versionRef })}
+          onClose={() => setPublishing(null)}
+        />
+      )}
     </AppShell>
   );
 }

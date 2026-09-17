@@ -113,9 +113,16 @@ export async function addCalypsoVersion(
   return data.data;
 }
 
-export async function releaseCalypsoArtifact(id: string, projectId: string, note: string): Promise<CalypsoArtifact> {
+/**
+ * sourceVersionRef를 안 주면 지금까지처럼 최신 minor를 승격한다. 주면 그 minor(released
+ * 아니어야 함)의 콘텐츠로 새 released 버전을 만든다 — version tree에서 과거 작업본을
+ * 골라 publish하는 경로(사용자 요청).
+ */
+export async function releaseCalypsoArtifact(
+  id: string, projectId: string, note: string, sourceVersionRef?: string,
+): Promise<CalypsoArtifact> {
   const { data } = await apiClient.post<ApiEnvelope<CalypsoArtifact>>(
-    `/calypso-artifacts/${id}/release`, { note }, { params: { projectId } },
+    `/calypso-artifacts/${id}/release`, { note, sourceVersionRef }, { params: { projectId } },
   );
   return data.data;
 }

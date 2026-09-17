@@ -64,6 +64,11 @@ export class CalypsoReleaseDto {
   @IsOptional()
   @IsString()
   note?: string;
+
+  /** 어느 minor를 승격할지 — 비우면 최신 minor. version tree에서 과거 작업본을 골라 publish할 때 쓴다. */
+  @IsOptional()
+  @IsString()
+  sourceVersionRef?: string;
 }
 
 /** editors/view-grants에 한 건 추가·삭제할 때 쓰는 몸체 — user 또는 department 중 하나. */

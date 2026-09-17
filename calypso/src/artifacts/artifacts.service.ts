@@ -248,13 +248,26 @@ export class ArtifactsService {
     return a;
   }
 
-  /** Release = major +1 · minor 0. 최신 업로드분을 그대로 승격한다. */
-  async release(id: string, note: string | undefined, actor: Actor) {
+  /**
+   * Release = major +1 · minor 0, 항상 새 버전을 하나 더 쌓는 방식으로 승격한다(과거
+   * 버전을 고쳐 쓰지 않는다). 기본은 최신 업로드분(minor)을 그대로 쓰지만, Calypso는
+   * minor를 여러 개 쌓아둘 수 있으므로(사용자 요청) `sourceVersionRef`로 과거의 released
+   * 아닌 minor를 하나 골라 그 콘텐츠로 release할 수도 있다 — version tree에서 최신이
+   * 아닌 작업본을 publish하는 경로다. 어느 쪽이든 새 major 번호는 항상 지금 진짜
+   * 최신(a.versions[0])의 major+1이다 — release가 몇 번째 minor의 데이터를 썼는지와
+   * 무관하게 버전 번호 자체는 계속 앞으로만 나간다.
+   */
+  async release(id: string, note: string | undefined, actor: Actor, sourceVersionRef?: string) {
     const a = await this.findOrThrow(id);
     this.assertCanEdit(a, actor);
     const latest = a.versions[0];
     if (!latest) throw new BadRequestException('There is no uploaded version to release.');
-    if (latest.isReleased) throw new BadRequestException('The latest version is already released.');
+
+    const source = sourceVersionRef
+      ? a.versions.find((v) => v.versionRef === sourceVersionRef)
+      : latest;
+    if (!source) throw new NotFoundException('That version was not found.');
+    if (source.isReleased) throw new BadRequestException('That version is already released.');
 
     const major = latest.major + 1;
     a.versions.unshift({
@@ -262,12 +275,12 @@ export class ArtifactsService {
       minor: 0,
       isReleased: true,
       versionRef: this.buildVersionRef(a, major, 0),
-      files: latest.files,
-      viewUrl: latest.viewUrl,
-      hpcPath: latest.hpcPath,
+      files: source.files,
+      viewUrl: source.viewUrl,
+      hpcPath: source.hpcPath,
       note: note ?? '',
       createdBy: actor.knoxId,
-      createdByDept: latest.createdByDept,
+      createdByDept: source.createdByDept,
       createdAt: new Date(),
     } as ArtifactVersion);
     await a.save();

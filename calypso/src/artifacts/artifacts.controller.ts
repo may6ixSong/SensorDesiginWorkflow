@@ -185,7 +185,7 @@ export class ArtifactsController {
 
   @Post(':id/release')
   async release(@Param('id') id: string, @Body() dto: ReleaseDto, @CurrentActor() me: Actor) {
-    const a = await this.artifacts.release(id, dto.note, me);
+    const a = await this.artifacts.release(id, dto.note, me, dto.sourceVersionRef);
     return { data: toArtifactDto(a, 'edit') };
   }
 

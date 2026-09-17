@@ -1,15 +1,13 @@
-import { useState } from 'react';
 import { Box } from '@mui/material';
 import DOMPurify from 'dompurify';
 import { CalypsoArtifact, CalypsoVersionView } from '@/api/calypsoClient';
 import { useDirectory } from '@/app/providers/DirectoryProvider';
 import { UserAvatar } from '@/components/common/Avatar';
 import { SirenButton, Badge } from '@/components/common/SirenButton';
-import { Field, TextInput } from '@/components/common/Panel';
-import { RichTextEditor, isRichTextEmpty } from '@/components/common/RichTextEditor';
+import { isRichTextEmpty } from '@/components/common/RichTextEditor';
 import { Icon } from '@/components/common/Icon';
 import { toast } from '@/store/toastStore';
-import { CURSOR_POINTER, FONT_DISPLAY, FONT_MONO, R, T } from '@/theme/tokens';
+import { CURSOR_POINTER, FONT_DISPLAY, FONT_MONO, T } from '@/theme/tokens';
 
 function fmtAt(iso: string): string {
   if (!iso) return '';
@@ -19,71 +17,24 @@ function fmtAt(iso: string): string {
   return `${t.getFullYear()}-${p(t.getMonth() + 1)}-${p(t.getDate())} ${p(t.getHours())}:${p(t.getMinutes())}`;
 }
 
-/** 새 버전에 넣을 콘텐츠 종류. artifact에 버전이 하나도 없으면 여기서 처음 정해진다
- * (설계서 04장 §2.2, §6.4) — 그 뒤로는 `a.network`에 따라 고정된다. */
-type ContentKind = 'file' | 'oa' | 'hpc';
-
-const KIND_LABEL: Record<ContentKind, string> = { file: 'File', oa: 'Link (OA)', hpc: 'Path (HPC)' };
-
 interface Props {
   a: CalypsoArtifact;
   version: CalypsoVersionView | null;
-  canEdit: boolean;
   onDownload: (v: CalypsoVersionView) => void;
-  onAddVersion: (input: { files?: File[]; viewUrl?: string; hpcPath?: string }, note: string) => void;
-  onRelease: (note: string) => void;
-  uploading: boolean;
-  releasing: boolean;
 }
 
 /**
- * 왼쪽(A) 영역 — 문서면 + 새 버전 추가 폼을 한 컬럼에 둔다(사용자 요청: B의 업로드를 A로
- * 옮긴다). Calypso는 실제 파일을 갖고 있으므로(§1.2와 달리 여기가 실물의 주인이다)
- * 링크-아웃이 아니라 진짜 다운로드 버튼을 낸다 — File 콘텐츠에 한해서다.
+ * 왼쪽(A) 영역 — 지금 고른 버전의 표지(문서면)만 그린다. "새 버전 추가"/"publish"는
+ * 이제 여기 없다 — Dialog(AddVersionDialog/PublishVersionDialog)로 옮겨서 version
+ * history 위쪽 버튼과 트리 각 행에서 각각 띄운다(사용자 요청).
  */
-export function ArtifactVersionContents({
-  a, version: v, canEdit, onDownload, onAddVersion, onRelease, uploading, releasing,
-}: Props) {
+export function ArtifactVersionContents({ a, version: v, onDownload }: Props) {
   const { resolveUser } = useDirectory();
-  const [note, setNote] = useState('');
-  const [pickedKind, setPickedKind] = useState<ContentKind | null>(null);
-  const [files, setFiles] = useState<File[]>([]);
-  const [link, setLink] = useState('');
-  const [path, setPath] = useState('');
-  // 아직 버전이 하나도 없으면(콘텐츠 종류를 지금 처음 정해야 함) 펼친 채로 시작한다 —
-  // 이미 하나 이상 있으면 표지(문서면)와 겹쳐 보이지 않게 접어 둔다(사용자 요청: 표지랑
-  // "새 버전 추가"를 같은 화면에 늘 펼쳐 두지 말고 구분할 것).
-  const [addOpen, setAddOpen] = useState(() => a.versionCount === 0);
   const accent = v?.isReleased ? T.pr : T.warn;
   // "WORKING"은 지금 보이는 버전이 실제 latest일 때만 — 사용자가 버전 트리에서 과거의
   // 미발행 버전을 눌러 봐도 그게 "지금 작업 중인 것"처럼 보이면 안 된다(사용자 지적,
   // ArtifactVersionTree/ArtifactSlide의 generic 버전 목록과 같은 규칙).
   const isLatest = !!v && a.latestVersion?.versionRef === v.versionRef;
-
-  // 이미 버전이 하나라도 있으면 network가 고정돼 있다 — 그 콘텐츠 종류만 보여준다.
-  // 아직 하나도 없으면(=콘텐츠 종류를 이번에 처음 정한다) 사용자가 고른 것을 쓴다.
-  const fixedKind: ContentKind | null = a.versionCount > 0
-    ? (a.network === 'OA' ? 'oa' : a.network === 'HPC' ? 'hpc' : 'file')
-    : null;
-  const kind = fixedKind ?? pickedKind;
-
-  const resetForm = () => { setNote(''); setFiles([]); setLink(''); setPath(''); setPickedKind(null); setAddOpen(false); };
-
-  const submit = () => {
-    if (kind === 'file') {
-      if (!files.length) return;
-      onAddVersion({ files }, note);
-    } else if (kind === 'oa') {
-      if (!link.trim()) return;
-      onAddVersion({ viewUrl: link.trim() }, note);
-    } else if (kind === 'hpc') {
-      if (!path.trim()) return;
-      onAddVersion({ hpcPath: path.trim() }, note);
-    } else {
-      return;
-    }
-    resetForm();
-  };
 
   const copyPath = async (value: string) => {
     try {
@@ -96,7 +47,7 @@ export function ArtifactVersionContents({
 
   return (
     <Box sx={{ flex: 1, minWidth: 0, overflowY: 'auto', background: T.sf3, padding: '22px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      <Box sx={{ width: '100%', maxWidth: 660, mx: 'auto', minHeight: v ? undefined : 0, display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <Box sx={{ width: '100%', maxWidth: 660, mx: 'auto' }}>
         {v ? (
           <Box
             sx={{
@@ -237,94 +188,6 @@ export function ArtifactVersionContents({
           >
             <Icon name="word" size={24} />
             <Box sx={{ fontSize: 12.5, mt: '9px' }}>Nothing added yet.</Box>
-          </Box>
-        )}
-
-        {canEdit && (
-          <Box sx={{ background: T.sf, border: `1px solid ${T.ln}`, borderRadius: '12px', overflow: 'hidden' }}>
-            {/* 표지(문서면)와 늘 같이 펼쳐 두지 않는다(사용자 요청) — 접었다 펴는 헤더로
-                분리해서, 이미 있는 버전을 보러 온 것뿐일 때는 폼이 화면을 안 차지한다. */}
-            <Box
-              component="button"
-              type="button"
-              onClick={() => setAddOpen((o) => !o)}
-              sx={{
-                width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '16px 20px', background: 'transparent', border: 'none', cursor: CURSOR_POINTER,
-                fontSize: 13, fontWeight: 700, color: T.tx, fontFamily: 'inherit', textAlign: 'left',
-              }}
-            >
-              Add a new version
-              <Icon name={addOpen ? 'up' : 'dn'} size={12} />
-            </Box>
-            {addOpen && <Box sx={{ padding: '0 20px 20px' }}>
-            {!kind ? (
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: '8px', mb: '12px' }}>
-                <Box sx={{ fontSize: 11.5, color: T.dm2 }}>
-                  This artifact has no version yet — pick what it will hold. This can&apos;t be changed afterwards.
-                </Box>
-                <Box sx={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                  {(Object.keys(KIND_LABEL) as ContentKind[]).map((k) => (
-                    <Box
-                      key={k}
-                      component="button"
-                      type="button"
-                      onClick={() => setPickedKind(k)}
-                      sx={{
-                        fontSize: 12.5, fontWeight: 600, padding: '7px 12px', borderRadius: `${R.sm}px`,
-                        cursor: CURSOR_POINTER, background: T.sf, border: `1px solid ${T.ln2}`, color: T.dm,
-                        '&:hover': { borderColor: T.pr, color: T.pr },
-                      }}
-                    >
-                      {KIND_LABEL[k]}
-                    </Box>
-                  ))}
-                </Box>
-              </Box>
-            ) : (
-              <>
-                {kind === 'file' && (
-                  <Field label={files.length > 1 ? `Files (${files.length} selected)` : 'File'}>
-                    <Box
-                      component="input"
-                      type="file"
-                      multiple
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFiles(Array.from(e.target.files ?? []))}
-                      sx={{ fontSize: 12.5, width: '100%' }}
-                    />
-                  </Field>
-                )}
-                {kind === 'oa' && (
-                  <Field label="Link">
-                    <TextInput value={link} onChange={setLink} placeholder="https://…" />
-                  </Field>
-                )}
-                {kind === 'hpc' && (
-                  <Field label="HPC path">
-                    <TextInput value={path} onChange={setPath} placeholder="/vwp/…" />
-                  </Field>
-                )}
-                <Field label="Note">
-                  <RichTextEditor value={note} onChange={setNote} placeholder="What changed in this version" minHeight={110} />
-                </Field>
-                <Box sx={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                  <SirenButton variant="primary" disabled={uploading} onClick={submit}>
-                    <Icon name="up" /> {uploading ? 'Adding…' : 'Add version'}
-                  </SirenButton>
-                  {!fixedKind && (
-                    <SirenButton onClick={() => setPickedKind(null)}>Back</SirenButton>
-                  )}
-                  <SirenButton
-                    disabled={!a.latestVersion || a.latestVersion.isReleased || releasing}
-                    onClick={() => onRelease(note)}
-                    sx={{ color: T.pr, borderColor: T.prLine }}
-                  >
-                    <Icon name="send" /> Publish latest
-                  </SirenButton>
-                </Box>
-              </>
-            )}
-            </Box>}
           </Box>
         )}
       </Box>

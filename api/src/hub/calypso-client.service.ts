@@ -413,6 +413,7 @@ export class CalypsoClientService {
     knoxId: string,
     departments: string[],
     isAdmin: boolean,
+    sourceVersionRef?: string,
   ): Promise<{ status: number; body: any } | null> {
     if (!this.baseUrl) return null;
     const controller = new AbortController();
@@ -422,7 +423,7 @@ export class CalypsoClientService {
         method: 'POST',
         signal: controller.signal,
         headers: { ...this.actorHeaders(knoxId, departments, isAdmin), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ note }),
+        body: JSON.stringify({ note, sourceVersionRef }),
       });
       const body = await res.json().catch(() => null);
       return { status: res.status, body };

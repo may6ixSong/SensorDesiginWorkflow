@@ -9,8 +9,12 @@ import { ReleaseDto } from '@/types/domain';
 import { releaseBadgeMap } from '@/lib/releaseBadge';
 import { toast } from '@/store/toastStore';
 import { Ey } from '@/components/common/Panel';
+import { SirenButton } from '@/components/common/SirenButton';
+import { Icon } from '@/components/common/Icon';
 import { ArtifactVersionContents } from './ArtifactVersionContents';
 import { ArtifactVersionTree } from './ArtifactVersionTree';
+import { AddVersionDialog } from './AddVersionDialog';
+import { PublishVersionDialog } from './PublishVersionDialog';
 import { T } from '@/theme/tokens';
 
 interface Props {
@@ -40,6 +44,8 @@ interface Props {
 export function CalypsoInlinePanel({ artifactId, projectId, blockId, releases, onOpenRelease }: Props) {
   const qc = useQueryClient();
   const [picked, setPicked] = useState<CalypsoVersionView | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const [publishing, setPublishing] = useState<CalypsoVersionView | null>(null);
 
   const { data: a, isLoading, isError } = useQuery({
     queryKey: queryKeys.calypsoArtifact(artifactId),
@@ -61,8 +67,9 @@ export function CalypsoInlinePanel({ artifactId, projectId, blockId, releases, o
     onError: (e: any) => toast(e?.response?.data?.message ?? 'Could not add version'),
   });
   const release = useMutation({
-    mutationFn: (note: string) => releaseCalypsoArtifact(artifactId, projectId, note),
-    onSuccess: () => { invalidate(); toast('Published'); },
+    mutationFn: ({ note, sourceVersionRef }: { note: string; sourceVersionRef?: string }) =>
+      releaseCalypsoArtifact(artifactId, projectId, note, sourceVersionRef),
+    onSuccess: () => { invalidate(); toast('Published'); setPublishing(null); },
     onError: (e: any) => toast(e?.response?.data?.message ?? 'Publish failed'),
   });
   const handleDownload = async (v: CalypsoVersionView) => {
@@ -98,28 +105,45 @@ export function CalypsoInlinePanel({ artifactId, projectId, blockId, releases, o
     // page와 같은 자리 배치를 슬라이드 폭에 맞게 옮겨온다(사용자 요청).
     <Box sx={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
       <Box sx={{ flex: 2, minWidth: 0, borderRadius: '12px', overflow: 'hidden' }}>
-        <ArtifactVersionContents
-          a={a}
-          version={shown}
-          canEdit={canEdit}
-          onDownload={handleDownload}
-          onAddVersion={(input, note) => upload.mutate({ input, note })}
-          onRelease={(note) => release.mutate(note)}
-          uploading={upload.isPending}
-          releasing={release.isPending}
-        />
+        <ArtifactVersionContents a={a} version={shown} onDownload={handleDownload} />
       </Box>
 
       <Box sx={{ flex: 1, minWidth: 0 }}>
-        <Ey sx={{ mb: '10px' }}>Version history</Ey>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', mb: '10px' }}>
+          <Ey sx={{ flex: 1, mb: 0 }}>Version history</Ey>
+          {canEdit && (
+            <SirenButton onClick={() => setAddOpen(true)}>
+              <Icon name="plus" size={12} /> Add a new version
+            </SirenButton>
+          )}
+        </Box>
         <ArtifactVersionTree
           versions={versions}
           selected={shown}
           onSelect={setPicked}
           releaseBadgeFor={(v) => relBadges.get(v.versionLabel)}
           onOpenRelease={onOpenRelease}
+          canPublish={canEdit}
+          onPublish={setPublishing}
         />
       </Box>
+
+      {addOpen && (
+        <AddVersionDialog
+          a={a}
+          onSubmit={(input, note) => upload.mutate({ input, note })}
+          submitting={upload.isPending}
+          onClose={() => setAddOpen(false)}
+        />
+      )}
+      {publishing && (
+        <PublishVersionDialog
+          version={publishing}
+          submitting={release.isPending}
+          onConfirm={(note) => release.mutate({ note, sourceVersionRef: publishing.versionRef })}
+          onClose={() => setPublishing(null)}
+        />
+      )}
     </Box>
   );
 }

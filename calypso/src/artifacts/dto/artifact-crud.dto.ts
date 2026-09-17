@@ -89,6 +89,15 @@ export class ReleaseDto {
   @IsOptional()
   @IsString()
   note?: string;
+
+  /**
+   * 어느 minor를 승격할지 — 비우면 지금까지처럼 최신 minor를 쓴다. Calypso는 minor를
+   * 여러 개 쌓아둘 수 있어서(사용자 요청), version tree에서 released 아닌 과거 minor를
+   * 골라 그 데이터로 바로 release할 수 있어야 한다.
+   */
+  @IsOptional()
+  @IsString()
+  sourceVersionRef?: string;
 }
 
 /** editors/viewGrants에 한 건 추가·삭제할 때 쓰는 몸체 — user 또는 department 중 하나. */

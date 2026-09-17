@@ -171,7 +171,7 @@ export class CalypsoProxyController {
     @CurrentActor() me: Actor,
   ) {
     const { departments, isAdmin } = await this.resolveContext(projectId, me);
-    const result = await this.calypso.release(id, dto.note, me.knoxId, departments, isAdmin);
+    const result = await this.calypso.release(id, dto.note, me.knoxId, departments, isAdmin, dto.sourceVersionRef);
     return this.relay(result);
   }
 

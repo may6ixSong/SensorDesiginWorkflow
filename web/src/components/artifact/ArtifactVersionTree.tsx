@@ -1,9 +1,17 @@
 import { Box } from '@mui/material';
+import DOMPurify from 'dompurify';
 import { CalypsoVersionView } from '@/api/calypsoClient';
 import { useDirectory } from '@/app/providers/DirectoryProvider';
-import { Badge } from '@/components/common/SirenButton';
+import { Badge, SirenButton } from '@/components/common/SirenButton';
+import { Icon } from '@/components/common/Icon';
 import { CURSOR_POINTER, FONT_MONO, R, T } from '@/theme/tokens';
 import { ReleaseBadge } from '@/lib/releaseBadge';
+
+/** 트리 행은 좁아서 서식까지 그대로 그리면 줄바꿈이 어긋난다 — 태그만 벗겨 한 줄
+ * 미리보기로 쓴다(본문 서식은 표지 카드에서 그대로 보여준다). */
+function notePreview(html: string): string {
+  return DOMPurify.sanitize(html, { ALLOWED_TAGS: [] }).trim();
+}
 
 const RAIL_W = 44;
 const TRUNK_X = 11;
@@ -22,6 +30,10 @@ interface Props {
    */
   releaseBadgeFor?: (v: CalypsoVersionView) => ReleaseBadge | undefined;
   onOpenRelease?: (releaseId: string) => void;
+  /** true면 released 아닌 각 행에 Publish 버튼을 낸다(edit 권한자만, 사용자 요청 —
+   * "새 버전 추가"뿐 아니라 publish도 최신이 아닌 과거 minor를 골라 할 수 있어야 한다). */
+  canPublish?: boolean;
+  onPublish?: (v: CalypsoVersionView) => void;
 }
 
 function fmtAt(iso: string): string {
@@ -37,7 +49,9 @@ function fmtAt(iso: string): string {
  * 같은 줄기/가지 언어를 쓴다(release=줄기, working=가지). 버전 모양이 달라서
  * (major.minor + 실제 파일 vs tier/giver) 컴포넌트 자체는 분리했다.
  */
-export function ArtifactVersionTree({ versions, selected, onSelect, releaseBadgeFor, onOpenRelease }: Props) {
+export function ArtifactVersionTree({
+  versions, selected, onSelect, releaseBadgeFor, onOpenRelease, canPublish, onPublish,
+}: Props) {
   const { resolveUser } = useDirectory();
 
   if (!versions.length) {
@@ -140,9 +154,32 @@ export function ArtifactVersionTree({ versions, selected, onSelect, releaseBadge
                   </Box>
                 )}
               </Box>
-              {v.note && <Box sx={{ fontSize: 12, color: T.tx, mt: '5px', lineHeight: 1.5 }}>{v.note}</Box>}
-              <Box sx={{ fontFamily: FONT_MONO, fontSize: 10, color: T.dm2, mt: '5px' }}>
-                {by.name} · {fmtAt(v.createdAt)}
+              {notePreview(v.note) && (
+                <Box
+                  sx={{
+                    fontSize: 12, color: T.tx, mt: '5px', lineHeight: 1.5,
+                    overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box',
+                    WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+                  }}
+                >
+                  {notePreview(v.note)}
+                </Box>
+              )}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', mt: '5px' }}>
+                <Box sx={{ fontFamily: FONT_MONO, fontSize: 10, color: T.dm2, flex: 1, minWidth: 0 }}>
+                  {by.name} · {fmtAt(v.createdAt)}
+                </Box>
+                {canPublish && !v.isReleased && onPublish && (
+                  <Box onClick={(e: React.MouseEvent) => e.stopPropagation()} sx={{ flex: '0 0 auto' }}>
+                    <SirenButton
+                      variant="ghost"
+                      onClick={() => onPublish(v)}
+                      sx={{ fontSize: 10.5, padding: '3px 8px', color: T.pr }}
+                    >
+                      <Icon name="send" size={11} /> Publish
+                    </SirenButton>
+                  </Box>
+                )}
               </Box>
             </Box>
           </Box>
