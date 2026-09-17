@@ -24,7 +24,8 @@ import { fmtAt, isOrphanPhase } from '@/lib/canvasModel';
 import { shortDate } from '@/lib/schedule';
 import { releaseBadgeMap } from '@/lib/releaseBadge';
 import { toast } from '@/store/toastStore';
-import { CURSOR_POINTER, FONT_MONO, R, T, TIER_COLOR, TIER_LABEL, TNUM } from '@/theme/tokens';
+import { CURSOR_POINTER, FONT_MONO, R, T, TNUM } from '@/theme/tokens';
+import { NetworkChip, ServiceChip } from '@/components/artifact/ArtifactChips';
 
 /** Overview에서 html preview를 함께 그릴 때 왼쪽(B) 칸의 실제 폭 — 900px 패널 - 좌우 여백
  * - 두 칸 사이 gap을 뺀 2/3. CalypsoInlinePanel의 왼쪽 칸과 같은 폭으로 맞춘다. */
@@ -216,7 +217,6 @@ export function ArtifactSlide({
     );
   }
 
-  const tier = TIER_COLOR[artifact.tier];
   // Hub 라이브 대상이면 artifact.versions(스냅샷) 대신 방금 그 서비스에 물어본 값을 쓴다.
   const effectiveVersions = isHubLive ? (live.data ?? []) : artifact.versions;
   const published = effectiveVersions.filter((v) => v.isPublished);
@@ -246,21 +246,12 @@ export function ArtifactSlide({
       )}
     >
       {/* ── 머리 — 출처 / 망 / 상태 ──
-          Tier 글자(A/B/C)는 절대 노출하지 않는다(사용자 지적) — "새 Artifact 추가"
-          다이얼로그와 같은 이름(TIER_LABEL)으로만 보여준다. */}
+          Tier 글자(A/B/C)는 절대 노출하지 않는다(사용자 지적) — "새 Artifact 추가" 피커와
+          같은 칩(ArtifactChips)만 쓴다: OA/HPC는 network가 정해진 것에만, OA/HPC SERVICE는
+          admin이 등록한 실제 Hub Service(Tier A/C)에만 뜬다. */}
       <Box sx={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', mb: '14px' }}>
-        <Box
-          sx={{
-            display: 'inline-flex', alignItems: 'center', gap: '5px',
-            background: tier.bg, color: tier.fg, fontSize: 11, fontWeight: 700,
-            padding: '3px 8px', borderRadius: `${R.xs}px`, letterSpacing: '0.03em',
-          }}
-        >
-          {TIER_LABEL[artifact.tier]}
-        </Box>
-        {artifact.network === 'HPC' && (
-          <Badge color={T.dm} bg={T.sf3} borderColor="transparent">HPC</Badge>
-        )}
+        {artifact.tier !== 'B' && <ServiceChip source={artifact.tier === 'C' ? 'hpc' : 'live'} />}
+        <NetworkChip network={artifact.network} />
         {published.length ? (
           <Badge color={T.ok} bg={T.okSoft} borderColor={T.okLine} sx={STATUS_BADGE_SX}>{t('artifact.published')}</Badge>
         ) : (

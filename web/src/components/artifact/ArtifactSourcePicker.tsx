@@ -7,10 +7,11 @@ import { queryKeys } from '@/api/queryKeys';
 import { ArtifactIntent } from '@/types/domain';
 import { departmentName } from '@/shared/constants/departments';
 import { Field, SelectInput, TextInput } from '@/components/common/Panel';
-import { Badge, SirenButton } from '@/components/common/SirenButton';
+import { SirenButton } from '@/components/common/SirenButton';
 import { Icon } from '@/components/common/Icon';
 import { toast } from '@/store/toastStore';
 import { CURSOR_POINTER, FONT_MONO, R, T } from '@/theme/tokens';
+import { EditChip, NetworkChip, ServiceChip } from './ArtifactChips';
 
 export type ArtifactSourceKind = 'live' | 'file' | 'hpc';
 
@@ -55,35 +56,6 @@ const radioSx = (sel: boolean) => ({
   border: `2px solid ${sel ? T.pr : T.ln3}`,
   background: sel ? T.pr : 'transparent',
 });
-
-/**
- * T.select(캔버스 select/flow 전용 청록)는 soft/line 짝이 없어 color-mix로 그 자리에서
- * 만든다 — HPC Service 칩 하나에만 쓰는 색이라 tokens.ts에 전용 짝을 새로 추가할 만큼은
- * 아니다(사용자 요청 — Edit/OA/HPC/OA Service/HPC Service 5개 칩이 전부 다른 색이어야 한다).
- */
-const HPC_SERVICE_SOFT_BG = 'color-mix(in srgb, var(--s-select) 16%, transparent)';
-const HPC_SERVICE_SOFT_LINE = 'color-mix(in srgb, var(--s-select) 45%, transparent)';
-
-/** Edit 권한이 있을 때만 — view는 이미 각 행의 캡션("view only — …")이 따로 설명한다. */
-function EditChip({ level }: { level: 'edit' | 'view' | null }) {
-  if (level !== 'edit') return null;
-  return <Badge color={T.pr} bg={T.prSoft} borderColor={T.prLine}>EDIT</Badge>;
-}
-
-/** network가 정해진 것에 대해서만(File인 Tier B는 아직 null이라 안 뜬다). */
-function NetworkChip({ network }: { network: 'OA' | 'HPC' | null | undefined }) {
-  if (!network) return null;
-  return network === 'HPC'
-    ? <Badge color={T.warn} bg={T.warnSoft} borderColor={T.warnLine}>HPC</Badge>
-    : <Badge color={T.ok} bg={T.okSoft} borderColor={T.okLine}>OA</Badge>;
-}
-
-/** admin이 등록한 실제 OA/HPC Service(Tier A/C)에서 온 후보에만 — Calypso(File Artifacts)는 해당 없다. */
-function ServiceChip({ source }: { source: 'live' | 'hpc' }) {
-  return source === 'hpc'
-    ? <Badge color={T.select} bg={HPC_SERVICE_SOFT_BG} borderColor={HPC_SERVICE_SOFT_LINE}>HPC SERVICE</Badge>
-    : <Badge color={T.info} bg={T.infoSoft} borderColor={T.infoLine}>OA SERVICE</Badge>;
-}
 
 /** OA/HPC Service 한 줄 — 펼치면 그 서비스의 실시간 후보가 아래에 뜬다(설계서 04장 §6.3 2단계). */
 function ServiceRow({

@@ -139,7 +139,11 @@ export function ArtifactVersionContents({
               )}
 
               <Box sx={{ mt: '20px', paddingTop: '16px', borderTop: `1px solid ${T.ln}` }}>
-                {v.files.length > 0 && (
+                {/* v.files는 서버 DTO(toVersionView)가 항상 배열을 보장하지만, 스키마 확장
+                    이전(fileName/storageKey 단수 필드) 시절 문서나 raw driver로 직접 넣은
+                    문서처럼 그 보장을 안 거친 데이터가 섞이면 undefined로 올 수 있다 —
+                    화면이 통째로 죽지 않게 방어한다. */}
+                {(v.files ?? []).length > 0 && (
                   <>
                     <Box sx={{ fontFamily: FONT_MONO, fontSize: 10, letterSpacing: '.15em', textTransform: 'uppercase', color: T.dm2, mb: '9px' }}>
                       {v.files.length > 1 ? `Files (${v.files.length})` : 'File'}
