@@ -21,22 +21,22 @@ const HPC_SERVICE_SOFT_BG = 'color-mix(in srgb, var(--s-select) 16%, transparent
 const HPC_SERVICE_SOFT_LINE = 'color-mix(in srgb, var(--s-select) 45%, transparent)';
 
 /** Edit 권한이 있을 때만 — view는 캡션("view only — …")이나 그 화면의 다른 요소가 따로 설명한다. */
-export function EditChip({ level }: { level: 'edit' | 'view' | null }) {
+export function EditChip({ level, sx }: { level: 'edit' | 'view' | null; sx?: object }) {
   if (level !== 'edit') return null;
-  return <Badge color={T.pr} bg={T.prSoft} borderColor={T.prLine}>EDIT</Badge>;
+  return <Badge color={T.pr} bg={T.prSoft} borderColor={T.prLine} sx={sx}>EDIT</Badge>;
 }
 
 /** network가 정해진 것에 대해서만(File인 Tier B는 아직 null이라 안 뜬다). */
-export function NetworkChip({ network }: { network: 'OA' | 'HPC' | null | undefined }) {
+export function NetworkChip({ network, sx }: { network: 'OA' | 'HPC' | null | undefined; sx?: object }) {
   if (!network) return null;
   return network === 'HPC'
-    ? <Badge color={T.warn} bg={T.warnSoft} borderColor={T.warnLine}>HPC</Badge>
-    : <Badge color={T.ok} bg={T.okSoft} borderColor={T.okLine}>OA</Badge>;
+    ? <Badge color={T.warn} bg={T.warnSoft} borderColor={T.warnLine} sx={sx}>HPC</Badge>
+    : <Badge color={T.ok} bg={T.okSoft} borderColor={T.okLine} sx={sx}>OA</Badge>;
 }
 
 /** admin이 등록한 실제 OA/HPC Service(Tier A/C)에서 온 것에만 — Calypso(File Artifacts)는 해당 없다. */
-export function ServiceChip({ source }: { source: 'live' | 'hpc' }) {
+export function ServiceChip({ source, sx }: { source: 'live' | 'hpc'; sx?: object }) {
   return source === 'hpc'
-    ? <Badge color={T.select} bg={HPC_SERVICE_SOFT_BG} borderColor={HPC_SERVICE_SOFT_LINE}>HPC SERVICE</Badge>
-    : <Badge color={T.info} bg={T.infoSoft} borderColor={T.infoLine}>OA SERVICE</Badge>;
+    ? <Badge color={T.select} bg={HPC_SERVICE_SOFT_BG} borderColor={HPC_SERVICE_SOFT_LINE} sx={sx}>HPC SERVICE</Badge>
+    : <Badge color={T.info} bg={T.infoSoft} borderColor={T.infoLine} sx={sx}>OA SERVICE</Badge>;
 }

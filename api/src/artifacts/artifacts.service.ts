@@ -86,7 +86,11 @@ export class ArtifactsService {
       projectId,
       name: input.name.trim(),
       tier: input.tier,
-      network: input.network ?? 'OA',
+      // ?? 는 안 쓴다 — findOrCreateExternal이 B(File Artifacts)에 명시적으로 null(File
+      // 콘텐츠 잠정)을 넘기는데, ??는 null도 undefined와 똑같이 'OA'로 되돌려버려서 B가
+      // 항상 OA로 잘못 생성되는 버그가 있었다. "안 준 경우"(undefined)만 'OA'로 기본값을
+      // 채운다 — Service Manage 수동 등록(A/C)처럼 network를 아예 안 넘기는 호출을 위해서다.
+      network: input.network === undefined ? 'OA' : input.network,
       serviceKey: input.serviceKey ?? null,
       externalArtifactId: input.externalArtifactId ?? null,
       artifactTypeKey: input.artifactTypeKey ?? null,
