@@ -37,6 +37,9 @@ interface CanvasState {
   snapshot: CanvasSnapshot | null;
   /* dialog */
   openId: string | null;
+  /** openDeliverable(id, tab)로 지정된 초기 탭 — 예: Release 이력 페이지의 Comments 칸
+   * 클릭이 ArtifactSlide를 Comments 탭으로 바로 열게 한다. */
+  openInitialTab: 'overview' | 'recipients' | 'comments' | null;
   noteDlg: string | null;
   addDlg: boolean;
   /**
@@ -94,7 +97,7 @@ interface CanvasState {
   setLinkPos: (p: { x: number; y: number } | null) => void;
   flash: (bnd: number | null) => void;
 
-  openDeliverable: (id: string | null) => void;
+  openDeliverable: (id: string | null, tab?: 'overview' | 'recipients' | 'comments') => void;
   setNoteDlg: (id: string | null) => void;
   setAddDlg: (v: boolean, intent?: CanvasState['addDlgIntent']) => void;
   setPhInfo: (id: string | null) => void;
@@ -124,6 +127,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   flashBnd: null,
   snapshot: null,
   openId: null,
+  openInitialTab: null,
   noteDlg: null,
   addDlg: false,
   addDlgIntent: 'own',
@@ -198,7 +202,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   setLinkPos: (p) => set({ linkPos: p }),
   flash: (bnd) => set({ flashBnd: bnd }),
 
-  openDeliverable: (id) => set({ openId: id }),
+  openDeliverable: (id, tab) => set({ openId: id, openInitialTab: id ? (tab ?? null) : null }),
   setNoteDlg: (id) => set({ noteDlg: id }),
   setAddDlg: (v, intent) => set({ addDlg: v, addDlgIntent: intent ?? 'own' }),
   setPhInfo: (id) => set({ phInfo: id }),

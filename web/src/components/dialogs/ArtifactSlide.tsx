@@ -95,6 +95,8 @@ interface Props {
   /** 이 workflow의 phase 목록 — Overview 탭의 Phase 카드(설계서 04장 §4.4 이전 표기 복원)에 쓴다. */
   phases?: WorkflowPhase[];
   onClose: () => void;
+  /** 처음 열릴 탭 — 지정 없으면 Overview(예: Release 이력 페이지의 Comments 칸에서 바로 열 때 씀). */
+  initialTab?: Tab;
   /** block에 붙은 recipient를 교체한다 — A/B/C 전부 공통이다. */
   onSaveRecipients: (p: AccessGrant) => void;
   saving?: boolean;
@@ -121,11 +123,11 @@ interface Props {
  *   (설계서 04장 §4.3). 전자는 패널이 잠긴 상태, 후자는 열린 패널 안의 빈 목록이다.
  */
 export function ArtifactSlide({
-  block, own, project, myDepartments, phases, onClose, onSaveRecipients, saving, onDelete,
+  block, own, project, myDepartments, phases, onClose, initialTab, onSaveRecipients, saving, onDelete,
   onChangeArtifact, changingArtifact, releases, onOpenRelease,
 }: Props) {
   const { t } = useTranslation();
-  const [tab, setTab] = useState<Tab>('overview');
+  const [tab, setTab] = useState<Tab>(initialTab ?? 'overview');
   const [changeOpen, setChangeOpen] = useState(false);
   /** 사용자가 Version history에서 다른 (hasHtmlView인) 버전을 직접 골랐으면 그 라벨 —
    * 안 골랐으면 undefined이고, 그러면 latest 버전을 요청한다(사용자 요청: 최초 open시
@@ -161,6 +163,11 @@ export function ArtifactSlide({
   
   useEffect(() => {
     setSelectedVersionLabel(undefined);
+  }, [block?.id]);
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    setTab(initialTab ?? 'overview');
   }, [block?.id]);
 
   if (!block) return null;

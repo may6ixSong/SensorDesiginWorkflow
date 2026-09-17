@@ -11,6 +11,7 @@ import { ProjectMembersPage } from '@/pages/ProjectMembersPage';
 import { ArtifactListPage } from '@/pages/ArtifactListPage';
 import { ArtifactDetailPage } from '@/pages/ArtifactDetailPage';
 import { BoardPage } from '@/pages/BoardPage';
+import { ReleaseHistoryPage } from '@/pages/ReleaseHistoryPage';
 import { NoAccessPage } from '@/pages/NoAccessPage';
 import { AccessDeniedPage } from '@/pages/AccessDeniedPage';
 import { GuidePage } from '@/pages/GuidePage';
@@ -54,6 +55,8 @@ export default function App() {
         <Route path="/details" element={<DetailsRedirect />} />
         <Route path="/details/:projectId" element={<DetailsRedirect />} />
         <Route path="/details/:projectId/:workflowId" element={<BoardPage />} />
+        <Route path="/details/:projectId/:workflowId/releases" element={<ReleaseHistoryPage />} />
+        <Route path="/details/:projectId/:workflowId/releases/:releaseId" element={<ReleaseHistoryPage />} />
         <Route path="/service-manage" element={<ServiceManagePage />} />
         <Route path="/guide" element={<GuidePage />} />
         <Route path="/no-access" element={<NoAccessPage />} />

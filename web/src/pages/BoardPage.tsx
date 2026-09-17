@@ -11,7 +11,6 @@ import { WorkflowSettingsDialog } from '@/components/dialogs/WorkflowSettingsDia
 import { AddArtifactDialog } from '@/components/dialogs/AddArtifactDialog';
 import { NoteDialog } from '@/components/dialogs/NoteDialog';
 import { ReleaseDialog } from '@/components/release/ReleaseDialog';
-import { ReleaseHistoryDialog } from '@/components/release/ReleaseHistoryDialog';
 import { Toast } from '@/components/common/Toast';
 import { useProject, useProjectWorkflows, useProjectMilestones, useProjects } from '@/api/hooks/useProjects';
 import { useUpdateWorkflow, useReplaceWorkflowAccess, useWorkflow, useUpdateWorkflowPhases } from '@/api/hooks/useWorkflow';
@@ -53,6 +52,7 @@ export function BoardPage() {
   const nodes = useCanvasStore((s) => s.nodes);
   const canvasMemos = useCanvasStore((s) => s.memos);
   const openId = useCanvasStore((s) => s.openId);
+  const openInitialTab = useCanvasStore((s) => s.openInitialTab);
   const noteDlg = useCanvasStore((s) => s.noteDlg);
   const addDlg = useCanvasStore((s) => s.addDlg);
   const phInfo = useCanvasStore((s) => s.phInfo);
@@ -72,9 +72,6 @@ export function BoardPage() {
   /** 수신 부서 필터 — 걸린 블록은 흐려질 뿐 사라지지 않는다(설계서 03장 §6.1). */
   const [recipientFilter, setRecipientFilter] = useState<string[]>([]);
   const [releaseOpen, setReleaseOpen] = useState(false);
-  const [historyOpen, setHistoryOpen] = useState(false);
-  /** artifact slide의 release 마커를 눌러 들어온 경우 — 그 release를 미리 골라둔다. */
-  const [historyPreselect, setHistoryPreselect] = useState<string | null>(null);
 
   /**
    * preview는 연동 서비스에 라이브로 버전을 물어보므로 평소 조회보다 느리다 —
@@ -229,7 +226,7 @@ export function BoardPage() {
               st.getState().setWorkflowSettingsTab('details');
             }}
             onOpenRelease={() => setReleaseOpen(true)}
-            onOpenHistory={() => { setHistoryPreselect(null); setHistoryOpen(true); }}
+            onOpenHistory={() => navigate(`/details/${projectId}/${workflowId}/releases`)}
           />
 
           <Canvas
@@ -249,6 +246,7 @@ export function BoardPage() {
               myDepartments={myDepartments}
               phases={phaseList}
               onClose={closeSlide}
+              initialTab={openInitialTab ?? undefined}
               onChangeArtifact={(newArtifact) =>
                 updateBlock.mutate(
                   { id: openBlock.id, newArtifact },
@@ -262,8 +260,7 @@ export function BoardPage() {
               releases={releases.data ?? []}
               onOpenRelease={(releaseId) => {
                 closeSlide();
-                setHistoryPreselect(releaseId);
-                setHistoryOpen(true);
+                navigate(`/details/${projectId}/${workflowId}/releases/${releaseId}`);
               }}
               saving={replaceRecipients.isPending}
               onSaveRecipients={(p) =>
@@ -419,20 +416,6 @@ export function BoardPage() {
                   },
                 )
               }
-            />
-          )}
-
-          {historyOpen && (
-            <ReleaseHistoryDialog
-              workflowName={workflow.name}
-              releases={releases.data ?? []}
-              departmentOptions={project?.departments ?? []}
-              initialSelectedId={historyPreselect}
-              onClose={() => setHistoryOpen(false)}
-              onOpenArtifact={(blockId) => {
-                setHistoryOpen(false);
-                st.getState().openDeliverable(blockId);
-              }}
             />
           )}
 

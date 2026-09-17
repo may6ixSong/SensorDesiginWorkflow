@@ -18,7 +18,7 @@ import {
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { ConfigService } from '@nestjs/config';
-import { ZipArchive } from 'archiver';
+import type { ZipArchive } from 'archiver';
 import { CurrentActor } from '../common/current-actor.decorator';
 import { Actor } from '../common/actor';
 import { SirenCallerGuard } from '../common/siren-caller.guard';
@@ -229,6 +229,13 @@ export class ArtifactsController {
     }
 
     const buffers = await Promise.all(files.map((f) => this.storage.download(f.storageKey)));
+    // archiver@8은 ESM 전용이라 컴파일된 CJS 코드에서 정적 import(=require)로 못 읽는다.
+    // 그냥 `await import('archiver')`를 쓰면 tsconfig의 module:commonjs 때문에 TypeScript가
+    // 다시 require()로 downlevel 컴파일해버려 같은 에러가 난다 — new Function으로 만든
+    // import() 호출은 TS가 문자열 안 코드를 못 건드리므로 런타임에 진짜 ESM dynamic
+    // import로 남는다(archiver 같은 ESM-only 패키지를 CJS에서 쓸 때 널리 쓰는 우회법).
+    const importArchiver = new Function('return import("archiver")') as () => Promise<typeof import('archiver')>;
+    const { ZipArchive } = await importArchiver();
     const archive = new ZipArchive({ zlib: { level: 9 } });
     files.forEach((f, i) => {
       const buf = buffers[i];
