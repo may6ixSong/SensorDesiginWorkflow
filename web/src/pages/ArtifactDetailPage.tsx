@@ -3,6 +3,7 @@ import { Box, CircularProgress, Stack } from '@mui/material';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AppShell } from '@/components/layout/AppShell';
+import { Tabs, TabPanel } from '@/components/common/Tabs';
 import { ArtifactVersionTree } from '@/components/artifact/ArtifactVersionTree';
 import { ArtifactVersionContents } from '@/components/artifact/ArtifactVersionContents';
 import { ArtifactAccessPanel } from '@/components/artifact/ArtifactAccessPanel';
@@ -20,6 +21,8 @@ import {
 import { toast } from '@/store/toastStore';
 import { T } from '@/theme/tokens';
 
+type DetailTab = 'versions' | 'access';
+
 /** A(내용+업로드):B(버전 트리) = 3:1 — workflow 쪽 상세 패널과 같은 비율(사용자 요청). */
 export function ArtifactDetailPage() {
   const { id = '', projectId = '' } = useParams();
@@ -27,6 +30,7 @@ export function ArtifactDetailPage() {
   const [picked, setPicked] = useState<CalypsoVersionView | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [publishing, setPublishing] = useState<CalypsoVersionView | null>(null);
+  const [tab, setTab] = useState<DetailTab>('versions');
 
   const { data: a, isLoading, isError, error } = useQuery({
     queryKey: queryKeys.calypsoArtifact(id),
@@ -42,7 +46,7 @@ export function ArtifactDetailPage() {
     if (forbidden) toast('You do not have view access to this artifact.');
   }, [forbidden]);
 
-  useEffect(() => setPicked(null), [id]);
+  useEffect(() => { setPicked(null); setTab('versions'); }, [id]);
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: queryKeys.calypsoArtifact(id) });
@@ -162,40 +166,54 @@ export function ArtifactDetailPage() {
             <ArtifactVersionContents a={a} version={shown} onDownload={handleDownload} />
           </Box>
           <Box sx={{ flex: 1, minWidth: 320, background: T.sf2, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            <Box>
-              <NetworkField
-                a={a}
-                canEdit={a.myAccess === 'edit'}
-                changing={network.isPending}
-                onChange={(kind) => network.mutate(kind)}
-              />
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: '10px', mb: '10px' }}>
-                <Box sx={{ fontSize: 12.5, fontWeight: 700, flex: 1 }}>Version history</Box>
-                {a.myAccess === 'edit' && (
-                  <SirenButton onClick={() => setAddOpen(true)}>
-                    <Icon name="plus" size={12} /> Add a new version
-                  </SirenButton>
-                )}
-              </Box>
-              <ArtifactVersionTree
-                versions={versions}
-                selected={shown}
-                onSelect={setPicked}
-                canPublish={a.myAccess === 'edit'}
-                onPublish={setPublishing}
-              />
-            </Box>
-            {a.myAccess === 'edit' && (
-              <ArtifactAccessPanel
-                artifact={a}
-                projectId={projectId}
-                onAddEditor={(g) => addEditor.mutate(g)}
-                onRemoveEditor={(g) => removeEditor.mutate(g)}
-                onAddViewGrant={(g) => addViewGrant.mutate(g)}
-                onRemoveViewGrant={(g) => removeViewGrant.mutate(g)}
-                onSetRestrictView={(v) => restrictView.mutate(v)}
-              />
-            )}
+            <NetworkField
+              a={a}
+              canEdit={a.myAccess === 'edit'}
+              changing={network.isPending}
+              onChange={(kind) => network.mutate(kind)}
+            />
+            {/* Version history가 길어지면 Permission이 아래로 밀려 안 보이는 문제가 있었어서
+                (사용자 지적) 탭으로 분리한다 — SIREN 상세 slide(CalypsoInlinePanel)에는 애초에
+                Permission을 안 보여주니 여기 독립 Artifact page에서만 필요하다. */}
+            <Tabs
+              tabs={[
+                { key: 'versions' as DetailTab, label: 'Version history' },
+                ...(a.myAccess === 'edit' ? [{ key: 'access' as DetailTab, label: 'Permission' }] : []),
+              ]}
+              value={tab}
+              onChange={setTab}
+            />
+            <TabPanel tabKey={tab}>
+              {tab === 'versions' && (
+                <Box>
+                  {a.myAccess === 'edit' && (
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: '10px' }}>
+                      <SirenButton onClick={() => setAddOpen(true)}>
+                        <Icon name="plus" size={12} /> Add a new version
+                      </SirenButton>
+                    </Box>
+                  )}
+                  <ArtifactVersionTree
+                    versions={versions}
+                    selected={shown}
+                    onSelect={setPicked}
+                    canPublish={a.myAccess === 'edit'}
+                    onPublish={setPublishing}
+                  />
+                </Box>
+              )}
+              {tab === 'access' && a.myAccess === 'edit' && (
+                <ArtifactAccessPanel
+                  artifact={a}
+                  projectId={projectId}
+                  onAddEditor={(g) => addEditor.mutate(g)}
+                  onRemoveEditor={(g) => removeEditor.mutate(g)}
+                  onAddViewGrant={(g) => addViewGrant.mutate(g)}
+                  onRemoveViewGrant={(g) => removeViewGrant.mutate(g)}
+                  onSetRestrictView={(v) => restrictView.mutate(v)}
+                />
+              )}
+            </TabPanel>
           </Box>
         </Box>
       </Box>

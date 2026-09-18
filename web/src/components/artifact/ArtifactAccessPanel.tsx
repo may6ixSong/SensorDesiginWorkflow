@@ -66,7 +66,7 @@ export function ArtifactAccessPanel({
 
   return (
     <Card>
-      <Ey sx={{ mb: '9px' }}>Access</Ey>
+      <Ey sx={{ mb: '9px' }}>Permission</Ey>
       <GrantList
         label="Editor"
         grants={artifact.editors}
