@@ -21,6 +21,8 @@ interface ListRow {
   intent: 'own' | 'received';
   publishedLabel: string | null;
   publishedAt: string | null;
+  /** 직전 release 대비 published version이 바뀌었는가 — 이 행을 강조하는 데만 쓴다. */
+  changed: boolean;
   masked: boolean;
   recipientDepartments: string[];
 }
@@ -80,6 +82,7 @@ export function ArtifactListView({
         intent: blockById.get(item.blockId)?.intent ?? 'own',
         publishedLabel: item.published?.versionLabel ?? null,
         publishedAt: item.published?.publishedAt ?? null,
+        changed: item.changed,
         masked: false,
         recipientDepartments: item.recipients.departments,
       }));
@@ -93,6 +96,7 @@ export function ArtifactListView({
           intent: b.intent,
           publishedLabel: null,
           publishedAt: null,
+          changed: false,
           masked: false,
           recipientDepartments: b.recipients?.departments ?? [],
         }));
@@ -107,6 +111,7 @@ export function ArtifactListView({
       intent: blockById.get(item.blockId)?.intent ?? 'own',
       publishedLabel: item.published?.versionLabel ?? null,
       publishedAt: item.published?.publishedAt ?? null,
+      changed: item.changed,
       masked: item.masked,
       recipientDepartments: item.recipients.departments,
     }));
@@ -315,9 +320,12 @@ function ListArtifactRow({
       onClick={() => onOpen(row.blockId)}
       sx={{
         display: 'flex', gap: '10px', alignItems: 'center', padding: '9px 8px',
-        borderTop: `1px solid ${T.ln}`,
+        // 직전 release 대비 published version이 바뀐 행은 배경색으로 눈에 띄게(사용자
+        // 요청) — 예전 release 표(HistoryRow)와 같은 표기(T.changed/T.changedLine).
+        background: row.changed ? T.changed : 'transparent',
+        borderTop: `1px solid ${row.changed ? T.changedLine : T.ln}`,
         cursor: CURSOR_POINTER,
-        '&:hover': { background: T.sf2 },
+        '&:hover': { background: row.changed ? T.changed : T.sf2 },
       }}
     >
       <Box sx={{ flex: '2 1 0', minWidth: 0, display: 'flex', alignItems: 'center', gap: '7px' }}>
