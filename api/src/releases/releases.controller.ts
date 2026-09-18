@@ -13,7 +13,7 @@ import { ReleasesService } from './releases.service';
 import { ReleaseFeedbackService } from './release-feedback.service';
 import { CreateReleaseDto } from './dto/release-crud.dto';
 import { toReleaseDto } from './dto/release.dto';
-import { CreateReleaseItemFeedbackDto } from './dto/release-item-feedback.dto';
+import { CreateReleaseFeedbackDto } from './dto/release-feedback.dto';
 import { ArtifactsService } from '../artifacts/artifacts.service';
 import { ArtifactAccessService } from '../artifacts/artifact-access.service';
 import { BlocksService } from '../blocks/blocks.service';
@@ -96,36 +96,35 @@ export class ReleasesController {
   }
 
   /**
-   * 한 산출물(item)에 대해, 그걸 받은 한 부서가 남긴 상태/코멘트 이력(설계서 09장 §4.2).
-   * department 쿼리는 필수다 — 다른 부서 것과 섞여 나오면 안 되기 때문에, "전체"라는
-   * 개념 자체가 없다. 그 department 소속인지는 서비스가 다시 확인한다.
+   * release 한 건에 대해, 그걸 받은 한 부서가 남긴 댓글 스레드(설계서 09장 §4.2~4.3) —
+   * 산출물 단위가 아니라 release 전체에 대한 것이다(사용자 확정). department 쿼리는
+   * 필수다 — 다른 부서 것과 섞여 나오면 안 되기 때문에, "전체"라는 개념 자체가 없다.
+   * 그 department 소속인지는 서비스가 다시 확인한다.
    */
-  @Get('releases/:releaseId/items/:blockId/feedback')
-  async listItemFeedback(
+  @Get('releases/:releaseId/feedback')
+  async listFeedback(
     @Param('releaseId') releaseId: string,
-    @Param('blockId') blockId: string,
     @Query('department') department: string,
     @CurrentActor() me: Actor,
   ) {
     const { release, project } = await this.loadReleaseForActor(releaseId, me);
-    return { data: await this.feedback.listForItem(release, blockId, department, project, me) };
+    return { data: await this.feedback.listForRelease(release, department, project, me) };
   }
 
-  @Post('releases/:releaseId/items/:blockId/feedback')
-  async createItemFeedback(
+  @Post('releases/:releaseId/feedback')
+  async createFeedback(
     @Param('releaseId') releaseId: string,
-    @Param('blockId') blockId: string,
-    @Body() dto: CreateReleaseItemFeedbackDto,
+    @Body() dto: CreateReleaseFeedbackDto,
     @CurrentActor() me: Actor,
   ) {
     const { release, project } = await this.loadReleaseForActor(releaseId, me);
-    return this.feedback.createForItem(release, blockId, dto, project, me);
+    return this.feedback.createForRelease(release, dto, project, me);
   }
 
   /**
    * release 한 건을 열 자격이 있는지 판정하고, 통과하면 release+project를 함께 돌려준다.
    * getOne과 feedback 두 라우트가 자격 판정 로직을 공유한다 — feedback도 결국 그 release를
-   * 볼 수 있어야 그 안의 item을 말할 자격이 있다(department별 세부 판정은 그 위에 얹힌다).
+   * 볼 수 있어야 그 위에 댓글을 남길 자격이 있다(department별 세부 판정은 그 위에 얹힌다).
    */
   private async loadReleaseForActor(releaseId: string, me: Actor) {
     const release = await this.releases.findOrThrow(releaseId);

@@ -1,7 +1,7 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { registerModels } from '../database/model-registration';
 import { Release, ReleaseSchema } from './schemas/release.schema';
-import { ReleaseItemFeedback, ReleaseItemFeedbackSchema } from './schemas/release-item-feedback.schema';
+import { ReleaseFeedback, ReleaseFeedbackSchema } from './schemas/release-feedback.schema';
 import { ReleasesService } from './releases.service';
 import { ReleaseFeedbackService } from './release-feedback.service';
 import { ReleasesController } from './releases.controller';
@@ -15,7 +15,7 @@ import { BlocksModule } from '../blocks/blocks.module';
 
 const Models = registerModels([
   { name: Release.name, schema: ReleaseSchema },
-  { name: ReleaseItemFeedback.name, schema: ReleaseItemFeedbackSchema },
+  { name: ReleaseFeedback.name, schema: ReleaseFeedbackSchema },
 ]);
 
 @Module({

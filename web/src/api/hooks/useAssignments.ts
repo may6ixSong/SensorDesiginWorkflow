@@ -7,8 +7,8 @@ import {
   MyReleaseRowDto,
   PagedDto,
   ReleaseDto,
-  ReleaseItemFeedbackDto,
-  ReleaseItemFeedbackStatus,
+  ReleaseFeedbackDto,
+  ReleaseFeedbackStatus,
 } from '@/types/domain';
 
 /**
@@ -111,16 +111,17 @@ export function useRelease(releaseId: string | null) {
 }
 
 /**
- * 한 산출물(item)에 대해 한 부서가 남긴 상태/코멘트 이력(설계서 09장 §4.2). department가
- * 바뀌면 완전히 다른 조회다 — 다른 부서 것과 섞이지 않도록 쿼리 키에 그대로 담는다.
+ * release 한 건에 대해 한 부서가 남긴 댓글 스레드(설계서 09장 §4.2~4.3) — 산출물 단위가
+ * 아니라 release 전체에 대한 것이다. department가 바뀌면 완전히 다른 조회다 — 다른 부서
+ * 것과 섞이지 않도록 쿼리 키에 그대로 담는다.
  */
-export function useReleaseItemFeedback(releaseId: string, blockId: string, department: string) {
+export function useReleaseFeedback(releaseId: string, department: string) {
   return useQuery({
-    queryKey: queryKeys.releaseItemFeedback(releaseId, blockId, department),
-    enabled: Boolean(releaseId) && Boolean(blockId) && Boolean(department),
+    queryKey: queryKeys.releaseFeedback(releaseId, department),
+    enabled: Boolean(releaseId) && Boolean(department),
     queryFn: async () => {
-      const res = await apiClient.get<ApiEnvelope<ReleaseItemFeedbackDto[]>>(
-        `/releases/${releaseId}/items/${blockId}/feedback`,
+      const res = await apiClient.get<ApiEnvelope<ReleaseFeedbackDto[]>>(
+        `/releases/${releaseId}/feedback`,
         { params: { department } },
       );
       return res.data.data;
@@ -128,20 +129,22 @@ export function useReleaseItemFeedback(releaseId: string, blockId: string, depar
   });
 }
 
-export function useCreateReleaseItemFeedback(releaseId: string, blockId: string) {
+export function useCreateReleaseFeedback(releaseId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { department: string; status: ReleaseItemFeedbackStatus; comment: string }) => {
-      const res = await apiClient.post<ReleaseItemFeedbackDto>(
-        `/releases/${releaseId}/items/${blockId}/feedback`,
-        input,
-      );
+    mutationFn: async (input: {
+      department: string;
+      comment: string;
+      /** 답글일 때만. 최상위 댓글은 생략한다. */
+      parentId?: string;
+      /** 최상위 댓글에서만 의미가 있다 — 생략하면 서버가 accepted(초록)로 채운다. */
+      status?: ReleaseFeedbackStatus;
+    }) => {
+      const res = await apiClient.post<ReleaseFeedbackDto>(`/releases/${releaseId}/feedback`, input);
       return res.data;
     },
     onSuccess: (_data, variables) => {
-      qc.invalidateQueries({
-        queryKey: queryKeys.releaseItemFeedback(releaseId, blockId, variables.department),
-      });
+      qc.invalidateQueries({ queryKey: queryKeys.releaseFeedback(releaseId, variables.department) });
     },
   });
 }
