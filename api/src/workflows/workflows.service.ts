@@ -91,7 +91,7 @@ export class WorkflowsService {
       releaseSeq: 0,
       isMock: false,
     });
-    await this.audit.log(actor.knoxId, 'WORKFLOW_CREATE', 'workflow', workflow._id, { department });
+    await this.audit.log(actor, 'WORKFLOW_CREATE', 'workflow', workflow._id, { department });
     return workflow;
   }
 
@@ -140,7 +140,7 @@ export class WorkflowsService {
       if (next !== previous) {
         workflow.editAccess = swapWorkflowDepartment(workflow.editAccess, previous, next);
         workflow.department = next;
-        await this.audit.log(actor.knoxId, 'WORKFLOW_DEPARTMENT_CHANGE', 'workflow', workflow._id, {
+        await this.audit.log(actor, 'WORKFLOW_DEPARTMENT_CHANGE', 'workflow', workflow._id, {
           from: previous,
           to: next,
         });
@@ -171,7 +171,7 @@ export class WorkflowsService {
     workflow.editAccess = pinWorkflowDepartment(input.editAccess, workflow.department);
     workflow.viewAccess = normalizeGrant(input.viewAccess);
     await workflow.save();
-    await this.audit.log(actor.knoxId, 'WORKFLOW_ACCESS_REPLACE', 'workflow', workflow._id, {
+    await this.audit.log(actor, 'WORKFLOW_ACCESS_REPLACE', 'workflow', workflow._id, {
       editAccess: workflow.editAccess,
       viewAccess: workflow.viewAccess,
     });
@@ -251,7 +251,7 @@ export class WorkflowsService {
 
     await this.model.updateOne({ _id: workflow._id }, { $set: { canvasLock: null } }).exec();
     if (!mine) {
-      await this.audit.log(actor.knoxId, 'CANVAS_LOCK_FORCE_RELEASE', 'workflow', workflow._id, {
+      await this.audit.log(actor, 'CANVAS_LOCK_FORCE_RELEASE', 'workflow', workflow._id, {
         previousHolder: current.holderKnoxId,
       });
     }

@@ -96,7 +96,7 @@ export class CanvasService {
       await workflow.save();
     }
 
-    await this.audit.log(actor.knoxId, 'CANVAS_SAVE', 'workflow', workflow._id, {
+    await this.audit.log(actor, 'CANVAS_SAVE', 'workflow', workflow._id, {
       blocks: dto.blocks.length,
       edges: dto.edges.length,
       memos: dto.memos.length,

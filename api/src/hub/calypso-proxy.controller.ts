@@ -78,8 +78,10 @@ export class CalypsoProxyController {
     if (!canAccessProject(actor, project)) {
       throw new ForbiddenException('You do not have access to this project.');
     }
-    const isAdmin = actor.isAdmin && !actor.isImpersonating;
-    return { departments: myDepartments(actor, project), isAdmin };
+    // actor.isAdmin은 시뮬레이션 중이면 이미 대상 본인 기준이다(common/actor.ts) —
+    // 여기서 isImpersonating을 따로 빼면 Admin이 다른 Admin을 시뮬레이션할 때 그 사람이
+    // 실제로는 갖고 있는 권한까지 없애게 되므로 그대로 넘긴다.
+    return { departments: myDepartments(actor, project), isAdmin: actor.isAdmin };
   }
 
   /** Calypso가 준 상태 코드·본문을 그대로 돌려준다 — 게이트 2는 항상 Calypso가 최종 판정한다. */
