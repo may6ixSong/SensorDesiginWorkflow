@@ -3,14 +3,13 @@ import { Box, CircularProgress } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { CalypsoArtifact, CalypsoGrant, CalypsoGrantInput, getCalypsoDepartmentRoster } from '@/api/calypsoClient';
 import { queryKeys } from '@/api/queryKeys';
-import { useAuth } from '@/app/providers/AuthProvider';
 import { UserSearchDialog } from '@/components/dialogs/UserSearchDialog';
 import { useDirectory } from '@/app/providers/DirectoryProvider';
 import { UserAvatar } from '@/components/common/Avatar';
 import { SirenButton, Badge } from '@/components/common/SirenButton';
 import { Card, Ey } from '@/components/common/Panel';
 import { Icon } from '@/components/common/Icon';
-import { departmentName } from '@/shared/constants/departments';
+import { canonicalDepartmentLabel } from '@/shared/constants/departments';
 import { CURSOR_POINTER, T } from '@/theme/tokens';
 
 interface Props {
@@ -46,7 +45,6 @@ function grantInput(g: CalypsoGrant): CalypsoGrantInput {
 export function ArtifactAccessPanel({
   artifact, projectId, onAddEditor, onRemoveEditor, onAddViewGrant, onRemoveViewGrant, onSetRestrictView,
 }: Props) {
-  const { user } = useAuth();
   const { data: roster, isLoading: loadingRoster, isError: rosterError } = useQuery({
     queryKey: queryKeys.calypsoDepartmentRoster(projectId),
     queryFn: () => getCalypsoDepartmentRoster(projectId),
@@ -64,10 +62,6 @@ export function ArtifactAccessPanel({
     return map;
   }, [roster]);
 
-  const myDepartments = useMemo(
-    () => roster?.members.find((m) => m.knoxId === user?.KnoxID)?.departments ?? [],
-    [roster, user?.KnoxID],
-  );
   const allDepartments = roster?.departments ?? [];
 
   return (
@@ -77,11 +71,10 @@ export function ArtifactAccessPanel({
         label="Editor"
         grants={artifact.editors}
         registrant={artifact.createdBy}
-        deptOptions={myDepartments}
+        deptOptions={allDepartments}
         membersByDept={membersByDept}
         loadingDepts={loadingRoster}
         deptError={rosterError}
-        deptHint={loadingRoster || rosterError || myDepartments.length ? undefined : 'You have no department in this project to grant edit to.'}
         onAdd={onAddEditor}
         onRemove={onRemoveEditor}
       />
@@ -198,7 +191,7 @@ function GrantList({
                 <Box sx={{ fontSize: 12 }}>{resolveUser(g.knoxId as string).name}</Box>
               </>
             ) : (
-              <Box sx={{ fontSize: 12 }}>{departmentName(g.department)} <Box component="span" sx={{ color: T.dm2 }}>(dept)</Box></Box>
+              <Box sx={{ fontSize: 12 }}>{canonicalDepartmentLabel(g.department as string)} <Box component="span" sx={{ color: T.dm2 }}>(dept)</Box></Box>
             )}
             <SirenButton variant="ghost" onClick={() => onRemove(grantInput(g))} sx={{ minWidth: 0, padding: '2px' }}>
               <Icon name="x" size={11} />
@@ -244,7 +237,7 @@ function GrantList({
                   }}
                 >
                   <Icon name={expanded ? 'up' : 'dn'} size={10} />
-                  <Box sx={{ flex: 1, fontSize: 12, fontWeight: 600 }}>{departmentName(d)}</Box>
+                  <Box sx={{ flex: 1, fontSize: 12, fontWeight: 600 }}>{canonicalDepartmentLabel(d)}</Box>
                   <Box sx={{ fontSize: 10, color: T.dm2 }}>{members.length} member{members.length === 1 ? '' : 's'}</Box>
                   <SirenButton
                     variant="ghost"

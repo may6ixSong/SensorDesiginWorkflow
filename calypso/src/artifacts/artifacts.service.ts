@@ -128,9 +128,9 @@ export class ArtifactsService {
 
   /**
    * editors/viewGrants에 부여를 하나 추가한다. 부여자 자신도 edit 권한이 있어야 하고
-   * (등록자/기존 editor/Admin), edit을 부서 단위로 줄 때는 **부여자 본인 소속 부서로만**
-   * 제한한다(§9.2 원칙 — 부서가 analog 단위라 타 부서에 통째로 주면 관련 없는 IP까지
-   * 편집권이 퍼진다). view는 어떤 부서든 지정할 수 있다.
+   * (등록자/기존 editor/Admin — `assertCanEdit`), 그 외엔 부서 제한 없이 editor든
+   * viewer든 어떤 부서에도 부여할 수 있다(사용자 결정 — 이미 edit 권한이 있는 사람만
+   * 이 패널에 접근하므로, 본인 부서로만 제한할 필요가 없다).
    */
   async addGrant(
     id: string,
@@ -140,12 +140,6 @@ export class ArtifactsService {
   ) {
     const a = await this.findOrThrow(id);
     this.assertCanEdit(a, actor);
-
-    if (kind === 'editors' && input.type === 'department' && !actor.isAdmin) {
-      if (!actor.departments.includes(input.department)) {
-        throw new ForbiddenException('You can only grant edit access to your own department.');
-      }
-    }
 
     const grant: ArtifactGrant = {
       type: input.type,
