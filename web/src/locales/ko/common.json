@@ -1,7 +1,8 @@
 {
   "appShell": {
     "notices": {
-      "empty": "아직 알림이 없습니다."
+      "empty": "아직 알림이 없습니다.",
+      "unread": "미확인"
     }
   },
   "members": {

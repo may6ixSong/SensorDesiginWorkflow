@@ -357,6 +357,9 @@ export interface ReleaseDto {
   workflowAt: { name: string; department: string };
   recipientDepartments: string[];
   items: ReleaseItemDto[];
+  /** 지금 이 사람이 이 과제에서 속한 부서 전체(Admin은 그 과제의 전 부서). "받은 것"
+   * 보기의 부서 필터 드롭다운 후보다(설계서 09장 §4.1). */
+  viewerDepartments: string[];
 }
 
 /** release 다이얼로그가 쓰는 미리보기 한 줄. 실행과 같은 로직으로 계산된다. */
@@ -490,6 +493,7 @@ export interface VersionEventDto {
   hpcPath: string | null;
   projectId: string;
   projectCode: string;
+  projectName: string;
   placements: { workflowId: string; workflowName: string; department: string; blockId: string }[];
 }
 

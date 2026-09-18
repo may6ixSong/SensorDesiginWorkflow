@@ -176,10 +176,15 @@ function ArtifactRow({ row }: { row: MyArtifactRowDto }) {
         )}
       </Box>
 
-      <Box sx={{ minWidth: 0, fontSize: 11.5 }}>
-        <Box sx={{ color: T.tx2, overflowWrap: 'anywhere' }}>{row.workflowName}</Box>
+      <Box sx={{ minWidth: 0 }}>
+        {/* project name이 가장 중요한 식별 정보다(사용자 확정) — workflow 이름보다 먼저,
+            더 크고 진하게 보여준다. */}
+        <Box sx={{ fontSize: 13, fontWeight: 800, color: T.tx, overflowWrap: 'anywhere' }}>
+          {row.projectName}
+        </Box>
+        <Box sx={{ color: T.tx2, fontSize: 11.5, overflowWrap: 'anywhere' }}>{row.workflowName}</Box>
         <Box sx={{ color: T.dm2, fontSize: 10.5 }}>
-          {row.projectCode} · {canonicalDepartmentLabel(row.workflowDepartment)}
+          {canonicalDepartmentLabel(row.workflowDepartment)}
         </Box>
       </Box>
 

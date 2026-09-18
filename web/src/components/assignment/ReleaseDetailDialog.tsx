@@ -1,8 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Box } from '@mui/material';
 import { ModalShell } from '@/components/common/ModalShell';
 import { Badge } from '@/components/common/SirenButton';
-import { Ey } from '@/components/common/Panel';
+import { Ey, SelectInput } from '@/components/common/Panel';
 import { UserAvatar } from '@/components/common/Avatar';
 import { NetworkTag } from '@/components/artifact/ArtifactChips';
 import { Location } from './Location';
@@ -41,6 +41,28 @@ export function ReleaseDetailDialog({
   const { data, isLoading, isError } = useRelease(row.id);
   const releasedBy = resolveUser(row.releasedBy);
 
+  // 부서 필터 — "받은 release"에서, 내가 여러 부서에 속해 있을 때 그중 한 부서로
+  // artifact 목록을 좁힌다(설계서 09장 §4.1, 사용자 확정). 낸(Outbox) release나 내가
+  // 소속 부서 없이 받은 경우(개별 recipientUsers)는 필터를 아예 보여주지 않는다 —
+  // viewerDepartments가 비면 전체 목록을 그대로 보여준다.
+  const viewerDepartments = data?.viewerDepartments ?? [];
+  const showDeptFilter = row.received && viewerDepartments.length > 0;
+  const [selectedDept, setSelectedDept] = useState('');
+
+  useEffect(() => {
+    // 다이얼로그를 처음 열 때는 무조건 첫 번째 부서로 고정한다(사용자 확정).
+    if (viewerDepartments.length && !viewerDepartments.includes(selectedDept)) {
+      setSelectedDept(viewerDepartments[0]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data?.viewerDepartments]);
+
+  const visibleItems = useMemo(() => {
+    if (!data) return [];
+    if (!showDeptFilter) return data.items;
+    return data.items.filter((item) => item.recipients.departments.includes(selectedDept));
+  }, [data, showDeptFilter, selectedDept]);
+
   useEffect(() => {
     markReleaseRead(user?.KnoxID ?? '', row.id);
     // row.id가 바뀌는 경우는 실질적으로 없다(호출부가 매번 새 컴포넌트를 마운트한다) —
@@ -54,18 +76,20 @@ export function ReleaseDetailDialog({
       onClose={onClose}
       width={980}
       header={
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-          <Box sx={{ fontFamily: FONT_MONO, fontSize: 17, fontWeight: 700, color: T.pr }}>
-            {row.label}
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          {/* project name이 가장 중요한 식별 정보다(사용자 확정) — 맨 위, 가장 크고 진하게. */}
+          <Box sx={{ fontSize: 16, fontWeight: 800, color: T.tx, overflowWrap: 'anywhere' }}>
+            {row.projectName}
           </Box>
-          <Box sx={{ fontSize: 14, fontWeight: 700 }}>{row.workflowAt.name}</Box>
-          <Badge color={T.dm} bg={T.sf3} borderColor={T.ln}>
-            {canonicalDepartmentLabel(row.workflowAt.department)}
-          </Badge>
-          <DirectionBadges row={row} />
-          <Box sx={{ flex: 1 }} />
-          <Box sx={{ fontSize: 11.5, color: T.dm2 }}>
-            {row.projectCode} · {row.projectName}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <Box sx={{ fontFamily: FONT_MONO, fontSize: 17, fontWeight: 700, color: T.pr }}>
+              {row.label}
+            </Box>
+            <Box sx={{ fontSize: 14, fontWeight: 700 }}>{row.workflowAt.name}</Box>
+            <Badge color={T.dm} bg={T.sf3} borderColor={T.ln}>
+              {canonicalDepartmentLabel(row.workflowAt.department)}
+            </Badge>
+            <DirectionBadges row={row} />
           </Box>
         </Box>
       }
@@ -90,7 +114,19 @@ export function ReleaseDetailDialog({
         </Box>
       </Box>
 
-      <Ey sx={{ mb: '7px' }}>Artifacts in this release</Ey>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', mb: '7px' }}>
+        <Ey sx={{ mb: 0 }}>Artifacts in this release</Ey>
+        {showDeptFilter && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Box sx={{ fontSize: 11, color: T.dm2 }}>Department</Box>
+            <SelectInput
+              value={selectedDept}
+              onChange={setSelectedDept}
+              options={viewerDepartments.map((d) => ({ value: d, label: canonicalDepartmentLabel(d) }))}
+            />
+          </Box>
+        )}
+      </Box>
 
       {isError ? (
         <Box
@@ -115,12 +151,12 @@ export function ReleaseDetailDialog({
         </Box>
       ) : (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          {data.items.map((item) => (
+          {visibleItems.map((item) => (
             <ItemCard key={item.blockId} item={item} />
           ))}
-          {!data.items.length && (
+          {!visibleItems.length && (
             <Box sx={{ fontSize: 12, color: T.dm2, padding: '18px 0', textAlign: 'center' }}>
-              This release carried no mapped artifacts.
+              {data.items.length ? 'No artifacts for this department.' : 'This release carried no mapped artifacts.'}
             </Box>
           )}
         </Box>

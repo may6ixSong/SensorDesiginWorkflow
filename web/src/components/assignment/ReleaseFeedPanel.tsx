@@ -141,6 +141,12 @@ function ReleaseRow({
       }}
     >
       <Box sx={{ display: 'flex', alignItems: 'center', gap: '7px', flexWrap: 'wrap', mb: '4px' }}>
+        {/* project name이 가장 중요한 식별 정보다(사용자 확정) — 이 화면은 과제를
+            가로지르므로, 어느 project인지가 workflow 이름보다 먼저 눈에 들어와야 한다. */}
+        <Box sx={{ fontSize: 13.5, fontWeight: 800, color: T.tx, minWidth: 0, overflowWrap: 'anywhere' }}>
+          {row.projectName}
+        </Box>
+        <Box sx={{ color: T.ln2 }}>·</Box>
         <Box sx={{ fontFamily: FONT_MONO, fontSize: 12, fontWeight: 700, color: T.pr }}>
           {row.label}
         </Box>
@@ -164,7 +170,7 @@ function ReleaseRow({
         <Box sx={{ fontSize: 11, color: T.dm }}>{by?.name ?? row.releasedBy}</Box>
         <Box sx={{ fontSize: 11, color: T.dm2 }}>·</Box>
         <Box sx={{ fontSize: 11, color: T.dm2 }}>
-          {row.projectCode} · {row.itemCount} artifact{row.itemCount === 1 ? '' : 's'}
+          {row.itemCount} artifact{row.itemCount === 1 ? '' : 's'}
         </Box>
         {/* 받은 쪽에서는 "내 어느 부서가 받았는가"가 곧 이 줄이 왜 나에게 왔는지의 설명이다. */}
         {direction === 'received' && row.myRecipientDepartments.length > 0 && (

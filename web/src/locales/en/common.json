@@ -1,7 +1,8 @@
 {
   "appShell": {
     "notices": {
-      "empty": "No notices yet."
+      "empty": "No notices yet.",
+      "unread": "Unread"
     }
   },
   "members": {

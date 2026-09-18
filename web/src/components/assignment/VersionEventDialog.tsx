@@ -39,11 +39,14 @@ export function VersionEventDialog({ event, onClose }: { event: VersionEventDto;
           >
             {event.isPublished ? 'PUBLISHED' : 'WORKING'}
           </Badge>
-          <Box sx={{ flex: 1 }} />
-          <Box sx={{ fontSize: 11, color: T.dm2 }}>{event.projectCode}</Box>
         </Box>
       }
     >
+      {/* project name이 가장 중요한 식별 정보다(사용자 확정) — 크고 진하게, 맨 위에. */}
+      <Box sx={{ fontSize: 15, fontWeight: 800, color: T.tx, mb: '10px', overflowWrap: 'anywhere' }}>
+        {event.projectName}
+      </Box>
+
       <Box sx={{ display: 'flex', alignItems: 'center', gap: '10px', mb: '16px', flexWrap: 'wrap' }}>
         <Box sx={{ fontFamily: FONT_MONO, fontSize: 18, fontWeight: 700, color: T.pr }}>
           {event.versionLabel}

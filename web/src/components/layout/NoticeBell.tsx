@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Box, Dialog, DialogContent, DialogTitle, Popover, Typography } from '@mui/material';
+import { useTranslation } from 'react-i18next';
 import { Icon } from '@/components/common/Icon';
 import { Badge } from '@/components/common/SirenButton';
 import { UserAvatar } from '@/components/common/Avatar';
@@ -42,6 +43,7 @@ const FEED_SIZE = 30;
  * 나뉜다 — useMyReceivedFeed 참고).
  */
 export function NoticeBell({ clientId }: { clientId: string }) {
+  const { t } = useTranslation();
   const btnRef = useRef<HTMLButtonElement>(null);
   const { resolveUser } = useDirectory();
 
@@ -50,7 +52,9 @@ export function NoticeBell({ clientId }: { clientId: string }) {
   const [emergency, setEmergency] = useState<Notice | null>(null);
 
   const { data, isLoading, isError } = useMyReceivedFeed(clientId, FEED_SIZE);
-  const releases = data?.items ?? [];
+  // data?.items ?? []를 매 렌더 새 배열로 만들면 아래 두 useMemo가 매번 다시 돈다 —
+  // data가 실제로 바뀔 때만 참조가 바뀌도록 여기서 한 번 고정한다.
+  const releases = useMemo(() => data?.items ?? [], [data]);
 
   // 쿠키는 리액트 상태가 아니라서, 읽음 이벤트가 뜰 때마다(다른 release를 열어 확인
   // 처리될 때) 이 값을 다시 계산해 배지를 즉시 갱신한다.
@@ -73,6 +77,14 @@ export function NoticeBell({ clientId }: { clientId: string }) {
     // readVersion은 값 자체를 쓰지 않고 재계산 트리거로만 쓴다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [releases, clientId, readVersion]);
+
+  /** 안 읽은 것을 맨 위로, 그다음은 최신 release 순이다(사용자 요청) — 서버는 이미
+   * releasedAt 내림차순으로 주므로, 안읽음/읽음 두 그룹으로만 다시 나눈다(그룹 안에서는
+   * 이미 정렬된 순서가 그대로 유지된다 — Array.sort는 안정 정렬이다). */
+  const sortedReleases = useMemo(
+    () => [...releases].sort((a, b) => Number(unreadIds.has(b.id)) - Number(unreadIds.has(a.id))),
+    [releases, unreadIds],
+  );
 
   useSignalRNotice({
     enabled: Boolean(import.meta.env.SYSTEM_API),
@@ -159,11 +171,12 @@ export function NoticeBell({ clientId }: { clientId: string }) {
           </Typography>
         ) : (
           <Box sx={{ maxHeight: 480, overflowY: 'auto', p: '8px' }}>
-            {releases.map((row) => (
+            {sortedReleases.map((row) => (
               <ReleaseFeedRow
                 key={row.id}
                 row={row}
                 unread={unreadIds.has(row.id)}
+                unreadLabel={t('appShell.notices.unread')}
                 onOpen={() => openRelease(row)}
                 resolveUser={resolveUser}
               />
@@ -186,13 +199,19 @@ export function NoticeBell({ clientId }: { clientId: string }) {
   );
 }
 
-/** 부서 · workflow · 누가 · 언제만 — note도, 산출물 수도, changed 배지도 없다(사용자 요청:
- * "간략하게"). 자세한 내용은 눌러서 상세 다이얼로그에서 본다. */
+/**
+ * project name · 부서 · workflow · 누가 · 언제 — note도, 산출물 수도, changed 배지도 없다
+ * (사용자 요청: "간략하게"). 자세한 내용은 눌러서 상세 다이얼로그에서 본다.
+ *
+ * ★ 안 읽음은 이제 작은 점 하나로 두지 않는다 — 붉은 점 + "Unread" 칩을 함께 써서 확실히
+ *   구별되게 한다(사용자 요청). 칩 문구는 시스템 언어를 따른다.
+ */
 function ReleaseFeedRow({
-  row, unread, onOpen, resolveUser,
+  row, unread, unreadLabel, onOpen, resolveUser,
 }: {
   row: MyReleaseRowDto;
   unread: boolean;
+  unreadLabel: string;
   onOpen: () => void;
   resolveUser: ReturnType<typeof useDirectory>['resolveUser'];
 }) {
@@ -212,10 +231,19 @@ function ReleaseFeedRow({
       <Box
         sx={{
           width: 7, height: 7, borderRadius: '50%', flex: '0 0 auto', mt: '6px',
-          background: unread ? T.pr : 'transparent',
+          background: unread ? T.danger : 'transparent',
         }}
       />
       <Box sx={{ minWidth: 0, flex: 1 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', mb: '2px' }}>
+          {/* project name이 가장 중요한 식별 정보다(사용자 확정) — 크고 진하게, 맨 앞. */}
+          <Box sx={{ fontSize: 13, fontWeight: 800, color: T.tx, minWidth: 0, overflowWrap: 'anywhere' }}>
+            {row.projectName}
+          </Box>
+          {unread && (
+            <Badge color={T.danger} bg={T.dangerSoft} borderColor={T.dangerLine}>{unreadLabel}</Badge>
+          )}
+        </Box>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
           <Box sx={{ fontFamily: FONT_MONO, fontSize: 11.5, fontWeight: 700, color: T.pr }}>{row.label}</Box>
           <Badge color={T.dm} bg={T.sf3} borderColor={T.ln}>

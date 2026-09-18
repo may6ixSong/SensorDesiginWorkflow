@@ -756,6 +756,16 @@ function ReleaseEventRow({ row, onClick }: { row: MyReleaseRowDto; onClick: () =
         '&:hover': { filter: 'brightness(0.98)' },
       }}
     >
+      {/* project name이 가장 중요한 식별 정보다(사용자 확정) — 이 마커와 같은 project
+          색(범례와 같은 값)을 그대로 써서 "이 색 = 이 project"를 강화한다. */}
+      <Box
+        sx={{
+          fontSize: 12.5, fontWeight: 800, color, mb: '2px',
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}
+      >
+        {row.projectName}
+      </Box>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
         <EventMarker color={color} shape="square" filled />
         <Box sx={{ fontFamily: FONT_MONO, fontSize: 11.5, fontWeight: 700, flex: '0 0 auto' }}>
@@ -784,7 +794,7 @@ function ReleaseEventRow({ row, onClick }: { row: MyReleaseRowDto; onClick: () =
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}
       >
-        {row.projectCode} · {row.itemCount} artifacts
+        {row.itemCount} artifacts
       </Box>
     </Box>
   );
@@ -804,6 +814,15 @@ function VersionEventRow({ event, onClick }: { event: VersionEventDto; onClick: 
         '&:hover': { background: T.sf2 },
       }}
     >
+      {/* project name — 마커와 같은 project 색을 그대로 써서 범례와 연결한다. */}
+      <Box
+        sx={{
+          fontSize: 12.5, fontWeight: 800, color, mb: '2px',
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}
+      >
+        {event.projectName}
+      </Box>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
         <EventMarker color={color} shape="circle" filled={event.isPublished} />
         <Box
@@ -828,15 +847,16 @@ function VersionEventRow({ event, onClick }: { event: VersionEventDto; onClick: 
           {fmtAt(event.occurredAt)}
         </Box>
       </Box>
-      <Box
-        sx={{
-          fontSize: 10.5, color: T.dm2, mt: '2px',
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}
-      >
-        {event.projectCode}
-        {event.placements.length > 0 && ` · ${event.placements.map((p) => p.workflowName).join(', ')}`}
-      </Box>
+      {event.placements.length > 0 && (
+        <Box
+          sx={{
+            fontSize: 10.5, color: T.dm2, mt: '2px',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}
+        >
+          {event.placements.map((p) => p.workflowName).join(', ')}
+        </Box>
+      )}
     </Box>
   );
 }

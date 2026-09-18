@@ -137,6 +137,7 @@ export interface VersionEventDto {
   hpcPath: string | null;
   projectId: string;
   projectCode: string;
+  projectName: string;
   /** 이 산출물이 내 scope 안에서 놓여 있는 자리들. */
   placements: { workflowId: string; workflowName: string; department: string; blockId: string }[];
 }

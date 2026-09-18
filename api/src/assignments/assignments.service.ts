@@ -273,6 +273,7 @@ export class AssignmentsService {
           hpcPath: v.hpcPath ?? null,
           projectId: artifact.projectId.toString(),
           projectCode: project?.code ?? '',
+          projectName: project?.name ?? '',
           placements,
         });
       }

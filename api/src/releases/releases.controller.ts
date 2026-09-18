@@ -99,7 +99,13 @@ export class ReleasesController {
       if (!allowed) throw new ForbiddenException('You do not have access to this release.');
     }
 
-    return toReleaseDto(release, await this.visibleArtifactIds(release, project, me));
+    return {
+      ...toReleaseDto(release, await this.visibleArtifactIds(release, project, me)),
+      // 이 사람이 지금 이 과제에서 속한 부서 전체 — Admin은 그 과제의 전 부서(01장 §2.4,
+      // myDepartments 정의 그대로). "받은 산출물" 목록을 부서 필터로 좁히는 드롭다운의
+      // 후보다(설계서 09장 §4.1) — 한 사람이 여러 부서에 속할 수 있어서 필요하다.
+      viewerDepartments: myDepartments(me, project),
+    };
   }
 
   /**
