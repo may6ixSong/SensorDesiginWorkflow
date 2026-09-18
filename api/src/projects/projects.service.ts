@@ -152,7 +152,7 @@ export class ProjectsService {
     if (!project.managers.includes(knoxId)) {
       project.managers.push(knoxId);
       await project.save();
-      await this.audit.log(actor.knoxId, 'PROJECT_MANAGER_ADD', 'project', project._id, { knoxId });
+      await this.audit.log(actor, 'PROJECT_MANAGER_ADD', 'project', project._id, { knoxId });
     }
     return this.findDetailOrThrow(id);
   }
@@ -161,7 +161,7 @@ export class ProjectsService {
     const project = await this.assertManageAccess(id, actor);
     project.managers = project.managers.filter((m) => m !== knoxId);
     await project.save();
-    await this.audit.log(actor.knoxId, 'PROJECT_MANAGER_REMOVE', 'project', project._id, { knoxId });
+    await this.audit.log(actor, 'PROJECT_MANAGER_REMOVE', 'project', project._id, { knoxId });
     return this.findDetailOrThrow(id);
   }
 
@@ -277,7 +277,7 @@ export class ProjectsService {
       status: 'ACTIVE',
       isMock: false,
     });
-    await this.audit.log(actor.knoxId, 'PROJECT_CREATE', 'project', project._id, { code, revision });
+    await this.audit.log(actor, 'PROJECT_CREATE', 'project', project._id, { code, revision });
     return project;
   }
 
@@ -307,7 +307,7 @@ export class ProjectsService {
     } else {
       project.members.push({ knoxId, departments: [dept], addedAt: new Date() });
       await project.save();
-      await this.audit.log(actor.knoxId, 'PROJECT_MEMBER_ADD', 'project', project._id, { knoxId, department: dept });
+      await this.audit.log(actor, 'PROJECT_MEMBER_ADD', 'project', project._id, { knoxId, department: dept });
     }
     return this.findDetailOrThrow(id);
   }
@@ -324,7 +324,7 @@ export class ProjectsService {
         project.members = project.members.filter((m) => m.knoxId !== knoxId);
       }
       await project.save();
-      await this.audit.log(actor.knoxId, 'PROJECT_MEMBER_REMOVE', 'project', project._id, { knoxId, department });
+      await this.audit.log(actor, 'PROJECT_MEMBER_REMOVE', 'project', project._id, { knoxId, department });
     }
     return this.findDetailOrThrow(id);
   }

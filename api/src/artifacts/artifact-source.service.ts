@@ -79,15 +79,16 @@ export class ArtifactSourceService {
     intent: CandidateIntent,
   ): Promise<CandidateListResult> {
     const svc = await this.hub.findByKeyOrThrow(serviceKey);
-    const isAdmin = actor.isAdmin && !actor.isImpersonating;
-    const summaries = await this.observer.listArtifacts(svc, project.code, project.revision, actor.knoxId, isAdmin);
+    // 시뮬레이션 중이면 actor.isAdmin은 이미 대상 본인 기준이다(common/actor.ts) —
+    // 호출부에서 isImpersonating을 따로 빼 줄 필요가 없다.
+    const summaries = await this.observer.listArtifacts(svc, project.code, project.revision, actor.knoxId, actor.isAdmin);
     if (summaries === null) {
       return { supported: false, candidates: [], note: 'This service does not support browsing — enter the artifact id directly.' };
     }
 
     const withAccess = await Promise.all(
       summaries.map(async (s) => {
-        const access = await this.observer.access(svc, s.artifactId, actor.knoxId, isAdmin);
+        const access = await this.observer.access(svc, s.artifactId, actor.knoxId, actor.isAdmin);
         const level: AccessLevel = access.canEdit ? 'edit' : access.canView ? 'view' : null;
         return { s, level };
       }),
@@ -113,8 +114,7 @@ export class ArtifactSourceService {
     intent: CandidateIntent,
   ): Promise<CandidateListResult> {
     const depts = myDepartments(actor, project);
-    const isAdmin = actor.isAdmin && !actor.isImpersonating;
-    const list = await this.calypso.listArtifacts(project._id.toString(), actor.knoxId, depts, isAdmin);
+    const list = await this.calypso.listArtifacts(project._id.toString(), actor.knoxId, depts, actor.isAdmin);
     return {
       supported: true,
       candidates: list.map((a) => ({
@@ -160,7 +160,6 @@ export class ArtifactSourceService {
     // Admin은 여기서도 통과한다(설계서 01장 §1) — 라이브 조회는 그 값을 확인하려는
     // 목적일 뿐, 판정 자체를 좌우하지 않는다.
     let level: AccessLevel = 'edit';
-    const isAdmin = actor.isAdmin && !actor.isImpersonating;
     if (!actor.isAdmin) {
       if (input.source === 'file') {
         const depts = myDepartments(actor, project);
@@ -187,7 +186,7 @@ export class ArtifactSourceService {
       { tier, name: input.name, serviceKey: serviceKey as string, externalArtifactId: input.externalArtifactId },
       actor,
     );
-    await this.hubSync.pullFullHistory(artifact, actor.knoxId, isAdmin);
+    await this.hubSync.pullFullHistory(artifact, actor.knoxId, actor.isAdmin);
     await artifact.save();
     return artifact;
   }
@@ -205,16 +204,17 @@ export class ArtifactSourceService {
   ): Promise<void> {
     if (actor.isAdmin) return;
 
+    // 여기 도달했다는 것은 actor.isAdmin이 false라는 뜻이다(바로 위에서 걸러졌다) —
+    // 게이트 2에는 항상 false로 물어본다.
     let level: AccessLevel;
-    const isAdmin = actor.isAdmin && !actor.isImpersonating;
     if (artifact.tier === 'B' && artifact.serviceKey === CALYPSO_SERVICE_KEY && artifact.externalArtifactId) {
       const depts = myDepartments(actor, project);
-      const list = await this.calypso.listArtifacts(project._id.toString(), actor.knoxId, depts, isAdmin);
+      const list = await this.calypso.listArtifacts(project._id.toString(), actor.knoxId, depts, false);
       level = list.find((a) => a.artifactId === artifact.externalArtifactId)?.access ?? null;
     } else if (artifact.serviceKey && artifact.externalArtifactId) {
       // A/C(OA Service/HPC Service) — 둘 다 같은 라이브 게이트다.
       const svc = await this.hub.findByKeyOrThrow(artifact.serviceKey);
-      const access = await this.observer.access(svc, artifact.externalArtifactId, actor.knoxId, isAdmin);
+      const access = await this.observer.access(svc, artifact.externalArtifactId, actor.knoxId, false);
       level = access.canEdit ? 'edit' : access.canView ? 'view' : null;
     } else {
       // 매핑이 없는 비정상 상태 — 물어볼 곳이 없으므로 막는다.

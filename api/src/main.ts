@@ -30,7 +30,7 @@ async function bootstrap() {
     origin: !corsOrigin || corsOrigin === '*' ? true : corsOrigin.split(',').map((o) => o.trim()),
     credentials: true,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-    allowedHeaders: 'Content-Type, Accept, X-Knox-Id, X-User-Group, X-Acting-As',
+    allowedHeaders: 'Content-Type, Accept, X-Knox-Id, X-User-Group, X-Acting-As, X-Acting-As-Group',
   });
 
   // TLS는 앞단(IIS/nginx)에서 종료한다 - api는 평문 HTTP로만 리스닝한다.
