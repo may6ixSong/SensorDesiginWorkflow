@@ -344,6 +344,22 @@ export interface ReleaseItemDto {
   masked: boolean;
 }
 
+/** 초록/노랑/빨강 dot 세 개 — 순서대로 전부 수용, 일부만 수용, 현재는 수용 불가능. */
+export type ReleaseItemFeedbackStatus = 'accepted' | 'partial' | 'blocked';
+
+/** release 안 한 산출물에 대해, 그걸 받은 한 부서가 남긴 상태/코멘트 한 건(설계서 09장 §4.2).
+ * 다른 부서에는 절대 섞여 오지 않는다 — department별로 완전히 분리된 조회다. */
+export interface ReleaseItemFeedbackDto {
+  id: string;
+  releaseId: string;
+  blockId: string;
+  department: string;
+  status: ReleaseItemFeedbackStatus;
+  comment: string;
+  createdBy: string;
+  createdAt: string;
+}
+
 export interface ReleaseDto {
   id: string;
   projectId: string;

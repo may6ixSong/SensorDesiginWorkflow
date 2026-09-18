@@ -1,18 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Box } from '@mui/material';
 import { ModalShell } from '@/components/common/ModalShell';
-import { Badge } from '@/components/common/SirenButton';
-import { Ey, SelectInput } from '@/components/common/Panel';
+import { Badge, SirenButton } from '@/components/common/SirenButton';
+import { Ey, SelectInput, TextArea } from '@/components/common/Panel';
 import { UserAvatar } from '@/components/common/Avatar';
 import { NetworkTag } from '@/components/artifact/ArtifactChips';
 import { Location } from './Location';
 import { useAuth } from '@/app/providers/AuthProvider';
 import { useDirectory } from '@/app/providers/DirectoryProvider';
-import { useRelease } from '@/api/hooks/useAssignments';
+import { useCreateReleaseItemFeedback, useRelease, useReleaseItemFeedback } from '@/api/hooks/useAssignments';
 import { markReleaseRead } from '@/lib/releaseReadTracker';
 import { fmtAt } from '@/lib/canvasModel';
 import { canonicalDepartmentLabel } from '@/shared/constants/departments';
-import { MyReleaseRowDto, ReleaseItemDto } from '@/types/domain';
+import { MyReleaseRowDto, ReleaseItemDto, ReleaseItemFeedbackStatus } from '@/types/domain';
 import { FONT_MONO, T } from '@/theme/tokens';
 
 /**
@@ -152,7 +152,14 @@ export function ReleaseDetailDialog({
       ) : (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
           {visibleItems.map((item) => (
-            <ItemCard key={item.blockId} item={item} />
+            <ItemCard
+              key={item.blockId}
+              item={item}
+              releaseId={row.id}
+              // feedback은 "받은 release"에서 지금 필터로 고른 그 부서에 대해서만이다
+              // (사용자 확정) — 낸(Outbox) release나 필터가 없는 경우는 아예 렌더하지 않는다.
+              feedbackDepartment={showDeptFilter ? selectedDept : null}
+            />
           ))}
           {!visibleItems.length && (
             <Box sx={{ fontSize: 12, color: T.dm2, padding: '18px 0', textAlign: 'center' }}>
@@ -186,7 +193,14 @@ function DirectionBadges({ row }: { row: MyReleaseRowDto }) {
  *   전자는 "아직 확정된 버전이 없다", 후자는 "있는지 없는지도 알려줄 수 없다"이고,
  *   둘을 같게 그리면 받는 쪽이 사실을 오해한다.
  */
-function ItemCard({ item }: { item: ReleaseItemDto }) {
+function ItemCard({
+  item, releaseId, feedbackDepartment,
+}: {
+  item: ReleaseItemDto;
+  releaseId: string;
+  /** null이면 feedback 섹션 자체를 렌더하지 않는다(Outbox 쪽 등, 사용자 확정 범위 밖). */
+  feedbackDepartment: string | null;
+}) {
   return (
     <Box
       sx={{
@@ -277,6 +291,128 @@ function ItemCard({ item }: { item: ReleaseItemDto }) {
             <Box sx={{ fontSize: 11.5, color: T.dm2 }}>None</Box>
           )}
         </Box>
+      </Box>
+
+      {feedbackDepartment && (
+        <Box sx={{ gridColumn: '1 / -1' }}>
+          <ItemFeedback releaseId={releaseId} blockId={item.blockId} department={feedbackDepartment} />
+        </Box>
+      )}
+    </Box>
+  );
+}
+
+const FEEDBACK_STATUS_META: Record<ReleaseItemFeedbackStatus, { label: string; color: string; bg: string; line: string }> = {
+  accepted: { label: 'Fully accepted', color: T.ok, bg: T.okSoft, line: T.okLine },
+  partial: { label: 'Partially accepted', color: T.warn, bg: T.warnSoft, line: T.warnLine },
+  blocked: { label: 'Cannot accept yet', color: T.danger, bg: T.dangerSoft, line: T.dangerLine },
+};
+
+/**
+ * 한 부서가 이 산출물에 대해 남기는 상태/코멘트 이력(설계서 09장 §4.2). 다른 부서에는
+ * 이 섹션 자체가 렌더되지 않는다 — department는 항상 지금 필터로 고른 값 하나뿐이다.
+ *
+ * ★ append-only다 — 새 항목을 추가할 뿐 기존 이력을 고치거나 지우지 않는다(Release 자체의
+ *   철회 불가 원칙과 같다). "현재 상태"는 가장 최근 항목으로 본다.
+ */
+function ItemFeedback({
+  releaseId, blockId, department,
+}: {
+  releaseId: string;
+  blockId: string;
+  department: string;
+}) {
+  const { resolveUser } = useDirectory();
+  const { data, isLoading } = useReleaseItemFeedback(releaseId, blockId, department);
+  const createFeedback = useCreateReleaseItemFeedback(releaseId, blockId);
+
+  const [status, setStatus] = useState<ReleaseItemFeedbackStatus | null>(null);
+  const [comment, setComment] = useState('');
+
+  const history = data ?? [];
+  const canSubmit = Boolean(status) && comment.trim().length > 0 && !createFeedback.isPending;
+
+  const submit = () => {
+    if (!status) return;
+    const text = comment.trim();
+    if (!text) return;
+    createFeedback.mutate(
+      { department, status, comment: text },
+      { onSuccess: () => { setStatus(null); setComment(''); } },
+    );
+  };
+
+  return (
+    <Box sx={{ mt: '10px', pt: '10px', borderTop: `1px dashed ${T.ln}` }}>
+      <Ey sx={{ mb: '6px' }}>
+        {canonicalDepartmentLabel(department)} status &amp; comments
+      </Ey>
+
+      {isLoading ? (
+        <Box sx={{ fontSize: 11.5, color: T.dm2 }}>Loading…</Box>
+      ) : (
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: '6px', mb: '10px' }}>
+          {history.map((entry) => {
+            const meta = FEEDBACK_STATUS_META[entry.status];
+            const author = resolveUser(entry.createdBy);
+            return (
+              <Box
+                key={entry.id}
+                sx={{
+                  display: 'flex', alignItems: 'flex-start', gap: '8px',
+                  border: `1px solid ${meta.line}`, background: meta.bg,
+                  borderRadius: '8px', padding: '7px 10px',
+                }}
+              >
+                <Box sx={{ width: 8, height: 8, borderRadius: '50%', background: meta.color, flex: '0 0 auto', mt: '4px' }} />
+                <Box sx={{ minWidth: 0, flex: 1 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', mb: '2px' }}>
+                    <Box sx={{ fontSize: 11.5, fontWeight: 700, color: meta.color }}>{meta.label}</Box>
+                    <UserAvatar user={author} size={14} />
+                    <Box sx={{ fontSize: 10.5, color: T.dm2 }}>{author?.name ?? entry.createdBy}</Box>
+                    <Box sx={{ fontSize: 10, color: T.dm2, fontFamily: FONT_MONO }}>{fmtAt(entry.createdAt)}</Box>
+                  </Box>
+                  <Box sx={{ fontSize: 11.5, color: T.tx, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+                    {entry.comment}
+                  </Box>
+                </Box>
+              </Box>
+            );
+          })}
+          {!history.length && (
+            <Box sx={{ fontSize: 11.5, color: T.dm2 }}>No status yet for this department.</Box>
+          )}
+        </Box>
+      )}
+
+      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: '10px', flexWrap: 'wrap' }}>
+        <Box sx={{ display: 'flex', gap: '6px', pt: '7px' }}>
+          {(Object.keys(FEEDBACK_STATUS_META) as ReleaseItemFeedbackStatus[]).map((s) => {
+            const meta = FEEDBACK_STATUS_META[s];
+            const selected = status === s;
+            return (
+              <Box
+                key={s}
+                component="button"
+                type="button"
+                onClick={() => setStatus(s)}
+                title={meta.label}
+                sx={{
+                  width: 18, height: 18, borderRadius: '50%', background: meta.color,
+                  border: selected ? `2px solid ${T.tx}` : `1px solid ${meta.line}`,
+                  boxShadow: selected ? `0 0 0 2px ${meta.bg}` : 'none',
+                  cursor: 'pointer', padding: 0,
+                }}
+              />
+            );
+          })}
+        </Box>
+        <Box sx={{ flex: 1, minWidth: 220 }}>
+          <TextArea value={comment} onChange={setComment} rows={2} />
+        </Box>
+        <SirenButton variant="primary" disabled={!canSubmit} onClick={submit} sx={{ mt: '2px' }}>
+          Add
+        </SirenButton>
       </Box>
     </Box>
   );

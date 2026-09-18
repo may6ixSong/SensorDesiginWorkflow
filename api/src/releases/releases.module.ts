@@ -1,7 +1,9 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { registerModels } from '../database/model-registration';
 import { Release, ReleaseSchema } from './schemas/release.schema';
+import { ReleaseItemFeedback, ReleaseItemFeedbackSchema } from './schemas/release-item-feedback.schema';
 import { ReleasesService } from './releases.service';
+import { ReleaseFeedbackService } from './release-feedback.service';
 import { ReleasesController } from './releases.controller';
 import { CommonAccessModule } from '../common/common-access.module';
 import { AuditModule } from '../audit/audit.module';
@@ -11,7 +13,10 @@ import { HubModule } from '../hub/hub.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { BlocksModule } from '../blocks/blocks.module';
 
-const Models = registerModels([{ name: Release.name, schema: ReleaseSchema }]);
+const Models = registerModels([
+  { name: Release.name, schema: ReleaseSchema },
+  { name: ReleaseItemFeedback.name, schema: ReleaseItemFeedbackSchema },
+]);
 
 @Module({
   imports: [
@@ -24,7 +29,7 @@ const Models = registerModels([{ name: Release.name, schema: ReleaseSchema }]);
     NotificationsModule,
     forwardRef(() => BlocksModule),
   ],
-  providers: [ReleasesService],
+  providers: [ReleasesService, ReleaseFeedbackService],
   controllers: [ReleasesController],
   exports: [ReleasesService, Models],
 })

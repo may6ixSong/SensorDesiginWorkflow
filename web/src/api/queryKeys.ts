@@ -36,6 +36,9 @@ export const queryKeys = {
   myCalendar: (from: string, to: string) => ['my', 'calendar', from, to] as const,
   /** release 한 건의 상세 — 목록 행을 눌러 다이얼로그를 열 때만 부른다. */
   release: (releaseId: string) => ['releases', releaseId] as const,
+  /** release 안 한 산출물에 대한 부서별 상태/코멘트 이력 — department별로 완전히 분리된 키다. */
+  releaseItemFeedback: (releaseId: string, blockId: string, department: string) =>
+    ['releases', releaseId, 'items', blockId, 'feedback', department] as const,
 
   hubServices: ['hub', 'services'] as const,
 

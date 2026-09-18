@@ -1,4 +1,4 @@
-import { Body, Controller, ForbiddenException, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { WorkflowAccessGuard } from '../common/guards/workflow-access.guard';
@@ -10,8 +10,10 @@ import { Workflow, WorkflowDocument } from '../workflows/schemas/workflow.schema
 import { Project, ProjectDocument } from '../projects/schemas/project.schema';
 import { canAccessProject, myDepartments, workflowLevel } from '../common/access';
 import { ReleasesService } from './releases.service';
+import { ReleaseFeedbackService } from './release-feedback.service';
 import { CreateReleaseDto } from './dto/release-crud.dto';
 import { toReleaseDto } from './dto/release.dto';
+import { CreateReleaseItemFeedbackDto } from './dto/release-item-feedback.dto';
 import { ArtifactsService } from '../artifacts/artifacts.service';
 import { ArtifactAccessService } from '../artifacts/artifact-access.service';
 import { BlocksService } from '../blocks/blocks.service';
@@ -27,6 +29,7 @@ import { BlocksService } from '../blocks/blocks.service';
 export class ReleasesController {
   constructor(
     private readonly releases: ReleasesService,
+    private readonly feedback: ReleaseFeedbackService,
     private readonly artifacts: ArtifactsService,
     private readonly artifactAccess: ArtifactAccessService,
     private readonly blocks: BlocksService,
@@ -81,6 +84,50 @@ export class ReleasesController {
    */
   @Get('releases/:releaseId')
   async getOne(@Param('releaseId') releaseId: string, @CurrentActor() me: Actor) {
+    const { release, project } = await this.loadReleaseForActor(releaseId, me);
+
+    return {
+      ...toReleaseDto(release, await this.visibleArtifactIds(release, project, me)),
+      // 이 사람이 지금 이 과제에서 속한 부서 전체 — Admin은 그 과제의 전 부서(01장 §2.4,
+      // myDepartments 정의 그대로). "받은 산출물" 목록을 부서 필터로 좁히는 드롭다운의
+      // 후보다(설계서 09장 §4.1) — 한 사람이 여러 부서에 속할 수 있어서 필요하다.
+      viewerDepartments: myDepartments(me, project),
+    };
+  }
+
+  /**
+   * 한 산출물(item)에 대해, 그걸 받은 한 부서가 남긴 상태/코멘트 이력(설계서 09장 §4.2).
+   * department 쿼리는 필수다 — 다른 부서 것과 섞여 나오면 안 되기 때문에, "전체"라는
+   * 개념 자체가 없다. 그 department 소속인지는 서비스가 다시 확인한다.
+   */
+  @Get('releases/:releaseId/items/:blockId/feedback')
+  async listItemFeedback(
+    @Param('releaseId') releaseId: string,
+    @Param('blockId') blockId: string,
+    @Query('department') department: string,
+    @CurrentActor() me: Actor,
+  ) {
+    const { release, project } = await this.loadReleaseForActor(releaseId, me);
+    return { data: await this.feedback.listForItem(release, blockId, department, project, me) };
+  }
+
+  @Post('releases/:releaseId/items/:blockId/feedback')
+  async createItemFeedback(
+    @Param('releaseId') releaseId: string,
+    @Param('blockId') blockId: string,
+    @Body() dto: CreateReleaseItemFeedbackDto,
+    @CurrentActor() me: Actor,
+  ) {
+    const { release, project } = await this.loadReleaseForActor(releaseId, me);
+    return this.feedback.createForItem(release, blockId, dto, project, me);
+  }
+
+  /**
+   * release 한 건을 열 자격이 있는지 판정하고, 통과하면 release+project를 함께 돌려준다.
+   * getOne과 feedback 두 라우트가 자격 판정 로직을 공유한다 — feedback도 결국 그 release를
+   * 볼 수 있어야 그 안의 item을 말할 자격이 있다(department별 세부 판정은 그 위에 얹힌다).
+   */
+  private async loadReleaseForActor(releaseId: string, me: Actor) {
     const release = await this.releases.findOrThrow(releaseId);
     const project = await this.projectModel.findById(release.projectId).exec();
     if (!canAccessProject(me, project)) {
@@ -99,13 +146,7 @@ export class ReleasesController {
       if (!allowed) throw new ForbiddenException('You do not have access to this release.');
     }
 
-    return {
-      ...toReleaseDto(release, await this.visibleArtifactIds(release, project, me)),
-      // 이 사람이 지금 이 과제에서 속한 부서 전체 — Admin은 그 과제의 전 부서(01장 §2.4,
-      // myDepartments 정의 그대로). "받은 산출물" 목록을 부서 필터로 좁히는 드롭다운의
-      // 후보다(설계서 09장 §4.1) — 한 사람이 여러 부서에 속할 수 있어서 필요하다.
-      viewerDepartments: myDepartments(me, project),
-    };
+    return { release, project };
   }
 
   /**

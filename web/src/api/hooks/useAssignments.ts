@@ -1,5 +1,5 @@
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { apiClient } from '../client';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { apiClient, ApiEnvelope } from '../client';
 import { queryKeys } from '../queryKeys';
 import {
   CalendarDto,
@@ -7,6 +7,8 @@ import {
   MyReleaseRowDto,
   PagedDto,
   ReleaseDto,
+  ReleaseItemFeedbackDto,
+  ReleaseItemFeedbackStatus,
 } from '@/types/domain';
 
 /**
@@ -104,6 +106,42 @@ export function useRelease(releaseId: string | null) {
     queryFn: async () => {
       const res = await apiClient.get<ReleaseDto>(`/releases/${releaseId}`);
       return res.data;
+    },
+  });
+}
+
+/**
+ * 한 산출물(item)에 대해 한 부서가 남긴 상태/코멘트 이력(설계서 09장 §4.2). department가
+ * 바뀌면 완전히 다른 조회다 — 다른 부서 것과 섞이지 않도록 쿼리 키에 그대로 담는다.
+ */
+export function useReleaseItemFeedback(releaseId: string, blockId: string, department: string) {
+  return useQuery({
+    queryKey: queryKeys.releaseItemFeedback(releaseId, blockId, department),
+    enabled: Boolean(releaseId) && Boolean(blockId) && Boolean(department),
+    queryFn: async () => {
+      const res = await apiClient.get<ApiEnvelope<ReleaseItemFeedbackDto[]>>(
+        `/releases/${releaseId}/items/${blockId}/feedback`,
+        { params: { department } },
+      );
+      return res.data.data;
+    },
+  });
+}
+
+export function useCreateReleaseItemFeedback(releaseId: string, blockId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { department: string; status: ReleaseItemFeedbackStatus; comment: string }) => {
+      const res = await apiClient.post<ReleaseItemFeedbackDto>(
+        `/releases/${releaseId}/items/${blockId}/feedback`,
+        input,
+      );
+      return res.data;
+    },
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({
+        queryKey: queryKeys.releaseItemFeedback(releaseId, blockId, variables.department),
+      });
     },
   });
 }
