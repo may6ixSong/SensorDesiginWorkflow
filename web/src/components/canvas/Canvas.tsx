@@ -12,6 +12,7 @@ import {
 import {
   CANVAS_TAIL, CH, MAXH, MAXW, MINH, MINW, PAD, ZOOM_DEFAULT_FLOOR, ZOOM_MAX, ZOOM_MIN, ZOOM_STEP, snp,
 } from '@/lib/constants';
+import { DEFAULT_MEMO_COLOR } from '@/lib/memoColors';
 import { FONT_MONO, T } from '@/theme/tokens';
 import { Icon } from '@/components/common/Icon';
 import { ConfirmDialog } from '@/components/dialogs/ConfirmDialog';
@@ -545,6 +546,7 @@ export function Canvas({
         workflow: workflow.id,
         phase: phases[0].id,
         text: 'New memo',
+        color: DEFAULT_MEMO_COLOR,
         x: snp(g.x + 46),
         y: 40 + 3 * 150,
         w: 160,

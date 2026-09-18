@@ -2,6 +2,7 @@ import { Box } from '@mui/material';
 import { CanvasNode, stOf } from '@/lib/canvasModel';
 import { WorkflowPhase } from '@/types/domain';
 import { Icon, IconName } from '@/components/common/Icon';
+import { NetworkTag } from '@/components/artifact/ArtifactChips';
 import { canonicalDepartmentLabel } from '@/shared/constants/departments';
 import { CURSOR_POINTER, R, T, TNUM } from '@/theme/tokens';
 
@@ -171,19 +172,9 @@ export function BlockNode({
             {/* 네트워크 표식 — 그 artifact에 등록된 실제 network 값을 그대로 읽는다(설계서
                 04장 §2.2) — tier에서 미리 정해두지 않는다. File Artifacts(B)는 File
                 콘텐츠면 network가 없어 표식을 그리지 않는다. */}
-            {d.net && (
-              <Box
-                sx={{
-                  // 20% 키웠다(사용자 요청: 9.5 -> 11.5).
-                  fontSize: 11.5, fontWeight: 700, letterSpacing: '0.04em',
-                  color: d.net === 'HPC' ? T.warn : T.dm,
-                  background: d.net === 'HPC' ? T.warnSoft : T.sf3,
-                  padding: '2px 5px', borderRadius: `${R.xs}px`, flexShrink: 0,
-                }}
-              >
-                {d.net}
-              </Box>
-            )}
+            {/* 20% 키웠다(사용자 요청: 9.5 -> 11.5) — NetworkTag가 Release list/dialog와
+                공유하는 바로 이 모양·색이다. */}
+            <NetworkTag network={d.net} />
 
             <Box sx={{ flex: 1 }} />
 

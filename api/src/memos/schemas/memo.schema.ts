@@ -7,6 +7,10 @@ import { Layout, LayoutSchema } from '../../blocks/schemas/block.schema';
 
 export type MemoDocument = Memo & Document;
 
+/** Windows 스티키 노트가 제공하는 색상으로 제한한다(사용자 요청) — FE lib/memoColors.ts와 짝. */
+export const MEMO_COLORS = ['yellow', 'blue', 'green', 'pink', 'gray', 'purple'] as const;
+export type MemoColor = (typeof MEMO_COLORS)[number];
+
 /** 버전 관리 대상이 아닌 설명용 블록. Edit 권한자에게만 노출 (설계서 4.7, 6.3). */
 @Schema({ timestamps: true })
 export class Memo {
@@ -21,6 +25,11 @@ export class Memo {
 
   @Prop({ type: LayoutSchema, required: true })
   layout: Layout;
+
+  /** 기존 데이터(색을 저장하기 전)는 이 필드가 없다 — FE가 그런 경우 yellow로 다룬다.
+   * 새로 저장되는 문서는 여기 default가 적용된다. */
+  @Prop({ type: String, enum: MEMO_COLORS, default: 'yellow' })
+  color: MemoColor;
 
   /** 작성자의 KnoxID (api에는 users 컬렉션이 없다 - src/common/actor.ts). */
   @Prop({ required: true, trim: true })

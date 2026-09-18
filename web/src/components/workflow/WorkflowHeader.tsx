@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { WorkflowDto } from '@/types/domain';
 import { SirenButton } from '@/components/common/SirenButton';
 import { Icon } from '@/components/common/Icon';
+import { ViewMode } from '@/lib/viewMode';
 import { R, T } from '@/theme/tokens';
 
 interface WorkflowHeaderProps {
@@ -19,21 +20,27 @@ interface WorkflowHeaderProps {
   /** Workflow settings(Details/Schedule/Permissions 탭) 열기. */
   onOpenSettings: () => void;
   onOpenRelease?: () => void;
-  onOpenHistory?: () => void;
+  /** canvas/list 전환 — 부서 필터 버튼 왼쪽에 세그먼트 버튼 2개로 그린다(사용자 요청). */
+  viewMode: ViewMode;
+  onChangeViewMode: (mode: ViewMode) => void;
 }
 
 const ICON_BUTTON_SIZE = 19.5;
 
 /**
- * workflow명 · 소속 부서 · 수신 부서 필터 · 설정 · Release.
+ * workflow명 · 소속 부서 · 수신 부서 필터 · view 전환 · 설정 · Release.
  *
+ * ★ canvas view와 list view가 공유하는 유일한 헤더다(사용자 요청) — 예전에는 Release
+ *   history 페이지가 "Back to canvas" 버튼과 자기만의 막대를 따로 그렸지만, 이제 이
+ *   헤더 하나로 통일한다. 예전 History(시계) 버튼은 없앴다 — list view 자체가 그 자리를
+ *   대신한다.
  * ★ 캔버스 편집 중에는 여기(app bar 아래)의 액션이 전부 잠긴다 — 그 처리는 Canvas가
  *   편집 상태를 알고 있으므로 상위에서 내려주는 게 아니라, 편집 중 이 헤더 자체를
  *   비활성 컨테이너로 감싸는 방식으로 한다(설계서 03장 §4.3).
  */
 export function WorkflowHeader({
   workflow, orphanCount, canEdit, departmentOptions, recipientFilter,
-  onChangeRecipientFilter, onOpenSettings, onOpenRelease, onOpenHistory,
+  onChangeRecipientFilter, onOpenSettings, onOpenRelease, viewMode, onChangeViewMode,
 }: WorkflowHeaderProps) {
   const { t } = useTranslation();
   const [filterAnchor, setFilterAnchor] = useState<HTMLElement | null>(null);
@@ -101,6 +108,24 @@ export function WorkflowHeader({
         />
       )}
 
+      {/* canvas/list 전환 — 부서 필터 버튼 바로 왼쪽. 선택된 쪽만 활성화된 것처럼 보인다. */}
+      <Stack direction="row" sx={{ border: `1px solid ${T.ln2}`, borderRadius: `${R.sm}px`, overflow: 'hidden' }}>
+        <SirenButton
+          variant={viewMode === 'canvas' ? 'on' : 'ghost'}
+          onClick={() => onChangeViewMode('canvas')}
+          sx={{ borderRadius: 0, border: 'none' }}
+        >
+          <Icon name="grid" size={13} /> Canvas
+        </SirenButton>
+        <SirenButton
+          variant={viewMode === 'list' ? 'on' : 'ghost'}
+          onClick={() => onChangeViewMode('list')}
+          sx={{ borderRadius: 0, border: 'none' }}
+        >
+          <Icon name="list" size={13} /> List
+        </SirenButton>
+      </Stack>
+
       {/* 수신 부서 필터 — 고른 부서가 받는 산출물만 남기고 나머지는 흐려진다. */}
       {departmentOptions.length > 0 && (
         <>
@@ -139,15 +164,6 @@ export function WorkflowHeader({
             })}
           </Menu>
         </>
-      )}
-
-      {/* Release 이력은 view 권한자도 본다 — 무엇이 언제 전달됐는지는 받는 쪽도 알아야 한다. */}
-      {onOpenHistory && (
-        <Tooltip title={t('release.history')}>
-          <SirenButton variant="ghost" onClick={onOpenHistory} aria-label={t('release.history')}>
-            <Icon name="hist" size={ICON_BUTTON_SIZE} />
-          </SirenButton>
-        </Tooltip>
       )}
 
       {canEdit && onOpenRelease && (
