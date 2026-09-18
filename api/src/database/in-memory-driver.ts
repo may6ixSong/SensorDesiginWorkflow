@@ -5,7 +5,10 @@
  *
  * 이 프로젝트의 서비스 코드가 실제로 쓰는 Mongoose Model/Query 메서드만 구현한다:
  * find/findOne/findById/findByIdAndDelete/create/insertMany/updateOne($set)/
- * deleteMany/countDocuments/distinct, 그리고 쿼리 체이닝 .sort()/.populate()/.exec().
+ * deleteMany/countDocuments/distinct, 그리고 쿼리 체이닝
+ * .sort()/.skip()/.limit()/.populate()/.exec().
+ * 필터 연산자는 $in/$nin/$ne/$exists/$gte/$gt/$lte/$lt/$elemMatch/$or/$and 까지 지원한다 -
+ * My Assignment의 달 범위 조회와 페이지네이션이 이 위에서 돈다.
  * 문서 인스턴스에는 .save()/.deleteOne()을 붙여 실제 Mongoose 문서처럼 동작하게 한다.
  *
  * _id는 실제 mongoose.Types.ObjectId를 그대로 쓴다 - 이 클래스는 순수 값 객체라
@@ -86,14 +89,101 @@ function setByPath(doc: AnyDoc, path: string, value: unknown): void {
   current[parts[parts.length - 1]] = value;
 }
 
-function matchesCondition(actual: unknown, condition: unknown): boolean {
-  if (condition && typeof condition === 'object' && !(condition instanceof Types.ObjectId) && !(condition instanceof Date)) {
-    if ('$in' in (condition as any)) {
-      const targets = ((condition as any).$in as unknown[]).map(idish);
-      const actualArr = Array.isArray(actual) ? actual : [actual];
-      return actualArr.some((a) => targets.includes(idish(a)));
+/**
+ * 비교 연산자가 받는 값 — Date/number/string 전부 정렬 가능한 원시값으로 낮춘다.
+ * Date끼리, 숫자끼리 비교되게 하려는 것뿐이고 서로 다른 타입을 섞어 비교하지는 않는다.
+ */
+function comparable(v: unknown): number | string | null {
+  if (v === null || v === undefined) return null;
+  if (v instanceof Date) return v.getTime();
+  if (typeof v === 'number') return v;
+  if (typeof v === 'string') {
+    // 'YYYY-MM-DD...' 같은 날짜 문자열은 문자열 비교로도 순서가 맞는다 — 그대로 둔다.
+    return v;
+  }
+  if (v instanceof Types.ObjectId) return v.toString();
+  return null;
+}
+
+function compare(actual: unknown, bound: unknown, op: '$gte' | '$gt' | '$lte' | '$lt'): boolean {
+  const a = comparable(actual);
+  const b = comparable(bound);
+  if (a === null || b === null) return false;
+  if (typeof a !== typeof b) return false;
+  switch (op) {
+    case '$gte': return a >= b;
+    case '$gt': return a > b;
+    case '$lte': return a <= b;
+    case '$lt': return a < b;
+  }
+}
+
+const COMPARISON_OPS = ['$gte', '$gt', '$lte', '$lt'] as const;
+
+/**
+ * 연산자 객체 하나를 한 값에 대해 판정한다. 배열(멀티키) 처리는 호출부가 한다.
+ *
+ * ★ 실제 MongoDB의 멀티키 의미론을 그대로 흉내낸다 — 배열 필드에 `{$gte, $lt}`를 걸면
+ *   "같은 원소 하나가 양쪽을 다 만족"이 아니라 "각 조건을 만족하는 원소가 배열 안에
+ *   하나씩 있으면" 매치다. 그래서 달 범위 필터는 **과매치**될 수 있고, 호출부가
+ *   엔트리 단위로 한 번 더 걸러야 한다(assignments 쪽이 그렇게 한다).
+ */
+function matchesOperators(actual: unknown, condition: Record<string, unknown>): boolean {
+  const actualArr = Array.isArray(actual) ? actual : [actual];
+  for (const [op, operand] of Object.entries(condition)) {
+    switch (op) {
+      case '$in': {
+        const targets = (operand as unknown[]).map(idish);
+        if (!actualArr.some((a) => targets.includes(idish(a)))) return false;
+        break;
+      }
+      case '$nin': {
+        const targets = (operand as unknown[]).map(idish);
+        if (actualArr.some((a) => targets.includes(idish(a)))) return false;
+        break;
+      }
+      case '$ne': {
+        // 배열이면 "그 값을 가진 원소가 하나도 없어야" 한다(MongoDB와 같다).
+        if (actualArr.some((a) => idish(a) === idish(operand))) return false;
+        break;
+      }
+      case '$exists': {
+        const present = actual !== undefined && actual !== null;
+        if (present !== Boolean(operand)) return false;
+        break;
+      }
+      case '$gte': case '$gt': case '$lte': case '$lt': {
+        if (!actualArr.some((a) => compare(a, operand, op as (typeof COMPARISON_OPS)[number]))) return false;
+        break;
+      }
+      case '$elemMatch': {
+        // 원소 하나가 하위 조건 전부를 만족해야 한다 — 위 멀티키 과매치를 정확히 좁힐 때 쓴다.
+        if (!Array.isArray(actual)) return false;
+        if (!actual.some((el) => matches(el as AnyDoc, operand as AnyDoc))) return false;
+        break;
+      }
+      default:
+        // 모르는 연산자는 동등 비교로 떨어뜨리지 않고 "안 맞음"으로 둔다 — 조용히 전체를
+        // 통과시키면 권한 필터가 무력화될 수 있어서, 실패를 관대하게 처리하지 않는다.
+        return false;
     }
   }
+  return true;
+}
+
+function isOperatorObject(condition: unknown): condition is Record<string, unknown> {
+  return (
+    !!condition &&
+    typeof condition === 'object' &&
+    !Array.isArray(condition) &&
+    !(condition instanceof Types.ObjectId) &&
+    !(condition instanceof Date) &&
+    Object.keys(condition).some((k) => k.startsWith('$'))
+  );
+}
+
+function matchesCondition(actual: unknown, condition: unknown): boolean {
+  if (isOperatorObject(condition)) return matchesOperators(actual, condition);
   const target = idish(condition);
   if (Array.isArray(actual)) {
     return actual.some((a) => idish(a) === target);
@@ -178,6 +268,8 @@ type QueryKind =
 class FakeQuery<T> implements PromiseLike<T> {
   private sortSpec: Record<string, 1 | -1> | null = null;
   private populatePaths: string[] = [];
+  private skipCount = 0;
+  private limitCount: number | null = null;
 
   constructor(
     private readonly store: Map<string, AnyDoc>,
@@ -189,6 +281,17 @@ class FakeQuery<T> implements PromiseLike<T> {
 
   sort(spec: Record<string, 1 | -1>): this {
     this.sortSpec = spec;
+    return this;
+  }
+
+  /** 페이지네이션 — My Assignment의 release 목록이 쓴다. sort 뒤에 적용된다. */
+  skip(n: number): this {
+    this.skipCount = n;
+    return this;
+  }
+
+  limit(n: number): this {
+    this.limitCount = n;
     return this;
   }
 
@@ -242,6 +345,9 @@ class FakeQuery<T> implements PromiseLike<T> {
       case 'find': {
         let docs = this.resolveMatches();
         if (this.sortSpec) docs = applySort(docs, this.sortSpec);
+        // skip/limit은 정렬 뒤에 — 실제 Mongo와 같은 순서다.
+        if (this.skipCount > 0) docs = docs.slice(this.skipCount);
+        if (this.limitCount !== null) docs = docs.slice(0, this.limitCount);
         return docs.map((d) => this.populateOne(d));
       }
       case 'findOne': {

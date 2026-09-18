@@ -105,3 +105,6 @@ export class Block {
 export const BlockSchema = SchemaFactory.createForClass(Block);
 BlockSchema.index({ workflowId: 1, phaseId: 1 });
 BlockSchema.index({ series: 1 });
+// My Assignment는 "내 부서 workflow의 own block 중 artifact가 매핑된 것"을 과제 경계를
+// 넘어 모은다 — workflow 묶음으로 한 번에 긁는 그 조회를 위한 인덱스다(설계서 09장).
+BlockSchema.index({ workflowId: 1, intent: 1, artifactId: 1 });

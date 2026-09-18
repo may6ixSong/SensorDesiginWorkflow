@@ -393,3 +393,109 @@ export interface ReleasePreviewDto {
   items: ReleasePreviewItemDto[];
   changedCount: number;
 }
+
+/* ------------------------------------------------------------------ *
+ * My Assignment (설계서 09장)
+ * ------------------------------------------------------------------ */
+
+export interface PageMetaDto {
+  page: number;
+  size: number;
+  total: number;
+  hasMore: boolean;
+}
+
+export interface PagedDto<T> {
+  items: T[];
+  meta: PageMetaDto;
+}
+
+/**
+ * release 목록 한 줄.
+ *
+ * ★ 버전 라벨·링크·경로가 **없다.** 그 값들은 산출물별 열람 권한을 그 서비스에 라이브로
+ *   물어봐야 정해지는데(01장 §4.2), 목록 한 페이지를 그리자고 산출물 수만큼 외부 호출을
+ *   낼 수는 없기 때문이다. 행을 누르면 `GET /releases/:id`가 그 한 건에 대해서만 판정한다.
+ */
+export interface MyReleaseRowDto {
+  id: string;
+  projectId: string;
+  projectCode: string;
+  projectName: string;
+  workflowId: string;
+  seq: number;
+  label: string;
+  releasedAt: string;
+  releasedBy: string;
+  note: string;
+  workflowAt: { name: string; department: string };
+  itemCount: number;
+  changedCount: number;
+  /** 이 release의 수신 부서 중 내가 속한 것만. */
+  myRecipientDepartments: string[];
+  received: boolean;
+  published: boolean;
+}
+
+/** 내 부서가 주는 산출물 한 자리. 행의 정체성은 artifact가 아니라 block이다. */
+export interface MyArtifactRowDto {
+  blockId: string;
+  blockName: string;
+  workflowId: string;
+  workflowName: string;
+  workflowDepartment: string;
+  projectId: string;
+  projectCode: string;
+  projectName: string;
+  phaseId: string;
+
+  artifactId: string;
+  artifactName: string;
+  tier: Tier;
+  network: NetworkKind;
+  serviceKey: string | null;
+
+  latestVersion: {
+    versionLabel: string;
+    isPublished: boolean;
+    versionRef: string | null;
+    occurredAt: string;
+    viewUrl: string | null;
+    hpcPath: string | null;
+    giverKnoxId: string | null;
+  } | null;
+  versionCount: number;
+  publishedVersionCount: number;
+
+  recipientDepartments: string[];
+  recipientUserCount: number;
+
+  updatedAt: string;
+}
+
+/** 달력의 artifact 버전 발행 event 하나. */
+export interface VersionEventDto {
+  artifactId: string;
+  artifactName: string;
+  tier: Tier;
+  network: NetworkKind;
+  versionLabel: string;
+  versionRef: string | null;
+  /** false면 SIREN이 기록은 했지만 그 서비스가 아직 공식 확정하지 않은 작업중 버전이다. */
+  isPublished: boolean;
+  occurredAt: string;
+  giverKnoxId: string | null;
+  giverDept: string | null;
+  viewUrl: string | null;
+  hpcPath: string | null;
+  projectId: string;
+  projectCode: string;
+  placements: { workflowId: string; workflowName: string; department: string; blockId: string }[];
+}
+
+export interface CalendarDto {
+  from: string;
+  to: string;
+  versionEvents: VersionEventDto[];
+  releaseEvents: MyReleaseRowDto[];
+}

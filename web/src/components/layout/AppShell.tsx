@@ -27,7 +27,11 @@ interface AppShellProps {
 // Short technical labels used throughout the top bar are kept in English
 // regardless of the language toggle (matches the rest of the mock content —
 // workflow/deliverable names, phase codes — which is English-only by design).
-const NAV_LABEL = 'Project List';
+const NAV_ITEMS = [
+  // Project List 왼쪽에 My Assignment를 둔다 — 과제를 고르기 전에 "내 일"부터 보는 순서다.
+  { to: '/my', label: 'My Assignment', match: (p: string) => p.startsWith('/my') },
+  { to: '/projects', label: 'Project List', match: (p: string) => p.startsWith('/projects') },
+] as const;
 
 /**
  * 목업 .tb 상단바 — 로고 + SIREN 워드마크 + 페이지 네비 + (보드에서만) 과제/workflow select
@@ -48,7 +52,6 @@ export function AppShell({
   const { pathname } = useLocation();
 
   const showSelects = !!onChangeProject;
-  const navOn = pathname.startsWith('/projects');
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
@@ -105,19 +108,25 @@ export function AppShell({
         <Box sx={{ width: '1px', height: 22, background: T.ln, flex: '0 0 auto' }} />
 
         <Box sx={{ display: 'flex', gap: '2px', flex: '0 0 auto' }}>
-          <Box
-            component={Link}
-            to="/projects"
-            sx={{
-              fontSize: 12, fontWeight: navOn ? 600 : 500, textDecoration: 'none',
-              padding: '6px 10px', borderRadius: '7px', whiteSpace: 'nowrap', flex: '0 0 auto',
-              color: navOn ? T.tx : T.dm,
-              background: navOn ? T.sf3 : 'transparent',
-              '&:hover': { background: T.sf2, color: T.tx },
-            }}
-          >
-            {NAV_LABEL}
-          </Box>
+          {NAV_ITEMS.map((item) => {
+            const on = item.match(pathname);
+            return (
+              <Box
+                key={item.to}
+                component={Link}
+                to={item.to}
+                sx={{
+                  fontSize: 12, fontWeight: on ? 600 : 500, textDecoration: 'none',
+                  padding: '6px 10px', borderRadius: '7px', whiteSpace: 'nowrap', flex: '0 0 auto',
+                  color: on ? T.tx : T.dm,
+                  background: on ? T.sf3 : 'transparent',
+                  '&:hover': { background: T.sf2, color: T.tx },
+                }}
+              >
+                {item.label}
+              </Box>
+            );
+          })}
         </Box>
 
         {showSelects && (

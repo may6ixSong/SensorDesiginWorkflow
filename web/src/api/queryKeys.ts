@@ -25,6 +25,18 @@ export const queryKeys = {
     ['projects', projectId, 'releases', 'department', department] as const,
   releasesByArtifact: (artifactId: string) => ['artifacts', artifactId, 'releases'] as const,
 
+  /**
+   * My Assignment (설계서 09장) — 과제를 가로지르는 조회라 projectId로 키를 나누지
+   * 않는다. 달력은 화면에 그리는 격자 범위를 그대로 키에 담아, 달을 앞뒤로 오갈 때
+   * 이미 본 달은 다시 부르지 않는다.
+   */
+  myReleases: (direction: 'received' | 'published', page: number) =>
+    ['my', 'releases', direction, page] as const,
+  myArtifacts: ['my', 'artifacts'] as const,
+  myCalendar: (from: string, to: string) => ['my', 'calendar', from, to] as const,
+  /** release 한 건의 상세 — 목록 행을 눌러 다이얼로그를 열 때만 부른다. */
+  release: (releaseId: string) => ['releases', releaseId] as const,
+
   hubServices: ['hub', 'services'] as const,
 
   /**
