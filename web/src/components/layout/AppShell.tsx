@@ -166,9 +166,10 @@ export function AppShell({
             label="User Guide"
             to="/guide"
           />
-          <NoticeBell clientId={user?.KnoxID ?? ''} />
           <LanguagePopover />
           <ThemeTogglePlatform />
+          {/* user badge 바로 옆으로(사용자 요청) — 예전에 테마 토글이 있던 자리다. */}
+          <NoticeBell clientId={user?.KnoxID ?? ''} />
           <ProfileButton />
         </Box>
       </Box>

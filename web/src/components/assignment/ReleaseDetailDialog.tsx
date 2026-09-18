@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Box } from '@mui/material';
 import { ModalShell } from '@/components/common/ModalShell';
 import { Badge } from '@/components/common/SirenButton';
@@ -5,8 +6,10 @@ import { Ey } from '@/components/common/Panel';
 import { UserAvatar } from '@/components/common/Avatar';
 import { NetworkTag } from '@/components/artifact/ArtifactChips';
 import { Location } from './Location';
+import { useAuth } from '@/app/providers/AuthProvider';
 import { useDirectory } from '@/app/providers/DirectoryProvider';
 import { useRelease } from '@/api/hooks/useAssignments';
+import { markReleaseRead } from '@/lib/releaseReadTracker';
 import { fmtAt } from '@/lib/canvasModel';
 import { canonicalDepartmentLabel } from '@/shared/constants/departments';
 import { MyReleaseRowDto, ReleaseItemDto } from '@/types/domain';
@@ -22,6 +25,10 @@ import { FONT_MONO, T, TIER_COLOR, TIER_LABEL } from '@/theme/tokens';
  *
  * 마스킹은 **열람 시점 기준**이라, 같은 release를 나중에 다시 열면 그때의 권한으로 다시
  * 판정된다(05장 §5).
+ *
+ * ★ "확인했다"의 유일한 기준이 여기다 — 이 다이얼로그가 열리는 순간(My Assignment의
+ *   Inbox/Outbox든, bell 팝업이든 호출부가 어디든 상관없이) 그 release를 읽음으로
+ *   기록한다(사용자 확정). 호출부가 각자 챙길 필요가 없도록 이 컴포넌트 자신이 마킹한다.
  */
 export function ReleaseDetailDialog({
   row, onClose,
@@ -29,9 +36,17 @@ export function ReleaseDetailDialog({
   row: MyReleaseRowDto;
   onClose: () => void;
 }) {
+  const { user } = useAuth();
   const { resolveUser } = useDirectory();
   const { data, isLoading, isError } = useRelease(row.id);
   const releasedBy = resolveUser(row.releasedBy);
+
+  useEffect(() => {
+    markReleaseRead(user?.KnoxID ?? '', row.id);
+    // row.id가 바뀌는 경우는 실질적으로 없다(호출부가 매번 새 컴포넌트를 마운트한다) —
+    // 그래도 방어적으로 넣어둔다. user?.KnoxID는 시뮬레이션 대상이 바뀌면 같이 바뀐다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [row.id, user?.KnoxID]);
 
   return (
     <ModalShell
