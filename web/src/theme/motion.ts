@@ -62,10 +62,23 @@ export const toastVariants: Variants = {
  * `custom`으로 direction(1 | 0 | -1)을 받는다.
  */
 export const pageVariants: Variants = {
-  enter: (d: number) => ({ opacity: 0, x: d === 0 ? 0 : d * 26 }),
+  /**
+   * ★ `custom`(direction)이 안 넘어오는 경우를 반드시 방어한다 — 예전에는 `d * 26`을
+   *   그대로 계산해서, d가 undefined면 `x: NaN`이 되었다. NaN 목표값은 애니메이션이
+   *   끝나지 않으므로 `AnimatePresence mode="wait"`가 exit 완료를 영원히 기다리고,
+   *   그 결과 페이지 래퍼가 opacity 0 에 갇혀 **DOM은 다 있는데 화면만 백지**가 됐다.
+   *   (framer-motion 13의 PresenceChild는 presence context를 만들 때 useMemo 의존성에
+   *    `custom`을 넣지 않아 stale 값이 넘어올 수 있고, direction 0 은 falsy이기도 하다.)
+   */
+  enter: (d: number) => ({ opacity: 0, x: slideOffset(d, 26) }),
   center: { opacity: 1, x: 0 },
-  exit: (d: number) => ({ opacity: 0, x: d === 0 ? 0 : d * -26 }),
+  exit: (d: number) => ({ opacity: 0, x: slideOffset(d, -26) }),
 };
+
+/** direction이 숫자가 아니면(=전달 실패) 방향 없는 fade로 떨어진다 — NaN을 만들지 않는다. */
+function slideOffset(direction: number, distance: number): number {
+  return Number.isFinite(direction) && direction !== 0 ? direction * distance : 0;
+}
 
 /**
  * 목록이 처음 그려질 때 항목을 차례로 세우는 stagger.
