@@ -38,6 +38,7 @@ import {
   toVersionView,
 } from './dto/artifact-crud.dto';
 import { CONTRACT_VERSION, toArtifactSummary, toVersionRecord } from './observer.dto';
+import { HubEventSenderService } from '../siren-common/hub-event-sender.service';
 
 function toGrantInput(dto: GrantDto): { type: 'user'; knoxId: string } | { type: 'department'; department: string } {
   if (dto.type === 'user') return { type: 'user', knoxId: dto.knoxId as string };
@@ -65,6 +66,7 @@ export class ArtifactsController {
     private readonly artifacts: ArtifactsService,
     private readonly storage: StorageService,
     private readonly config: ConfigService,
+    private readonly hubEvents: HubEventSenderService,
   ) {}
 
   private get publicBaseUrl(): string {
@@ -185,12 +187,16 @@ export class ArtifactsController {
       },
       me,
     );
+    // fire-and-forget — SIREN이 매핑해 뒀다면 즉시 캐시를 채워 넣는다(문제 1). 업로드
+    // 자체는 이미 성공했으므로 이 알림이 느리거나 실패해도 응답을 막지 않는다.
+    void this.hubEvents.notifyVersionPublished(saved, saved.versions[0]);
     return { data: toArtifactDto(saved, 'edit') };
   }
 
   @Post(':id/release')
   async release(@Param('id') id: string, @Body() dto: ReleaseDto, @CurrentActor() me: Actor) {
     const a = await this.artifacts.release(id, dto.versionNote, dto.description, me, dto.sourceVersionRef);
+    void this.hubEvents.notifyVersionPublished(a, a.versions[0]);
     return { data: toArtifactDto(a, 'edit') };
   }
 

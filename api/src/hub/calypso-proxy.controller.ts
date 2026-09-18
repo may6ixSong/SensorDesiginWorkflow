@@ -22,7 +22,9 @@ import { CurrentActor } from '../common/decorators/current-actor.decorator';
 import { Actor } from '../common/actor';
 import { canAccessProject, myDepartments } from '../common/access';
 import { Project, ProjectDocument } from '../projects/schemas/project.schema';
-import { CalypsoClientService } from './calypso-client.service';
+import { Artifact, ArtifactDocument } from '../artifacts/schemas/artifact.schema';
+import { CALYPSO_SERVICE_KEY, CalypsoClientService } from './calypso-client.service';
+import { HubSyncService } from './hub-sync.service';
 import {
   CalypsoAddVersionDto, CalypsoGrantDto, CalypsoReleaseDto, CreateCalypsoArtifactDto,
   SetCalypsoNetworkDto, SetCalypsoRestrictViewDto,
@@ -57,7 +59,9 @@ import {
 export class CalypsoProxyController {
   constructor(
     private readonly calypso: CalypsoClientService,
+    private readonly hubSync: HubSyncService,
     @InjectModel(Project.name) private readonly projectModel: Model<ProjectDocument>,
+    @InjectModel(Artifact.name) private readonly artifactModel: Model<ArtifactDocument>,
   ) {}
 
   /** 게이트 1 — project member 여부 확인 후, 그 project 안에서의 실제 department를 계산한다. */
@@ -82,6 +86,29 @@ export class CalypsoProxyController {
     }
     if (result.status >= 200 && result.status < 300) return result.body;
     throw new HttpException(result.body ?? { message: 'File service request failed.' }, result.status);
+  }
+
+  /**
+   * SIREN이 직접 프록시한 publish/upload 직후, 이 artifact가 이미 어떤 workflow에
+   * 매핑돼 있으면 그 자리에서 SIREN 캐시(artifact.versions)를 즉시 갱신한다(설계서 07장
+   * §4.3, "문제 2" 수정).
+   *
+   * ★ 이게 없으면 Calypso 발행 이벤트 발신기(문제 1)나 야간 재동기화(문제 3, 아직 미스케줄)
+   *   없이는 SIREN UI를 거쳐 publish해도 SIREN 자신의 캐시가 영원히 갱신되지 않는다 —
+   *   그런데 SIREN BE는 이미 이 프록시 호출 경로 위에 있고 knoxId/isAdmin도 이미 갖고
+   *   있으므로, 여기서 pullFullHistory를 한 번 더 부르는 것이 가장 싸게 해결하는 방법이다.
+   * ★ 아직 매핑되지 않은 artifact(어느 workflow도 이 externalArtifactId를 참조하지 않음)는
+   *   조용히 건너뛴다 — 매핑되는 순간 ArtifactSourceService가 전체 이력을 한 번에 pull한다.
+   * ★ 실패해도 방금 끝난 publish/upload 자체는 이미 성공했으므로 에러를 던지지 않는다 —
+   *   사용자에게 보여줄 결과는 이미 `relay()`가 반환한 뒤다.
+   */
+  private async syncCache(externalArtifactId: string, knoxId: string, isAdmin: boolean): Promise<void> {
+    const artifact = await this.artifactModel
+      .findOne({ serviceKey: CALYPSO_SERVICE_KEY, externalArtifactId })
+      .exec();
+    if (!artifact) return;
+    await this.hubSync.pullFullHistory(artifact, knoxId, isAdmin);
+    await artifact.save();
   }
 
   /**
@@ -151,7 +178,9 @@ export class CalypsoProxyController {
       departments,
       isAdmin,
     );
-    return this.relay(result);
+    const body = this.relay(result);
+    await this.syncCache(id, me.knoxId, isAdmin);
+    return body;
   }
 
   /** 파일이 하나면 그대로, 여러 개면 zip으로 묶여서 온다 — Calypso가 그 판정을 한다(§3.9). */
@@ -187,7 +216,9 @@ export class CalypsoProxyController {
     const result = await this.calypso.release(
       id, dto.versionNote, dto.description, me.knoxId, departments, isAdmin, dto.sourceVersionRef,
     );
-    return this.relay(result);
+    const body = this.relay(result);
+    await this.syncCache(id, me.knoxId, isAdmin);
+    return body;
   }
 
   @Post(':id/editors')

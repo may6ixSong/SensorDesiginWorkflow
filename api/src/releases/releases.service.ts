@@ -341,19 +341,37 @@ export class ReleasesService {
       .exec();
     const seq = bumped?.releaseSeq ?? (workflow.releaseSeq ?? 0) + 1;
 
-    const release = await this.model.create({
-      projectId: workflow.projectId,
-      workflowId: workflow._id,
-      seq,
-      releasedAt: new Date(),
-      releasedBy: actor.knoxId,
-      note,
-      workflowAt: { name: workflow.name, department: workflow.department },
-      items,
-      recipientDepartments: [...departments],
-      recipientUsers: [...users],
-      isMock: false,
-    });
+    // ★ 이 프로젝트는 실제 트랜잭션(session)을 쓰지 않는다(인메모리 목업 드라이버가 지원하지
+    //   않는다 — database/in-memory-driver.ts) — 그래서 증가와 문서 생성을 하나로 묶을 수는
+    //   없다. 대신 문서 생성이 실패하면 방금 올린 seq를 되돌려, "카운터만 올라가고 release
+    //   문서는 없는" 상태(관측된 실제 버그 — 개발 DB의 releaseSeq=3인데 release 문서 0건)가
+    //   남지 않게 한다.
+    let release: ReleaseDocument;
+    try {
+      release = await this.model.create({
+        projectId: workflow.projectId,
+        workflowId: workflow._id,
+        seq,
+        releasedAt: new Date(),
+        releasedBy: actor.knoxId,
+        note,
+        workflowAt: { name: workflow.name, department: workflow.department },
+        items,
+        recipientDepartments: [...departments],
+        recipientUsers: [...users],
+        isMock: false,
+      });
+    } catch (e) {
+      await this.workflowModel
+        .updateOne({ _id: workflow._id }, { $inc: { releaseSeq: -1 } })
+        .exec()
+        .catch((rollbackError) => {
+          this.logger.error(
+            `Release seq rollback failed for workflow ${workflow._id.toString()} (seq ${seq}) — ${(rollbackError as Error).message}`,
+          );
+        });
+      throw e;
+    }
 
     await this.audit.log(actor.knoxId, 'RELEASE_CREATE', 'release', release._id, {
       workflowId: workflow._id.toString(),

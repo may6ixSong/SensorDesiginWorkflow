@@ -34,6 +34,14 @@ export class VersionPublishedEventDto {
   @MinLength(1)
   versionLabel: string;
 
+  /**
+   * 그 서비스가 발급한 진짜 불변 참조(있으면) — source 계보(sourceRefs) 연결에 쓴다(문제 4).
+   * 모든 서비스가 갖고 있는 건 아니므로 nullable/optional이다.
+   */
+  @IsOptional()
+  @IsString()
+  versionRef: string | null;
+
   /** artifact를 받는 user가(view 권한) 볼 수 있는 버전인지 — 가시성 판정의 유일한 근거 */
   @IsBoolean()
   isPublished: boolean;

@@ -107,7 +107,14 @@ export class CalypsoClientService {
     departments: string[],
     isAdmin: boolean,
   ): Promise<{ canView: boolean; canEdit: boolean }> {
-    if (!this.baseUrl) return { canView: false, canEdit: false };
+    if (!this.baseUrl) {
+      // fail-closed 결과(canView:false)는 "이 사람은 실제로 권한이 없다"는 정상 판정과
+      // 화면상 똑같이 보인다(마스킹) — 설정 자체가 비어 있는 이 케이스만은 최소한 로그에
+      // 남겨서, 운영 중 "권한 있는 사람에게도 전부 published 버전이 없어 보인다"는
+      // 증상이 났을 때 이 원인(CALYPSO_API 미설정)부터 제외할 수 있게 한다(문제 6).
+      this.logger.warn(`Calypso access check skipped — CALYPSO_API is not configured (checking ${externalArtifactId})`);
+      return { canView: false, canEdit: false };
+    }
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
     try {
@@ -174,7 +181,18 @@ export class CalypsoClientService {
    * artifacts.controller.ts) 그걸 그대로 부른다.
    */
   async versions(externalArtifactId: string, knoxId: string): Promise<
-    { versionLabel: string; isReleased: boolean; giverKnoxId: string | null; viewUrl: string | null; network: 'OA' | 'HPC' | null }[]
+    {
+      versionLabel: string;
+      isReleased: boolean;
+      giverKnoxId: string | null;
+      viewUrl: string | null;
+      network: 'OA' | 'HPC' | null;
+      /** Calypso의 불변 참조(toVersionRecord) — source 계보(sourceRefs) 연결에 쓴다(문제 4). */
+      versionRef: string | null;
+      /** Calypso가 이 버전을 만든 실제 시각 — pull한 순서가 아니라 이 값으로 최신순 정렬해야
+       *  "index 0 = 최신" 불변식이 깨지지 않는다(문제 5). */
+      createdAt: string | null;
+    }[]
   > {
     if (!this.baseUrl) return [];
     const controller = new AbortController();
@@ -196,6 +214,8 @@ export class CalypsoClientService {
         giverKnoxId: v.giver?.knoxId ?? null,
         viewUrl: v.viewUrl ?? null,
         network: v.network ?? null,
+        versionRef: v.versionRef ?? null,
+        createdAt: v.createdAt ?? null,
       }));
     } catch (e) {
       this.logger.warn(`Calypso versions error for ${externalArtifactId} — ${(e as Error).message}`);

@@ -1,4 +1,4 @@
-import { BadRequestException, Controller, Post, Req, UseGuards } from '@nestjs/common';
+import { BadRequestException, Controller, Logger, Post, Req, UseGuards } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { plainToInstance } from 'class-transformer';
@@ -16,6 +16,8 @@ import { VersionPublishedEventDto } from './dto/version-event.dto';
 @Controller('hub/events')
 @UseGuards(HubTokenGuard)
 export class HubEventsController {
+  private readonly logger = new Logger(HubEventsController.name);
+
   constructor(
     @InjectModel(Artifact.name) private readonly artifacts: Model<ArtifactDocument>,
     private readonly hubSync: HubSyncService,
@@ -56,7 +58,16 @@ export class HubEventsController {
     const artifact = await this.artifacts
       .findOne({ serviceKey: sender.serviceKey, externalArtifactId: dto.externalArtifactId })
       .exec();
-    if (!artifact) return { recorded: false };
+    if (!artifact) {
+      // 200으로 응답하되(그 산출물이 아직 아무 workflow에도 매핑되지 않았을 뿐인 정상
+      // 케이스와, 발신기의 (serviceKey, externalArtifactId)가 실제로 어긋난 버그 케이스를
+      // 겉으로는 구분할 수 없다) 최소한 로그에는 남긴다 — 발신기를 새로 붙였을 때(문제 1)
+      // 조회 키가 어긋나면 그동안 아무 에러 없이 이벤트가 계속 유실될 수 있다(문제 8).
+      this.logger.warn(
+        `version-published event dropped — no artifact mapped for ${sender.serviceKey}/${dto.externalArtifactId}`,
+      );
+      return { recorded: false };
+    }
 
     // ★ artifact.name은 안 건드린다 — SIREN 쪽에서 생성 시 admin/사용자가 정한 이름을
     //   그대로 유지한다(block.name과 같은 이유, 사용자 지적). 예전에는 이 이벤트의
@@ -65,6 +76,7 @@ export class HubEventsController {
     this.hubSync.upsertVersionEntry(artifact, sender.tier, {
       versionLabel: dto.versionLabel,
       isPublished: dto.isPublished,
+      versionRef: dto.versionRef ?? null,
       giverKnoxId: dto.updatedUserId,
       giverDept: null,
       viewUrl: dto.viewUrl ?? null,
