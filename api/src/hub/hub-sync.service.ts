@@ -5,14 +5,14 @@ import { Artifact, ArtifactDocument, ArtifactVersion } from '../artifacts/schema
 import { Tier } from '../common/constants/tier';
 import { HubService } from './hub.service';
 import { ObserverClientService } from './observer-client.service';
-import { CalypsoClientService } from './calypso-client.service';
-
-const CALYPSO_SERVICE_KEY = 'calypso';
+import { CALYPSO_SERVICE_KEY, CalypsoClientService } from './calypso-client.service';
 
 /** upsertVersionEntry가 받는, 서비스 종류를 가리지 않는 정규화된 입력(설계서 07장 §4.1). */
 export interface NormalizedVersionInput {
   versionLabel: string;
   isPublished: boolean;
+  /** 그 서비스가 준 불변 참조. 없으면(A/C tier의 observer 계약처럼 아직 안 실어오면) null(문제 4). */
+  versionRef: string | null;
   giverKnoxId: string | null;
   giverDept: string | null;
   /** OA Service 전용 */
@@ -61,7 +61,7 @@ export class HubSyncService {
       tier,
       versionLabel: input.versionLabel,
       isPublished: input.isPublished,
-      versionRef: null,
+      versionRef: input.versionRef,
       giverKnoxId: input.giverKnoxId,
       giverDept: input.giverDept,
       sourceRefs: [],
@@ -103,13 +103,17 @@ export class HubSyncService {
           this.upsertVersionEntry(artifact, 'B', {
             versionLabel: v.versionLabel,
             isPublished: v.isReleased,
+            versionRef: v.versionRef,
             giverKnoxId: v.giverKnoxId,
             giverDept: null,
             viewUrl: v.viewUrl,
             hpcPath: null,
             // pull 계약엔 note가 없다 — upsertVersionEntry가 기존 값을 그대로 이어받는다.
             note: null,
-            observedAt: new Date(),
+            // Calypso가 이 버전을 실제로 만든 시각을 그대로 쓴다 — 전부 new Date()(pull한
+            // 시각)를 넣으면 모든 버전이 사실상 동시각이 되어 index 0 = 최신 불변식이
+            // Calypso의 응답 순서에 좌우되며 깨진다(문제 5).
+            observedAt: v.createdAt ? new Date(v.createdAt) : new Date(),
           });
         }
         return;
@@ -122,6 +126,9 @@ export class HubSyncService {
         this.upsertVersionEntry(artifact, tier, {
           versionLabel: r.versionLabel,
           isPublished: r.isReleased,
+          // observer 계약(pull)엔 top-level versionRef가 아직 없다 — sourceRefs 안에만 있다.
+          // A/C tier까지 넓히는 건 이 수정의 범위를 벗어난다(문제 4는 Calypso/B 한정).
+          versionRef: null,
           giverKnoxId: r.giverKnoxId,
           giverDept: r.giverDept,
           // HPC Service(C)는 실 파일이 아니라 경로만 온다 — pull 계약(observer-contract-v1.yaml,
