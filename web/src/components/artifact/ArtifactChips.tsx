@@ -1,5 +1,6 @@
+import { Box } from '@mui/material';
 import { Badge } from '@/components/common/SirenButton';
-import { T } from '@/theme/tokens';
+import { R, T } from '@/theme/tokens';
 
 /**
  * Artifact 출처/권한 칩 3종 — "새 Artifact 추가"/"소스 변경" 피커(ArtifactSourcePicker)와
@@ -32,6 +33,30 @@ export function NetworkChip({ network, sx }: { network: 'OA' | 'HPC' | null | un
   return network === 'HPC'
     ? <Badge color={T.warn} bg={T.warnSoft} borderColor={T.warnLine} sx={sx}>HPC</Badge>
     : <Badge color={T.ok} bg={T.okSoft} borderColor={T.okLine} sx={sx}>OA</Badge>;
+}
+
+/**
+ * 캔버스 block(BlockNode)의 OA/HPC 표식과 정확히 같은 모양·색이다(사용자 요청 — Release
+ * list/dialog의 tier 글자 배지를 이걸로 대체한다). NetworkChip과 달리 테두리가 없고
+ * OA는 중립색(HPC만 강조색)인, 캔버스 특유의 수수한 표식이다 — 의도적으로 다른 컴포넌트다.
+ */
+export function NetworkTag({ network, sx }: { network: 'OA' | 'HPC' | null | undefined; sx?: object }) {
+  if (!network) return null;
+  return (
+    <Box
+      component="span"
+      sx={{
+        display: 'inline-block',
+        fontSize: 11.5, fontWeight: 700, letterSpacing: '0.04em',
+        color: network === 'HPC' ? T.warn : T.dm,
+        background: network === 'HPC' ? T.warnSoft : T.sf3,
+        padding: '2px 5px', borderRadius: `${R.xs}px`, flexShrink: 0,
+        ...sx,
+      }}
+    >
+      {network}
+    </Box>
+  );
 }
 
 /** admin이 등록한 실제 OA/HPC Service(Tier A/C)에서 온 것에만 — Calypso(File Artifacts)는 해당 없다. */

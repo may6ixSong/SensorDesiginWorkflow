@@ -6,9 +6,10 @@ import { ModalShell } from '@/components/common/ModalShell';
 import { SirenButton, Badge } from '@/components/common/SirenButton';
 import { Ey } from '@/components/common/Panel';
 import { Icon } from '@/components/common/Icon';
+import { NetworkTag } from '@/components/artifact/ArtifactChips';
 import { ConfirmDialog } from '@/components/dialogs/ConfirmDialog';
 import { canonicalDepartmentLabel } from '@/shared/constants/departments';
-import { CURSOR_POINTER, FONT_MONO, R, T, TIER_COLOR, TNUM } from '@/theme/tokens';
+import { CURSOR_POINTER, FONT_MONO, R, T, TNUM } from '@/theme/tokens';
 
 /** blockId → (sourceBlockId → versionRef | null) */
 type SourceSelection = Record<string, Record<string, string | null>>;
@@ -39,9 +40,22 @@ export function ReleaseDialog({ workflowName, preview, loading, saving, onClose,
   const [noteErr, setNoteErr] = useState(false);
   const [selection, setSelection] = useState<SourceSelection>({});
   const [confirmOpen, setConfirmOpen] = useState(false);
+  /** null이면 "All" 탭 — 부서를 고르면 그 부서가 recipient인 항목만 본다(사용자 요청).
+   * 탭 자체는 이번 release가 실제로 전달할 항목들의 recipients를 조사해서 만든다 —
+   * 받는 user는 조사하지 않는다(부서만). */
+  const [deptTab, setDeptTab] = useState<string | null>(null);
 
-  const items = preview?.items ?? [];
+  const items = useMemo(() => preview?.items ?? [], [preview]);
   const changed = useMemo(() => items.filter((i) => i.changed), [items]);
+  const departments = useMemo(() => {
+    const set = new Set<string>();
+    items.forEach((i) => i.recipients.departments.forEach((d) => set.add(d)));
+    return [...set].sort();
+  }, [items]);
+  const visibleItems = useMemo(
+    () => (deptTab ? items.filter((i) => i.recipients.departments.includes(deptTab)) : items),
+    [items, deptTab],
+  );
 
   const pick = (blockId: string, sourceBlockId: string, versionRef: string | null) =>
     setSelection((prev) => ({
@@ -101,15 +115,59 @@ export function ReleaseDialog({ workflowName, preview, loading, saving, onClose,
             </Box>
           </Box>
 
+          {/* 부서별 탭 — 이번 release가 실제로 어디로 가는지 부서 단위로 미리 볼 수 있게
+              한다(사용자 요청). "All"이 항상 첫 탭이고 기본 선택이다. */}
+          {departments.length > 0 && (
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: '5px', mb: '10px' }}>
+              <Box
+                component="button"
+                type="button"
+                onClick={() => setDeptTab(null)}
+                sx={{
+                  fontSize: 11.5, fontWeight: 600, padding: '5px 10px', borderRadius: `${R.pill}px`,
+                  cursor: CURSOR_POINTER, transition: '.14s',
+                  background: deptTab === null ? T.pr : T.sf,
+                  color: deptTab === null ? '#fff' : T.dm,
+                  border: `1px solid ${deptTab === null ? T.pr : T.ln2}`,
+                }}
+              >
+                All
+              </Box>
+              {departments.map((d) => (
+                <Box
+                  key={d}
+                  component="button"
+                  type="button"
+                  onClick={() => setDeptTab(d)}
+                  sx={{
+                    fontSize: 11.5, fontWeight: 600, padding: '5px 10px', borderRadius: `${R.pill}px`,
+                    cursor: CURSOR_POINTER, transition: '.14s',
+                    background: deptTab === d ? T.pr : T.sf,
+                    color: deptTab === d ? '#fff' : T.dm,
+                    border: `1px solid ${deptTab === d ? T.pr : T.ln2}`,
+                  }}
+                >
+                  {canonicalDepartmentLabel(d)}
+                </Box>
+              ))}
+            </Box>
+          )}
+
           <Box sx={{ maxHeight: 380, overflowY: 'auto', mb: '16px' }}>
-            {items.map((item) => (
-              <ReleaseRow
-                key={item.blockId}
-                item={item}
-                selection={selection[item.blockId] ?? {}}
-                onPick={(sourceBlockId, ref) => pick(item.blockId, sourceBlockId, ref)}
-              />
-            ))}
+            {visibleItems.length === 0 ? (
+              <Box sx={{ padding: '20px 4px', textAlign: 'center', color: T.dm2, fontSize: 12.5 }}>
+                Nothing goes to {deptTab ? canonicalDepartmentLabel(deptTab) : 'anyone'} in this release.
+              </Box>
+            ) : (
+              visibleItems.map((item) => (
+                <ReleaseRow
+                  key={item.blockId}
+                  item={item}
+                  selection={selection[item.blockId] ?? {}}
+                  onPick={(sourceBlockId, ref) => pick(item.blockId, sourceBlockId, ref)}
+                />
+              ))
+            )}
           </Box>
 
           <Box sx={{ mb: '6px' }}>
@@ -169,7 +227,6 @@ function ReleaseRow({
   onPick: (sourceBlockId: string, versionRef: string | null) => void;
 }) {
   const { t } = useTranslation();
-  const tier = TIER_COLOR[item.tier];
 
   return (
     <Box
@@ -181,14 +238,7 @@ function ReleaseRow({
       }}
     >
       <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-        <Box
-          sx={{
-            fontSize: 10, fontWeight: 700, color: tier.fg, background: tier.bg,
-            padding: '2px 6px', borderRadius: `${R.xs}px`, flexShrink: 0,
-          }}
-        >
-          {item.tier}
-        </Box>
+        <NetworkTag network={item.network} />
         <Box sx={{ fontSize: 13, fontWeight: 600, minWidth: 0, flex: 1 }}>{item.artifactName}</Box>
 
         {item.published ? (

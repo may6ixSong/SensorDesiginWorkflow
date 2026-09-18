@@ -184,16 +184,23 @@ export function phaseAtX(phases: WorkflowPhase[], phasePW: Record<string, number
  * 새로 생성된 블록을 지정된 Phase 레인 안쪽(좌상단)에 배치한다.
  * 백엔드가 내려주는 기본 layout(0,0)은 Phase를 모르므로, FE에서 레인 좌표로 보정해야
  * `phase` 필드와 실제 x 좌표가 어긋나 엉뚱한 레인에 그려지는 것을 막는다.
+ *
+ * ★ y축은 그 Phase에 이미 있는 블록들과 절대 겹치지 않는 자리로 잡는다(사용자 요청) —
+ *   항상 레인 맨 위에 놓아 기존 블록을 가리던 것에서, 그 레인의 가장 아래 블록보다
+ *   더 아래에 놓는 방식으로 바꿨다. `existing`이 비어 있으면(그 레인에 아무것도 없으면)
+ *   예전과 같은 기본 위치(TOP_PAD)를 쓴다.
  */
 export function placeInLane(
   block: { x: number; y: number; phase: string },
   phases: WorkflowPhase[],
   phasePW: Record<string, number>,
+  existing: { phase: string; y: number; h: number }[] = [],
 ): void {
   const g = laneG(phases, phasePW).lanes[block.phase];
   if (!g) return;
   block.x = snp(g.x + LANE_PAD);
-  block.y = snp(TOP_PAD);
+  const bottoms = existing.filter((n) => n.phase === block.phase).map((n) => n.y + n.h);
+  block.y = bottoms.length ? snp(Math.max(...bottoms) + GAP) : snp(TOP_PAD);
 }
 
 /**

@@ -47,7 +47,13 @@ export function AddArtifactDialog({
   const { t } = useTranslation();
   const [intent, setIntent] = useState<ArtifactIntent>('own');
   const [name, setName] = useState('');
+  /** 사용자가 마지막으로 고른 artifact 후보의 이름 — name 필드를 비워 둔 채 제출해도
+   * 이 값으로 채워 보낸다(사용자 요청: artifact를 매핑하면 이름은 optional). */
+  const [pickedName, setPickedName] = useState('');
   const [phaseId, setPhaseId] = useState<string>(phases[0]?.id ?? '');
+  /** true면 이 자리에서 바로 artifact를 매핑하고, false면 자리만 잡아두고 나중에
+   * 매핑한다(사용자 요청 — block은 artifact 없이도 만들 수 있다, 설계서 03장 §2.3). */
+  const [mapNow, setMapNow] = useState(true);
   const [src, setSrc] = useState<ArtifactSourceState>(emptySourceState());
   const [err, setErr] = useState<string | null>(null);
 
@@ -56,12 +62,21 @@ export function AddArtifactDialog({
   };
 
   const submit = () => {
-    if (!name.trim() || !phaseId) { setErr('Name and phase are required.'); return; }
+    if (!phaseId) { setErr('Phase is required.'); return; }
+    if (!mapNow) {
+      // 매핑을 나중으로 미루는 경우엔 이름이 유일한 단서라 반드시 있어야 한다.
+      if (!name.trim()) { setErr('Name is required when you are not mapping an artifact yet.'); return; }
+      setErr(null);
+      onCreate({ name: name.trim(), phaseId, intent });
+      return;
+    }
     if (!src.source) { setErr('Pick where this artifact comes from.'); return; }
-    const newArtifact = resolveNewArtifact(src, name.trim());
+    const finalName = name.trim() || pickedName;
+    if (!finalName) { setErr('Name and phase are required.'); return; }
+    const newArtifact = resolveNewArtifact(src, finalName);
     if (!newArtifact) { setErr('Finish picking the artifact for that source.'); return; }
     setErr(null);
-    onCreate({ name: name.trim(), phaseId, intent, newArtifact });
+    onCreate({ name: finalName, phaseId, intent, newArtifact });
   };
 
   return (
@@ -104,7 +119,7 @@ export function AddArtifactDialog({
         </Box>
       </Field>
 
-      <Field label="Name">
+      <Field label={mapNow ? 'Name — optional, defaults to the artifact you pick below' : 'Name'}>
         <TextInput
           value={name}
           onChange={(v) => { setName(v); setErr(null); }}
@@ -141,16 +156,44 @@ export function AddArtifactDialog({
         </Box>
       </Field>
 
-      <ArtifactSourcePicker
-        workflowId={workflowId}
-        projectId={projectId}
-        intent={intent}
-        myDepartments={myDepartments}
-        departmentOptions={departmentOptions}
-        state={src}
-        onChange={setSrc}
-        onSelectName={(n) => { if (!name.trim()) setName(n); }}
-      />
+      <Field label="Artifact mapping">
+        <Box sx={{ display: 'flex', gap: '8px' }}>
+          {([true, false] as const).map((v) => (
+            <Box
+              key={String(v)}
+              component="button"
+              type="button"
+              onClick={() => { setMapNow(v); setErr(null); }}
+              sx={{
+                flex: 1, fontSize: 13, fontWeight: 600, padding: '10px', borderRadius: `${R.sm}px`,
+                cursor: CURSOR_POINTER, transition: '.14s',
+                background: mapNow === v ? T.prSoft : T.sf,
+                border: `1px solid ${mapNow === v ? T.pr : T.ln2}`,
+                color: mapNow === v ? T.pr : T.dm,
+              }}
+            >
+              {v ? 'Map an artifact now' : 'Decide later'}
+            </Box>
+          ))}
+        </Box>
+      </Field>
+
+      {mapNow ? (
+        <ArtifactSourcePicker
+          workflowId={workflowId}
+          projectId={projectId}
+          intent={intent}
+          myDepartments={myDepartments}
+          departmentOptions={departmentOptions}
+          state={src}
+          onChange={setSrc}
+          onSelectName={(n) => { setPickedName(n); if (!name.trim()) setName(n); }}
+        />
+      ) : (
+        <Box sx={{ fontSize: 11.5, color: T.dm2, lineHeight: 1.6, mb: '10px' }}>
+          This just holds a place on the canvas — map it to an artifact later from the block&apos;s detail.
+        </Box>
+      )}
 
       {err && <Box sx={{ fontSize: 12, color: T.danger, mb: '10px' }}>{err}</Box>}
 
