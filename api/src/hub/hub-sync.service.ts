@@ -54,8 +54,13 @@ export class HubSyncService {
     const versions = artifact.versions ?? [];
     const idx = versions.findIndex((v) => v.versionLabel === input.versionLabel);
     // pull(mapping-time·야간 재동기화)은 note를 모른다 — null로 덮어써서 push 이벤트가
-    // 이미 채워둔 note를 지우지 않게, 안 준 경우엔 기존 값을 그대로 이어받는다.
+    // 이미 채워둔 note를 지우지 않게, 안 준 경우엔 기존 값을 그대로 이어받는다. viewUrl/
+    // hpcPath도 같은 이유로 같은 패턴을 쓴다 — 발신기(문제 1)나 관측 계약 중 하나가 그
+    // 값을 못 실어 보내는 라운드가 있어도(리뷰 결함 1), 이미 캐시된 값을 조용히
+    // null로 지워버리지 않는다.
     const note = input.note ?? versions[idx]?.note ?? '';
+    const viewUrl = input.viewUrl ?? versions[idx]?.viewUrl ?? null;
+    const hpcPath = input.hpcPath ?? versions[idx]?.hpcPath ?? null;
     const entry = {
       _id: idx >= 0 ? versions[idx]._id : new Types.ObjectId(),
       tier,
@@ -65,8 +70,8 @@ export class HubSyncService {
       giverKnoxId: input.giverKnoxId,
       giverDept: input.giverDept,
       sourceRefs: [],
-      viewUrl: input.viewUrl,
-      hpcPath: input.hpcPath,
+      viewUrl,
+      hpcPath,
       note,
       assertedBy: null,
       assertedAt: null,

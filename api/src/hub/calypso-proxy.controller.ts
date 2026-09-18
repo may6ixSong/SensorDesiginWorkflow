@@ -6,6 +6,7 @@ import {
   ForbiddenException,
   Get,
   HttpException,
+  Logger,
   NotFoundException,
   Param,
   Patch,
@@ -57,6 +58,8 @@ import {
  */
 @Controller('calypso-artifacts')
 export class CalypsoProxyController {
+  private readonly logger = new Logger(CalypsoProxyController.name);
+
   constructor(
     private readonly calypso: CalypsoClientService,
     private readonly hubSync: HubSyncService,
@@ -100,15 +103,21 @@ export class CalypsoProxyController {
    * ★ 아직 매핑되지 않은 artifact(어느 workflow도 이 externalArtifactId를 참조하지 않음)는
    *   조용히 건너뛴다 — 매핑되는 순간 ArtifactSourceService가 전체 이력을 한 번에 pull한다.
    * ★ 실패해도 방금 끝난 publish/upload 자체는 이미 성공했으므로 에러를 던지지 않는다 —
-   *   사용자에게 보여줄 결과는 이미 `relay()`가 반환한 뒤다.
+   *   사용자에게 보여줄 결과는 이미 `relay()`가 반환한 뒤다. (리뷰 결함 2 — 이전 버전은
+   *   이 약속을 주석으로만 적어 두고 실제로는 findOne/save가 던지는 예외를 그대로
+   *   호출부까지 흘려보내, 이미 성공한 publish/upload가 500으로 보이는 경우가 있었다.)
    */
   private async syncCache(externalArtifactId: string, knoxId: string, isAdmin: boolean): Promise<void> {
-    const artifact = await this.artifactModel
-      .findOne({ serviceKey: CALYPSO_SERVICE_KEY, externalArtifactId })
-      .exec();
-    if (!artifact) return;
-    await this.hubSync.pullFullHistory(artifact, knoxId, isAdmin);
-    await artifact.save();
+    try {
+      const artifact = await this.artifactModel
+        .findOne({ serviceKey: CALYPSO_SERVICE_KEY, externalArtifactId })
+        .exec();
+      if (!artifact) return;
+      await this.hubSync.pullFullHistory(artifact, knoxId, isAdmin);
+      await artifact.save();
+    } catch (e) {
+      this.logger.warn(`cache sync after Calypso publish/upload failed for ${externalArtifactId} — ${(e as Error).message}`);
+    }
   }
 
   /**

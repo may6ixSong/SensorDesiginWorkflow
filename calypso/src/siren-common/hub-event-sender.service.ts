@@ -43,6 +43,11 @@ export class HubEventSenderService {
     const token = this.config.get<string>('calypsoEventToken');
     const artifactId = artifact._id.toString();
     const versionLabel = `${version.major}.${version.minor}`;
+    // observer.dto.ts#toVersionRecord(pull 경로)와 같은 규칙으로 만든다 — 여기서 null을
+    // 보내면 hub-sync.service.ts의 upsertVersionEntry가 그대로 덮어써서(fallback이 없었다)
+    // SIREN 쪽에 이미 있던 viewUrl이 지워졌었다(리뷰 결함 1).
+    const publicBaseUrl = this.config.get<string>('publicBaseUrl') ?? 'http://localhost:5174';
+    const viewUrl = `${publicBaseUrl.replace(/\/$/, '')}/artifacts/${artifactId}`;
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -62,7 +67,7 @@ export class HubEventSenderService {
           versionLabel,
           isPublished: version.isReleased === true,
           versionRef: version.versionRef,
-          viewUrl: null,
+          viewUrl,
           path: null,
           note: version.versionNote || null,
         }),
