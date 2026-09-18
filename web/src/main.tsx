@@ -9,6 +9,7 @@ import { ThemeModeProvider, useThemeMode } from './theme/ThemeModeContext';
 import { AuthProvider } from './app/providers/AuthProvider';
 import { DirectoryProvider } from './app/providers/DirectoryProvider';
 import { PlatformPreferencesSync } from './components/layout/PlatformPreferencesSync';
+import { RouteErrorBoundary } from './app/RouteErrorBoundary';
 import App from './App';
 import './i18n';
 
@@ -42,7 +43,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             <PlatformPreferencesSync />
             <QueryClientProvider client={queryClient}>
               <BrowserRouter>
-                <App />
+                <RouteErrorBoundary>
+                  <App />
+                </RouteErrorBoundary>
               </BrowserRouter>
             </QueryClientProvider>
           </MuiThemeBridge>
