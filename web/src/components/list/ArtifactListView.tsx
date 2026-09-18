@@ -8,6 +8,7 @@ import { NetworkTag } from '@/components/artifact/ArtifactChips';
 import { useDirectory } from '@/app/providers/DirectoryProvider';
 import { useComments } from '@/api/hooks/useComments';
 import { fmtAt } from '@/lib/canvasModel';
+import { canonicalDepartmentLabel } from '@/shared/constants/departments';
 import { BlockDto, NetworkKind, ReleaseDto, ReleasePreviewItemDto, WorkflowDto } from '@/types/domain';
 import { CURSOR_POINTER, FONT_MONO, R, T, TNUM } from '@/theme/tokens';
 
@@ -281,6 +282,7 @@ function ArtifactGroup({
           >
             <Box sx={{ flex: '2 1 0', minWidth: 0 }}>Artifact</Box>
             <Box sx={{ width: 110, flexShrink: 0 }}>Phase</Box>
+            <Box sx={{ width: 150, flexShrink: 0 }}>Recipient</Box>
             <Box sx={{ width: 100, flexShrink: 0 }}>Published Version</Box>
             <Box sx={{ width: 130, flexShrink: 0 }}>Updated</Box>
             <Box sx={{ flex: '2 1 0', minWidth: 0 }}>Comments</Box>
@@ -338,6 +340,26 @@ function ListArtifactRow({
 
       <Box sx={{ width: 110, flexShrink: 0, fontSize: 12, color: T.dm, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         {row.phaseName}
+      </Box>
+
+      {/* 부서만 보여준다 — 일반 user recipient는 여기 표시하지 않는다(사용자 요청).
+          아무 부서도 없으면 그냥 비워둔다. */}
+      <Box sx={{ width: 150, flexShrink: 0, display: 'flex', alignItems: 'center', gap: '4px', overflow: 'hidden' }}>
+        {row.recipientDepartments.slice(0, 2).map((d) => (
+          <Box
+            key={d}
+            sx={{
+              fontSize: 10.5, color: T.dm, background: T.sf3, borderRadius: `${R.pill}px`,
+              padding: '2px 7px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              maxWidth: 90,
+            }}
+          >
+            {canonicalDepartmentLabel(d)}
+          </Box>
+        ))}
+        {row.recipientDepartments.length > 2 && (
+          <Box sx={{ fontSize: 10.5, color: T.dm2, flexShrink: 0 }}>+{row.recipientDepartments.length - 2}</Box>
+        )}
       </Box>
 
       <Box sx={{ width: 100, flexShrink: 0, fontFamily: FONT_MONO, fontSize: 12, ...TNUM }}>
