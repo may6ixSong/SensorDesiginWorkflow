@@ -167,3 +167,12 @@ ReleaseSchema.index({ workflowId: 1, seq: -1 });
 ReleaseSchema.index({ projectId: 1, releasedAt: -1 });
 ReleaseSchema.index({ recipientDepartments: 1, releasedAt: -1 });
 ReleaseSchema.index({ 'items.artifactId': 1, releasedAt: -1 });
+// --- My Assignment (설계서 09장) ---
+// "내가/내 부서가 받은 것"은 recipientDepartments·recipientUsers로, "내가/내 부서가 낸 것"은
+// releasedBy·workflowAt.department로 과제 경계를 넘어 가로질러 조회한다. 달력 탭은 여기에
+// releasedAt 범위를 더해 그 달만 읽는다 — 어느 경로로 들어와도 releasedAt이 정렬 키라서
+// 복합 인덱스의 뒤쪽에 둔다.
+ReleaseSchema.index({ recipientUsers: 1, releasedAt: -1 });
+ReleaseSchema.index({ releasedBy: 1, releasedAt: -1 });
+ReleaseSchema.index({ 'workflowAt.department': 1, releasedAt: -1 });
+ReleaseSchema.index({ releasedAt: -1 });

@@ -6,6 +6,7 @@ import { DetailsRedirect } from '@/pages/DetailsRedirect';
 import { HomePage } from '@/pages/HomePage';
 import { ServiceManagePage } from '@/pages/ServiceManagePage';
 import { ProjectListPage } from '@/pages/ProjectListPage';
+import { MyAssignmentPage } from '@/pages/MyAssignmentPage';
 import { ProjectInfoPage } from '@/pages/ProjectInfoPage';
 import { ProjectMembersPage } from '@/pages/ProjectMembersPage';
 import { ArtifactListPage } from '@/pages/ArtifactListPage';
@@ -46,6 +47,7 @@ export default function App() {
       <PageTransition>
       <Routes>
         <Route path="/" element={<HomePage />} />
+        <Route path="/my" element={<MyAssignmentPage />} />
         <Route path="/projects" element={<ProjectListPage />} />
         <Route path="/projects/:projectId" element={<ProjectInfoPage />} />
         <Route path="/projects/:projectId/members" element={<ProjectMembersPage />} />

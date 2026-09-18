@@ -184,3 +184,12 @@ export const ArtifactSchema = SchemaFactory.createForClass(Artifact);
 // 같은 (serviceKey, externalArtifactId)는 과제 안에서 하나여야 한다 — 여러 workflow가
 // 그 하나를 공유하는 것이 정상이고, 중복 생성되면 권한이 갈라진다.
 ArtifactSchema.index({ projectId: 1, serviceKey: 1, externalArtifactId: 1 });
+// --- My Assignment 달력 · 내 산출물 목록 (설계서 09장) ---
+// 달력은 "이번 달에 발행된 버전"만 읽어야 한다. 버전은 이 문서의 배열 안에 있으므로
+// multikey 인덱스를 걸고, 범위 조건은 **문서 단위로 과매치**된다는 점을 전제로 쓴다
+// (배열의 서로 다른 원소가 $gte와 $lt를 나눠 만족해도 문서가 걸린다) — 그래서 서비스가
+// 엔트리 단위로 한 번 더 거른다. publishedAt은 미발행(working) 버전에서 null이라
+// observedAt도 함께 건다.
+ArtifactSchema.index({ 'versions.publishedAt': -1 });
+ArtifactSchema.index({ 'versions.observedAt': -1 });
+ArtifactSchema.index({ updatedAt: -1 });

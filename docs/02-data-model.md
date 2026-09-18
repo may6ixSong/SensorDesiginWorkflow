@@ -383,8 +383,28 @@ ReleaseItem {
 | `POST` | `/workflows/:id/releases` | 실행. `{ note, sources: { [blockId]: { [sourceBlockId]: versionRef \| null } } }` |
 | `GET` | `/workflows/:id/releases` | 그 workflow의 release 목록 |
 | `GET` | `/releases/:id` | 상세 (표) |
+| `GET` | `/releases/:id` | 상세 1건. workflow 단위 Guard를 못 거는 경로라 **자기 자신이 자격을 판정한다** — recipient · 실행자 · 그 workflow 소속 부서 · 그 workflow view 권한 중 하나(09장 §4.1). 산출물별 마스킹은 열람 시점 재판정 |
 | `GET` | `/releases?department=` | 부서별 필터 뷰 |
 | `GET` | `/artifacts/:id/releases` | artifact별 타임라인 |
+
+### 7.5 My Assignment ★신규★ (09장)
+
+과제를 가로지르는 조회라 workflow 단위 Guard가 붙지 않는다 — 무엇을 보여줄지는 전부
+scope 계산(`MyScopeService`)이 정하고, 그 계산이 항상 "내가 member인 과제"에서 시작하므로
+Project 계층(01장 §2.2)은 그대로 지켜진다. **Admin은 어느 라우트에서도 필터가 없다.**
+
+| Method | Path | 비고 |
+|---|---|---|
+| `GET` | `/my/releases/received` | `?page=&size=` 내가/내 부서가 recipient인 release. 최신순 페이지네이션 |
+| `GET` | `/my/releases/published` | `?page=&size=` 내가 실행했거나 내 부서 workflow가 낸 release |
+| `GET` | `/my/artifacts` | 내 부서 workflow의 own block 중 artifact가 매핑된 것. 최근 1년, 최근 갱신순 |
+| `GET` | `/my/calendar` | `?from=&to=` (ISO-8601, 100일 이내) 그 범위의 버전 발행 event + release event |
+
+**새 컬렉션을 만들지 않았다** — 기존 컬렉션에 인덱스만 더해 가로질러 읽는다(09장 §6).
+`releases`에 `{recipientUsers, releasedAt}` · `{releasedBy, releasedAt}` ·
+`{'workflowAt.department', releasedAt}` · `{releasedAt}`,
+`artifacts`에 `{'versions.publishedAt'}` · `{'versions.observedAt'}` · `{updatedAt}`,
+`blocks`에 `{workflowId, intent, artifactId}`.
 
 `POST /releases` 는 **멱등하지 않다.** 중복 클릭을 막기 위해 FE는 요청 중 버튼을 잠그고,
 BE는 `releaseSeq` 를 원자적으로 증가시켜 순번 충돌을 막는다.
