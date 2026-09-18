@@ -11,6 +11,13 @@ interface Props {
   open: boolean;
   onClose: () => void;
   width?: number | string;
+  /** 명시하면 Paper 높이를 이 값으로 고정한다(기본은 내용에 맞춰 자라다 90vh에서 멈춤). */
+  height?: number | string;
+  /**
+   * true면 overlay(backdrop) 클릭으로 닫히지 않는다 — 실수로 큰 작업 화면을 날리기 쉬운
+   * 다이얼로그(예: 부서×산출물 매트릭스)에 쓴다. Esc 키 닫힘은 그대로 둔다.
+   */
+  disableBackdropClose?: boolean;
   header: ReactNode;
   /** 헤더 아래 탭 등 고정 영역 */
   belowHeader?: ReactNode;
@@ -26,12 +33,17 @@ interface Props {
  *   붙이면 리듬이 어긋난다. scale 0.96에서 올라오며 안착하는 spring이고,
  *   prefers-reduced-motion이면 전환이 사라진다.
  */
-export function ModalShell({ open, onClose, width = 640, header, belowHeader, children, footer }: Props) {
+export function ModalShell({
+  open, onClose, width = 640, height, disableBackdropClose, header, belowHeader, children, footer,
+}: Props) {
   const m = useMotion();
   return (
     <Dialog
       open={open}
-      onClose={onClose}
+      onClose={(_e, reason) => {
+        if (disableBackdropClose && reason === 'backdropClick') return;
+        onClose();
+      }}
       maxWidth={false}
       // MUI의 기본 Grow 대신 framer-motion spring을 쓴다 — 앱 전체가 같은 전환 토큰을
       // 공유해야 "같은 물성"으로 읽힌다.
@@ -40,6 +52,7 @@ export function ModalShell({ open, onClose, width = 640, header, belowHeader, ch
       PaperProps={{
         sx: {
           width,
+          height,
           maxWidth: '96vw',
           maxHeight: '90vh',
           background: T.sf,

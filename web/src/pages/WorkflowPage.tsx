@@ -8,6 +8,7 @@ import { WorkflowHeader } from '@/components/workflow/WorkflowHeader';
 import { Canvas } from '@/components/canvas/Canvas';
 import { ArtifactListView } from '@/components/list/ArtifactListView';
 import { ArtifactSlide } from '@/components/dialogs/ArtifactSlide';
+import { RecipientMatrixDialog } from '@/components/dialogs/RecipientMatrixDialog';
 import { PhaseInfoDialog } from '@/components/dialogs/PhaseInfoDialog';
 import { WorkflowSettingsDialog } from '@/components/dialogs/WorkflowSettingsDialog';
 import { AddArtifactDialog } from '@/components/dialogs/AddArtifactDialog';
@@ -102,6 +103,7 @@ export function WorkflowPage() {
    * 화면마다 적용 방식은 다르다). */
   const [recipientFilter, setRecipientFilter] = useState<string[]>([]);
   const [releaseOpen, setReleaseOpen] = useState(false);
+  const [recipientMatrixOpen, setRecipientMatrixOpen] = useState(false);
 
   /** Release 다이얼로그 전용 — 열려 있을 때만 라이브로 조회한다(설계서 05장 §4.4). */
   const releasePreview = useReleasePreview(workflowId, releaseOpen);
@@ -235,6 +237,7 @@ export function WorkflowPage() {
             onOpenRelease={() => setReleaseOpen(true)}
             viewMode={pendingCookieRedirect ? 'list' : mode}
             onChangeViewMode={switchView}
+            onOpenRecipientMatrix={canEdit ? () => setRecipientMatrixOpen(true) : undefined}
           />
 
           {pendingCookieRedirect ? (
@@ -388,6 +391,16 @@ export function WorkflowPage() {
               onClose={() => st.getState().setAddDlg(false)}
               submitting={createBlock.isPending}
               onCreate={handleCreateArtifact}
+            />
+          )}
+
+          {recipientMatrixOpen && canEdit && (
+            <RecipientMatrixDialog
+              workflowId={workflowId ?? ''}
+              blocks={blocks ?? []}
+              phases={phaseList}
+              departmentOptions={project?.departments ?? []}
+              onClose={() => setRecipientMatrixOpen(false)}
             />
           )}
 
