@@ -244,8 +244,8 @@ function ProjectLegendPanel({
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: '6px', mb: '14px' }}>
           {projects.map((p) => (
             <Box key={p._id} title={p.name} sx={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
-              {/* 이니셜은 project name 첫 글자로 뽑는다(사용자 확정) — 옆의 표시 텍스트는
-                  여전히 project code다, 그건 다른 값이다. */}
+              {/* 이니셜도, 옆의 표시 텍스트도 전부 project name 기준이다(사용자 확정) —
+                  project code는 이 범례에서 더 이상 쓰지 않는다. */}
               <InitialBadge color={colorForKnoxId(p._id)} label={p.name} />
               <Box
                 sx={{
@@ -253,7 +253,7 @@ function ProjectLegendPanel({
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 }}
               >
-                {p.code}
+                {p.name}
               </Box>
             </Box>
           ))}
