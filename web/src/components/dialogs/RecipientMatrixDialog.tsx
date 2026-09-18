@@ -14,7 +14,8 @@ import { MOTION } from '@/theme/motion';
 import { useMotion } from '@/theme/useReducedMotion';
 import { R, T } from '@/theme/tokens';
 
-const ROW_HEADER_W = 220;
+const MILESTONE_W = 92;
+const ROW_HEADER_W = 190;
 const COL_W = 120;
 const HEADER_ROW_H = 40;
 const DATA_ROW_H = 44;
@@ -34,12 +35,21 @@ interface PendingToggle {
   adding: boolean;
 }
 
+/** 연속된 같은 milestone(phase) 행을 하나의 rowSpan 셀로 묶기 위한 그룹 정보. */
+interface MilestoneGroup {
+  name: string;
+  span: number;
+}
+
 /**
  * "Artifact별 전달 부서" 매트릭스 — workflow toolbar(canvas/list view가 공유하는 헤더)의
  * table 아이콘 버튼에서 연다(사용자 요청).
  *
  * ★ 행 = 이 workflow가 **주는**(intent === 'own') artifact뿐이다 — 받는(received) 쪽은
  *   recipient 개념 자체가 없다. 열 = 그 과제의 부서(사용자 요청: 부서가 열).
+ * ★ artifact 이름 왼쪽에 milestone(phase) 열을 따로 두고, 같은 milestone이 연속되면
+ *   rowSpan으로 병합한다(사용자 요청 — 예전에 artifact가 열이었을 때 phase group
+ *   header를 colSpan으로 묶던 것과 대칭이다).
  * ★ 셀 하나하나가 그 block의 recipient(AccessGrant.departments) 토글 스위치다. 클릭은
  *   바로 반영되지 않고 항상 confirm을 거친다 — 실수로 전달 대상을 바꾸면 알림이 엉뚱한
  *   부서로 나가기 때문이다.
@@ -57,6 +67,7 @@ export function RecipientMatrixDialog({ workflowId, blocks, phases, departmentOp
   const [pending, setPending] = useState<PendingToggle | null>(null);
 
   const orderedPhases = useMemo(() => sortSchedule(phases), [phases]);
+  const phaseNameOf = (phaseId: string) => phases.find((p) => p.id === phaseId)?.name ?? '—';
 
   /** 내가 주는 artifact만 — phase 순서 → 이름 순으로 정렬해 행을 만든다. */
   const rows = useMemo(() => {
@@ -71,7 +82,25 @@ export function RecipientMatrixDialog({ workflowId, blocks, phases, departmentOp
       });
   }, [blocks, orderedPhases]);
 
-  const phaseNameOf = (phaseId: string) => phases.find((p) => p.id === phaseId)?.name ?? '—';
+  /**
+   * 행 인덱스별 milestone 병합 정보 — 그 그룹의 첫 행이면 {name, span}, 아니면 null(그
+   * 자리엔 셀을 아예 그리지 않는다 — 위 행의 rowSpan이 덮는다, 진짜 HTML rowSpan이라야
+   * sticky 위치도 자연스럽게 맞는다).
+   */
+  const milestoneCells = useMemo(() => {
+    const out: (MilestoneGroup | null)[] = [];
+    rows.forEach((b, i) => {
+      if (i > 0 && rows[i - 1].phaseId === b.phaseId) {
+        out.push(null);
+        return;
+      }
+      let span = 1;
+      while (rows[i + span] && rows[i + span].phaseId === b.phaseId) span += 1;
+      out.push({ name: phaseNameOf(b.phaseId), span });
+    });
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, phases]);
 
   const handleCellClick = (block: BlockDto, dept: string) => {
     if (!block.artifactId || replaceRecipients.isPending) return;
@@ -134,8 +163,6 @@ export function RecipientMatrixDialog({ workflowId, blocks, phases, departmentOp
                 border: `1px solid ${T.ln}`,
                 borderRadius: `${R.md}px`,
                 background: T.sf,
-                // 셀이 hover에서 튀어나올 때 옆 셀 border 위로 그려지게끔 여유를 둔다.
-                padding: '1px',
               }}
             >
               <Box
@@ -147,7 +174,19 @@ export function RecipientMatrixDialog({ workflowId, blocks, phases, departmentOp
                     <Box
                       component="th"
                       sx={{
-                        position: 'sticky', top: 0, left: 0, zIndex: 4,
+                        position: 'sticky', top: 0, left: 0, zIndex: 5,
+                        width: MILESTONE_W, minWidth: MILESTONE_W, height: HEADER_ROW_H,
+                        background: T.sf3, borderRight: `1px solid ${T.ln}`, borderBottom: `1px solid ${T.ln}`,
+                        fontSize: 10, fontWeight: 700, color: T.dm2, letterSpacing: '0.03em',
+                        padding: '8px 10px', textAlign: 'left', verticalAlign: 'middle',
+                      }}
+                    >
+                      {t('recipientMatrix.milestoneColumn')}
+                    </Box>
+                    <Box
+                      component="th"
+                      sx={{
+                        position: 'sticky', top: 0, left: MILESTONE_W, zIndex: 5,
                         width: ROW_HEADER_W, minWidth: ROW_HEADER_W, height: HEADER_ROW_H,
                         background: T.sf3, borderRight: `1px solid ${T.ln}`, borderBottom: `1px solid ${T.ln}`,
                         fontSize: 11, fontWeight: 700, color: T.dm2, letterSpacing: '0.03em',
@@ -182,22 +221,40 @@ export function RecipientMatrixDialog({ workflowId, blocks, phases, departmentOp
                   {rows.map((b, rowIdx) => {
                     const rowBg = rowIdx % 2 === 0 ? T.sf : T.sf2;
                     const mapped = Boolean(b.artifactId);
+                    const milestone = milestoneCells[rowIdx];
                     return (
                       <Box component="tr" key={b.id}>
+                        {milestone && (
+                          <Box
+                            component="th"
+                            rowSpan={milestone.span}
+                            sx={{
+                              position: 'sticky', left: 0, zIndex: 1,
+                              width: MILESTONE_W, minWidth: MILESTONE_W,
+                              background: T.sf3,
+                              borderRight: `1px solid ${T.ln}`, borderBottom: `1px solid ${T.ln}`,
+                              fontSize: 10.5, fontWeight: 700, color: T.dm2, letterSpacing: '0.03em',
+                              padding: '5px 10px', textAlign: 'left', verticalAlign: 'middle',
+                            }}
+                          >
+                            <Tooltip title={milestone.name}>
+                              <Box sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'normal', lineHeight: 1.3 }}>
+                                {milestone.name}
+                              </Box>
+                            </Tooltip>
+                          </Box>
+                        )}
                         <Box
                           component="th"
                           scope="row"
                           sx={{
-                            position: 'sticky', left: 0, zIndex: 1,
+                            position: 'sticky', left: MILESTONE_W, zIndex: 1,
                             width: ROW_HEADER_W, minWidth: ROW_HEADER_W, height: DATA_ROW_H,
                             background: rowBg,
                             borderRight: `1px solid ${T.ln}`, borderBottom: `1px solid ${T.ln}`,
                             padding: '5px 12px', textAlign: 'left', verticalAlign: 'middle',
                           }}
                         >
-                          <Box sx={{ fontSize: 9.5, fontWeight: 700, color: T.dm2, letterSpacing: '0.03em', textTransform: 'uppercase' }}>
-                            {phaseNameOf(b.phaseId)}
-                          </Box>
                           <Tooltip title={b.name}>
                             <Box
                               sx={{
@@ -290,10 +347,12 @@ function EmptyState({ text }: { text: string }) {
  * 여부)에 따라 표식이 바뀐다.
  *
  * hover는 이 셀에서만 일어난다(사용자 요청 — 행/열로 번지지 않는다) — 그래서 상태를 JS로
- * 들고 있지 않고 `&:hover`만으로 처리한다. 안쪽 원(pop)이 살짝 떠오르며 그림자가 지는
- * "입체적으로 튀어나오는" 느낌을 주고(사용자 요청), 체크↔X/＋ 아이콘 전환도 같은
- * hover만으로 크로스페이드된다. block의 recipient 여부(active)가 실제로 바뀔 때만
- * AnimatePresence로 원 자체가 등장/소멸한다.
+ * 들고 있지 않고 `&:hover`만으로 처리한다. td 안에 tile(rmTile)을 따로 두고, hover 시
+ * **tile 전체**가 위로 떠오르며(translateY + scale) 진짜 카드 그림자(T.shLg)를 얻는다 —
+ * 표식 원(rmPop)만 커지는 게 아니라 그 밑 배경 자체가 입체적으로 튀어나오는 느낌을
+ * 주기 위해서다(사용자 요청). 표식 자체는 그 tile 안에서 체크↔X(또는 ＋)로 한 번 더
+ * 크로스페이드된다. block의 recipient 여부(active)가 실제로 바뀔 때만 AnimatePresence로
+ * 원 자체가 등장/소멸한다.
  */
 function MatrixCell({
   mapped, active, disabledTitle, onClick,
@@ -303,37 +362,43 @@ function MatrixCell({
   disabledTitle: string;
   onClick: () => void;
 }) {
-  const popSx = {
-    position: 'relative' as const,
-    width: 24, height: 24, borderRadius: '50%',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    transition: 'transform .22s cubic-bezier(.34,1.56,.64,1), box-shadow .18s ease, background .15s ease, border-color .15s ease',
-  };
-
   const cell = (
     <Box
       component="td"
       onClick={mapped ? onClick : undefined}
-      className="rmCell"
       sx={{
+        position: 'relative',
         width: COL_W, minWidth: COL_W, height: DATA_ROW_H,
         borderRight: `1px solid ${T.ln}`, borderBottom: `1px solid ${T.ln}`,
         textAlign: 'center', verticalAlign: 'middle',
         cursor: mapped ? 'pointer' : 'not-allowed',
         userSelect: 'none',
-        background: !mapped ? T.sf3 : 'transparent',
-        opacity: mapped ? 1 : 0.55,
-        transition: 'opacity .15s ease',
-        '&:active .rmPop': mapped ? { transform: 'translateY(0) scale(0.92)' } : undefined,
-        // 셀 자체가 아니라 안쪽 pop만 떠오른다 — grid 테두리는 그대로 고정된다.
-        '&:hover .rmPop': mapped ? { transform: 'translateY(-2px) scale(1.18)', boxShadow: T.shMd, zIndex: 3 } : undefined,
+        padding: '4px',
+        '&:active .rmTile': mapped ? { transform: 'translateY(0) scale(0.95)', boxShadow: T.shXs } : undefined,
+        // tile 전체가 뜨는 진짜 입체 효과 — 원(rmPop)은 그 안에서 한 번 더 반응한다.
+        '&:hover .rmTile': mapped ? {
+          transform: 'translateY(-4px) scale(1.06)',
+          boxShadow: T.shLg,
+          zIndex: 6,
+        } : undefined,
+        '&:hover .rmTile.rmTileOn': { background: T.dangerSoft, borderColor: T.dangerLine },
+        '&:hover .rmTile.rmTileOff': { background: T.prSoft, borderColor: T.prLine },
+        '&:hover .rmPop': mapped ? { transform: 'scale(1.1)' } : undefined,
         '&:hover .rmIconOn': { opacity: 0 },
         '&:hover .rmIconOff': { opacity: 1 },
-        '&:hover .rmPopOn': { background: T.dangerSoft, borderColor: T.dangerLine },
-        '&:hover .rmPopOff': { background: T.prSoft, borderColor: T.prLine },
       }}
     >
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+      <Box
+        className={`rmTile${active ? ' rmTileOn' : ' rmTileOff'}`}
+        sx={{
+          width: '100%', height: '100%', borderRadius: `${R.sm}px`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: !mapped ? T.sf3 : active ? T.prSoft : 'transparent',
+          border: `1px solid ${!mapped ? 'transparent' : active ? T.prLine : 'transparent'}`,
+          opacity: mapped ? 1 : 0.55,
+          transition: 'transform .24s cubic-bezier(.34,1.56,.64,1), box-shadow .24s cubic-bezier(.34,1.56,.64,1), background .15s ease, border-color .15s ease, opacity .15s ease',
+        }}
+      >
         {!mapped ? (
           <Box sx={{
             width: 14, height: 14, borderRadius: '50%',
@@ -349,8 +414,13 @@ function MatrixCell({
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.4 }}
                 transition={MOTION.press}
-                className="rmPop rmPopOn"
-                style={{ ...popSx, background: T.prSoft, border: `1px solid ${T.prLine}`, color: T.pr }}
+                className="rmPop"
+                style={{
+                  position: 'relative', width: 22, height: 22, borderRadius: '50%',
+                  background: T.pr, color: '#fff',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  transition: 'transform .18s cubic-bezier(.34,1.56,.64,1)',
+                }}
               >
                 <Box className="rmIconOn" sx={{ display: 'flex', transition: 'opacity .12s ease' }}>
                   <Icon name="check" size={11} />
@@ -359,7 +429,7 @@ function MatrixCell({
                   className="rmIconOff"
                   sx={{
                     position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    opacity: 0, color: T.danger, transition: 'opacity .12s ease',
+                    opacity: 0, transition: 'opacity .12s ease',
                   }}
                 >
                   <Icon name="x" size={10} />
@@ -372,8 +442,13 @@ function MatrixCell({
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.5 }}
                 transition={MOTION.fade}
-                className="rmPop rmPopOff"
-                style={{ ...popSx, border: `1px dashed ${T.ln3}`, color: T.dm2 }}
+                className="rmPop"
+                style={{
+                  width: 22, height: 22, borderRadius: '50%',
+                  border: `1px dashed ${T.ln3}`, color: T.dm2,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  transition: 'transform .18s cubic-bezier(.34,1.56,.64,1), color .15s ease',
+                }}
               >
                 <Box
                   className="rmIconOff"

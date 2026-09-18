@@ -172,6 +172,7 @@
     "eyebrow": "Workflow toolbar",
     "title": "Recipient departments by artifact",
     "subtitle": "Click a cell to add or remove that department as a recipient of that artifact.",
+    "milestoneColumn": "Milestone",
     "artifactColumn": "Artifact",
     "notMappedShort": "No artifact",
     "notMappedTooltip": "No artifact mapped to this block yet.",
