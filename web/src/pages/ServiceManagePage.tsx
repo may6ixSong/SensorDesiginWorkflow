@@ -48,7 +48,7 @@ export function ServiceManagePage() {
         <Box sx={{ maxWidth: 1080, mx: 'auto' }}>
           <Box sx={{ fontSize: 15, fontWeight: 700, letterSpacing: '-.01em', mb: '4px' }}>Service Manage</Box>
           <Box sx={{ fontSize: 12, color: T.dm2, mb: '22px' }}>
-            Register the services this Hub can pull artifact versions from. File Artifacts (Calypso) is
+            Register the services this Hub can pull artifact versions from. Calypso is
             built into SIREN and isn&apos;t registered here.
           </Box>
           {SECTIONS.map((s) => (

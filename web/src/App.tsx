@@ -47,7 +47,7 @@ export default function App() {
       <PageTransition>
       <Routes>
         <Route path="/" element={<HomePage />} />
-        <Route path="/my" element={<MyAssignmentPage />} />
+        <Route path="/assignment" element={<MyAssignmentPage />} />
         <Route path="/projects" element={<ProjectListPage />} />
         <Route path="/projects/:projectId" element={<ProjectInfoPage />} />
         <Route path="/projects/:projectId/members" element={<ProjectMembersPage />} />

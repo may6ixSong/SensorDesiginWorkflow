@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Box } from '@mui/material';
 import { Badge } from '@/components/common/SirenButton';
+import { Pager } from '@/components/common/Pager';
 import { UserAvatar } from '@/components/common/Avatar';
 import { useDirectory } from '@/app/providers/DirectoryProvider';
 import { useMyReleases } from '@/api/hooks/useAssignments';
@@ -101,59 +102,16 @@ export function ReleaseFeedPanel({
         )}
       </Box>
 
-      {meta && meta.total > 0 && (
-        <Box
-          sx={{
-            display: 'flex', alignItems: 'center', gap: '8px',
-            padding: '8px 13px', borderTop: `1px solid ${T.ln}`, background: T.sf2,
-          }}
-        >
-          <Box sx={{ fontSize: 11, color: T.dm2, fontFamily: FONT_MONO }}>
-            {(meta.page - 1) * meta.size + 1}–{Math.min(meta.page * meta.size, meta.total)} / {meta.total}
-          </Box>
-          <Box sx={{ flex: 1 }} />
-          <PagerButton
-            label="Previous page"
-            disabled={meta.page <= 1}
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-          >
-            ‹
-          </PagerButton>
-          <PagerButton
-            label="Next page"
-            disabled={!meta.hasMore}
-            onClick={() => setPage((p) => p + 1)}
-          >
-            ›
-          </PagerButton>
-        </Box>
+      {meta && (
+        <Pager
+          page={meta.page}
+          size={meta.size}
+          total={meta.total}
+          hasMore={meta.hasMore}
+          onPrev={() => setPage((p) => Math.max(1, p - 1))}
+          onNext={() => setPage((p) => p + 1)}
+        />
       )}
-    </Box>
-  );
-}
-
-function PagerButton({
-  disabled, onClick, label, children,
-}: {
-  disabled: boolean; onClick: () => void; label: string; children: React.ReactNode;
-}) {
-  return (
-    <Box
-      component="button"
-      type="button"
-      disabled={disabled}
-      aria-label={label}
-      onClick={onClick}
-      sx={{
-        display: 'grid', placeItems: 'center', width: 26, height: 24,
-        border: `1px solid ${T.ln2}`, borderRadius: '7px', background: T.sf,
-        color: disabled ? T.dm2 : T.tx, opacity: disabled ? 0.45 : 1,
-        cursor: disabled ? 'default' : CURSOR_POINTER, fontFamily: 'inherit',
-        fontSize: 15, lineHeight: 1, paddingBottom: '2px',
-        '&:hover': disabled ? {} : { background: T.sf3 },
-      }}
-    >
-      {children}
     </Box>
   );
 }

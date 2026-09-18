@@ -103,17 +103,6 @@ export const TIER_COLOR: Record<'A' | 'B' | 'C', { fg: string; bg: string }> = {
   C: { fg: 'var(--s-tier-c)', bg: 'var(--s-tier-c-soft)' },
 };
 
-/**
- * Tier 글자(A/B/C)는 SIREN 내부 분류일 뿐 사용자에게 보여줄 정보가 아니다(사용자 지적,
- * 설계서 04장 §6). 화면에는 항상 이 이름으로만 표시한다 — "새 Artifact 추가" 다이얼로그의
- * 소스 이름과 동일하다.
- */
-export const TIER_LABEL: Record<'A' | 'B' | 'C', string> = {
-  A: 'OA Service',
-  B: 'File Artifacts',
-  C: 'HPC Service',
-};
-
 /** 라운드 — 12(md)가 기본이다. 카드·다이얼로그는 한 단계 크게 간다. */
 export const R = {
   xs: 6,

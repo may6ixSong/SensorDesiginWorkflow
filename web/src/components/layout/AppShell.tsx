@@ -29,7 +29,7 @@ interface AppShellProps {
 // workflow/deliverable names, phase codes — which is English-only by design).
 const NAV_ITEMS = [
   // Project List 왼쪽에 My Assignment를 둔다 — 과제를 고르기 전에 "내 일"부터 보는 순서다.
-  { to: '/my', label: 'My Assignment', match: (p: string) => p.startsWith('/my') },
+  { to: '/assignment', label: 'My Assignment', match: (p: string) => p.startsWith('/assignment') },
   { to: '/projects', label: 'Project List', match: (p: string) => p.startsWith('/projects') },
 ] as const;
 

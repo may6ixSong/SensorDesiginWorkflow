@@ -9,7 +9,7 @@ import { useDirectory } from '@/app/providers/DirectoryProvider';
 import { fmtAt } from '@/lib/canvasModel';
 import { canonicalDepartmentLabel } from '@/shared/constants/departments';
 import { VersionEventDto } from '@/types/domain';
-import { FONT_MONO, T, TIER_COLOR, TIER_LABEL } from '@/theme/tokens';
+import { FONT_MONO, T } from '@/theme/tokens';
 
 /**
  * artifact 버전 event 한 건 — 달력에서 클릭했을 때 여는 가벼운 다이얼로그.
@@ -22,7 +22,6 @@ import { FONT_MONO, T, TIER_COLOR, TIER_LABEL } from '@/theme/tokens';
 export function VersionEventDialog({ event, onClose }: { event: VersionEventDto; onClose: () => void }) {
   const { resolveUser } = useDirectory();
   const giver = event.giverKnoxId ? resolveUser(event.giverKnoxId) : null;
-  const tier = TIER_COLOR[event.tier];
 
   return (
     <ModalShell
@@ -48,14 +47,6 @@ export function VersionEventDialog({ event, onClose }: { event: VersionEventDto;
       <Box sx={{ display: 'flex', alignItems: 'center', gap: '10px', mb: '16px', flexWrap: 'wrap' }}>
         <Box sx={{ fontFamily: FONT_MONO, fontSize: 18, fontWeight: 700, color: T.pr }}>
           {event.versionLabel}
-        </Box>
-        <Box
-          sx={{
-            fontSize: 10.5, fontWeight: 700, color: tier.fg, background: tier.bg,
-            padding: '2px 6px', borderRadius: '5px',
-          }}
-        >
-          {TIER_LABEL[event.tier]}
         </Box>
         <Box sx={{ flex: 1 }} />
         <Box sx={{ fontSize: 11, color: T.dm2, fontFamily: FONT_MONO }}>{fmtAt(event.occurredAt)}</Box>

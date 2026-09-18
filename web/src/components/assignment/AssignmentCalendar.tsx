@@ -10,7 +10,7 @@ import { useProjects } from '@/api/hooks/useProjects';
 import { fmtAt } from '@/lib/canvasModel';
 import { canonicalDepartmentLabel } from '@/shared/constants/departments';
 import { MyReleaseRowDto, ProjectDto, VersionEventDto } from '@/types/domain';
-import { CURSOR_POINTER, FONT_MONO, T, TIER_LABEL } from '@/theme/tokens';
+import { CURSOR_POINTER, FONT_MONO, T } from '@/theme/tokens';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -244,7 +244,9 @@ function ProjectLegendPanel({
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: '6px', mb: '14px' }}>
           {projects.map((p) => (
             <Box key={p._id} title={p.name} sx={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
-              <InitialBadge color={colorForKnoxId(p._id)} label={p.code} />
+              {/* 이니셜은 project name 첫 글자로 뽑는다(사용자 확정) — 옆의 표시 텍스트는
+                  여전히 project code다, 그건 다른 값이다. */}
+              <InitialBadge color={colorForKnoxId(p._id)} label={p.name} />
               <Box
                 sx={{
                   fontSize: 10.5, color: T.tx2, minWidth: 0,
@@ -508,8 +510,8 @@ function MonthGrid({
               isSelected={key === selectedKey}
               events={byDay.get(key) ?? []}
               onClick={() => onSelectDay(day)}
-              minHeight={92}
-              maxChips={3}
+              cellSize={100}
+              maxChips={2}
               showRightBorder
             />
           );
@@ -556,7 +558,7 @@ function WeekGrid({
               isSelected={key === selectedKey}
               events={byDay.get(key) ?? []}
               onClick={() => onSelectDay(day)}
-              minHeight={280}
+              cellSize={280}
               maxChips={10}
               showRightBorder={false}
             />
@@ -567,9 +569,21 @@ function WeekGrid({
   );
 }
 
-/** 칸 하나. 클릭하면 이 날짜를 선택하고, 선택 결과는 C 패널에 인라인으로 나온다. */
+/**
+ * 칸 하나. 클릭하면 이 날짜를 선택하고, 선택 결과는 C 패널에 인라인으로 나온다.
+ *
+ * ★ 월간 보기(`showRightBorder: true`)는 **모든 칸이 완전히 같은 크기**여야 한다(사용자
+ *   요청) — event 개수가 몇 개든 칸 크기가 흔들리면 안 된다. `minHeight`(내용에 따라
+ *   자라는 하한선)가 아니라 고정 `height` + `overflow: hidden`을 쓴다 — CSS Grid는 한
+ *   행 안에서 가장 큰 셀에 맞춰 그 행 전체가 늘어나므로, `minHeight`만으로는 event가
+ *   많은 주(week)만 유독 키가 커진다. 넘치는 event는 "+N more"로 요약하고, 자세한
+ *   내용은 그 날짜를 클릭해 C 패널에서 본다.
+ * ★ 주간 보기(`showRightBorder: false`)는 이미 flexbox(`flex: 1`)로 다른 요일 칸과 같은
+ *   높이를 맞추고 있어(칼럼들이 같은 높이의 부모 안에서 나눠 갖는다) 이 문제가 없다 —
+ *   `minHeight`를 그대로 쓴다.
+ */
 function DayCell({
-  day, inMonth, isToday, isSelected, events, onClick, minHeight, maxChips, showRightBorder,
+  day, inMonth, isToday, isSelected, events, onClick, cellSize, maxChips, showRightBorder,
 }: {
   day: Date;
   inMonth: boolean;
@@ -577,7 +591,7 @@ function DayCell({
   isSelected: boolean;
   events: DayEvent[];
   onClick: () => void;
-  minHeight: number;
+  cellSize: number;
   maxChips: number;
   showRightBorder: boolean;
 }) {
@@ -588,7 +602,10 @@ function DayCell({
     <Box
       onClick={onClick}
       sx={{
-        minHeight, padding: '5px 6px', flex: showRightBorder ? undefined : 1,
+        padding: '5px 6px',
+        ...(showRightBorder
+          ? { height: cellSize, overflow: 'hidden' }
+          : { minHeight: cellSize, flex: 1 }),
         borderRight: showRightBorder ? `1px solid ${T.ln}` : 'none',
         borderBottom: `1px solid ${T.ln}`,
         background: isSelected ? T.prSoft : inMonth ? T.sf : T.sf2,
@@ -817,7 +834,7 @@ function VersionEventRow({ event, onClick }: { event: VersionEventDto; onClick: 
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}
       >
-        {TIER_LABEL[event.tier]} · {event.projectCode}
+        {event.projectCode}
         {event.placements.length > 0 && ` · ${event.placements.map((p) => p.workflowName).join(', ')}`}
       </Box>
     </Box>

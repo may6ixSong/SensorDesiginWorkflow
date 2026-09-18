@@ -13,7 +13,7 @@ import { markReleaseRead } from '@/lib/releaseReadTracker';
 import { fmtAt } from '@/lib/canvasModel';
 import { canonicalDepartmentLabel } from '@/shared/constants/departments';
 import { MyReleaseRowDto, ReleaseItemDto } from '@/types/domain';
-import { FONT_MONO, T, TIER_COLOR, TIER_LABEL } from '@/theme/tokens';
+import { FONT_MONO, T } from '@/theme/tokens';
 
 /**
  * "이 release로 무엇이 어떻게 오갔는가" 한 장 (설계서 09장 §4).
@@ -151,7 +151,6 @@ function DirectionBadges({ row }: { row: MyReleaseRowDto }) {
  *   둘을 같게 그리면 받는 쪽이 사실을 오해한다.
  */
 function ItemCard({ item }: { item: ReleaseItemDto }) {
-  const tier = TIER_COLOR[item.tier];
   return (
     <Box
       sx={{
@@ -174,9 +173,6 @@ function ItemCard({ item }: { item: ReleaseItemDto }) {
           {item.firstTime && (
             <Badge color={T.info} bg={T.infoSoft} borderColor={T.infoLine}>FIRST</Badge>
           )}
-        </Box>
-        <Box sx={{ fontSize: 10.5, color: tier.fg, background: tier.bg, display: 'inline-block', padding: '1px 5px', borderRadius: '5px', fontWeight: 700 }}>
-          {TIER_LABEL[item.tier]}
         </Box>
         {item.phaseName && (
           <Box sx={{ fontSize: 11, color: T.dm2, mt: '4px' }}>Phase · {item.phaseName}</Box>

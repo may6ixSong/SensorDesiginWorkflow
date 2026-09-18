@@ -1,13 +1,18 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Box } from '@mui/material';
 import { Badge } from '@/components/common/SirenButton';
 import { Icon } from '@/components/common/Icon';
+import { Pager } from '@/components/common/Pager';
 import { NetworkTag } from '@/components/artifact/ArtifactChips';
 import { useMyArtifacts } from '@/api/hooks/useAssignments';
 import { fmtAt } from '@/lib/canvasModel';
 import { canonicalDepartmentLabel } from '@/shared/constants/departments';
 import { MyArtifactRowDto } from '@/types/domain';
-import { FONT_MONO, T, TIER_COLOR, TIER_LABEL } from '@/theme/tokens';
+import { FONT_MONO, T } from '@/theme/tokens';
+
+/** 사용자 요청 — 15개 단위. 이 목록은 서버가 이미 1년 창 + scope로 좁혀 통째로 주므로
+ * (페이지네이션 없이, 09장 §3), 여기서는 필터링된 결과를 클라이언트에서 15개씩 자른다. */
+const PAGE_SIZE = 15;
 
 /**
  * 내가/내 부서가 관리하는 산출물 자리(block) 목록 — 모든 과제·모든 workflow를 가로지른다
@@ -23,6 +28,7 @@ import { FONT_MONO, T, TIER_COLOR, TIER_LABEL } from '@/theme/tokens';
 export function MyArtifactsPanel({ sx }: { sx?: object }) {
   const { data = [], isLoading, isError } = useMyArtifacts();
   const [q, setQ] = useState('');
+  const [page, setPage] = useState(1);
 
   const rows = useMemo(() => {
     const term = q.trim().toLowerCase();
@@ -33,6 +39,13 @@ export function MyArtifactsPanel({ sx }: { sx?: object }) {
         .includes(term),
     );
   }, [data, q]);
+
+  // 검색어가 바뀌면 결과 집합이 통째로 바뀌므로 1페이지로 되돌린다.
+  useEffect(() => setPage(1), [q]);
+
+  const pageCount = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const safePage = Math.min(page, pageCount);
+  const paged = rows.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   return (
     <Box
@@ -107,12 +120,21 @@ export function MyArtifactsPanel({ sx }: { sx?: object }) {
           </Box>
         ) : (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-            {rows.map((row) => (
+            {paged.map((row) => (
               <ArtifactRow key={row.blockId} row={row} />
             ))}
           </Box>
         )}
       </Box>
+
+      <Pager
+        page={safePage}
+        size={PAGE_SIZE}
+        total={rows.length}
+        hasMore={safePage < pageCount}
+        onPrev={() => setPage((p) => Math.max(1, p - 1))}
+        onNext={() => setPage((p) => Math.min(pageCount, p + 1))}
+      />
     </Box>
   );
 }
@@ -120,9 +142,11 @@ export function MyArtifactsPanel({ sx }: { sx?: object }) {
 /**
  * 클릭 이벤트가 없는 것은 **의도된 상태**다 — 무엇을 열지 아직 정하지 않았다(사용자 요청).
  * 그래서 button이 아니라 그냥 행이고, hover도 주지 않는다.
+ *
+ * ★ tier(OA Service/HPC Service/File Artifacts) 배지는 없다(사용자 확정) — network(OA/HPC)
+ *   칩만으로 충분하고, "File Artifacts"는 공식 용어에서 폐기됐다.
  */
 function ArtifactRow({ row }: { row: MyArtifactRowDto }) {
-  const tier = TIER_COLOR[row.tier];
   const latest = row.latestVersion;
 
   return (
@@ -143,14 +167,6 @@ function ArtifactRow({ row }: { row: MyArtifactRowDto }) {
             {row.blockName}
           </Box>
           <NetworkTag network={row.network} />
-          <Box
-            sx={{
-              fontSize: 10, fontWeight: 700, color: tier.fg, background: tier.bg,
-              padding: '1px 5px', borderRadius: '5px', whiteSpace: 'nowrap',
-            }}
-          >
-            {TIER_LABEL[row.tier]}
-          </Box>
         </Box>
         {/* block 이름과 artifact 자신의 이름은 다를 수 있다 — 캔버스는 block 이름을 쓴다. */}
         {row.artifactName !== row.blockName && (

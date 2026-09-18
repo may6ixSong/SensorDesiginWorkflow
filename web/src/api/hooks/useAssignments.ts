@@ -16,12 +16,12 @@ import {
  * own block)로 좁혀 주므로, 여기서는 projectId 같은 걸 넘기지 않는다.
  */
 
-const DEFAULT_PAGE_SIZE = 10;
+const DEFAULT_PAGE_SIZE = 5;
 
 /**
- * @param size 기본 10(My Assignment의 Inbox/Outbox 패널). 종Bell 팝업처럼 더 큰 페이지가
- *   필요한 호출부는 직접 넘긴다 — 페이지 크기가 다르면 다른 조회이므로 쿼리 키에도
- *   함께 담는다(queryKeys.myReleases).
+ * @param size 기본 5(My Assignment의 Inbox/Outbox 패널, 사용자 요청). bell 팝업처럼 더 큰
+ *   페이지가 필요한 호출부는 직접 넘긴다 — 페이지 크기가 다르면 다른 조회이므로 쿼리
+ *   키에도 함께 담는다(queryKeys.myReleases).
  */
 export function useMyReleases(direction: 'received' | 'published', page: number, size = DEFAULT_PAGE_SIZE) {
   return useQuery({
