@@ -166,5 +166,28 @@
     "codeImmutable": "Project code and revision cannot be changed after creation.",
     "noAccess": "You do not have access to this project.",
     "noWorkflowAccess": "You do not have access to this workflow."
+  },
+  "recipientMatrix": {
+    "tooltip": "Recipient departments by artifact",
+    "eyebrow": "Workflow toolbar",
+    "title": "Recipient departments by artifact",
+    "subtitle": "Click a cell to add or remove that department as a recipient of that artifact.",
+    "departmentColumn": "Department",
+    "notMappedShort": "No artifact",
+    "notMappedTooltip": "No artifact mapped to this block yet.",
+    "legendActive": "Recipient",
+    "legendUnmapped": "No artifact mapped",
+    "emptyBlocks": "This workflow doesn't provide any artifacts yet.",
+    "emptyDepartments": "No departments registered for this project.",
+    "addTitle": "Add recipient department",
+    "addMessage": "Add {{dept}} as a recipient of \"{{artifact}}\"?",
+    "removeTitle": "Remove recipient department",
+    "removeMessage": "Remove {{dept}} from the recipients of \"{{artifact}}\"?",
+    "add": "Add",
+    "remove": "Remove",
+    "cancel": "Cancel",
+    "addedToast": "Recipient added",
+    "removedToast": "Recipient removed",
+    "updateFailed": "Failed to update recipients"
   }
 }

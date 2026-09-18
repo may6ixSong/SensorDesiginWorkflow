@@ -166,5 +166,28 @@
     "codeImmutable": "과제 코드와 Revision은 생성 후 변경할 수 없습니다.",
     "noAccess": "이 과제에 대한 접근 권한이 없습니다.",
     "noWorkflowAccess": "이 workflow에 대한 접근 권한이 없습니다."
+  },
+  "recipientMatrix": {
+    "tooltip": "Artifact별 전달 부서",
+    "eyebrow": "Workflow 툴바",
+    "title": "Artifact별 전달 부서",
+    "subtitle": "빈 칸을 클릭해 그 artifact의 전달 부서를 추가하거나, 표식이 있는 칸을 클릭해 제거하세요.",
+    "departmentColumn": "부서",
+    "notMappedShort": "미매핑",
+    "notMappedTooltip": "아직 이 block에 artifact가 매핑되지 않았습니다.",
+    "legendActive": "전달 대상",
+    "legendUnmapped": "artifact 미매핑",
+    "emptyBlocks": "이 workflow가 전달하는 artifact가 아직 없습니다.",
+    "emptyDepartments": "이 과제에 등록된 부서가 없습니다.",
+    "addTitle": "전달 부서 추가",
+    "addMessage": "\"{{artifact}}\"의 전달 부서에 {{dept}}를 추가하시겠습니까?",
+    "removeTitle": "전달 부서 제거",
+    "removeMessage": "\"{{artifact}}\"의 전달 부서에서 {{dept}}를 제거하시겠습니까?",
+    "add": "추가",
+    "remove": "제거",
+    "cancel": "취소",
+    "addedToast": "전달 부서가 추가되었습니다",
+    "removedToast": "전달 부서가 제거되었습니다",
+    "updateFailed": "전달 부서 변경에 실패했습니다"
   }
 }

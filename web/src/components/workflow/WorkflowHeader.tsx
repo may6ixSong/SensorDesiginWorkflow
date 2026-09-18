@@ -23,6 +23,12 @@ interface WorkflowHeaderProps {
   /** canvas/list 전환 — 부서 필터 버튼 왼쪽에 세그먼트 버튼 2개로 그린다(사용자 요청). */
   viewMode: ViewMode;
   onChangeViewMode: (mode: ViewMode) => void;
+  /**
+   * "Artifact별 전달 부서" 매트릭스 열기 — 부서 필터 버튼 바로 왼쪽의 table 아이콘
+   * 버튼(사용자 요청). canEdit이 아니면 이 버튼 자체를 그리지 않는다 — 그 다이얼로그는
+   * edit 권한자 전용이다.
+   */
+  onOpenRecipientMatrix?: () => void;
 }
 
 const ICON_BUTTON_SIZE = 19.5;
@@ -41,6 +47,7 @@ const ICON_BUTTON_SIZE = 19.5;
 export function WorkflowHeader({
   workflow, orphanCount, canEdit, departmentOptions, recipientFilter,
   onChangeRecipientFilter, onOpenSettings, onOpenRelease, viewMode, onChangeViewMode,
+  onOpenRecipientMatrix,
 }: WorkflowHeaderProps) {
   const { t } = useTranslation();
   const [filterAnchor, setFilterAnchor] = useState<HTMLElement | null>(null);
@@ -125,6 +132,20 @@ export function WorkflowHeader({
           <Icon name="list" size={13} /> List
         </SirenButton>
       </Stack>
+
+      {/* Artifact별 전달 부서 매트릭스 — 부서 필터 버튼 바로 왼쪽. edit 권한자 전용. */}
+      {canEdit && onOpenRecipientMatrix && (
+        <Tooltip title={t('recipientMatrix.tooltip')}>
+          <SirenButton
+            variant="ghost"
+            onClick={onOpenRecipientMatrix}
+            sx={{ padding: '6px 8px' }}
+            aria-label={t('recipientMatrix.tooltip')}
+          >
+            <Icon name="excel" size={ICON_BUTTON_SIZE} />
+          </SirenButton>
+        </Tooltip>
+      )}
 
       {/* 수신 부서 필터 — 고른 부서가 받는 산출물만 남기고 나머지는 흐려진다. */}
       {departmentOptions.length > 0 && (
