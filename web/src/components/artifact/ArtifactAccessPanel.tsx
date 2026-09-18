@@ -47,7 +47,7 @@ export function ArtifactAccessPanel({
   artifact, projectId, onAddEditor, onRemoveEditor, onAddViewGrant, onRemoveViewGrant, onSetRestrictView,
 }: Props) {
   const { user } = useAuth();
-  const { data: roster, isLoading: loadingRoster } = useQuery({
+  const { data: roster, isLoading: loadingRoster, isError: rosterError } = useQuery({
     queryKey: queryKeys.calypsoDepartmentRoster(projectId),
     queryFn: () => getCalypsoDepartmentRoster(projectId),
     enabled: !!projectId,
@@ -80,7 +80,8 @@ export function ArtifactAccessPanel({
         deptOptions={myDepartments}
         membersByDept={membersByDept}
         loadingDepts={loadingRoster}
-        deptHint={loadingRoster || myDepartments.length ? undefined : 'You have no department in this project to grant edit to.'}
+        deptError={rosterError}
+        deptHint={loadingRoster || rosterError || myDepartments.length ? undefined : 'You have no department in this project to grant edit to.'}
         onAdd={onAddEditor}
         onRemove={onRemoveEditor}
       />
@@ -123,6 +124,7 @@ export function ArtifactAccessPanel({
           deptOptions={allDepartments}
           membersByDept={membersByDept}
           loadingDepts={loadingRoster}
+          deptError={rosterError}
           onAdd={onAddViewGrant}
           onRemove={onRemoveViewGrant}
         />
@@ -132,7 +134,7 @@ export function ArtifactAccessPanel({
 }
 
 function GrantList({
-  label, grants, registrant, deptOptions, membersByDept, loadingDepts, deptHint, onAdd, onRemove,
+  label, grants, registrant, deptOptions, membersByDept, loadingDepts, deptError, deptHint, onAdd, onRemove,
 }: {
   label: string;
   grants: CalypsoGrant[];
@@ -142,6 +144,10 @@ function GrantList({
   /** 부서 → 그 부서 소속 knoxId 목록 — 펼쳤을 때만 실명 조회에 쓴다. */
   membersByDept: Record<string, string[]>;
   loadingDepts?: boolean;
+  /** 로스터 조회 자체가 실패했다 — "이 project엔 부서가 없다"와 절대 같은 문구로
+   * 보여주면 안 된다(사용자가 실제로 겪은 사고: SIREN↔Calypso 토큰이 어긋나 있었는데
+   * 화면엔 그냥 "부서 없음"으로만 보였다). */
+  deptError?: boolean;
   deptHint?: string;
   onAdd: (g: CalypsoGrantInput) => void;
   onRemove: (g: CalypsoGrantInput) => void;
@@ -209,12 +215,16 @@ function GrantList({
           <Box sx={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 11, color: T.dm2 }}>
             <CircularProgress size={11} /> Loading departments…
           </Box>
+        ) : deptError ? (
+          <Box sx={{ fontSize: 11, color: T.danger }}>
+            Couldn&apos;t load the department list — try again shortly.
+          </Box>
         ) : pickableDepts.length > 0 && (
           <SirenButton onClick={() => setDeptPickerOpen((o) => !o)}>
             <Icon name="plus" /> Add department
           </SirenButton>
         )}
-        {deptHint && !pickableDepts.length && !loadingDepts && (
+        {deptHint && !pickableDepts.length && !loadingDepts && !deptError && (
           <Box sx={{ fontSize: 11, color: T.dm2 }}>{deptHint}</Box>
         )}
       </Box>
