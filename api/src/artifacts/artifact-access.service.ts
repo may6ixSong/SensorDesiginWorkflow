@@ -101,8 +101,9 @@ export class ArtifactAccessService {
    * fail-closed다: 서비스가 죽었거나 느리면 `{canView:false, canEdit:false}`를 돌려주므로
    * 결과적으로 막힌다. 권한 판정에서 실패를 관대하게 처리하면 안 된다.
    *
-   * isAdmin은 항상 false로 넘긴다 — 여기 도달했다는 것은 actor.isAdmin이 false라는 뜻이고
-   * (위에서 이미 걸러졌다), 시뮬레이션 중에 대상 사용자 시야를 정확히 재현해야 한다.
+   * isAdmin은 항상 false로 넘긴다 — 여기 도달했다는 것은 actor.isAdmin이 false라는 뜻이다
+   * (위에서 이미 걸러졌다). 시뮬레이션 중이면 actor.isAdmin 자체가 대상 본인 기준이므로
+   * (common/actor.ts) 그 사람의 시야가 그대로 재현된다.
    */
   private async serviceAccess(
     actor: Actor,
@@ -165,23 +166,12 @@ export class ArtifactAccessService {
     if (!serviceKey || !externalArtifactId || serviceKey === CALYPSO_SERVICE_KEY) return null;
     try {
       const svc = await this.hub.findByKeyOrThrow(serviceKey);
-      return await this.observer.htmlView(svc, externalArtifactId, versionLabel, actor.knoxId, this.isAdminVisible(actor));
+      return await this.observer.htmlView(svc, externalArtifactId, versionLabel, actor.knoxId, actor.isAdmin);
     } catch (e) {
       this.logger.warn(
         `html-view failed for ${serviceKey}/${externalArtifactId}@${versionLabel} — ${(e as Error).message}`,
       );
       return null;
     }
-  }
-
-  /**
-   * RPM처럼 서비스가 자발적으로 지원하면, 실제 검증된 Admin(시뮬레이션 중이 아닌)에게
-   * member가 아니어도 편집자 시야(작업중 버전)를 보여줄 수 있다. isAdmin은 realKnoxId
-   * 기준이라 시뮬레이션 중에도 true로 남으므로, isImpersonating도 함께 봐야 한다 —
-   * 시뮬레이션 중엔 Admin의 super 권한이 아니라 대상 사용자 본인의 실제 권한으로
-   * 보여야 하기 때문이다(§13.3 규칙 2와 같은 이유).
-   */
-  private isAdminVisible(actor: Actor): boolean {
-    return actor.isAdmin && !actor.isImpersonating;
   }
 }

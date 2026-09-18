@@ -118,7 +118,7 @@ export class HubService {
     if (existing) {
       existing.artifactTypes.push(newType);
       await existing.save();
-      await this.audit.log(actor.realKnoxId, 'ARTIFACT_SERVICE_ADD_TYPE', 'artifactService', existing._id, {
+      await this.audit.log(actor, 'ARTIFACT_SERVICE_ADD_TYPE', 'artifactService', existing._id, {
         key: existing.key,
         artifactTypeKey,
       });
@@ -142,7 +142,7 @@ export class HubService {
       isMock: false,
       artifactTypes: [newType],
     });
-    await this.audit.log(actor.realKnoxId, 'ARTIFACT_SERVICE_REGISTER', 'artifactService', svc._id, {
+    await this.audit.log(actor, 'ARTIFACT_SERVICE_REGISTER', 'artifactService', svc._id, {
       key: svc.key,
       tier: svc.defaultTier,
     });
@@ -184,7 +184,7 @@ export class HubService {
     }
     await svc.save();
 
-    await this.audit.log(actor.realKnoxId, 'ARTIFACT_SERVICE_UPDATE', 'artifactService', svc._id, {
+    await this.audit.log(actor, 'ARTIFACT_SERVICE_UPDATE', 'artifactService', svc._id, {
       key: svc.key,
       enabled: svc.enabled,
     });

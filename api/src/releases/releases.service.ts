@@ -373,7 +373,7 @@ export class ReleasesService {
       throw e;
     }
 
-    await this.audit.log(actor.knoxId, 'RELEASE_CREATE', 'release', release._id, {
+    await this.audit.log(actor, 'RELEASE_CREATE', 'release', release._id, {
       workflowId: workflow._id.toString(),
       seq,
       itemCount: items.length,

@@ -3,7 +3,7 @@ import Cookies from 'js-cookie';
 import axios from 'axios';
 import { addEventLog } from '../../service/event-log-service';
 import { useTranslation } from 'react-i18next';
-import { setApiActingAs, setApiKnoxId, setApiUserGroup } from '../../api/client';
+import { setApiActingAs, setApiActingAsGroup, setApiKnoxId, setApiUserGroup } from '../../api/client';
 import { getEmployeesByIDs } from '../../service/user-service';
 import { useThemeMode } from '../../theme/ThemeModeContext';
 
@@ -212,7 +212,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   /**
    * 특정 사용자 화면 재현(§13). Admin 전용 — FE도 자기 몫을 하지만(§13.3 규칙 6) 최종
-   * 방어선은 항상 api의 isAdmin 재검증이다(X-Acting-As는 그쪽에서도 다시 본다).
+   * 방어선은 항상 api의 재검증이다(X-Acting-As는 그쪽에서도 다시 보고, 실제 호출자가
+   * Admin이 아니면 거부한다). 시뮬레이션이 켜진 뒤의 권한은 **대상 본인 기준**으로
+   * 계산된다 — 그 사람으로 새로 접속한 것과 같아야 하므로, Admin의 super 권한은 화면에도
+   * api에도 남지 않는다(사용자 요청).
    * 이름/부서는 SDP_COMMON_API 직원 조회로, Group/Authority/Language/Theme는 로그인 때와
    * 같은 USER_GROUP_API로 채운다 — 후자가 실패해도(플랫폼에 등록 안 된 사용자) 시뮬레이션
    * 자체는 거부하지 않는다(사용자 요청: 나중에 만들 접근 신청 페이지 등을 확인하려면
@@ -248,13 +251,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       denied = true;
     }
 
+    // ★ 이 두 줄은 반드시 같이 간다. `X-Acting-As`만 보내고 대상의 Group을 안 보내면,
+    //   api가 실제 호출자(Admin)의 Group으로 admin 판정을 해버려 시뮬레이션 내내 admin
+    //   super 권한이 그대로 남는다 — 그게 "권한 없는 사용자인데 모든 release·artifact가
+    //   보이고 수정까지 되던" 버그였다(사용자 보고). SIREN BE는 이 값으로 세운 actor를
+    //   Calypso까지 그대로 이어 싣는다(설계서 07장 §2) — 그래서 여기서 Calypso 몫의
+    //   헤더를 따로 계산할 필요는 여전히 없다.
+    //   USER_GROUP_API 조회가 실패한 대상(denied)은 Group이 User 클래스 기본값
+    //   ('Developer')이라 자연히 non-admin이 된다.
     setApiActingAs(knoxId);
-    // Calypso를 포함해 그 어떤 서비스도 이제 브라우저가 직접 호출하지 않는다 — SIREN BE가
-    // actor(knoxId/isAdmin/isImpersonating)만으로 department/admin 여부를 대신 계산해서
-    // 싣는다(설계서 07장 §2). 그래서 여기서 그 서비스 몫의 헤더를 따로 계산해 둘 필요가
-    // 없다 — 예전엔 Calypso의 admin bypass를 위해 대상 본인의 Group을 별도로 실어 보냈지만,
-    // SIREN Actor 모델 자체에 "시뮬레이션 대상 본인의 Group"이라는 축이 없어 그 세부까지
-    // 재현하지는 않는다(A/C Tier의 게이트 2 라이브 조회와 같은 단순화).
+    setApiActingAsGroup(target.Group ?? null);
     setSimulatedAccountDenied(denied);
     setSimulatedUser(target);
     i18n.changeLanguage(target.Language);
@@ -263,6 +269,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const stopSimulation = () => {
     setApiActingAs(null);
+    setApiActingAsGroup(null);
     setSimulatedUser(null);
     setSimulatedAccountDenied(false);
     i18n.changeLanguage(realUser.Language);

@@ -99,7 +99,7 @@ export class ArtifactsService {
       createdBy: actor.knoxId,
       isMock: false,
     });
-    await this.audit.log(actor.knoxId, 'ARTIFACT_CREATE', 'artifact', artifact._id, {
+    await this.audit.log(actor, 'ARTIFACT_CREATE', 'artifact', artifact._id, {
       tier: input.tier,
       serviceKey: input.serviceKey ?? null,
     });
@@ -196,7 +196,7 @@ export class ArtifactsService {
     };
     artifact.versions = [entry as ArtifactVersion, ...(artifact.versions ?? [])];
     await artifact.save();
-    await this.audit.log(actor.knoxId, 'ARTIFACT_VERSION_ASSERT', 'artifact', artifact._id, {
+    await this.audit.log(actor, 'ARTIFACT_VERSION_ASSERT', 'artifact', artifact._id, {
       versionLabel: entry.versionLabel,
       isPublished: entry.isPublished,
     });

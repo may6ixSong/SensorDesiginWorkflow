@@ -137,7 +137,7 @@ export class BlocksService {
       createdBy: actor.knoxId,
       isMock: false,
     });
-    await this.audit.log(actor.knoxId, 'BLOCK_CREATE', 'block', block._id, {
+    await this.audit.log(actor, 'BLOCK_CREATE', 'block', block._id, {
       workflowId: workflow._id.toString(),
       intent,
       artifactId: artifactId?.toString() ?? null,
@@ -173,7 +173,7 @@ export class BlocksService {
         // 구성이라는 보장이 없다(사용자 결정: 조용히 남기면 잘못된 부서에 알림이 갈 수 있다).
         block.recipients = EMPTY_RECIPIENTS();
         // 무엇이 누구에게 전달되는지가 통째로 달라지는 사건이라 반드시 남긴다.
-        await this.audit.log(actor.knoxId, 'BLOCK_ARTIFACT_REMAP', 'block', block._id, {
+        await this.audit.log(actor, 'BLOCK_ARTIFACT_REMAP', 'block', block._id, {
           workflowId: block.workflowId.toString(),
           from: before,
           to: after,
@@ -188,7 +188,7 @@ export class BlocksService {
   async remove(blockId: string, actor: Actor): Promise<void> {
     const block = await this.findOrThrow(blockId);
     await this.model.findByIdAndDelete(blockId).exec();
-    await this.audit.log(actor.knoxId, 'BLOCK_DELETE', 'block', block._id, {
+    await this.audit.log(actor, 'BLOCK_DELETE', 'block', block._id, {
       workflowId: block.workflowId.toString(),
     });
   }
@@ -211,7 +211,7 @@ export class BlocksService {
     }
     block.recipients = normalizeGrant(input);
     await block.save();
-    await this.audit.log(actor.knoxId, 'BLOCK_RECIPIENTS_REPLACE', 'block', block._id, {
+    await this.audit.log(actor, 'BLOCK_RECIPIENTS_REPLACE', 'block', block._id, {
       recipients: block.recipients,
     });
     return this.findOrThrow(blockId);
