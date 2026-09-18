@@ -15,6 +15,7 @@ import {
   DEFAULT_PW, GAP, LANE_PAD, MH, MW, NH, NW, ROW_H, TOP_PAD, WALL_FORCE, snp,
 } from './constants';
 import { T, TIER_COLOR } from '@/theme/tokens';
+import { MemoColor, normalizeMemoColor } from './memoColors';
 
 /* ── 작업 모델 ── */
 
@@ -66,6 +67,7 @@ export interface CanvasMemo {
   workflow: string;
   phase: string;
   text: string;
+  color: MemoColor;
   x: number;
   y: number;
   w: number;
@@ -130,6 +132,7 @@ export function toCanvasMemo(m: MemoDto): CanvasMemo {
     workflow: m.workflowId,
     phase: m.phaseId,
     text: m.text,
+    color: normalizeMemoColor(m.color),
     x: m.layout.x,
     y: m.layout.y,
     w: m.layout.w || MW,

@@ -256,6 +256,8 @@ export interface MemoDto {
   phaseId: string;
   text: string;
   layout: { x: number; y: number; w: number; h: number };
+  /** Windows 스티키 노트 색상 6종 중 하나. 없으면(기존 데이터) 기본색(yellow)으로 다룬다. */
+  color?: string | null;
 }
 
 export interface EdgeDto {

@@ -81,6 +81,7 @@ export class CanvasService {
         id: m.id,
         phaseId: m.phaseId,
         text: m.text,
+        color: m.color,
         layout: m.layout,
         createdBy: actor.knoxId,
       })),

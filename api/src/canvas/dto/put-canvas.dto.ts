@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsBoolean, IsObject, IsOptional, IsString, ValidateNested } from 'class-validator';
+import { IsArray, IsBoolean, IsIn, IsObject, IsOptional, IsString, ValidateNested } from 'class-validator';
 import { LayoutDto } from '../../blocks/dto/block-crud.dto';
+import { MEMO_COLORS } from '../../memos/schemas/memo.schema';
 
 export class CanvasBlockDto {
   @IsString()
@@ -24,6 +25,11 @@ export class CanvasMemoDto {
 
   @IsString()
   text: string;
+
+  /** 안 보내면(예전 클라이언트) 서비스가 스키마 default(yellow)로 저장한다. */
+  @IsOptional()
+  @IsIn(MEMO_COLORS)
+  color?: string;
 
   @ValidateNested()
   @Type(() => LayoutDto)

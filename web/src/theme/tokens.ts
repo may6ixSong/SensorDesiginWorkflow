@@ -68,8 +68,20 @@ export const T = {
   canvasEditBg: 'var(--s-canvas-edit-bg)',
   canvasEditGrid: 'var(--s-canvas-edit-grid)',
   canvasEditLine: 'var(--s-canvas-edit-line)',
-  memo: 'var(--s-memo)',
-  memoLine: 'var(--s-memo-line)',
+  /** Windows 스티키 노트 색상 6종(사용자 요청) — lib/memoColors.ts가 이 토큰들을 memo의
+   * color 값에 따라 골라 쓴다. */
+  memoYellow: 'var(--s-memo-yellow)',
+  memoYellowLine: 'var(--s-memo-yellow-line)',
+  memoBlue: 'var(--s-memo-blue)',
+  memoBlueLine: 'var(--s-memo-blue-line)',
+  memoGreen: 'var(--s-memo-green)',
+  memoGreenLine: 'var(--s-memo-green-line)',
+  memoPink: 'var(--s-memo-pink)',
+  memoPinkLine: 'var(--s-memo-pink-line)',
+  memoGray: 'var(--s-memo-gray)',
+  memoGrayLine: 'var(--s-memo-gray-line)',
+  memoPurple: 'var(--s-memo-purple)',
+  memoPurpleLine: 'var(--s-memo-purple-line)',
 
   /* ── 그림자 ── */
   shXs: 'var(--s-sh-xs)',

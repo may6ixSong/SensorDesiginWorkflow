@@ -17,7 +17,7 @@ export class MemosService {
    */
   async replaceAllForWorkflow(
     workflowId: string,
-    memos: { id?: string; phaseId: string; text: string; layout: any; createdBy: string }[],
+    memos: { id?: string; phaseId: string; text: string; color?: string; layout: any; createdBy: string }[],
     isMock = false,
   ) {
     await this.model.deleteMany({ workflowId }).exec();
@@ -26,6 +26,8 @@ export class MemosService {
       workflowId,
       phaseId: m.phaseId,
       text: m.text,
+      // 안 보내면(예전 클라이언트) 스키마 default(yellow)가 적용된다.
+      color: m.color,
       layout: m.layout,
       createdBy: m.createdBy,
       isMock,

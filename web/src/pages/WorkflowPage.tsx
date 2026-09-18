@@ -477,6 +477,7 @@ function CanvasBody({
         memos: s.memos.map((m) => ({
           phaseId: m.phase,
           text: m.text,
+          color: m.color,
           layout: { x: m.x, y: m.y, w: m.w, h: m.h },
         })),
         edges: s.edges.map((e) => ({
@@ -534,10 +535,11 @@ function CanvasBody({
       {noteDlg && (
         <NoteDialog
           text={canvasMemos.find((m) => m.id === noteDlg)?.text ?? ''}
+          color={canvasMemos.find((m) => m.id === noteDlg)?.color}
           onClose={() => st.getState().setNoteDlg(null)}
-          onSave={(text) => {
+          onSave={(text, color) => {
             const s = st.getState();
-            s.setMemos(s.memos.map((m) => (m.id === noteDlg ? { ...m, text } : m)));
+            s.setMemos(s.memos.map((m) => (m.id === noteDlg ? { ...m, text, color } : m)));
             s.setNoteDlg(null);
             toast('Memo saved');
           }}
