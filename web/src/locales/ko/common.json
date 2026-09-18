@@ -172,7 +172,7 @@
     "eyebrow": "Workflow 툴바",
     "title": "Artifact별 전달 부서",
     "subtitle": "빈 칸을 클릭해 그 artifact의 전달 부서를 추가하거나, 표식이 있는 칸을 클릭해 제거하세요.",
-    "milestoneColumn": "Milestone",
+    "phaseColumn": "Phase",
     "artifactColumn": "Artifact",
     "notMappedShort": "No artifact",
     "notMappedTooltip": "No artifact mapped to this block yet.",

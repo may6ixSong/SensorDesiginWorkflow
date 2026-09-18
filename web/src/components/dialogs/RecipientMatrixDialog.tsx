@@ -14,11 +14,13 @@ import { MOTION } from '@/theme/motion';
 import { useMotion } from '@/theme/useReducedMotion';
 import { R, T } from '@/theme/tokens';
 
-const MILESTONE_W = 92;
+const PHASE_W = 92;
 const ROW_HEADER_W = 190;
 const COL_W = 120;
 const HEADER_ROW_H = 40;
 const DATA_ROW_H = 44;
+/** phase 그룹 경계선 — 기본 grid 선(T.ln)보다 한 단계 더 진하게(사용자 요청). */
+const PHASE_BORDER = `2px solid ${T.ln2}`;
 
 interface Props {
   workflowId: string;
@@ -35,8 +37,8 @@ interface PendingToggle {
   adding: boolean;
 }
 
-/** 연속된 같은 milestone(phase) 행을 하나의 rowSpan 셀로 묶기 위한 그룹 정보. */
-interface MilestoneGroup {
+/** 연속된 같은 phase 행을 하나의 rowSpan 셀로 묶기 위한 그룹 정보. */
+interface PhaseGroup {
   name: string;
   span: number;
 }
@@ -47,9 +49,10 @@ interface MilestoneGroup {
  *
  * ★ 행 = 이 workflow가 **주는**(intent === 'own') artifact뿐이다 — 받는(received) 쪽은
  *   recipient 개념 자체가 없다. 열 = 그 과제의 부서(사용자 요청: 부서가 열).
- * ★ artifact 이름 왼쪽에 milestone(phase) 열을 따로 두고, 같은 milestone이 연속되면
- *   rowSpan으로 병합한다(사용자 요청 — 예전에 artifact가 열이었을 때 phase group
- *   header를 colSpan으로 묶던 것과 대칭이다).
+ * ★ artifact 이름 왼쪽에 phase 열을 따로 두고, 같은 phase가 연속되면 rowSpan으로
+ *   병합한다(사용자 요청 — 예전에 artifact가 열이었을 때 phase group header를
+ *   colSpan으로 묶던 것과 대칭이다). 그 phase 그룹의 경계는 기본 grid 선보다 한 단계
+ *   더 진한 border(PHASE_BORDER)로 표시한다(사용자 요청).
  * ★ 셀 하나하나가 그 block의 recipient(AccessGrant.departments) 토글 스위치다. 클릭은
  *   바로 반영되지 않고 항상 confirm을 거친다 — 실수로 전달 대상을 바꾸면 알림이 엉뚱한
  *   부서로 나가기 때문이다.
@@ -83,12 +86,12 @@ export function RecipientMatrixDialog({ workflowId, blocks, phases, departmentOp
   }, [blocks, orderedPhases]);
 
   /**
-   * 행 인덱스별 milestone 병합 정보 — 그 그룹의 첫 행이면 {name, span}, 아니면 null(그
+   * 행 인덱스별 phase 병합 정보 — 그 그룹의 첫 행이면 {name, span}, 아니면 null(그
    * 자리엔 셀을 아예 그리지 않는다 — 위 행의 rowSpan이 덮는다, 진짜 HTML rowSpan이라야
    * sticky 위치도 자연스럽게 맞는다).
    */
-  const milestoneCells = useMemo(() => {
-    const out: (MilestoneGroup | null)[] = [];
+  const phaseCells = useMemo(() => {
+    const out: (PhaseGroup | null)[] = [];
     rows.forEach((b, i) => {
       if (i > 0 && rows[i - 1].phaseId === b.phaseId) {
         out.push(null);
@@ -101,6 +104,10 @@ export function RecipientMatrixDialog({ workflowId, blocks, phases, departmentOp
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, phases]);
+
+  /** 그 행이 자기 phase 그룹의 마지막 행인가 — 그 아래 border를 진하게 그린다. */
+  const isPhaseBoundary = (rowIdx: number) =>
+    rowIdx === rows.length - 1 || rows[rowIdx + 1].phaseId !== rows[rowIdx].phaseId;
 
   const handleCellClick = (block: BlockDto, dept: string) => {
     if (!block.artifactId || replaceRecipients.isPending) return;
@@ -175,18 +182,18 @@ export function RecipientMatrixDialog({ workflowId, blocks, phases, departmentOp
                       component="th"
                       sx={{
                         position: 'sticky', top: 0, left: 0, zIndex: 5,
-                        width: MILESTONE_W, minWidth: MILESTONE_W, height: HEADER_ROW_H,
+                        width: PHASE_W, minWidth: PHASE_W, height: HEADER_ROW_H,
                         background: T.sf3, borderRight: `1px solid ${T.ln}`, borderBottom: `1px solid ${T.ln}`,
                         fontSize: 10, fontWeight: 700, color: T.dm2, letterSpacing: '0.03em',
                         padding: '8px 10px', textAlign: 'left', verticalAlign: 'middle',
                       }}
                     >
-                      {t('recipientMatrix.milestoneColumn')}
+                      {t('recipientMatrix.phaseColumn')}
                     </Box>
                     <Box
                       component="th"
                       sx={{
-                        position: 'sticky', top: 0, left: MILESTONE_W, zIndex: 5,
+                        position: 'sticky', top: 0, left: PHASE_W, zIndex: 5,
                         width: ROW_HEADER_W, minWidth: ROW_HEADER_W, height: HEADER_ROW_H,
                         background: T.sf3, borderRight: `1px solid ${T.ln}`, borderBottom: `1px solid ${T.ln}`,
                         fontSize: 11, fontWeight: 700, color: T.dm2, letterSpacing: '0.03em',
@@ -221,25 +228,27 @@ export function RecipientMatrixDialog({ workflowId, blocks, phases, departmentOp
                   {rows.map((b, rowIdx) => {
                     const rowBg = rowIdx % 2 === 0 ? T.sf : T.sf2;
                     const mapped = Boolean(b.artifactId);
-                    const milestone = milestoneCells[rowIdx];
+                    const phase = phaseCells[rowIdx];
+                    const boundary = isPhaseBoundary(rowIdx);
+                    const bottomBorder = boundary ? PHASE_BORDER : `1px solid ${T.ln}`;
                     return (
                       <Box component="tr" key={b.id}>
-                        {milestone && (
+                        {phase && (
                           <Box
                             component="th"
-                            rowSpan={milestone.span}
+                            rowSpan={phase.span}
                             sx={{
                               position: 'sticky', left: 0, zIndex: 1,
-                              width: MILESTONE_W, minWidth: MILESTONE_W,
+                              width: PHASE_W, minWidth: PHASE_W,
                               background: T.sf3,
-                              borderRight: `1px solid ${T.ln}`, borderBottom: `1px solid ${T.ln}`,
+                              borderRight: `1px solid ${T.ln}`, borderBottom: PHASE_BORDER,
                               fontSize: 10.5, fontWeight: 700, color: T.dm2, letterSpacing: '0.03em',
                               padding: '5px 10px', textAlign: 'left', verticalAlign: 'middle',
                             }}
                           >
-                            <Tooltip title={milestone.name}>
+                            <Tooltip title={phase.name}>
                               <Box sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'normal', lineHeight: 1.3 }}>
-                                {milestone.name}
+                                {phase.name}
                               </Box>
                             </Tooltip>
                           </Box>
@@ -248,10 +257,10 @@ export function RecipientMatrixDialog({ workflowId, blocks, phases, departmentOp
                           component="th"
                           scope="row"
                           sx={{
-                            position: 'sticky', left: MILESTONE_W, zIndex: 1,
+                            position: 'sticky', left: PHASE_W, zIndex: 1,
                             width: ROW_HEADER_W, minWidth: ROW_HEADER_W, height: DATA_ROW_H,
                             background: rowBg,
-                            borderRight: `1px solid ${T.ln}`, borderBottom: `1px solid ${T.ln}`,
+                            borderRight: `1px solid ${T.ln}`, borderBottom: bottomBorder,
                             padding: '5px 12px', textAlign: 'left', verticalAlign: 'middle',
                           }}
                         >
@@ -278,6 +287,7 @@ export function RecipientMatrixDialog({ workflowId, blocks, phases, departmentOp
                               key={`${b.id}-${dept}`}
                               mapped={mapped}
                               active={active}
+                              bottomBorder={bottomBorder}
                               disabledTitle={t('recipientMatrix.notMappedTooltip')}
                               onClick={() => handleCellClick(b, dept)}
                             />
@@ -355,10 +365,12 @@ function EmptyState({ text }: { text: string }) {
  * 원 자체가 등장/소멸한다.
  */
 function MatrixCell({
-  mapped, active, disabledTitle, onClick,
+  mapped, active, bottomBorder, disabledTitle, onClick,
 }: {
   mapped: boolean;
   active: boolean;
+  /** phase 그룹의 마지막 행이면 PHASE_BORDER, 아니면 기본 grid 선(사용자 요청). */
+  bottomBorder: string;
   disabledTitle: string;
   onClick: () => void;
 }) {
@@ -369,7 +381,7 @@ function MatrixCell({
       sx={{
         position: 'relative',
         width: COL_W, minWidth: COL_W, height: DATA_ROW_H,
-        borderRight: `1px solid ${T.ln}`, borderBottom: `1px solid ${T.ln}`,
+        borderRight: `1px solid ${T.ln}`, borderBottom: bottomBorder,
         textAlign: 'center', verticalAlign: 'middle',
         cursor: mapped ? 'pointer' : 'not-allowed',
         userSelect: 'none',
