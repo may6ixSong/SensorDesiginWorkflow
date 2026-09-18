@@ -220,21 +220,7 @@ export function ArtifactListView({
           )}
         </Box>
 
-        {showCurrent ? (
-          <Box
-            sx={{
-              display: 'flex', alignItems: 'center', gap: '8px', mb: '16px',
-              fontSize: 12.5, color: T.dm, lineHeight: 1.6, background: T.okSoft,
-              border: `1px solid ${T.okLine}`, borderRadius: `${R.sm}px`, padding: '9px 11px',
-            }}
-          >
-            <Box sx={{ width: 7, height: 7, borderRadius: '50%', background: T.ok, flexShrink: 0 }} />
-            <Box>
-              Not released yet — this is the live state of every artifact (and every empty block) in this
-              workflow right now, compared against {sortedReleases[0]?.label ?? 'the last release'}.
-            </Box>
-          </Box>
-        ) : selected && (
+        {!showCurrent && selected && (
           <>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: '9px', mb: '10px', flexWrap: 'wrap' }}>
               <Box sx={{ fontFamily: FONT_MONO, fontSize: 15, fontWeight: 700, color: T.pr, ...TNUM }}>
