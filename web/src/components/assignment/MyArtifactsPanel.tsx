@@ -20,7 +20,7 @@ import { FONT_MONO, T, TIER_COLOR, TIER_LABEL } from '@/theme/tokens';
  *   외부 호출이 나간다 — 그래서 A/B/C를 가리지 않고 이 기준 하나로 통일했다(사용자 확정).
  * ★ **최근 1년** 안에 움직인 것만 온다. 그보다 오래된 것은 서버가 아예 싣지 않는다.
  */
-export function MyArtifactsPanel() {
+export function MyArtifactsPanel({ sx }: { sx?: object }) {
   const { data = [], isLoading, isError } = useMyArtifacts();
   const [q, setQ] = useState('');
 
@@ -39,6 +39,7 @@ export function MyArtifactsPanel() {
       sx={{
         border: `1px solid ${T.ln}`, borderRadius: '14px', background: T.sf,
         display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden',
+        ...sx,
       }}
     >
       <Box
@@ -48,10 +49,7 @@ export function MyArtifactsPanel() {
         }}
       >
         <Box sx={{ width: 8, height: 8, borderRadius: '50%', background: T.ok, flex: '0 0 auto' }} />
-        <Box sx={{ fontSize: 13, fontWeight: 700 }}>Artifacts my departments give</Box>
-        <Box sx={{ fontSize: 11.5, color: T.dm2 }}>
-          mapped blocks across every project · updated within a year
-        </Box>
+        <Box sx={{ fontSize: 13, fontWeight: 700 }}>Artifacts</Box>
         <Box sx={{ flex: 1 }} />
         <Box
           sx={{

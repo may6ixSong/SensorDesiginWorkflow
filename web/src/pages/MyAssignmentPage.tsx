@@ -2,13 +2,12 @@ import { useState } from 'react';
 import { Box } from '@mui/material';
 import { AppShell } from '@/components/layout/AppShell';
 import { Tabs, TabPanel } from '@/components/common/Tabs';
-import { useAuth } from '@/app/providers/AuthProvider';
 import { ReleaseFeedPanel } from '@/components/assignment/ReleaseFeedPanel';
 import { MyArtifactsPanel } from '@/components/assignment/MyArtifactsPanel';
 import { AssignmentCalendar } from '@/components/assignment/AssignmentCalendar';
 import { ReleaseDetailDialog } from '@/components/assignment/ReleaseDetailDialog';
 import { MyReleaseRowDto } from '@/types/domain';
-import { FONT_DISPLAY, T } from '@/theme/tokens';
+import { T } from '@/theme/tokens';
 
 type View = 'overview' | 'calendar';
 
@@ -24,25 +23,20 @@ type View = 'overview' | 'calendar';
  *   release 다이얼로그를 열 때 그 한 건에 대해서만 돈다(01장 §4.2, 09장 §4).
  */
 export function MyAssignmentPage() {
-  const { user, isAdmin } = useAuth();
   const [view, setView] = useState<View>('overview');
   const [openRelease, setOpenRelease] = useState<MyReleaseRowDto | null>(null);
 
   return (
     <AppShell>
-      <Box sx={{ flex: 1, overflow: 'auto', background: T.bg }}>
-        <Box sx={{ maxWidth: 1420, mx: 'auto', px: '28px', py: '26px' }}>
-          <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: '14px', mb: '16px', flexWrap: 'wrap' }}>
-            <Box>
-              <Box sx={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 800, letterSpacing: '-.02em' }}>
-                My Assignment
-              </Box>
-              <Box sx={{ fontSize: 12, color: T.dm, mt: '5px' }}>
-                {isAdmin
-                  ? 'Every release and artifact version across every project (Admin)'
-                  : `Releases and artifacts for ${user?.KnoxID ?? 'you'} and your departments, across every project`}
-              </Box>
-            </Box>
+      <Box
+        sx={{
+          flex: 1, minHeight: 0, overflow: 'hidden', background: T.bg,
+          display: 'flex', flexDirection: 'column',
+        }}
+      >
+        <Box sx={{ flex: '0 0 auto', px: '24px', pt: '20px' }}>
+          <Box sx={{ fontSize: 22, fontWeight: 700, letterSpacing: '-.01em', mb: '14px' }}>
+            My Assignment
           </Box>
 
           <Tabs<View>
@@ -52,34 +46,47 @@ export function MyAssignmentPage() {
               { key: 'overview', label: 'Overview' },
               { key: 'calendar', label: 'Calendar' },
             ]}
-            sx={{ mb: '18px' }}
+            sx={{ mb: '16px' }}
           />
+        </Box>
 
+        {/* display:grid + gridTemplateRows:'1fr' 는 TabPanel(framer-motion div, 자기 높이가 없다)이
+            이 컨테이너의 실제 높이를 그대로 물려받게 하는 자리다 — 그래야 안의 overview grid가
+            height:'100%'로 실제 남은 세로 공간을 다 쓸 수 있다. */}
+        <Box
+          sx={{
+            flex: 1, minHeight: 0, overflow: 'hidden', px: '24px', pb: '20px',
+            display: 'grid', gridTemplateRows: '1fr',
+          }}
+        >
           <TabPanel tabKey={view}>
             {view === 'overview' ? (
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                {/* 받은 것 / 낸 것은 서로 대칭이라 나란히 둔다. 좁아지면 자연히 쌓인다. */}
-                <Box
-                  sx={{
-                    display: 'grid', gap: '14px',
-                    gridTemplateColumns: '1fr 1fr',
-                    '@media (max-width: 1100px)': { gridTemplateColumns: '1fr' },
-                  }}
-                >
-                  <ReleaseFeedPanel
-                    direction="received"
-                    title="Released to me"
-                    caption="I or my departments are a recipient"
-                    onOpen={setOpenRelease}
-                  />
-                  <ReleaseFeedPanel
-                    direction="published"
-                    title="Released by us"
-                    caption="published by me or my departments"
-                    onOpen={setOpenRelease}
-                  />
-                </Box>
-                <MyArtifactsPanel />
+              <Box
+                sx={{
+                  display: 'grid', height: '100%', minHeight: 0, gap: '14px',
+                  gridTemplateColumns: 'minmax(320px, 1fr) minmax(420px, 1.7fr)',
+                  gridTemplateRows: '1fr 1fr',
+                  gridTemplateAreas: '"received artifacts" "published artifacts"',
+                  '@media (max-width: 1000px)': {
+                    gridTemplateColumns: '1fr',
+                    gridTemplateRows: 'auto auto auto',
+                    gridTemplateAreas: '"received" "published" "artifacts"',
+                  },
+                }}
+              >
+                <ReleaseFeedPanel
+                  direction="received"
+                  title="Inbox"
+                  onOpen={setOpenRelease}
+                  sx={{ gridArea: 'received' }}
+                />
+                <ReleaseFeedPanel
+                  direction="published"
+                  title="Outbox"
+                  onOpen={setOpenRelease}
+                  sx={{ gridArea: 'published' }}
+                />
+                <MyArtifactsPanel sx={{ gridArea: 'artifacts' }} />
               </Box>
             ) : (
               <AssignmentCalendar onOpenRelease={setOpenRelease} />

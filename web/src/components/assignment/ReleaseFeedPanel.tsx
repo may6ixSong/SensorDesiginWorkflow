@@ -18,12 +18,12 @@ import { CURSOR_POINTER, FONT_MONO, T } from '@/theme/tokens';
  *   페이지씩 잘라 주고, 여기서는 페이지 번호만 옮긴다.
  */
 export function ReleaseFeedPanel({
-  direction, title, caption, onOpen,
+  direction, title, onOpen, sx,
 }: {
   direction: 'received' | 'published';
   title: string;
-  caption: string;
   onOpen: (row: MyReleaseRowDto) => void;
+  sx?: object;
 }) {
   const [page, setPage] = useState(1);
   const { data, isLoading, isError, isPlaceholderData } = useMyReleases(direction, page);
@@ -35,6 +35,7 @@ export function ReleaseFeedPanel({
       sx={{
         border: `1px solid ${T.ln}`, borderRadius: '14px', background: T.sf,
         display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden',
+        ...sx,
       }}
     >
       <Box
@@ -50,7 +51,6 @@ export function ReleaseFeedPanel({
           }}
         />
         <Box sx={{ fontSize: 13, fontWeight: 700 }}>{title}</Box>
-        <Box sx={{ fontSize: 11.5, color: T.dm2 }}>{caption}</Box>
         <Box sx={{ flex: 1 }} />
         {meta && (
           <Box sx={{ fontSize: 11, color: T.dm2, fontFamily: FONT_MONO }}>{meta.total}</Box>
