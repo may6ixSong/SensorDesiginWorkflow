@@ -46,7 +46,7 @@ export function EdgeLayer({
     // 색으로 경고한다(설계서 03장 §2.2의 publish 3상태를 그대로 쓴다).
     const blocked = !bi && a.publishState === 'unpublished' && b.publishState !== 'unpublished';
     const on = !!hlSet && hlSet.has(e.from) && hlSet.has(e.to);
-    // 선택된 산출물과 무관한 flow — 관련 없는 블록을 흐리게 하는 것과 같은 기준(0.4)으로
+    // 선택된 산출물과 무관한 flow — 관련 없는 노드를 흐리게 하는 것과 같은 기준(0.4)으로
     // 같이 낮춘다. <g>로 묶어야 marker(화살촉)까지 함께 흐려진다.
     const unrelated = !!hlSet && !on;
     // 하이라이트는 강조색(T.pr)이 아니라 별도 청록(T.select)을 쓴다 — 인디고 하나만 쓰면

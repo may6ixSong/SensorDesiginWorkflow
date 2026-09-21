@@ -6,10 +6,10 @@
  * ★ 캔버스에는 **version 개념이 없다** — 모든 편집은 overwrite이고 스냅샷을 찍지 않는다
  *   (설계서 03장 §1). 그래서 예전의 스냅샷 변환기(toCanvasNodeFromSnapshot 등)와
  *   "받는 산출물"(incoming) 배치기가 전부 사라졌다.
- * ★ 블록에는 **버전 라벨을 쓰지 않는다.** 버전은 상세 slide에서만 보이고, 캔버스는
+ * ★ 노드에는 **버전 라벨을 쓰지 않는다.** 버전은 상세 slide에서만 보이고, 캔버스는
  *   publish 3상태 배지만 그린다(설계서 03장 §2).
  */
-import { BlockDto, EdgeDto, MemoDto, PublishState, Tier, WorkflowPhase, isMaskedArtifact } from '@/types/domain';
+import { NodeDto, EdgeDto, MemoDto, PublishState, Tier, WorkflowPhase, isMaskedArtifact } from '@/types/domain';
 import { DAY_MS, dayMs } from './schedule';
 import {
   DEFAULT_PW, GAP, LANE_PAD, MH, MW, NH, NW, ROW_H, TOP_PAD, WALL_FORCE, snp,
@@ -23,7 +23,7 @@ export interface CanvasNode {
   id: string;
   workflow: string;
   /**
-   * 이 블록이 걸려 있는 phase의 id. workflow의 phase 목록에 없으면 "일정 유실" 상태다 —
+   * 이 노드가 걸려 있는 phase의 id. workflow의 phase 목록에 없으면 "일정 유실" 상태다 —
    * 캔버스는 좌표를 그대로 두고 유실 표시만 붙인다(isOrphanPhase 참고).
    */
   phase: string;
@@ -38,7 +38,7 @@ export interface CanvasNode {
   net: 'OA' | 'HPC' | null;
   /**
    * "새 Artifact 추가" 다이얼로그의 첫 질문(주는/받는, 설계서 04장 §6.1)이 그대로
-   * 온다 — 캔버스는 받는(received) block을 배경색으로 구별해 보여준다.
+   * 온다 — 캔버스는 받는(received) node를 배경색으로 구별해 보여준다.
    */
   intent: 'own' | 'received';
 
@@ -47,7 +47,7 @@ export interface CanvasNode {
 
   /**
    * A/B/C 전부 공통이다 — 같은 artifact라도 workflow마다 recipient가 다를 수 있어
-   * artifact가 아니라 block에 붙는다(설계서 04장 §3.2).
+   * artifact가 아니라 node에 붙는다(설계서 04장 §3.2).
    */
   recipientDepartments: string[];
 
@@ -101,7 +101,7 @@ export interface Blk {
 
 /* ── 서버 DTO → 작업 모델 ── */
 
-export function toCanvasNode(b: BlockDto): CanvasNode {
+export function toCanvasNode(b: NodeDto): CanvasNode {
   const artifact = b.artifact;
   const masked = isMaskedArtifact(artifact);
   return {
@@ -184,26 +184,26 @@ export function phaseAtX(phases: WorkflowPhase[], phasePW: Record<string, number
 }
 
 /**
- * 새로 생성된 블록을 지정된 Phase 레인 안쪽(좌상단)에 배치한다.
+ * 새로 생성된 노드를 지정된 Phase 레인 안쪽(좌상단)에 배치한다.
  * 백엔드가 내려주는 기본 layout(0,0)은 Phase를 모르므로, FE에서 레인 좌표로 보정해야
  * `phase` 필드와 실제 x 좌표가 어긋나 엉뚱한 레인에 그려지는 것을 막는다.
  *
- * ★ y축은 그 Phase에 이미 있는 블록들과 절대 겹치지 않는 자리로 잡는다(사용자 요청) —
- *   항상 레인 맨 위에 놓아 기존 블록을 가리던 것에서, 그 레인의 가장 아래 블록보다
+ * ★ y축은 그 Phase에 이미 있는 노드들과 절대 겹치지 않는 자리로 잡는다(사용자 요청) —
+ *   항상 레인 맨 위에 놓아 기존 노드를 가리던 것에서, 그 레인의 가장 아래 노드보다
  *   더 아래에 놓는 방식으로 바꿨다. `existing`이 비어 있으면(그 레인에 아무것도 없으면)
  *   예전과 같은 기본 위치(TOP_PAD)를 쓴다.
  */
 export function placeInLane(
-  block: { x: number; y: number; phase: string },
+  node: { x: number; y: number; phase: string },
   phases: WorkflowPhase[],
   phasePW: Record<string, number>,
   existing: { phase: string; y: number; h: number }[] = [],
 ): void {
-  const g = laneG(phases, phasePW).lanes[block.phase];
+  const g = laneG(phases, phasePW).lanes[node.phase];
   if (!g) return;
-  block.x = snp(g.x + LANE_PAD);
-  const bottoms = existing.filter((n) => n.phase === block.phase).map((n) => n.y + n.h);
-  block.y = bottoms.length ? snp(Math.max(...bottoms) + GAP) : snp(TOP_PAD);
+  node.x = snp(g.x + LANE_PAD);
+  const bottoms = existing.filter((n) => n.phase === node.phase).map((n) => n.y + n.h);
+  node.y = bottoms.length ? snp(Math.max(...bottoms) + GAP) : snp(TOP_PAD);
 }
 
 /**
@@ -257,14 +257,14 @@ export function minPW(blocks: Blk[], pid: string) {
 /**
  * Phase 폭 변경. phasePW를 갱신하고, 리사이즈하는 phase의 오른쪽 경계선 뒤에 있는
  * 모든 phase의 레인 x가 그 폭 변화량(dx)만큼 통째로 밀리므로, 그 phase들에 속한
- * 블록도 같은 dx만큼 같이 옮겨 제 레인 안의 상대 위치를 그대로 유지한다.
+ * 노드도 같은 dx만큼 같이 옮겨 제 레인 안의 상대 위치를 그대로 유지한다.
  *
  * 늘릴 때뿐 아니라 줄일 때도 반드시 옮겨야 한다 — 줄여도 뒤 phase들의 레인은
- * 왼쪽으로 그만큼 밀리는데, 블록만 제자리에 남으면 그 블록이 이제 자기 레인
+ * 왼쪽으로 그만큼 밀리는데, 노드만 제자리에 남으면 그 노드가 이제 자기 레인
  * 바깥(옆 phase 쪽)에 걸치게 되어 resolveNodePhases가 엉뚱한 phase로 재배정해
  * 버린다(사용자가 겪은 "phase가 바뀌는" 역효과 — 늘릴 때만 막아서는 줄일 때
- * 그대로 재현된다). 리사이즈 중인 phase 자신과 그 이전 phase들의 블록은 늘리든
- * 줄이든 절대 움직이지 않는다 — 그 블록들의 레인 x 자체가 안 변하기 때문이다.
+ * 그대로 재현된다). 리사이즈 중인 phase 자신과 그 이전 phase들의 노드는 늘리든
+ * 줄이든 절대 움직이지 않는다 — 그 노드들의 레인 x 자체가 안 변하기 때문이다.
  */
 export function resizePhase(
   blocks: Blk[],
@@ -316,7 +316,7 @@ export function wallAdj(
 }
 
 /**
- * 클릭한 블록 기준 flow 하이라이트 집합 (목업 connectedSet, 설계서 3.9).
+ * 클릭한 노드 기준 flow 하이라이트 집합 (목업 connectedSet, 설계서 3.9).
  * prev 방향은 prev만, next 방향은 next만 계속 타고 간다 — 양방향을 섞지 않는다.
  */
 export function connectedSet(id: string, edges: CanvasEdge[]): Set<string> {
@@ -395,7 +395,7 @@ export function stOf(n: CanvasNode): StatusStyle {
   }
 }
 
-/** 블록의 tier 배지 색 — 미매핑/마스킹이면 중립색으로 둔다. */
+/** 노드의 tier 배지 색 — 미매핑/마스킹이면 중립색으로 둔다. */
 export function tierStyle(n: CanvasNode): { fg: string; bg: string } {
   if (!n.tier) return { fg: T.dm2, bg: T.sf3 };
   return TIER_COLOR[n.tier];

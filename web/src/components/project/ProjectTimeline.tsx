@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
 import { Box } from '@mui/material';
 import { Link } from 'react-router-dom';
-import { BlockDto, Milestone, ScheduleSpan, WorkflowDto } from '@/types/domain';
-import { useBlocks } from '@/api/hooks/useBlocks';
+import { NodeDto, Milestone, ScheduleSpan, WorkflowDto } from '@/types/domain';
+import { useNodes } from '@/api/hooks/useNodes';
 import {
   DAY_MS, DateRange, dayMs, monthTicks, rangeOf, ratioIn, shortDate, sortSchedule, spanDays,
 } from '@/lib/schedule';
@@ -33,16 +33,16 @@ const LEGEND = [
  * 캔버스와 같은 publish 3상태를 집계한다(설계서 03장 §2.2) — 버전 배열을 다시 훑지
  * 않고 서버가 계산해 내려준 publishState를 그대로 쓴다.
  */
-function statusCounts(blocks: BlockDto[]) {
+function statusCounts(nodes: NodeDto[]) {
   let notSubmitted = 0;
   let inProgress = 0;
   let released = 0;
-  blocks.forEach((b) => {
-    if (b.publishState === 'published') released++;
-    else if (b.publishState === 'newlyPublished') inProgress++;
+  nodes.forEach((n) => {
+    if (n.publishState === 'published') released++;
+    else if (n.publishState === 'newlyPublished') inProgress++;
     else notSubmitted++;
   });
-  return { notSubmitted, inProgress, released, total: blocks.length };
+  return { notSubmitted, inProgress, released, total: nodes.length };
 }
 
 /**
@@ -265,7 +265,7 @@ export function ProjectTimeline({
  *
  * ★ 권한이 없는(myAccess === null) workflow도 phase 자체는 서버가 그대로 준다(사용자
  *   결정, 설계서 01장 §3.7) — "존재를 보여주되 잠근다"를 phase 일정까지 적용한다. 그
- *   안의 산출물(block)은 여전히 완전히 가려야 하므로 useBlocks 자체를 부르지 않는다 —
+ *   안의 산출물(node)은 여전히 완전히 가려야 하므로 useNodes 자체를 부르지 않는다 —
  *   `@WorkflowAccess('view')` 가드가 어차피 403을 줄 호출을 미리 걸러낸다. 행 전체는
  *   음영 처리하고 클릭을 막는다(canOpen).
  */
@@ -275,11 +275,11 @@ function WorkflowTimelineRow({
   projectId: string; workflow: WorkflowDto; geo: Geometry;
 }) {
   const canOpen = workflow.myAccess !== null;
-  const { data: blocks } = useBlocks(workflow.id, canOpen);
-  const deliverables = canOpen ? blocks : undefined;
+  const { data: nodes } = useNodes(workflow.id, canOpen);
+  const deliverables = canOpen ? nodes : undefined;
 
   const byPhase = useMemo(() => {
-    const m = new Map<string, BlockDto[]>();
+    const m = new Map<string, NodeDto[]>();
     (deliverables ?? []).forEach((d) => {
       const arr = m.get(d.phaseId) ?? [];
       arr.push(d);

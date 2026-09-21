@@ -1,16 +1,16 @@
 import { useState } from 'react';
 import { Box } from '@mui/material';
-import { BlockDto } from '@/types/domain';
+import { NodeDto } from '@/types/domain';
 import { ModalShell } from '@/components/common/ModalShell';
 import { SirenButton } from '@/components/common/SirenButton';
 import { Ey, Field, TextInput } from '@/components/common/Panel';
 import { Icon } from '@/components/common/Icon';
 import { ArtifactSourcePicker, ArtifactSourceState, emptySourceState, resolveNewArtifact } from '@/components/artifact/ArtifactSourcePicker';
-import { NewArtifactSourceInput } from '@/api/hooks/useBlocks';
+import { NewArtifactSourceInput } from '@/api/hooks/useNodes';
 import { R, T } from '@/theme/tokens';
 
 interface Props {
-  block: BlockDto;
+  node: NodeDto;
   projectId: string | undefined;
   projectCode: string | undefined;
   projectRevision: string | undefined;
@@ -22,18 +22,18 @@ interface Props {
 }
 
 /**
- * 이미 만들어진 block의 artifact를 바꾼다(설계서 04장 §6 재매핑) — Block(자리)과
+ * 이미 만들어진 node의 artifact를 바꾼다(설계서 04장 §6 재매핑) — WorkflowNode(자리)와
  * Artifact(실체)가 분리돼 있으므로 자리는 그대로 두고 무엇을 가리키는지만 바꾼다.
  *
- * ★ intent(주는/받는)는 block 생성 시 확정되어 여기서 바꾸지 않는다 — 후보 목록의
+ * ★ intent(주는/받는)는 node 생성 시 확정되어 여기서 바꾸지 않는다 — 후보 목록의
  *   pickable 판정도 그대로 그 intent를 따른다.
  * ★ 저장하면 서버가 이전 recipient를 초기화한다(사용자 결정) — 새 산출물에 이전 구성이
  *   그대로 유효하다는 보장이 없기 때문이다. 그 사실을 여기서 미리 알려 준다.
  */
 export function ChangeArtifactDialog({
-  block, projectId, myDepartments, departmentOptions, onClose, onSave, submitting,
+  node, projectId, myDepartments, departmentOptions, onClose, onSave, submitting,
 }: Props) {
-  const [name, setName] = useState(block.name);
+  const [name, setName] = useState(node.name);
   const [src, setSrc] = useState<ArtifactSourceState>(emptySourceState());
   const [err, setErr] = useState<string | null>(null);
 
@@ -53,7 +53,7 @@ export function ChangeArtifactDialog({
       header={
         <>
           <Ey>Change artifact</Ey>
-          <Box sx={{ fontSize: 16, fontWeight: 700, mt: '2px' }}>{block.name}</Box>
+          <Box sx={{ fontSize: 16, fontWeight: 700, mt: '2px' }}>{node.name}</Box>
         </>
       }
     >
@@ -66,7 +66,7 @@ export function ChangeArtifactDialog({
       >
         <Box sx={{ mt: '1px', flexShrink: 0 }}><Icon name="info" /></Box>
         <Box>
-          This block still {block.intent === 'own' ? 'gives' : 'receives'} an artifact — you&apos;re only changing
+          This node still {node.intent === 'own' ? 'gives' : 'receives'} an artifact — you&apos;re only changing
           which one. Recipients will be reset once you save.
         </Box>
       </Box>
@@ -76,9 +76,9 @@ export function ChangeArtifactDialog({
       </Field>
 
       <ArtifactSourcePicker
-        workflowId={block.workflowId}
+        workflowId={node.workflowId}
         projectId={projectId}
-        intent={block.intent}
+        intent={node.intent}
         myDepartments={myDepartments}
         departmentOptions={departmentOptions}
         state={src}

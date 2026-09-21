@@ -15,7 +15,7 @@ import {
  * My Assignment (설계서 09장) — 과제 경계를 넘어 "내 일"만 모아 오는 조회들.
  *
  * 서버가 이미 scope(내가 member인 과제 → 내 부서가 소속 부서인 workflow → 그 workflow의
- * own block)로 좁혀 주므로, 여기서는 projectId 같은 걸 넘기지 않는다.
+ * own node)로 좁혀 주므로, 여기서는 projectId 같은 걸 넘기지 않는다.
  */
 
 const DEFAULT_PAGE_SIZE = 5;

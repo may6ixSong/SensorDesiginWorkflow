@@ -40,7 +40,7 @@ export const T = {
   select: 'var(--s-select)',
   selectRing: 'var(--s-select-ring)',
 
-  /** block.intent === 'received' 전용 — "밖에서 받는 것" 표시. */
+  /** node.intent === 'received' 전용 — "밖에서 받는 것" 표시. */
   recv: 'var(--s-recv)',
   recvSoft: 'var(--s-recv-soft)',
 
@@ -95,7 +95,7 @@ export const T = {
 
 /**
  * Tier 색 — A→C 신뢰도 내림차순이 색에서 읽혀야 한다.
- * 배지·캔버스 블록·release 표가 전부 이 한 곳을 참조한다.
+ * 배지·캔버스 노드·release 표가 전부 이 한 곳을 참조한다.
  */
 export const TIER_COLOR: Record<'A' | 'B' | 'C', { fg: string; bg: string }> = {
   A: { fg: 'var(--s-tier-a)', bg: 'var(--s-tier-a-soft)' },

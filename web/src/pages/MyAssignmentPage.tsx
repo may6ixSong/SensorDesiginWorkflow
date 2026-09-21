@@ -23,7 +23,7 @@ const OVERVIEW_PROJECT_FILTER_COOKIE = 'siren-my-assignment-overview-project-fil
  *
  * 무엇이 내 것인지는 전부 서버가 정한다(MyScopeService): 내가 member인 과제 → 그 과제
  * 로스터에서 **내가 속한 부서가 소속 부서인 workflow** → 그 workflow에서 **내가 주는
- * 산출물(own)이면서 artifact가 매핑된 block**. release는 그와 별개로 recipient(부서·개인)와
+ * 산출물(own)이면서 artifact가 매핑된 node**. release는 그와 별개로 recipient(부서·개인)와
  * 발행 부서로 판정한다. Admin은 어느 쪽에도 필터가 걸리지 않는다.
  *
  * ★ 이 페이지의 어떤 목록도 산출물마다 외부 서비스에 권한을 물어보지 않는다 — 그 판정은

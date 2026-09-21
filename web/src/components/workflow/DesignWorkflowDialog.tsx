@@ -4,14 +4,14 @@ import { useNavigate } from 'react-router-dom';
 import { useQueries } from '@tanstack/react-query';
 import { apiClient, ApiEnvelope } from '@/api/client';
 import { queryKeys } from '@/api/queryKeys';
-import { BlockDto, EdgeDto, Milestone, WorkflowDto } from '@/types/domain';
+import { NodeDto, EdgeDto, Milestone, WorkflowDto } from '@/types/domain';
 import { Icon } from '@/components/common/Icon';
 import { CURSOR_POINTER, FONT_MONO, T } from '@/theme/tokens';
 import { buildDomainModel, withAlpha, lighten, darken, DomainWorkflowModel, UNASSIGNED_DOMAIN } from '@/lib/domainWorkflow';
 import { useThemeMode } from '@/theme/ThemeModeContext';
 import {
-  buildWorldLayout, connectedDeliverables, BlockNode, DomainZoneLayout, WorldLayout,
-  BLOCK_LABEL_W, DOMAIN_HEAD_H, LABEL_W, UNSCHEDULED_W,
+  buildWorldLayout, connectedDeliverables, WorldNode, DomainZoneLayout, WorldLayout,
+  NODE_LABEL_W, DOMAIN_HEAD_H, LABEL_W, UNSCHEDULED_W,
 } from '@/lib/designWorkflowLayout';
 import { SpaceBackdrop, SpacePalette, useSpacePalette } from './spaceBackdrop';
 
@@ -140,20 +140,20 @@ function WorkflowStage({
   const [dragging, setDragging] = useState(false);
   const fittedRef = useRef(false);
 
-  /* 모든 workflow의 블록 — 캐시 키가 보드와 같아 이미 열어본 workflow는 즉시 뜬다. */
+  /* 모든 workflow의 노드 — 캐시 키가 보드와 같아 이미 열어본 workflow는 즉시 뜬다. */
   const results = useQueries({
     queries: workflows.map((w) => ({
-      queryKey: queryKeys.blocks(w.id),
+      queryKey: queryKeys.nodes(w.id),
       staleTime: 15_000,
       queryFn: async () => {
-        const res = await apiClient.get<BlockDto[]>(`/workflows/${w.id}/blocks`);
+        const res = await apiClient.get<NodeDto[]>(`/workflows/${w.id}/nodes`);
         return res.data;
       },
     })),
   });
   const sig = results.map((r) => `${r.status}:${r.dataUpdatedAt}`).join('|');
   const { byWorkflow, loading } = useMemo(() => {
-    const m = new Map<string, BlockDto[]>();
+    const m = new Map<string, NodeDto[]>();
     let anyLoading = false;
     workflows.forEach((w, i) => {
       const data = results[i]?.data;
@@ -220,7 +220,7 @@ function WorkflowStage({
     return connectedDeliverables(selectedId, edgesByWorkflow.get(hlOwner) ?? []);
   }, [selectedId, hlOwner, edgesByWorkflow]);
 
-  const onSelectBlock = useCallback((id: string) => {
+  const onSelectNode = useCallback((id: string) => {
     setSelectedId((cur) => (cur === id ? null : id));
   }, []);
 
@@ -337,7 +337,7 @@ function WorkflowStage({
 
   /* ── 드래그 = 시점 이동 ──
    * setPointerCapture는 쓰지 않는다 — 캡처를 걸면 이후 click의 타깃까지 뷰포트로
-   * 바뀌어 안쪽 블록/버튼의 onClick이 죽는다. 대신 드래그 중에만 window에 리스너를
+   * 바뀌어 안쪽 노드/버튼의 onClick이 죽는다. 대신 드래그 중에만 window에 리스너를
    * 달고, 4px 넘게 움직였으면 뒤따르는 click을 무시한다. */
   const dragRef = useRef<{ px: number; py: number; cx: number; cy: number } | null>(null);
   const movedRef = useRef(false);
@@ -399,7 +399,7 @@ function WorkflowStage({
   }, [cam, world.zones, size.h]);
 
   /**
-   * 줌이 낮으면 블록 글자가 어차피 안 읽히므로 접는다(LOD). fit-all 상태에서도
+   * 줌이 낮으면 노드 글자가 어차피 안 읽히므로 접는다(LOD). fit-all 상태에서도
    * "이게 뭔지"는 보여야 하므로 예전보다 낮은 줌에서도 계속 켜져 있게 문턱을 낮췄다.
    */
   const detail = cam.z > 0.16;
@@ -483,7 +483,7 @@ function WorkflowStage({
                   hlSet={hlSet}
                   hlOwner={hlOwner}
                   onOpenWorkflow={openWorkflow}
-                  onSelectBlock={onSelectBlock}
+                  onSelectNode={onSelectNode}
                 />
               );
             })}
@@ -616,7 +616,7 @@ function TimeAxis({
  *   요소마다 직접 곱해서 넘긴다.
  */
 function DomainZone({
-  zone, world, statusHex, orphanHex, detail, dim, hlSet, hlOwner, onOpenWorkflow, onSelectBlock,
+  zone, world, statusHex, orphanHex, detail, dim, hlSet, hlOwner, onOpenWorkflow, onSelectNode,
 }: {
   zone: DomainZoneLayout;
   world: WorldLayout;
@@ -627,7 +627,7 @@ function DomainZone({
   hlSet: Set<string> | null;
   hlOwner: string | null;
   onOpenWorkflow: (id: string) => void;
-  onSelectBlock: (id: string) => void;
+  onSelectNode: (id: string) => void;
 }) {
   const label = zone.key === UNASSIGNED_DOMAIN ? 'Unassigned' : zone.label;
   const lineW = world.bounds.w;
@@ -723,15 +723,15 @@ function DomainZone({
               )}
             </Box>
 
-            {row.blocks.map((b) => (
-              <DeliverableBlock
+            {row.nodes.map((b) => (
+              <DeliverableNode
                 key={b.id}
                 b={b}
                 hex={b.orphan ? orphanHex : statusHex[b.status]}
                 detail={detail}
                 selected={!!hlSet && hlSet.has(b.id)}
                 opacity={rowDim * (hlSet && !hlSet.has(b.id) ? 0.3 : 1)}
-                onSelect={onSelectBlock}
+                onSelect={onSelectNode}
               />
             ))}
           </Box>
@@ -767,10 +767,10 @@ function Halo({ children, sx, style, className }: { children: React.ReactNode; s
  *
  * 일정을 잃은 산출물은 상태색 대신 붉은색 + 파선 링을 둘러 즉시 구분되게 한다.
  */
-function DeliverableBlock({
+function DeliverableNode({
   b, hex, detail, selected, opacity, onSelect,
 }: {
-  b: BlockNode; hex: string; detail: boolean;
+  b: WorldNode; hex: string; detail: boolean;
   selected: boolean; opacity: number; onSelect: (id: string) => void;
 }) {
   /*
@@ -839,7 +839,7 @@ function DeliverableBlock({
           sx={{
             fontSize: 16, fontWeight: 600, color: b.orphan ? T.danger : T.tx, textAlign: 'left',
             textShadow: `0 1px 3px ${withAlpha('#000000', 0.25)}`,
-            maxWidth: BLOCK_LABEL_W, overflow: 'hidden', textOverflow: 'ellipsis',
+            maxWidth: NODE_LABEL_W, overflow: 'hidden', textOverflow: 'ellipsis',
           }}
         >
           {b.name}

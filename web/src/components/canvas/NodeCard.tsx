@@ -7,7 +7,7 @@ import { canonicalDepartmentLabel } from '@/shared/constants/departments';
 import { CURSOR_POINTER, R, T, TNUM } from '@/theme/tokens';
 
 /**
- * tier별 블록 아이콘 — A는 그 서비스가 들고 있는 "살아 있는" 산출물이라 패키지,
+ * tier별 노드 아이콘 — A는 그 서비스가 들고 있는 "살아 있는" 산출물이라 패키지,
  * B는 동기화되는 문서, C는 링크·수기 기록이라 체인. 매핑이 아예 없으면 빈 상태다.
  */
 function iconFor(n: CanvasNode): IconName {
@@ -19,7 +19,7 @@ function iconFor(n: CanvasNode): IconName {
 
 interface Props {
   d: CanvasNode;
-  /** 이 블록이 걸린 phase. 찾을 수 없으면(=일정 유실) undefined다. */
+  /** 이 노드가 걸린 phase. 찾을 수 없으면(=일정 유실) undefined다. */
   phase?: WorkflowPhase;
   /**
    * 일정 유실 — 가리키던 phase가 workflow 일정에서 사라졌다. 좌표는 그대로 두고
@@ -46,14 +46,14 @@ interface Props {
 }
 
 /**
- * 캔버스 위의 산출물 블록.
+ * 캔버스 위의 산출물 노드.
  *
  * ★ **버전 라벨을 쓰지 않는다.** 버전은 상세 slide에서만 보이고, 여기서는 publish
  *   3상태 배지만 그린다(설계서 03장 §2.1~2.2).
  * ★ Edit/View 권한자가 **완전히 동일한 화면**을 본다 — 권한에 따라 달라지는 것은 각
  *   산출물의 내용이지 캔버스 구조가 아니다(설계서 03장 §1).
  */
-export function BlockNode({
+export function NodeCard({
   d, phase, orphan = false, edit, canEdit, isSel, onHl, dimLink, hasHl, filteredOut = false,
   onOpen, onPinClick, onGripDown, linkActive, registerRef,
   onPointerDown, onPointerMove, onPointerUp, onClick,
@@ -61,7 +61,7 @@ export function BlockNode({
   const st = stOf(d);
   const compact = d.h < 150;
 
-  // 클릭으로 flow 하이라이트가 켜져 있는데 이 블록이 그 흐름에 안 걸려 있으면 흐리게 —
+  // 클릭으로 flow 하이라이트가 켜져 있는데 이 노드가 그 흐름에 안 걸려 있으면 흐리게 —
   // 연결된 것들이 상대적으로 더 눈에 띄게 한다.
   const connected = onHl && hasHl;
   const unrelated = hasHl && !onHl;
@@ -90,7 +90,7 @@ export function BlockNode({
       style={{ left: d.x, top: d.y, width: d.w, height: d.h }}
       sx={{
         position: 'absolute',
-        // 선택된 블록 전체(Details 버튼 포함)를 자체 stacking context로 끌어올린다.
+        // 선택된 노드 전체(Details 버튼 포함)를 자체 stacking context로 끌어올린다.
         zIndex: isSel ? 20 : 'auto',
         // 카드 자체는 overflow: hidden(아래)이라 안쪽 모서리를 둥글게 잘라내지만, Details
         // 버튼은 카드 바깥 위쪽에 떠야 하므로 이 바깥 래퍼는 잘라내지 않는다.
@@ -104,7 +104,7 @@ export function BlockNode({
       {/* 상세 열기 — 이 세션 이전부터 있던 원래 모양(짙은 배경 + 흰 "Details" 글자,
           말풍선 꼭지 포함)으로 복원했다(사용자 요청). 선택됐을 때만 뜨고, 더블클릭으로도
           동일하게 열린다. T.inv는 테마와 무관하게 항상 어두운 표면이라 dark 모드에서도
-          카드 배경과 구별된다. zIndex를 블록 자체보다 높게 둬서 phase 헤더 띠에 가려지지
+          카드 배경과 구별된다. zIndex를 노드 자체보다 높게 둬서 phase 헤더 띠에 가려지지
           않는다. */}
       {!edit && isSel && (
         <Box
@@ -115,7 +115,7 @@ export function BlockNode({
           title="Open details"
           aria-label={`Open ${d.name}`}
           sx={{
-            // 버튼 전체를 20% 키웠다(사용자 요청) — 커진 높이만큼 block 위 여백도 다시 맞춘다.
+            // 버튼 전체를 20% 키웠다(사용자 요청) — 커진 높이만큼 node 위 여백도 다시 맞춘다.
             position: 'absolute', top: 0, left: '50%',
             transform: 'translate(-50%, -46px)', zIndex: 15,
             display: 'inline-flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap',

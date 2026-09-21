@@ -3,7 +3,7 @@ import { Box } from '@mui/material';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
-  AccessGrant, ArtifactHtmlView, ArtifactVersionDto, BlockDto, ProjectDetailDto, ReleaseDto, WorkflowPhase,
+  AccessGrant, ArtifactHtmlView, ArtifactVersionDto, NodeDto, ProjectDetailDto, ReleaseDto, WorkflowPhase,
   isMaskedArtifact,
 } from '@/types/domain';
 import { SlidePanel } from '@/components/common/SlidePanel';
@@ -13,7 +13,7 @@ import { TabPanel, Tabs } from '@/components/common/Tabs';
 import { Icon, IconName } from '@/components/common/Icon';
 import { UserAvatar } from '@/components/common/Avatar';
 import { useDirectory } from '@/app/providers/DirectoryProvider';
-import { NewArtifactSourceInput, useHtmlView, useLiveVersions } from '@/api/hooks/useBlocks';
+import { NewArtifactSourceInput, useHtmlView, useLiveVersions } from '@/api/hooks/useNodes';
 import { useComments, useCreateComment } from '@/api/hooks/useComments';
 import { CommentDto } from '@/types/domain';
 import { AccessGrantEditor } from '@/components/dialogs/AccessGrantEditor';
@@ -85,7 +85,7 @@ function EmptyState({
 }
 
 interface Props {
-  block: BlockDto | null;
+  node: NodeDto | null;
   /** 이 workflow의 Edit 권한 — recipient를 편집할 수 있는지의 기준이다. */
   own: boolean;
   project?: ProjectDetailDto;
@@ -97,11 +97,11 @@ interface Props {
   onClose: () => void;
   /** 처음 열릴 탭 — 지정 없으면 Overview(예: Release 이력 페이지의 Comments 칸에서 바로 열 때 씀). */
   initialTab?: Tab;
-  /** block에 붙은 recipient를 교체한다 — A/B/C 전부 공통이다. */
+  /** node에 붙은 recipient를 교체한다 — A/B/C 전부 공통이다. */
   onSaveRecipients: (p: AccessGrant) => void;
   saving?: boolean;
   onDelete?: () => void;
-  /** 산출물 매핑/재매핑(설계서 04장 §6) — Block과 Artifact가 분리돼 있어 언제든 바꿀 수 있다. */
+  /** 산출물 매핑/재매핑(설계서 04장 §6) — WorkflowNode와 Artifact가 분리돼 있어 언제든 바꿀 수 있다. */
   onChangeArtifact?: (newArtifact: NewArtifactSourceInput) => void;
   changingArtifact?: boolean;
   /** 이 workflow의 release 이력 — 버전 트리 위 release 마커(설계서 05장 §7.3)에 쓴다. */
@@ -123,7 +123,7 @@ interface Props {
  *   (설계서 04장 §4.3). 전자는 패널이 잠긴 상태, 후자는 열린 패널 안의 빈 목록이다.
  */
 export function ArtifactSlide({
-  block, own, project, myDepartments, phases, onClose, initialTab, onSaveRecipients, saving, onDelete,
+  node, own, project, myDepartments, phases, onClose, initialTab, onSaveRecipients, saving, onDelete,
   onChangeArtifact, changingArtifact, releases, onOpenRelease,
 }: Props) {
   const { t } = useTranslation();
@@ -137,9 +137,9 @@ export function ArtifactSlide({
   /* ── A Tier 라이브 버전 조회 (설계서 04장 §19.5/§19.6 복원) ──
      Calypso 제외 Hub 등록 서비스에 연동된 A Tier만 대상이다 — 이런 산출물의
      `artifact.versions`(캔버스 목록에 실려 온 값)는 매핑 당시 스냅샷일 뿐이라 믿을 수
-     없다. block이 아직 없거나(early return 전) masked/미매핑이어도 훅은 早期 return 전에
+     없다. node가 아직 없거나(early return 전) masked/미매핑이어도 훅은 早期 return 전에
      불러야 하므로(Hooks 규칙) 안전하게 optional chaining으로 판정한다. */
-  const artifactForHook = block?.artifact;
+  const artifactForHook = node?.artifact;
   const safeArtifactForHook = artifactForHook && !isMaskedArtifact(artifactForHook) ? artifactForHook : null;
   const isHubLive =
     !!safeArtifactForHook &&
@@ -147,7 +147,7 @@ export function ArtifactSlide({
     !!safeArtifactForHook.serviceKey &&
     safeArtifactForHook.serviceKey !== 'calypso' &&
     !!safeArtifactForHook.externalArtifactId;
-  const live = useLiveVersions(block?.workflowId, block?.id, isHubLive);
+  const live = useLiveVersions(node?.workflowId, node?.id, isHubLive);
 
   /* ── html preview (설계서 04장 §19 확장) ──
      latest(또는 사용자가 고른) 버전에 hasHtmlView가 있을 때만 켠다 — 이것도 Hooks 규칙 때문에
@@ -155,16 +155,16 @@ export function ArtifactSlide({
   const versionsForHtmlHook = isHubLive ? (live.data ?? []) : (safeArtifactForHook?.versions ?? []);
   const requestedVersionLabel = selectedVersionLabel ?? versionsForHtmlHook[0]?.versionLabel;
   const requestedVersion = versionsForHtmlHook.find((v) => v.versionLabel === requestedVersionLabel);
-  const htmlView = useHtmlView(block?.workflowId, block?.id, requestedVersionLabel, !!requestedVersion?.hasHtmlView);
+  const htmlView = useHtmlView(node?.workflowId, node?.id, requestedVersionLabel, !!requestedVersion?.hasHtmlView);
 
   /** 탭 배지 숫자용 — CommentsTab이 같은 queryKey로 다시 불러도 캐시를 재사용할 뿐 추가
    * 네트워크 요청은 없다. own이 아니면 Comments 탭 자체가 없으니 아예 물어보지 않는다
    * (설계서 01장 §3.8 확장) — 안 그러면 view 권한자 화면에서 이 훅이 403을 받는다. */
-  const comments = useComments(block?.workflowId, block?.id, own);
+  const comments = useComments(node?.workflowId, node?.id, own);
   
   useEffect(() => {
     setSelectedVersionLabel(undefined);
-  }, [block?.id]);
+  }, [node?.id]);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -172,14 +172,14 @@ export function ArtifactSlide({
     // (설계서 01장 §3.8 확장) — deep-link(예: 목록의 Comments 칸)로 그 탭을 요청받아도
     // own이 아니면 Overview로 접는다.
     setTab(initialTab && (own || initialTab === 'overview') ? initialTab : 'overview');
-  }, [block?.id]);
+  }, [node?.id]);
 
-  if (!block) return null;
-  const artifact = block.artifact;
+  if (!node) return null;
+  const artifact = node.artifact;
 
   /* ── 열람 차단 ──
      서버가 권한을 판정해 masked로 내려보냈다는 뜻이다 — A/B/C 전부 그 서비스에서
-     canView/canEdit이 없는 것이다(설계서 01장 §4.2 갱신, block.recipients는 더 이상
+     canView/canEdit이 없는 것이다(설계서 01장 §4.2 갱신, node.recipients는 더 이상
      이 판정에 관여하지 않는다). */
   if (isMaskedArtifact(artifact)) {
     return (
@@ -197,11 +197,11 @@ export function ArtifactSlide({
   /* ── 출처 미지정 ── 자리는 있으나 아직 아무것도 안 걸린 정상 빈 상태다. */
   if (!artifact) {
     return (
-      <SlidePanel open onClose={onClose} width="560px" header={<SlideHeader name={block.name} />}>
+      <SlidePanel open onClose={onClose} width="560px" header={<SlideHeader name={node.name} />}>
         <EmptyState
           icon="unlinked"
           title="No source yet"
-          body="This block holds a place on the canvas. Map it to an artifact to start tracking versions."
+          body="This node holds a place on the canvas. Map it to an artifact to start tracking versions."
         />
         {own && onChangeArtifact && (
           <Box sx={{ display: 'flex', justifyContent: 'center', mt: '-16px' }}>
@@ -212,7 +212,7 @@ export function ArtifactSlide({
         )}
         {changeOpen && onChangeArtifact && (
           <ChangeArtifactDialog
-            block={block}
+            node={node}
             projectId={project?._id}
             projectCode={project?.code}
             projectRevision={project?.revision}
@@ -285,7 +285,7 @@ export function ArtifactSlide({
 
       {changeOpen && onChangeArtifact && (
         <ChangeArtifactDialog
-          block={block}
+          node={node}
           projectId={project?._id}
           projectCode={project?.code}
           projectRevision={project?.revision}
@@ -320,7 +320,7 @@ export function ArtifactSlide({
       {/* ── 탭 ──
           Recipients/Comments는 이 workflow의 Edit Access(own)가 있는 사람에게만 보인다
           (사용자 결정, 설계서 01장 §3.8 확장) — artifact 자체의 view/edit 권한이나
-          block.recipients 소속과 무관하다. 탭 자체를 아예 목록에서 뺀다 — 읽기 전용으로
+          node.recipients 소속과 무관하다. 탭 자체를 아예 목록에서 뺀다 — 읽기 전용으로
           보여주던 예전 동작(view 권한자에게 recipient를 읽기 전용 노출)은 폐지했다. */}
       <Tabs
         tabs={[
@@ -340,7 +340,7 @@ export function ArtifactSlide({
       <TabPanel tabKey={tab}>
         {tab === 'overview' && (
           <OverviewTab
-            block={block}
+            node={node}
             phases={phases ?? []}
             versions={effectiveVersions}
             isCalypsoB={isCalypsoB}
@@ -351,7 +351,7 @@ export function ArtifactSlide({
             onSelectVersion={(v) => setSelectedVersionLabel(v.versionLabel)}
             calypsoArtifactId={artifact.serviceKey === 'calypso' ? artifact.externalArtifactId : null}
             projectId={project?._id}
-            blockId={block.id}
+            nodeId={node.id}
             releases={releases ?? []}
             onOpenRelease={onOpenRelease}
             isLive={isHubLive}
@@ -361,7 +361,7 @@ export function ArtifactSlide({
 
         {tab === 'recipients' && (
           <RecipientsTab
-            block={block}
+            node={node}
             canEdit={canEditRecipients}
             departmentOptions={project?.departments ?? []}
             onSaveRecipients={onSaveRecipients}
@@ -369,7 +369,7 @@ export function ArtifactSlide({
           />
         )}
 
-        {tab === 'comments' && <CommentsTab block={block} versions={effectiveVersions} />}
+        {tab === 'comments' && <CommentsTab node={node} versions={effectiveVersions} />}
       </TabPanel>
     </SlidePanel>
   );
@@ -387,10 +387,10 @@ export function ArtifactSlide({
  *   (라이브 조회 대상이 아니다) 늘 비어 있고, 실제 파일·버전은 Calypso 쪽에 있다.
  */
 function OverviewTab({
-  block, phases, versions, isCalypsoB, showHtmlPanel, htmlViewData, htmlViewLoading,
-  selectedVersionLabel, onSelectVersion, calypsoArtifactId, projectId, blockId, releases, onOpenRelease, isLive, liveLoading,
+  node, phases, versions, isCalypsoB, showHtmlPanel, htmlViewData, htmlViewLoading,
+  selectedVersionLabel, onSelectVersion, calypsoArtifactId, projectId, nodeId, releases, onOpenRelease, isLive, liveLoading,
 }: {
-  block: BlockDto;
+  node: NodeDto;
   phases: WorkflowPhase[];
   versions: ArtifactVersionDto[];
   isCalypsoB: boolean;
@@ -406,7 +406,7 @@ function OverviewTab({
   calypsoArtifactId: string | null;
   /** SIREN project id — Calypso 프록시가 department를 계산하는 데 필요하다(설계서 07장 §2). */
   projectId: string | undefined;
-  blockId: string;
+  nodeId: string;
   releases: ReleaseDto[];
   onOpenRelease?: (releaseId: string) => void;
   /** Calypso 제외 Hub 등록 서비스에 연동된 A Tier — 이 목록이 그 서비스에 방금 물어본
@@ -414,8 +414,8 @@ function OverviewTab({
   isLive?: boolean;
   liveLoading?: boolean;
 }) {
-  const phase = phases.find((p) => p.id === block.phaseId);
-  const orphan = isOrphanPhase(phases, block.phaseId);
+  const phase = phases.find((p) => p.id === node.phaseId);
+  const orphan = isOrphanPhase(phases, node.phaseId);
 
   return (
     <>
@@ -425,7 +425,7 @@ function OverviewTab({
         <CalypsoInlinePanel
           artifactId={calypsoArtifactId}
           projectId={projectId}
-          blockId={blockId}
+          nodeId={nodeId}
           releases={releases}
           onOpenRelease={onOpenRelease}
         />
@@ -442,7 +442,7 @@ function OverviewTab({
               versions={versions}
               calypsoArtifactId={calypsoArtifactId}
               projectId={projectId}
-              blockId={blockId}
+              nodeId={nodeId}
               releases={releases}
               onOpenRelease={onOpenRelease}
               isLive={isLive}
@@ -457,7 +457,7 @@ function OverviewTab({
           versions={versions}
           calypsoArtifactId={calypsoArtifactId}
           projectId={projectId}
-          blockId={blockId}
+          nodeId={nodeId}
           releases={releases}
           onOpenRelease={onOpenRelease}
           isLive={isLive}
@@ -469,7 +469,7 @@ function OverviewTab({
 }
 
 /** Phase 카드 — 개편 전 산출물 상세 머리에 있던 "이 산출물이 어느 phase에 있는지"를
- * Overview 본문으로 옮겨 복원한다. 지금 모델에서 block은 phase 하나에만 걸린다. */
+ * Overview 본문으로 옮겨 복원한다. 지금 모델에서 node는 phase 하나에만 걸린다. */
 function PhaseCard({ phase, orphan }: { phase: WorkflowPhase | undefined; orphan: boolean }) {
   return (
     <Card sx={{ mb: '12px' }}>
@@ -506,13 +506,13 @@ function PhaseCard({ phase, orphan }: { phase: WorkflowPhase | undefined; orphan
  * 지금 그대로 유지한다(사용자 요청).
  */
 function VersionList({
-  versions, calypsoArtifactId, projectId, blockId, releases, onOpenRelease, isLive, liveLoading,
+  versions, calypsoArtifactId, projectId, nodeId, releases, onOpenRelease, isLive, liveLoading,
   selectedVersionLabel, onSelectVersion,
 }: {
   versions: ArtifactVersionDto[];
   calypsoArtifactId: string | null;
   projectId: string | undefined;
-  blockId: string;
+  nodeId: string;
   releases: ReleaseDto[];
   onOpenRelease?: (releaseId: string) => void;
   isLive?: boolean;
@@ -526,7 +526,7 @@ function VersionList({
   const { t } = useTranslation();
   const { resolveUser } = useDirectory();
 
-  const releasesByVersion = useMemo(() => releaseBadgeMap(releases, blockId), [releases, blockId]);
+  const releasesByVersion = useMemo(() => releaseBadgeMap(releases, nodeId), [releases, nodeId]);
 
   if (liveLoading) {
     return (
@@ -675,7 +675,7 @@ function VersionList({
 /**
  * 수신 대상 (설계서 04장 §5).
  *
- * ★ **A/B/C 전부 공통** — recipient는 그 workflow의 block에 붙는다. 같은 artifact라도
+ * ★ **A/B/C 전부 공통** — recipient는 그 workflow의 node에 붙는다. 같은 artifact라도
  *   workflow마다 다를 수 있기 때문이다(같은 artifact가 workflow X·Y 양쪽에 있어도 서로
  *   다른 recipient를 가질 수 있다). 이 목록은 **release 알림 대상**일 뿐, slide를 열 수
  *   있는지와는 무관하다(정책 변경, 01장 §4.2) — recipient는 더 이상 edit/view로 나뉘지도
@@ -685,9 +685,9 @@ function VersionList({
  *   안에서는 `canEdit`가 사실상 항상 `own`(=true)이다.
  */
 function RecipientsTab({
-  block, canEdit, departmentOptions, onSaveRecipients, saving,
+  node, canEdit, departmentOptions, onSaveRecipients, saving,
 }: {
-  block: BlockDto;
+  node: NodeDto;
   canEdit: boolean;
   departmentOptions: string[];
   onSaveRecipients: Props['onSaveRecipients'];
@@ -695,7 +695,7 @@ function RecipientsTab({
 }) {
   const { t } = useTranslation();
 
-  const initial = block.recipients ?? { departments: [], users: [] };
+  const initial = node.recipients ?? { departments: [], users: [] };
   const [recipients, setRecipients] = useState<AccessGrant>(initial);
 
   const dirty = useMemo(
@@ -752,10 +752,10 @@ function RecipientsTab({
  * 댓글 — Artifact 전체 또는 특정 버전에 대해 남긴다. Recipients/Access와 달리 BoardPage까지
  * 상태를 올릴 필요가 없는 독립 기능이라 여기서 직접 훅을 호출하고 toast도 바로 처리한다.
  */
-function CommentsTab({ block, versions }: { block: BlockDto; versions: ArtifactVersionDto[] }) {
+function CommentsTab({ node, versions }: { node: NodeDto; versions: ArtifactVersionDto[] }) {
   const { resolveUser } = useDirectory();
-  const comments = useComments(block.workflowId, block.id);
-  const create = useCreateComment(block.workflowId, block.id);
+  const comments = useComments(node.workflowId, node.id);
+  const create = useCreateComment(node.workflowId, node.id);
 
   const [text, setText] = useState('');
   const [versionId, setVersionId] = useState('');
@@ -775,7 +775,7 @@ function CommentsTab({ block, versions }: { block: BlockDto; versions: ArtifactV
   // 후보가 있으면 기본으로 최신 버전(0번)을 골라 둔다.
   useEffect(() => {
     setVersionId(versionOptions[0]?.value ?? '');
-  }, [block.id, versionOptions]);
+  }, [node.id, versionOptions]);
 
   const submit = () => {
     const body = text.trim();

@@ -30,8 +30,8 @@ export function useUpdateWorkflow(workflowId: string) {
     onSuccess: (workflow) => {
       qc.setQueryData(queryKeys.workflow(workflowId), workflow);
       qc.invalidateQueries({ queryKey: queryKeys.projectWorkflows(workflow.projectId) });
-      // 부서가 바뀌면 각 블록의 권한 판정 결과도 달라질 수 있다.
-      qc.invalidateQueries({ queryKey: queryKeys.blocks(workflowId) });
+      // 부서가 바뀌면 각 노드의 권한 판정 결과도 달라질 수 있다.
+      qc.invalidateQueries({ queryKey: queryKeys.nodes(workflowId) });
     },
   });
 }
@@ -53,7 +53,7 @@ export function useReplaceWorkflowAccess(workflowId: string) {
     onSuccess: (workflow) => {
       qc.setQueryData(queryKeys.workflow(workflowId), workflow);
       qc.invalidateQueries({ queryKey: queryKeys.projectWorkflows(workflow.projectId) });
-      qc.invalidateQueries({ queryKey: queryKeys.blocks(workflowId) });
+      qc.invalidateQueries({ queryKey: queryKeys.nodes(workflowId) });
     },
   });
 }
@@ -62,8 +62,8 @@ export function useReplaceWorkflowAccess(workflowId: string) {
  * 이 workflow만의 일정을 통째로 교체한다 — 추가/삭제/개명/재일정, 서로 겹치는 일정까지
  * 전부 허용된다. id를 비워 보내면 새 phase, 보내지 않은 기존 id는 삭제다.
  *
- * ★ 지워진 phase를 가리키던 블록은 서버가 건드리지 않는다(옮기지도, 지우지도 않는다).
- *   그 블록은 캔버스의 원래 좌표에 남아 "일정 유실"로 표시되므로, 여기서 blocks 쿼리도
+ * ★ 지워진 phase를 가리키던 노드는 서버가 건드리지 않는다(옮기지도, 지우지도 않는다).
+ *   그 노드는 캔버스의 원래 좌표에 남아 "일정 유실"로 표시되므로, 여기서 nodes 쿼리도
  *   함께 무효화해 캔버스가 곧바로 그 상태를 다시 그리게 한다.
  * ★ 이 요청은 canvasLock과 무관하다 — 누가 캔버스를 편집 중이어도 일정은 바뀔 수 있다.
  */
@@ -76,7 +76,7 @@ export function useUpdateWorkflowPhases(workflowId: string) {
     },
     onSuccess: (workflow) => {
       qc.setQueryData(queryKeys.workflow(workflowId), workflow);
-      qc.invalidateQueries({ queryKey: queryKeys.blocks(workflowId) });
+      qc.invalidateQueries({ queryKey: queryKeys.nodes(workflowId) });
     },
   });
 }

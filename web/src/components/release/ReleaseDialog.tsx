@@ -11,7 +11,7 @@ import { ConfirmDialog } from '@/components/dialogs/ConfirmDialog';
 import { canonicalDepartmentLabel } from '@/shared/constants/departments';
 import { CURSOR_POINTER, FONT_MONO, R, T, TNUM } from '@/theme/tokens';
 
-/** blockId → (sourceBlockId → versionRef | null) */
+/** nodeId → (sourceNodeId → versionRef | null) */
 type SourceSelection = Record<string, Record<string, string | null>>;
 
 interface Props {
@@ -57,10 +57,10 @@ export function ReleaseDialog({ workflowName, preview, loading, saving, onClose,
     [items, deptTab],
   );
 
-  const pick = (blockId: string, sourceBlockId: string, versionRef: string | null) =>
+  const pick = (nodeId: string, sourceNodeId: string, versionRef: string | null) =>
     setSelection((prev) => ({
       ...prev,
-      [blockId]: { ...(prev[blockId] ?? {}), [sourceBlockId]: versionRef },
+      [nodeId]: { ...(prev[nodeId] ?? {}), [sourceNodeId]: versionRef },
     }));
 
   const submit = () => {
@@ -93,7 +93,7 @@ export function ReleaseDialog({ workflowName, preview, loading, saving, onClose,
         <Box sx={{ padding: '40px 16px', textAlign: 'center', color: T.dm }}>
           <Box sx={{ fontSize: 13.5, fontWeight: 600, color: T.tx, mb: '4px' }}>Nothing to release</Box>
           <Box sx={{ fontSize: 12, color: T.dm2, lineHeight: 1.6 }}>
-            No block on this canvas has an artifact mapped yet.
+            No node on this canvas has an artifact mapped yet.
           </Box>
         </Box>
       ) : (
@@ -161,10 +161,10 @@ export function ReleaseDialog({ workflowName, preview, loading, saving, onClose,
             ) : (
               visibleItems.map((item) => (
                 <ReleaseRow
-                  key={item.blockId}
+                  key={item.nodeId}
                   item={item}
-                  selection={selection[item.blockId] ?? {}}
-                  onPick={(sourceBlockId, ref) => pick(item.blockId, sourceBlockId, ref)}
+                  selection={selection[item.nodeId] ?? {}}
+                  onPick={(sourceNodeId, ref) => pick(item.nodeId, sourceNodeId, ref)}
                 />
               ))
             )}
@@ -224,7 +224,7 @@ function ReleaseRow({
 }: {
   item: ReleasePreviewItemDto;
   selection: Record<string, string | null>;
-  onPick: (sourceBlockId: string, versionRef: string | null) => void;
+  onPick: (sourceNodeId: string, versionRef: string | null) => void;
 }) {
   const { t } = useTranslation();
 
@@ -281,11 +281,11 @@ function ReleaseRow({
         <Box sx={{ mt: '8px', pt: '8px', borderTop: `1px dashed ${T.ln}` }}>
           {item.changed ? (
             item.sources.map((s) => {
-              const current = selection[s.blockId] !== undefined
-                ? selection[s.blockId]
+              const current = selection[s.nodeId] !== undefined
+                ? selection[s.nodeId]
                 : (s.selected?.versionRef ?? null);
               return (
-                <Box key={s.blockId} sx={{ display: 'flex', alignItems: 'center', gap: '8px', mb: '5px' }}>
+                <Box key={s.nodeId} sx={{ display: 'flex', alignItems: 'center', gap: '8px', mb: '5px' }}>
                   <Box sx={{ fontSize: 11, color: T.dm2, minWidth: 44 }}>FROM</Box>
                   <Box sx={{ fontSize: 11.5, color: T.tx2, flex: 1, minWidth: 0 }}>{s.artifactName}</Box>
                   {s.candidates.length ? (
@@ -293,7 +293,7 @@ function ReleaseRow({
                       component="select"
                       value={current ?? ''}
                       onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-                        onPick(s.blockId, e.target.value || null)
+                        onPick(s.nodeId, e.target.value || null)
                       }
                       sx={{
                         fontFamily: FONT_MONO, fontSize: 11.5, padding: '3px 7px',

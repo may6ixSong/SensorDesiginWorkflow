@@ -69,7 +69,7 @@ export function VersionEventDialog({ event, onClose }: { event: VersionEventDto;
           <Ey sx={{ mb: '6px' }}>Placed in</Ey>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
             {event.placements.map((p) => (
-              <Box key={p.blockId} sx={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 11.5 }}>
+              <Box key={p.nodeId} sx={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 11.5 }}>
                 <Box sx={{ fontWeight: 600 }}>{p.workflowName}</Box>
                 <Box sx={{ fontSize: 10.5, color: T.dm2 }}>{canonicalDepartmentLabel(p.department)}</Box>
               </Box>

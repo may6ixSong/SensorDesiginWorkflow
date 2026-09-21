@@ -67,7 +67,7 @@ export function Tabs<K extends string>({
               <Box
                 component={motion.div}
                 layoutId="siren-tab-underline"
-                transition={m(MOTION.block)}
+                transition={m(MOTION.node)}
                 sx={{
                   position: 'absolute', left: 0, right: 0, bottom: 0,
                   height: '2px', background: T.pr, borderRadius: '2px 2px 0 0',

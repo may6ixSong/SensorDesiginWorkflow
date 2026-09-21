@@ -24,7 +24,7 @@ interface Props {
 /**
  * 권한 한 벌(부서 다중 + 개별 사용자 다중) 편집기.
  *
- * workflow의 Edit/View Access, artifact(B/C/D)의 Edit/View Access, A Tier block의
+ * workflow의 Edit/View Access, artifact(B/C/D)의 Edit/View Access, A Tier node의
  * recipient가 전부 같은 모양이라 하나로 만들어 재사용한다(설계서 01장 §3.3, §4.3).
  *
  * ★ **부서는 어디서든 여러 개** 넣을 수 있다.

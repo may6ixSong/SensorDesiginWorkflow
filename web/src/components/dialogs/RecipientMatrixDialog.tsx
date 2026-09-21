@@ -2,8 +2,8 @@ import { useMemo, useState } from 'react';
 import { Box, Tooltip } from '@mui/material';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
-import { BlockDto, WorkflowPhase } from '@/types/domain';
-import { useReplaceBlockRecipients } from '@/api/hooks/useBlocks';
+import { NodeDto, WorkflowPhase } from '@/types/domain';
+import { useReplaceNodeRecipients } from '@/api/hooks/useNodes';
 import { sortSchedule } from '@/lib/schedule';
 import { ModalShell } from '@/components/common/ModalShell';
 import { ConfirmDialog } from '@/components/dialogs/ConfirmDialog';
@@ -24,7 +24,7 @@ const PHASE_BORDER = `2px solid ${T.ln2}`;
 
 interface Props {
   workflowId: string;
-  blocks: BlockDto[];
+  nodes: NodeDto[];
   phases: WorkflowPhase[];
   /** 그 과제에 등록된 부서(Project.departments) — 열이 된다. */
   departmentOptions: string[];
@@ -32,7 +32,7 @@ interface Props {
 }
 
 interface PendingToggle {
-  block: BlockDto;
+  node: NodeDto;
   dept: string;
   adding: boolean;
 }
@@ -53,19 +53,19 @@ interface PhaseGroup {
  *   병합한다(사용자 요청 — 예전에 artifact가 열이었을 때 phase group header를
  *   colSpan으로 묶던 것과 대칭이다). 그 phase 그룹의 경계는 기본 grid 선보다 한 단계
  *   더 진한 border(PHASE_BORDER)로 표시한다(사용자 요청).
- * ★ 셀 하나하나가 그 block의 recipient(AccessGrant.departments) 토글 스위치다. 클릭은
+ * ★ 셀 하나하나가 그 node의 recipient(AccessGrant.departments) 토글 스위치다. 클릭은
  *   바로 반영되지 않고 항상 confirm을 거친다 — 실수로 전달 대상을 바꾸면 알림이 엉뚱한
  *   부서로 나가기 때문이다.
- * ★ replaceRecipients는 **완전 교체**라(부분 병합 아님, blocks.service.ts
+ * ★ replaceRecipients는 **완전 교체**라(부분 병합 아님, nodes.service.ts
  *   replaceRecipients) departments만 바꿀 때도 기존 users는 그대로 실어 보내야 한다.
  * ★ hover 효과는 그 셀 하나로 국한한다(사용자 요청) — 행/열 전체로 번지는 밴드 강조는
  *   쓰지 않는다. 그래서 hover 상태는 JS로 추적하지 않고 각 셀의 `&:hover` CSS만으로
  *   처리한다.
  */
-export function RecipientMatrixDialog({ workflowId, blocks, phases, departmentOptions, onClose }: Props) {
+export function RecipientMatrixDialog({ workflowId, nodes, phases, departmentOptions, onClose }: Props) {
   const { t } = useTranslation();
   const m = useMotion();
-  const replaceRecipients = useReplaceBlockRecipients(workflowId);
+  const replaceRecipients = useReplaceNodeRecipients(workflowId);
 
   const [pending, setPending] = useState<PendingToggle | null>(null);
 
@@ -75,15 +75,15 @@ export function RecipientMatrixDialog({ workflowId, blocks, phases, departmentOp
   /** 내가 주는 artifact만 — phase 순서 → 이름 순으로 정렬해 행을 만든다. */
   const rows = useMemo(() => {
     const phaseIdx = new Map(orderedPhases.map((p, i) => [p.id, i]));
-    return blocks
-      .filter((b) => b.intent === 'own')
+    return nodes
+      .filter((n) => n.intent === 'own')
       .sort((a, b) => {
         const pa = phaseIdx.get(a.phaseId) ?? orderedPhases.length;
         const pb = phaseIdx.get(b.phaseId) ?? orderedPhases.length;
         if (pa !== pb) return pa - pb;
         return a.name.localeCompare(b.name);
       });
-  }, [blocks, orderedPhases]);
+  }, [nodes, orderedPhases]);
 
   /**
    * 행 인덱스별 phase 병합 정보 — 그 그룹의 첫 행이면 {name, span}, 아니면 null(그
@@ -109,19 +109,19 @@ export function RecipientMatrixDialog({ workflowId, blocks, phases, departmentOp
   const isPhaseBoundary = (rowIdx: number) =>
     rowIdx === rows.length - 1 || rows[rowIdx + 1].phaseId !== rows[rowIdx].phaseId;
 
-  const handleCellClick = (block: BlockDto, dept: string) => {
-    if (!block.artifactId || replaceRecipients.isPending) return;
-    const has = block.recipients?.departments.includes(dept) ?? false;
-    setPending({ block, dept, adding: !has });
+  const handleCellClick = (node: NodeDto, dept: string) => {
+    if (!node.artifactId || replaceRecipients.isPending) return;
+    const has = node.recipients?.departments.includes(dept) ?? false;
+    setPending({ node, dept, adding: !has });
   };
 
   const confirmToggle = () => {
     if (!pending) return;
-    const { block, dept, adding } = pending;
-    const currentDepts = block.recipients?.departments ?? [];
+    const { node, dept, adding } = pending;
+    const currentDepts = node.recipients?.departments ?? [];
     const nextDepts = adding ? [...currentDepts, dept] : currentDepts.filter((d) => d !== dept);
     replaceRecipients.mutate(
-      { blockId: block.id, departments: nextDepts, users: block.recipients?.users ?? [] },
+      { nodeId: node.id, departments: nextDepts, users: node.recipients?.users ?? [] },
       {
         onSuccess: () => {
           toast(adding ? t('recipientMatrix.addedToast') : t('recipientMatrix.removedToast'));
@@ -152,7 +152,7 @@ export function RecipientMatrixDialog({ workflowId, blocks, phases, departmentOp
         }
       >
         {rows.length === 0 ? (
-          <EmptyState text={t('recipientMatrix.emptyBlocks')} />
+          <EmptyState text={t('recipientMatrix.emptyNodes')} />
         ) : departmentOptions.length === 0 ? (
           <EmptyState text={t('recipientMatrix.emptyDepartments')} />
         ) : (
@@ -330,7 +330,7 @@ export function RecipientMatrixDialog({ workflowId, blocks, phases, departmentOp
           title={t(pending.adding ? 'recipientMatrix.addTitle' : 'recipientMatrix.removeTitle')}
           message={t(pending.adding ? 'recipientMatrix.addMessage' : 'recipientMatrix.removeMessage', {
             dept: pending.dept,
-            artifact: pending.block.name,
+            artifact: pending.node.name,
           })}
           confirmLabel={t(pending.adding ? 'recipientMatrix.add' : 'recipientMatrix.remove')}
           cancelLabel={t('recipientMatrix.cancel')}
@@ -361,7 +361,7 @@ function EmptyState({ text }: { text: string }) {
  * **tile 전체**가 위로 떠오르며(translateY + scale) 진짜 카드 그림자(T.shLg)를 얻는다 —
  * 표식 원(rmPop)만 커지는 게 아니라 그 밑 배경 자체가 입체적으로 튀어나오는 느낌을
  * 주기 위해서다(사용자 요청). 표식 자체는 그 tile 안에서 체크↔X(또는 ＋)로 한 번 더
- * 크로스페이드된다. block의 recipient 여부(active)가 실제로 바뀔 때만 AnimatePresence로
+ * 크로스페이드된다. node의 recipient 여부(active)가 실제로 바뀔 때만 AnimatePresence로
  * 원 자체가 등장/소멸한다.
  */
 function MatrixCell({

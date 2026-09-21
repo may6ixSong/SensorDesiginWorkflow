@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient, ApiEnvelope } from '../client';
 import { queryKeys } from '../queryKeys';
-import { BlockDto, EdgeDto, MemoDto } from '@/types/domain';
+import { NodeDto, EdgeDto, MemoDto } from '@/types/domain';
 
 interface Layout {
   x: number;
@@ -11,7 +11,7 @@ interface Layout {
 }
 
 export interface PutCanvasPayload {
-  blocks: { id: string; layout: Layout; phaseId: string }[];
+  nodes: { id: string; layout: Layout; phaseId: string }[];
   memos: { phaseId: string; text: string; color: string; layout: Layout }[];
   edges: { fromId: string; toId: string; bidirectional: boolean; auto: boolean }[];
   /** 레인 폭을 조절했을 때만 보낸다 — 생략하면 기존 저장값이 유지된다. */
@@ -19,7 +19,7 @@ export interface PutCanvasPayload {
 }
 
 export interface PutCanvasResult {
-  blocks: BlockDto[];
+  nodes: NodeDto[];
   memos: MemoDto[];
   edges: EdgeDto[];
 }
@@ -42,7 +42,7 @@ export function usePutCanvas(workflowId: string) {
       return res.data.data;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.blocks(workflowId) });
+      qc.invalidateQueries({ queryKey: queryKeys.nodes(workflowId) });
       qc.invalidateQueries({ queryKey: queryKeys.memos(workflowId) });
       qc.invalidateQueries({ queryKey: queryKeys.edges(workflowId) });
       qc.invalidateQueries({ queryKey: queryKeys.workflow(workflowId) });

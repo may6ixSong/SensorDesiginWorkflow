@@ -56,7 +56,7 @@ interface CanvasState {
    */
   workflowSettingsTab: WorkflowSettingsTab | null;
   /** Incoming 카드 클릭 시 선택된 산출물 id — 읽기 전용 상세 dialog에 쓰인다. */
-  /** 새로 추가된 블록 id — 설정되면 Canvas가 뷰포트를 그 블록으로 이동시키고 비운다. */
+  /** 새로 추가된 노드 id — 설정되면 Canvas가 뷰포트를 그 노드로 이동시키고 비운다. */
   focusReq: string | null;
   /**
    * origin==='incoming' 노드는 이 캔버스 소유가 아니라 서버에 위치를 저장할 곳이 없어
@@ -85,7 +85,7 @@ interface CanvasState {
   setMemos: (memos: CanvasMemo[]) => void;
   setEdges: (edges: CanvasEdge[]) => void;
   setPhasePW: (pw: Record<string, number>) => void;
-  bumpBlocks: () => void;
+  bumpNodes: () => void;
 
   enterEdit: () => void;
   exitEdit: () => void;
@@ -104,7 +104,7 @@ interface CanvasState {
   setWorkflowSettingsTab: (tab: WorkflowSettingsTab | null) => void;
   setFocusReq: (id: string | null) => void;
   setIncomingOverride: (id: string, x: number, y: number, phase: string) => void;
-  /** 블록 재렌더 트리거용 카운터 (드래그 커밋 후 등) */
+  /** 노드 재렌더 트리거용 카운터 (드래그 커밋 후 등) */
   rev: number;
 }
 
@@ -161,7 +161,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   setMemos: (memos) => set((s) => ({ memos, rev: s.rev + 1 })),
   setEdges: (edges) => set((s) => ({ edges, rev: s.rev + 1 })),
   setPhasePW: (phasePW) => set((s) => ({ phasePW, rev: s.rev + 1 })),
-  bumpBlocks: () => set((s) => ({ rev: s.rev + 1 })),
+  bumpNodes: () => set((s) => ({ rev: s.rev + 1 })),
 
   enterEdit: () => {
     const s = get();

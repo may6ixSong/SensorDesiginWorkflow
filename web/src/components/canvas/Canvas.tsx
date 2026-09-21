@@ -18,7 +18,7 @@ import { Icon } from '@/components/common/Icon';
 import { ConfirmDialog } from '@/components/dialogs/ConfirmDialog';
 import { PhaseStepper } from './PhaseStepper';
 import { EdgeLayer } from './EdgeLayer';
-import { BlockNode } from './BlockNode';
+import { NodeCard } from './NodeCard';
 import { MemoBlock } from './MemoBlock';
 import { Toolbox } from './Toolbox';
 import { Legend } from './Legend';
@@ -28,7 +28,7 @@ interface Props {
   phases: WorkflowPhase[];
   canEdit: boolean;
   /**
-   * 수신 부서 필터 — 선택된 부서가 recipient에 없는 블록을 흐리게 한다.
+   * 수신 부서 필터 — 선택된 부서가 recipient에 없는 노드를 흐리게 한다.
    * **숨기지 않는다**: flow 구조가 끊겨 보이면 안 되기 때문이다(설계서 03장 §6.1).
    * 비어 있으면 전체를 그대로 보여준다.
    */
@@ -56,7 +56,7 @@ export function Canvas({
 }: Props) {
   const { t } = useTranslation();
   /**
-   * 수신 부서 필터 — 걸린 블록은 흐려질 뿐 사라지지 않는다. 필터가 비어 있으면 아무것도
+   * 수신 부서 필터 — 걸린 노드는 흐려질 뿐 사라지지 않는다. 필터가 비어 있으면 아무것도
    * 흐리게 하지 않는다(설계서 03장 §6.1).
    */
   const isFilteredOut = useMemo(() => {
@@ -64,7 +64,7 @@ export function Canvas({
     if (!wanted.length) return () => false;
     return (n: CanvasNode) => !n.recipientDepartments.some((d) => wanted.includes(d));
   }, [recipientFilter]);
-  /** 블록 아이콘/LIVE 배지에 쓸 서비스별 tier(Hub 설계서 §5.1) — Hub 레지스트리 캐시를 그대로 쓴다. */
+  /** 노드 아이콘/LIVE 배지에 쓸 서비스별 tier(Hub 설계서 §5.1) — Hub 레지스트리 캐시를 그대로 쓴다. */
   const vpRef = useRef<HTMLDivElement>(null);
   const cvRef = useRef<HTMLDivElement>(null);
   const elRefs = useRef(new Map<string, HTMLDivElement>());
@@ -344,7 +344,7 @@ export function Canvas({
     if (freeMove) {
       b.x = snp(rawX);
       b.y = snp(rawY);
-      s.bumpBlocks();
+      s.bumpNodes();
       return;
     }
     D.accX += rawX - b.x;
@@ -356,7 +356,7 @@ export function Canvas({
     b.x = nx;
     b.y = ny;
     // 위치는 style prop으로 렌더되므로 상태만 갱신하면 블록과 엣지가 함께 따라온다.
-    s.bumpBlocks();
+    s.bumpNodes();
   };
 
   const onBlockPointerUp = (id: string) => (e: React.PointerEvent) => {
@@ -389,7 +389,7 @@ export function Canvas({
         } else {
           s.setIncomingOverride(id, b.x, b.y, b.phase);
         }
-        s.bumpBlocks();
+        s.bumpNodes();
         return;
       }
       // 메모는 Phase 사이 어디든 걸쳐 있어도 무방 — 놓인 위치의 레인으로 소속만 갱신한다.
@@ -403,7 +403,7 @@ export function Canvas({
           toast(`Moved to ${(phases.find((p) => p.id === np) || { name: '' }).name}`);
         }
       }
-      s.bumpBlocks();
+      s.bumpNodes();
       return;
     }
 
@@ -430,7 +430,7 @@ export function Canvas({
   };
 
   /* ── VIEW 모드 클릭 → 선택 + flow 하이라이트 (설계서 3.9) ── */
-  const onBlockClick = (id: string) => (e: React.MouseEvent) => {
+  const onNodeClick = (id: string) => (e: React.MouseEvent) => {
     e.stopPropagation();
     const s = st.getState();
     if (s.edit) return;
@@ -438,7 +438,7 @@ export function Canvas({
     else s.select(id, connectedSet(id, s.edges));
   };
 
-  /* ── 편집 모드 flow 클릭 → 그 flow와 양 끝 block을 먼저 highlight하고, 삭제는
+  /* ── 편집 모드 flow 클릭 → 그 flow와 양 끝 node를 먼저 highlight하고, 삭제는
      confirm을 거친 뒤에만 실제로 일어난다(사용자 요청 — 즉시 삭제되면 되돌릴 수 없다). ── */
   const [edgeToDelete, setEdgeToDelete] = useState<CanvasEdge | null>(null);
   const onEdgeClick = (e: CanvasEdge) => {
@@ -473,13 +473,13 @@ export function Canvas({
       if (nw === nb.w && nh === nb.h) return;
       nb.w = nw;
       nb.h = nh;
-      st.getState().bumpBlocks();
+      st.getState().bumpNodes();
     };
     const up = () => {
       gripRef.current = null;
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
-      st.getState().bumpBlocks();
+      st.getState().bumpNodes();
     };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
@@ -505,7 +505,7 @@ export function Canvas({
       phResizeRef.current = null;
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
-      st.getState().bumpBlocks();
+      st.getState().bumpNodes();
     };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
@@ -525,9 +525,9 @@ export function Canvas({
       s.enterEdit();
       return;
     }
-    // 블록의 Phase 메타데이터 확정 — 좌표는 건드리지 않는다(겹침 허용, 위 주석 참고).
+    // 노드의 Phase 메타데이터 확정 — 좌표는 건드리지 않는다(겹침 허용, 위 주석 참고).
     const { reassigned } = resolveNodePhases(s.nodes, phases, s.phasePW);
-    if (reassigned) s.bumpBlocks();
+    if (reassigned) s.bumpNodes();
     // 저장이 끝난 뒤에야 edit을 끈다 — 그 전에 끄면 disabled 쿼리가 재활성화되며
     // 아직 반영 안 된 서버 데이터로 로컬 편집 결과를 덮어써 버릴 수 있다.
     onSaveLayout(() => st.getState().exitEdit());
@@ -565,7 +565,7 @@ export function Canvas({
   const flashBnd = useCanvasStore((s) => s.flashBnd);
   /** 일정을 잃은 산출물 수 — 0보다 크면 캔버스 위에 눈에 띄는 배너를 띄운다. */
   // rev를 의존성에 넣는 이유: 드래그로 phase가 바뀌어도 nodes 배열 자체는 그대로라
-  // (in-place 수정) 이 값이 갱신되지 않는다. bumpBlocks()가 올리는 rev가 유일한 신호다.
+  // (in-place 수정) 이 값이 갱신되지 않는다. bumpNodes()가 올리는 rev가 유일한 신호다.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const orphanCount = useMemo(() => countOrphans(nodes, phases), [nodes, phases, rev]);
 
@@ -677,7 +677,7 @@ export function Canvas({
           ))}
 
           {nodes.map((d) => (
-            <BlockNode
+            <NodeCard
               key={d.id}
               d={d}
               phase={phases.find((p) => p.id === d.phase)}
@@ -697,7 +697,7 @@ export function Canvas({
               onPointerDown={onBlockPointerDown(d.id)}
               onPointerMove={onBlockPointerMove(d.id)}
               onPointerUp={onBlockPointerUp(d.id)}
-              onClick={onBlockClick(d.id)}
+              onClick={onNodeClick(d.id)}
             />
           ))}
         </Box>

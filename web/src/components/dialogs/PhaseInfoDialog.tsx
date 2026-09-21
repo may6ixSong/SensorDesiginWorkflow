@@ -25,7 +25,7 @@ export function PhaseInfoDialog({ workflowName, phase: p, nodes, onClose, onOpen
     past: { t: 'Done', c: T.dm, b: T.sf2, d: T.ln },
     current: { t: 'In progress', c: T.pr, b: T.prSoft, d: T.prLine },
   }[spanState(p)];
-  // publish까지 끝난 블록 수 — 캔버스와 같은 3상태 기준을 쓴다(설계서 03장 §2.2).
+  // publish까지 끝난 노드 수 — 캔버스와 같은 3상태 기준을 쓴다(설계서 03장 §2.2).
   const rel = ds.filter((d) => d.publishState === 'published').length;
 
   const stat = (label: string, value: string, color?: string) => (
@@ -60,7 +60,7 @@ export function PhaseInfoDialog({ workflowName, phase: p, nodes, onClose, onOpen
         {stat('Published', `${rel}/${ds.length}`, T.pr)}
       </Row>
       <Card>
-        <Ey sx={{ mb: "10px" }}>Blocks in this phase</Ey>
+        <Ey sx={{ mb: "10px" }}>Nodes in this phase</Ey>
         {ds.length ? (
           ds.map((d) => {
             const s = stOf(d);
@@ -86,7 +86,7 @@ export function PhaseInfoDialog({ workflowName, phase: p, nodes, onClose, onOpen
             );
           })
         ) : (
-          <Box sx={{ fontSize: 12.5, color: T.dm2 }}>No blocks</Box>
+          <Box sx={{ fontSize: 12.5, color: T.dm2 }}>No nodes</Box>
         )}
       </Card>
     </ModalShell>

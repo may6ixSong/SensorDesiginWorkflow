@@ -36,7 +36,7 @@ export function NetworkChip({ network, sx }: { network: 'OA' | 'HPC' | null | un
 }
 
 /**
- * 캔버스 block(BlockNode)의 OA/HPC 표식과 정확히 같은 모양·색이다(사용자 요청 — Release
+ * 캔버스 node(NodeCard)의 OA/HPC 표식과 정확히 같은 모양·색이다(사용자 요청 — Release
  * list/dialog의 tier 글자 배지를 이걸로 대체한다). NetworkChip과 달리 테두리가 없고
  * OA는 중립색(HPC만 강조색)인, 캔버스 특유의 수수한 표식이다 — 의도적으로 다른 컴포넌트다.
  */

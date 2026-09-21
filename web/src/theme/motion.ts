@@ -13,8 +13,8 @@ import type { Transition, Variants } from 'framer-motion';
 export const MOTION = {
   /** 다이얼로그·슬라이드 패널. 살짝 무겁게 잡아 "묵직하게 안착"하는 느낌을 준다. */
   panel: { type: 'spring', stiffness: 420, damping: 38, mass: 0.9 } as Transition,
-  /** 캔버스 블록의 layout 변화. 패널보다 가볍고 빠르다. */
-  block: { type: 'spring', stiffness: 520, damping: 42, mass: 0.8 } as Transition,
+  /** 캔버스 노드의 layout 변화. 패널보다 가볍고 빠르다. */
+  node: { type: 'spring', stiffness: 520, damping: 42, mass: 0.8 } as Transition,
   /** 버튼 눌림 — 아주 짧고 탄력 있게. */
   press: { type: 'spring', stiffness: 700, damping: 30 } as Transition,
   /** 목록 정렬·필터 변화처럼 여러 항목이 동시에 움직일 때. */

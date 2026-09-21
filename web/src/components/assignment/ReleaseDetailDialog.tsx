@@ -152,7 +152,7 @@ export function ReleaseDetailDialog({
       ) : (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
           {visibleItems.map((item) => (
-            <ItemCard key={item.blockId} item={item} />
+            <ItemCard key={item.nodeId} item={item} />
           ))}
           {!visibleItems.length && (
             <Box sx={{ fontSize: 12, color: T.dm2, padding: '18px 0', textAlign: 'center' }}>
@@ -251,7 +251,7 @@ function ItemCard({ item }: { item: ReleaseItemDto }) {
           <Box sx={{ fontSize: 11.5, color: T.dm2 }}>—</Box>
         ) : (
           item.sources.map((s) => (
-            <Box key={s.blockId} sx={{ mb: '5px' }}>
+            <Box key={s.nodeId} sx={{ mb: '5px' }}>
               <Box sx={{ fontSize: 11.5, overflowWrap: 'anywhere' }}>{s.artifactName}</Box>
               <Box
                 sx={{

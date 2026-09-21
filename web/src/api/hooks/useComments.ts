@@ -8,26 +8,26 @@ import { CommentDto } from '@/types/domain';
  * `enabled`(기본 true)를 호출부가 명시적으로 그 판정(예: `own`/`canEdit`)에 걸어야 한다.
  * 안 걸면 view 권한자 화면에서도 이 쿼리가 나가 API가 403을 던진다.
  */
-export function useComments(workflowId: string | undefined, blockId: string | undefined, enabled = true) {
+export function useComments(workflowId: string | undefined, nodeId: string | undefined, enabled = true) {
   return useQuery({
-    queryKey: queryKeys.comments(workflowId ?? '', blockId ?? ''),
-    enabled: Boolean(workflowId) && Boolean(blockId) && enabled,
+    queryKey: queryKeys.comments(workflowId ?? '', nodeId ?? ''),
+    enabled: Boolean(workflowId) && Boolean(nodeId) && enabled,
     queryFn: async () => {
       const res = await apiClient.get<ApiEnvelope<CommentDto[]>>(
-        `/workflows/${workflowId}/blocks/${blockId}/comments`,
+        `/workflows/${workflowId}/nodes/${nodeId}/comments`,
       );
       return res.data.data;
     },
   });
 }
 
-export function useCreateComment(workflowId: string, blockId: string) {
+export function useCreateComment(workflowId: string, nodeId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: { text: string; versionId?: string; parentCommentId?: string }) => {
-      const res = await apiClient.post<CommentDto>(`/workflows/${workflowId}/blocks/${blockId}/comments`, input);
+      const res = await apiClient.post<CommentDto>(`/workflows/${workflowId}/nodes/${nodeId}/comments`, input);
       return res.data;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.comments(workflowId, blockId) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.comments(workflowId, nodeId) }),
   });
 }
