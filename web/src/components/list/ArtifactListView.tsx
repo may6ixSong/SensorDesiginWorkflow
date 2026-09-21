@@ -5,11 +5,13 @@ import { SirenButton } from '@/components/common/SirenButton';
 import { Icon } from '@/components/common/Icon';
 import { UserAvatar } from '@/components/common/Avatar';
 import { NetworkTag } from '@/components/artifact/ArtifactChips';
+import { FEEDBACK_STATUS_META, ReleaseFeedbackSection, StatusDot } from '@/components/release/ReleaseFeedbackThread';
 import { useDirectory } from '@/app/providers/DirectoryProvider';
 import { useComments } from '@/api/hooks/useComments';
+import { useAllReleaseFeedback } from '@/api/hooks/useAssignments';
 import { fmtAt } from '@/lib/canvasModel';
 import { canonicalDepartmentLabel } from '@/shared/constants/departments';
-import { NodeDto, NetworkKind, ReleaseDto, ReleasePreviewItemDto, WorkflowDto } from '@/types/domain';
+import { NodeDto, NetworkKind, ReleaseDto, ReleaseFeedbackStatus, ReleasePreviewItemDto, WorkflowDto } from '@/types/domain';
 import { CURSOR_POINTER, FONT_MONO, R, T, TNUM } from '@/theme/tokens';
 
 type OpenTab = 'overview' | 'recipients' | 'comments';
@@ -214,7 +216,9 @@ export function ArtifactListView({
       {/* 우측 — 선택된 release(또는 Current)의 artifact 표 */}
       <Box sx={{ flex: 1, minWidth: 0, overflowY: 'auto' }}>
         <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: '12px' }}>
-          {canEdit && (
+          {/* Current를 볼 때만 노출된다(사용자 확정, 설계서 05장 §7.1) — 과거 release는
+              그 시점의 스냅샷이라 여기서 새 node를 만드는 게 의미가 없다. */}
+          {canEdit && showCurrent && (
             <SirenButton variant="primary" onClick={onAddArtifact}>
               <Icon name="plus" /> Add New Node
             </SirenButton>
@@ -244,6 +248,18 @@ export function ArtifactListView({
                 {selected.note}
               </Box>
             )}
+
+            {/* 부서별 status/comment 대시보드(설계서 05장 §7.1.1) — Comments 컬럼과 같은
+                기준으로 workflow Edit Access에게만 보인다. 캔버스/list view가 공유하는
+                recipientFilter가 비어 있으면(전체 부서) 요약을, 부서로 좁혔으면 그 부서(들)의
+                스레드 전체를 보여준다. */}
+            {canEdit && (
+              <ReleaseFeedbackDashboard
+                releaseId={selected.id}
+                recipientDepartments={selected.recipientDepartments}
+                recipientFilter={recipientFilter}
+              />
+            )}
           </>
         )}
 
@@ -255,6 +271,91 @@ export function ArtifactListView({
           </>
         )}
       </Box>
+    </Box>
+  );
+}
+
+/**
+ * 부서별 release status/comment 대시보드(설계서 05장 §7.1.1) — 09장 §4의 assumption
+ * A4를 완성한다: "workflow(낸 쪽)이 여러 부서의 상태를 한눈에 모아보는 화면"이 이제
+ * workflow의 list view 안, 과거 release를 열었을 때 산출물 표 위에 얹힌다.
+ *
+ * 필터 없음(전체 부서) → 부서마다 요약 카드 하나(최신 status + 댓글 수)만, 한 번에
+ * 부르는 `GET .../feedback/all`로. 부서 1개 이상으로 좁혔을 때 → 그 부서(들)의 스레드
+ * 전체(답글·작성 폼 포함)를 `ReleaseFeedbackSection`으로 — My Assignment와 같은
+ * 컴포넌트를 재사용하므로 여기서 다는 답글도 완전히 동작한다.
+ */
+function ReleaseFeedbackDashboard({
+  releaseId, recipientDepartments, recipientFilter,
+}: {
+  releaseId: string;
+  recipientDepartments: string[];
+  recipientFilter: string[];
+}) {
+  if (!recipientDepartments.length) return null;
+
+  if (recipientFilter.length > 0) {
+    const filtered = recipientDepartments.filter((d) => recipientFilter.includes(d));
+    if (!filtered.length) return null;
+    return (
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: '18px', mb: '18px' }}>
+        {filtered.map((dept) => (
+          <Box key={dept} sx={{ border: `1px solid ${T.ln}`, borderRadius: `${R.sm}px`, padding: '12px 14px', background: T.sf2 }}>
+            <ReleaseFeedbackSection releaseId={releaseId} department={dept} />
+          </Box>
+        ))}
+      </Box>
+    );
+  }
+
+  return <ReleaseFeedbackSummary releaseId={releaseId} recipientDepartments={recipientDepartments} />;
+}
+
+/** "전체 부서" 요약 — 부서마다 최신 top-level status + 댓글 수만 카드로. */
+function ReleaseFeedbackSummary({
+  releaseId, recipientDepartments,
+}: {
+  releaseId: string;
+  recipientDepartments: string[];
+}) {
+  const { data, isLoading } = useAllReleaseFeedback(releaseId, true);
+
+  return (
+    <Box sx={{ mb: '18px' }}>
+      <Ey sx={{ mb: '9px' }}>Department status &amp; comments — all recipients</Ey>
+      {isLoading ? (
+        <Box sx={{ fontSize: 11.5, color: T.dm2 }}>Loading…</Box>
+      ) : (
+        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '10px' }}>
+          {recipientDepartments.map((dept) => {
+            const entries = data?.[dept] ?? [];
+            const topLevel = entries.filter((e) => !e.parentId);
+            const latestStatus: ReleaseFeedbackStatus = topLevel.length
+              ? (topLevel[topLevel.length - 1].status ?? 'accepted')
+              : 'accepted';
+            const meta = FEEDBACK_STATUS_META[latestStatus];
+            return (
+              <Box
+                key={dept}
+                sx={{
+                  border: `1px solid ${meta.line}`, background: meta.bg, borderRadius: `${R.sm}px`,
+                  padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '5px',
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                  <StatusDot status={latestStatus} selected={false} />
+                  <Box sx={{ fontSize: 12.5, fontWeight: 700 }}>{canonicalDepartmentLabel(dept)}</Box>
+                </Box>
+                <Box sx={{ fontSize: 11, color: T.dm2 }}>
+                  {entries.length === 0
+                    ? 'No comments yet'
+                    : `${entries.length} comment${entries.length > 1 ? 's' : ''} · ${meta.label}`}
+                </Box>
+              </Box>
+            );
+          })}
+        </Box>
+      )}
     </Box>
   );
 }

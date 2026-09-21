@@ -8,7 +8,7 @@ import { CurrentProject, CurrentWorkflow } from '../common/decorators/current-wo
 import { Actor } from '../common/actor';
 import { Workflow, WorkflowDocument } from '../workflows/schemas/workflow.schema';
 import { Project, ProjectDocument } from '../projects/schemas/project.schema';
-import { canAccessProject, myDepartments, workflowLevel } from '../common/access';
+import { canAccessProject, canEditWorkflow, myDepartments, workflowLevel } from '../common/access';
 import { ReleasesService } from './releases.service';
 import { ReleaseFeedbackService } from './release-feedback.service';
 import { CreateReleaseDto } from './dto/release-crud.dto';
@@ -98,8 +98,9 @@ export class ReleasesController {
   /**
    * release 한 건에 대해, 그걸 받은 한 부서가 남긴 댓글 스레드(설계서 09장 §4.2~4.3) —
    * 산출물 단위가 아니라 release 전체에 대한 것이다(사용자 확정). department 쿼리는
-   * 필수다 — 다른 부서 것과 섞여 나오면 안 되기 때문에, "전체"라는 개념 자체가 없다.
-   * 그 department 소속인지는 서비스가 다시 확인한다.
+   * 필수다 — 다른 부서 것과 섞여 나오면 안 되기 때문이다. 그 department 소속인지, 또는
+   * 이 release를 낸 workflow의 Edit Access가 있는지는 서비스가 다시 확인한다(★확장,
+   * 05장 §7.1.1 — workflow 쪽에서 부서별로 필터링해 들여다보는 경로).
    */
   @Get('releases/:releaseId/feedback')
   async listFeedback(
@@ -107,8 +108,25 @@ export class ReleasesController {
     @Query('department') department: string,
     @CurrentActor() me: Actor,
   ) {
-    const { release, project } = await this.loadReleaseForActor(releaseId, me);
-    return { data: await this.feedback.listForRelease(release, department, project, me) };
+    const { release, project, workflow } = await this.loadReleaseForActor(releaseId, me);
+    return { data: await this.feedback.listForRelease(release, department, project, workflow, me) };
+  }
+
+  /**
+   * release 한 건의 **모든** recipient 부서의 스레드를 한 번에(설계서 05장 §7.1.1) —
+   * workflow 쪽 list view의 대시보드가 "전체 부서" 상태로 볼 때 쓴다. §4.3의 department별
+   * 라우트와 달리 여기는 department 파라미터가 없다 — 항상 전체다. 그래서 접근 자격도
+   * 더 좁다: 그 release를 낸 workflow의 Edit Access 또는 Admin만 — 개별 부서 소속만으로는
+   * (자기 부서든 남의 부서든) 이 라우트를 호출할 수 없다. 부서 하나만의 스레드는 여전히
+   * `GET .../feedback?department=` 하나뿐이다.
+   */
+  @Get('releases/:releaseId/feedback/all')
+  async listAllFeedback(@Param('releaseId') releaseId: string, @CurrentActor() me: Actor) {
+    const { release, project, workflow } = await this.loadReleaseForActor(releaseId, me);
+    if (!me.isAdmin && !canEditWorkflow(me, workflow, project)) {
+      throw new ForbiddenException('Only the releasing workflow’s Edit Access can view all departments at once.');
+    }
+    return { data: await this.feedback.listAllForRelease(release) };
   }
 
   @Post('releases/:releaseId/feedback')
@@ -117,14 +135,17 @@ export class ReleasesController {
     @Body() dto: CreateReleaseFeedbackDto,
     @CurrentActor() me: Actor,
   ) {
-    const { release, project } = await this.loadReleaseForActor(releaseId, me);
-    return this.feedback.createForRelease(release, dto, project, me);
+    const { release, project, workflow } = await this.loadReleaseForActor(releaseId, me);
+    return this.feedback.createForRelease(release, dto, project, workflow, me);
   }
 
   /**
-   * release 한 건을 열 자격이 있는지 판정하고, 통과하면 release+project를 함께 돌려준다.
-   * getOne과 feedback 두 라우트가 자격 판정 로직을 공유한다 — feedback도 결국 그 release를
-   * 볼 수 있어야 그 위에 댓글을 남길 자격이 있다(department별 세부 판정은 그 위에 얹힌다).
+   * release 한 건을 열 자격이 있는지 판정하고, 통과하면 release+project+workflow를 함께
+   * 돌려준다. getOne과 feedback 라우트들이 자격 판정 로직을 공유한다 — feedback도 결국
+   * 그 release를 볼 수 있어야 그 위에 댓글을 남기거나 읽을 자격이 있다(department별/
+   * 전체 부서 세부 판정은 그 위에 얹힌다). workflow는 항상 조회한다 — Admin이어도
+   * feedback 라우트들이 workflow Edit Access 판정에 필요로 하기 때문이다(예전엔
+   * `!me.isAdmin`일 때만 조회했다).
    */
   private async loadReleaseForActor(releaseId: string, me: Actor) {
     const release = await this.releases.findOrThrow(releaseId);
@@ -133,9 +154,10 @@ export class ReleasesController {
       throw new ForbiddenException('You do not have access to this project.');
     }
 
+    const workflow = await this.workflowModel.findById(release.workflowId).exec();
+
     if (!me.isAdmin) {
       const myDepts = myDepartments(me, project);
-      const workflow = await this.workflowModel.findById(release.workflowId).exec();
       const allowed =
         (release.recipientUsers ?? []).includes(me.knoxId) ||
         (release.recipientDepartments ?? []).some((d) => myDepts.includes(d)) ||
@@ -145,7 +167,7 @@ export class ReleasesController {
       if (!allowed) throw new ForbiddenException('You do not have access to this release.');
     }
 
-    return { release, project };
+    return { release, project, workflow };
   }
 
   /**

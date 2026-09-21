@@ -39,6 +39,9 @@ export const queryKeys = {
   /** release 한 건에 대한 부서별 댓글 스레드 — department별로 완전히 분리된 키다. */
   releaseFeedback: (releaseId: string, department: string) =>
     ['releases', releaseId, 'feedback', department] as const,
+  /** release 한 건의 **모든** recipient 부서 스레드를 한 번에(설계서 05장 §7.1.1) —
+   *  workflow list view의 대시보드가 "전체 부서" 상태일 때만 쓴다. */
+  releaseFeedbackAll: (releaseId: string) => ['releases', releaseId, 'feedback', 'all'] as const,
 
   hubServices: ['hub', 'services'] as const,
 
