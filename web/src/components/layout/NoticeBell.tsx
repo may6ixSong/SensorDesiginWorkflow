@@ -158,9 +158,16 @@ export function NoticeBell({ clientId }: { clientId: string }) {
         onClose={() => setOpen(false)}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
         transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-        PaperProps={{ sx: { mt: 1, width: 460, maxHeight: 560, border: `1px solid ${T.ln}`, borderRadius: '14px' } }}
+        PaperProps={{
+          sx: {
+            mt: 1, width: 460, maxHeight: 560, border: `1px solid ${T.ln}`, borderRadius: '14px',
+            // Paper 자신은 스크롤하지 않는다(사용자 요청) — 스크롤은 아래 release 목록
+            // 하나에만 있으면 된다. flex column으로 감싸 목록 쪽만 남는 공간을 먹게 한다.
+            display: 'flex', flexDirection: 'column', overflow: 'hidden',
+          },
+        }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', px: '16px', py: '12px', borderBottom: `1px solid ${T.ln}` }}>
+        <Box sx={{ flex: '0 0 auto', display: 'flex', alignItems: 'center', gap: '8px', px: '16px', py: '12px', borderBottom: `1px solid ${T.ln}` }}>
           <Typography sx={{ fontWeight: 700, fontSize: 13.5 }}>Inbox</Typography>
           <Typography sx={{ fontSize: 11, color: T.dm2 }}>released to me or my departments</Typography>
         </Box>
@@ -168,7 +175,7 @@ export function NoticeBell({ clientId }: { clientId: string }) {
         {/* legend겸 filter(사용자 요청) — project별 색을 name 기준으로 구분해 보여주고,
             체크를 끄면 아래 목록에서 그 project가 빠진다. */}
         {Boolean(projects.length) && (
-          <Box sx={{ px: '16px', py: '10px', borderBottom: `1px solid ${T.ln}` }}>
+          <Box sx={{ flex: '0 0 auto', px: '16px', py: '10px', borderBottom: `1px solid ${T.ln}` }}>
             <ProjectFilterLegend
               projects={projects}
               excludedIds={excludedProjectIds}
@@ -179,44 +186,48 @@ export function NoticeBell({ clientId }: { clientId: string }) {
           </Box>
         )}
 
-        {isError ? (
-          <Typography sx={{ px: 2, py: 3, fontSize: 12.5, color: T.danger, textAlign: 'center' }}>
-            Could not load releases.
-          </Typography>
-        ) : isLoading ? (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: '6px', p: '10px' }}>
-            {[0, 1, 2].map((i) => (
-              <Box
-                key={i}
-                sx={{
-                  height: 52, borderRadius: '10px', border: `1px solid ${T.ln}`, background: T.sf2,
-                  animation: 'sirenPulse 1.4s ease-in-out infinite', animationDelay: `${i * 0.16}s`,
-                }}
-              />
-            ))}
-          </Box>
-        ) : releases.length === 0 ? (
-          <Typography sx={{ px: 2, py: 4, fontSize: 12.5, color: T.dm, textAlign: 'center' }}>
-            Nothing has been released to you or your departments yet.
-          </Typography>
-        ) : visibleReleases.length === 0 ? (
-          <Typography sx={{ px: 2, py: 4, fontSize: 12.5, color: T.dm, textAlign: 'center' }}>
-            No releases match the selected projects.
-          </Typography>
-        ) : (
-          <Box sx={{ maxHeight: 480, overflowY: 'auto', p: '8px' }}>
-            {visibleReleases.map((row) => (
-              <ReleaseFeedRow
-                key={row.id}
-                row={row}
-                unread={unreadIds.has(row.id)}
-                unreadLabel={t('appShell.notices.unread')}
-                onOpen={() => openRelease(row)}
-                resolveUser={resolveUser}
-              />
-            ))}
-          </Box>
-        )}
+        {/* 스크롤은 이 영역 하나에만 둔다(사용자 요청) — Paper 자체는 overflow:hidden이라
+            더 이상 바깥쪽에 겹쳐 뜨는 스크롤바가 없다. */}
+        <Box sx={{ flex: '1 1 auto', minHeight: 0, overflowY: 'auto' }}>
+          {isError ? (
+            <Typography sx={{ px: 2, py: 3, fontSize: 12.5, color: T.danger, textAlign: 'center' }}>
+              Could not load releases.
+            </Typography>
+          ) : isLoading ? (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: '6px', p: '10px' }}>
+              {[0, 1, 2].map((i) => (
+                <Box
+                  key={i}
+                  sx={{
+                    height: 52, borderRadius: '10px', border: `1px solid ${T.ln}`, background: T.sf2,
+                    animation: 'sirenPulse 1.4s ease-in-out infinite', animationDelay: `${i * 0.16}s`,
+                  }}
+                />
+              ))}
+            </Box>
+          ) : releases.length === 0 ? (
+            <Typography sx={{ px: 2, py: 4, fontSize: 12.5, color: T.dm, textAlign: 'center' }}>
+              Nothing has been released to you or your departments yet.
+            </Typography>
+          ) : visibleReleases.length === 0 ? (
+            <Typography sx={{ px: 2, py: 4, fontSize: 12.5, color: T.dm, textAlign: 'center' }}>
+              No releases match the selected projects.
+            </Typography>
+          ) : (
+            <Box sx={{ p: '8px' }}>
+              {visibleReleases.map((row) => (
+                <ReleaseFeedRow
+                  key={row.id}
+                  row={row}
+                  unread={unreadIds.has(row.id)}
+                  unreadLabel={t('appShell.notices.unread')}
+                  onOpen={() => openRelease(row)}
+                  resolveUser={resolveUser}
+                />
+              ))}
+            </Box>
+          )}
+        </Box>
       </Popover>
 
       {selectedRelease && (

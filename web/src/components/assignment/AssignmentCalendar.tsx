@@ -590,19 +590,6 @@ function DayCell({
   const shown = events.slice(0, maxChips);
   const hidden = events.length - shown.length;
 
-  // release는 이제 도형이 아니라 칸 배경 자체로 알린다(사용자 요청) — 그 날의 release가
-  // 걸린 project 색(들)을 옅게 tint한다. project가 둘 이상이면 색을 나란히 나눠 칠한다.
-  const releaseColors = Array.from(
-    new Set(
-      events
-        .filter((e): e is Extract<DayEvent, { kind: 'release' }> => e.kind === 'release')
-        .map((e) => colorForKnoxId(e.data.projectId)),
-    ),
-  );
-  const releaseBg = releaseHighlight(releaseColors);
-  const restBg = inMonth ? T.sf : T.sf2;
-  const restHoverBg = inMonth ? T.sf2 : T.sf3;
-
   return (
     <Box
       onClick={onClick}
@@ -613,13 +600,13 @@ function DayCell({
           : { minHeight: cellSize, flex: 1 }),
         borderRight: showRightBorder ? `1px solid ${T.ln}` : 'none',
         borderBottom: `1px solid ${T.ln}`,
-        background: isSelected ? T.prSoft : releaseBg ?? restBg,
+        background: isSelected ? T.prSoft : inMonth ? T.sf : T.sf2,
         outline: isSelected ? `1.5px solid ${T.pr}` : 'none',
         outlineOffset: '-1.5px',
         cursor: CURSOR_POINTER,
         display: 'flex', flexDirection: 'column', gap: '3px',
         ...(showRightBorder ? { '&:nth-of-type(7n)': { borderRight: 'none' } } : {}),
-        '&:hover': { background: isSelected ? T.prSoft : releaseBg ?? restHoverBg },
+        '&:hover': { background: isSelected ? T.prSoft : inMonth ? T.sf2 : T.sf3 },
       }}
     >
       <Box
@@ -639,17 +626,6 @@ function DayCell({
       {hidden > 0 && <Box sx={{ fontSize: 9.5, color: T.dm2 }}>+{hidden} more</Box>}
     </Box>
   );
-}
-
-/** release가 걸린 날의 칸 배경 — project 색을 옅게 tint한다. 둘 이상이면 나란히 나눠 칠한다. */
-function releaseHighlight(colors: string[]): string | null {
-  if (!colors.length) return null;
-  if (colors.length === 1) return withAlpha(colors[0], 0.18);
-  const step = 100 / colors.length;
-  const stops = colors
-    .map((c, i) => `${withAlpha(c, 0.22)} ${(i * step).toFixed(2)}%, ${withAlpha(c, 0.22)} ${((i + 1) * step).toFixed(2)}%`)
-    .join(', ');
-  return `linear-gradient(90deg, ${stops})`;
 }
 
 /**
@@ -672,12 +648,15 @@ function EventChip({ event }: { event: DayEvent }) {
   const color = colorForKnoxId(event.data.projectId);
 
   if (event.kind === 'release') {
+    // release는 칸 배경이 아니라 이 막대(칩) 자체를 project 색으로 highlight한다
+    // (사용자 요청) — 날짜 칸의 배경은 다른 날과 동일하게 그대로 둔다.
     return (
       <Box
         sx={{
-          fontSize: 9.5, borderRadius: '4px', padding: '1.5px 5px 1.5px 6px',
-          background: T.sf, border: `1px solid ${T.ln}`, borderLeft: `3px solid ${color}`,
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: T.tx2,
+          fontSize: 9.5, borderRadius: '4px', padding: '1.5px 5px',
+          background: withAlpha(color, 0.22), border: `1px solid ${withAlpha(color, 0.55)}`,
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: T.tx,
+          fontWeight: 600,
         }}
       >
         {event.data.label} {event.data.workflowAt.name}
