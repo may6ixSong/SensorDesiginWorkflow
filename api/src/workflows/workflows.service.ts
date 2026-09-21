@@ -60,7 +60,7 @@ export class WorkflowsService {
    *
    * phase는 인자로 받지 않고 반드시 과제 마일스톤의 복사본으로 시작한다. 마일스톤 id를
    * 재사용하지 않고 새 id를 발급하는 것이 중요하다 — 그래야 나중에 과제 마일스톤이
-   * 바뀌거나 지워져도 이 workflow의 phase와 그걸 가리키는 블록이 영향받지 않는다.
+   * 바뀌거나 지워져도 이 workflow의 phase와 그걸 가리키는 노드가 영향받지 않는다.
    */
   async create(
     projectId: Types.ObjectId,
@@ -181,8 +181,8 @@ export class WorkflowsService {
   /**
    * 이 workflow의 phase 목록을 통째로 교체한다.
    *
-   * ★ 사라진 phase를 가리키던 블록은 절대 건드리지 않는다 — 옮기지도, 지우지도, phaseId를
-   *   비우지도 않는다. 블록은 캔버스의 원래 좌표에 그대로 남고, FE가 "이 phaseId는 지금
+   * ★ 사라진 phase를 가리키던 노드는 절대 건드리지 않는다 — 옮기지도, 지우지도, phaseId를
+   *   비우지도 않는다. 노드는 캔버스의 원래 좌표에 그대로 남고, FE가 "이 phaseId는 지금
    *   목록에 없다"는 사실만으로 유실 표시를 그린다. 같은 id의 phase를 다시 만들어 주면
    *   자동으로 원래대로 붙는다.
    * ★ 이 PATCH도 canvasLock과 무관하다(위 updateMeta와 같은 이유).

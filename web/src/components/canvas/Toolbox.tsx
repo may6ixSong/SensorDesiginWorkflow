@@ -39,7 +39,7 @@ export function Toolbox({ canEdit, edit, onToggleEdit, onCancel, onAdd, onNote }
                 받는 산출물을 만드는 기능으로 이어지지 않았다(intent는 서버가 항상
                 'own'으로 고정) — 사용자 요청으로 하나로 합쳤다. 자세한 재설계는 이후
                 별도로 진행한다. */}
-            <TbBtn title="Add block" icon="inbox" onClick={onAdd} />
+            <TbBtn title="Add node" icon="inbox" onClick={onAdd} />
             <Sep />
             <TbBtn title="Add memo" icon="note" onClick={onNote} />
           </Group>

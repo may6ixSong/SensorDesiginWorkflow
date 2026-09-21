@@ -7,11 +7,11 @@ import { Actor } from '../common/actor';
  * slide 열람 정책 회귀 테스트 (설계서 01장 §4.2 갱신, 사용자 결정).
  *
  * 지키려는 규칙 — **slide를 열 수 있는지는 오직 그 서비스의 canView/canEdit로만
- * 정해진다.** block.recipients(누가 이 workflow의 이 자리에서 받기로 돼 있는가)는 더
+ * 정해진다.** node.recipients(누가 이 workflow의 이 자리에서 받기로 돼 있는가)는 더
  * 이상 이 판정에 관여하지 않는다.
  *
  * 이전 정책(2단 게이트: recipient 먼저, 그다음 서비스 권한)에서는 같은 부서가 만든
- * workflow이고 artifact 자체는 view 제한이 없어도, 그 block의 recipient가 다른 부서로
+ * workflow이고 artifact 자체는 view 제한이 없어도, 그 node의 recipient가 다른 부서로
  * 지정돼 있으면 "You do not have access to this artifact"로 막혔다(사용자 보고) — 이제는
  * 그 경우에도 서비스가 canView:true를 주면 열린다.
  */
@@ -33,7 +33,11 @@ function makeService(calypsoAccess: { canView: boolean; canEdit: boolean }) {
 }
 
 const artifact = { serviceKey: CALYPSO_SERVICE_KEY, externalArtifactId: 'ext-1' };
-const project = { members: [{ knoxId: 'user.k', departments: ['A'] }], departments: ['A', 'B'] };
+// 부서는 {id, name} 쌍이다(02장 §9) — id로 이름을 그대로 재사용한다.
+const project = {
+  members: [{ knoxId: 'user.k', departments: ['A'] }],
+  departments: [{ id: 'A', name: 'A' }, { id: 'B', name: 'B' }],
+};
 
 describe('ArtifactAccessService.levelFor', () => {
   it('Admin은 서비스 응답과 무관하게 항상 edit', async () => {
@@ -42,9 +46,9 @@ describe('ArtifactAccessService.levelFor', () => {
     expect(level).toBe('edit');
   });
 
-  it('canView:true면 block/recipient 구성과 무관하게 열린다 — 사용자가 보고한 시나리오', async () => {
+  it('canView:true면 node/recipient 구성과 무관하게 열린다 — 사용자가 보고한 시나리오', async () => {
     const svc = makeService({ canView: true, canEdit: false });
-    // block을 아예 넘기지 않는다 — 시그니처 자체에서 빠졌다. 그래도 view가 나와야 한다.
+    // node를 아예 넘기지 않는다 — 시그니처 자체에서 빠졌다. 그래도 view가 나와야 한다.
     const level = await svc.levelFor(actor(), artifact, project);
     expect(level).toBe('view');
   });

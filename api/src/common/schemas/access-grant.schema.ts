@@ -6,7 +6,7 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
  * 이 모양이 시스템 전체에서 반복된다:
  *   - Workflow.editAccess / viewAccess (workflow 자체를 편집/열람할 수 있는가 — 이 둘은
  *     여전히 edit/view로 나뉜다. artifact/recipient와는 별개 축이다)
- *   - Block.recipients (A/B/C 공통 — 그 block의 artifact를 받을 대상. 실제 edit/view
+ *   - WorkflowNode.recipients (A/B/C 공통 — 그 node의 artifact를 받을 대상. 실제 edit/view
  *     여부는 더 이상 여기서 갈리지 않는다 — 그 서비스가 정한다)
  *
  * ★ 부서 단위 권한은 **조회 시점에 실시간으로** 판정한다 — 부여 시점의 멤버를 얼려두지

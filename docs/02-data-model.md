@@ -8,8 +8,8 @@ MongoDB 문서형 구조를 유지한다. 이 장은 **변경분 위주**로 적
 projects        과제 (code+revision 불변, milestones, members, departments)
 workflows       workflow (department, ownerKnoxId, editAccess/viewAccess, phases, canvasLock)
 artifacts       ★신규★ 산출물 실체 (tier, 권한, recipient, publish 이력)
-blocks          ★개명★ 캔버스 위의 자리 (구 deliverables) — artifact를 가리킨다
-memos           메모 블록
+nodes          ★개명★ 캔버스 위의 자리 (구 deliverables → blocks → nodes) — artifact를 가리킨다
+memos           메모 노드
 edges           flow 연결선
 releases        ★신규★ workflow release 기록 (구 hldReleases 폐기)
 artifactServices  연동 서비스 레지스트리 — OA Service/HPC Service 등록, baseURL당 1개 토큰(07장 §3)
@@ -31,10 +31,10 @@ Project {
   code: string                  // 불변. 생성 후 UI 수정 경로 없음
   revision: string              // 불변. 'EVT' + 정수(0 이상). 예: 'EVT0', 'EVT1'
   name: string                  // 수정 가능
-  departments: string[]         // 이 과제가 인정하는 부서 목록
+  departments: [{ id: string, name: string }]  // ★변경★ 구 string[] — id는 발급 후 불변, name은 개명 가능(§9)
   departmentsSeeded: boolean
   milestones: [{ id, name, start, end }]
-  members: [{ knoxId, departments: string[], addedAt }]
+  members: [{ knoxId, departments: string[], addedAt }]  // departments는 위 departments[].id 배열(§9.2)
   managers: string[]            // milestone 편집 role
   meta: Record<string, string>  // ★신규★ 표시 전용 부가 필드 (가정 P5)
   status: 'ACTIVE' | ...
@@ -63,11 +63,11 @@ Workflow {
   projectId
   name: string
   description: string
-  department: string            // 반드시 project.departments 중 하나. 빈 값 불가
+  department: string            // project.departments[].id 중 하나. 빈 값 불가(§9)
   ownerKnoxId: string           // 정확히 1명. 이양 불가 (TODO 주석)
 
-  editAccess: { departments: string[], users: string[] }
-  viewAccess: { departments: string[], users: string[] }
+  editAccess: { departments: string[], users: string[] }  // departments는 id(§9)
+  viewAccess: { departments: string[], users: string[] }  // departments는 id(§9)
 
   phases: [{ id, name, start, end }]
   phaseWidths: Record<string, number>
@@ -91,7 +91,7 @@ Workflow {
 >   다시 쓰지 않는다.
 > - `PATCH /workflows/:id`(Name/Description/Department)와 `PATCH /workflows/:id/phases`는
 >   **`canvasLock`을 확인하지도, 건드리지도 않는다.** A가 캔버스를 편집(=lock 점유) 하는 동안에도
->   B는 그 workflow의 description을 얼마든지 바꿀 수 있다 — lock은 오직 `blocks`/`edges`/`memos`/
+>   B는 그 workflow의 description을 얼마든지 바꿀 수 있다 — lock은 오직 `nodes`/`edges`/`memos`/
 >   `layout` 저장(=캔버스 그 자체)에만 관여한다(03장 §3.3).
 > - 구현상 두 업데이트가 서로 다른 필드 집합을 `$set`하므로, Mongoose 레벨에서 자연히 경쟁하지
 >   않는다. 굳이 트랜잭션을 쓸 필요가 없다.
@@ -109,7 +109,7 @@ Workflow {
 
 ## 3. artifacts ★신규★
 
-산출물의 **실체**다. 캔버스 위의 자리(`blocks`)와 분리한다 — 같은 산출물이 여러 workflow에 놓여도
+산출물의 **실체**다. 캔버스 위의 자리(`nodes`)와 분리한다 — 같은 산출물이 여러 workflow에 놓여도
 권한과 버전 이력은 하나다.
 
 ```ts
@@ -128,7 +128,7 @@ Artifact {
                                        // 경로는 versions[].hpcPath로 온다(07장 §4.1)
 
   // --- 권한: artifact는 권한을 전혀 들고 있지 않는다(04장 §3) ---
-  // recipient는 여기 두지 않는다. workflow마다 달라질 수 있어서 Block.recipients(§4)에
+  // recipient는 여기 두지 않는다. workflow마다 달라질 수 있어서 WorkflowNode.recipients(§4)에
   // 저장한다 — 01장 §4.1 참조. A/B/C 전부 공통이다. (구 설계는 B/C를 여기
   // editAccess/viewAccess/expectedGiver로 뒀었다 — 전부 폐기했다.)
 
@@ -157,7 +157,7 @@ ArtifactVersion {
 
 ### 규칙
 
-- **`recipients`는 artifact가 아니라 항상 `Block.recipients`에 있다(A/B/C 공통, §4).**
+- **`recipients`는 artifact가 아니라 항상 `WorkflowNode.recipients`에 있다(A/B/C 공통, §4).**
   artifact는 `editAccess`/`viewAccess`/`expectedGiver` 같은 권한 필드를 전혀 갖지 않는다.
 - `versions[0].tier` 가 그 산출물의 "현재 tier"이며, `artifact.tier` 는 그 값을 캐시한 것이다.
 - **버전 가시성** — `isPublished: false` 인 엔트리는 그 산출물의 giver(그 서비스가 판정하는
@@ -166,7 +166,7 @@ ArtifactVersion {
   스키마의 일이다** — SIREN의 `ArtifactVersion`은 이 필드들을 그대로 캐시하는
   `viewUrl`/`hpcPath`(둘 다 이미 있음)로 충분하고, 파일 목록 자체는 여기 두지 않는다.
   실물 열람·다운로드는 항상 그 서비스(Calypso)로 보낸다 — SIREN은 참조만 갖는다(04장 §2).
-- **Mapping 범위 — 같은 과제(project)만.** workflow의 block을 어떤 artifact에 매핑할 때, 후보는
+- **Mapping 범위 — 같은 과제(project)만.** workflow의 node를 어떤 artifact에 매핑할 때, 후보는
   **그 workflow와 `projectId`가 같은 artifact로 한정**한다. 같은 `code`라도 `revision`이 다르면
   다른 project이므로(01장·02장 §1) 자동으로 후보에서 빠진다. Admin이 여러 과제를 동시에 볼 수
   있어도 이 제약은 그대로 적용된다 — 매핑 API는 `artifact.projectId !== workflow.projectId`
@@ -196,12 +196,12 @@ majorKey(v: ArtifactVersion): string {
 
 ---
 
-## 4. blocks (구 deliverables)
+## 4. nodes (구 deliverables)
 
 캔버스 위의 **자리**다. 버전도 권한도 갖지 않는다 — 전부 `artifacts` 로 옮겼다.
 
 ```ts
-Block {
+WorkflowNode {
   _id
   projectId
   workflowId
@@ -213,11 +213,11 @@ Block {
   layout: { x, y, w, h }
   intent: 'own' | 'received'    // "새 Artifact 추가" 다이얼로그 첫 질문. 생성 후 불변(04장 §6)
 
-  // artifact가 매핑된 block에서 의미가 있다 — A/B/C 전부 공통이다. workflow마다
-  // 독립이라 여기, block에 둔다 — 01장 §4.1/§4.4. edit/view로 나뉘지 않는 단일 grant다.
+  // artifact가 매핑된 node에서 의미가 있다 — A/B/C 전부 공통이다. workflow마다
+  // 독립이라 여기, node에 둔다 — 01장 §4.1/§4.4. edit/view로 나뉘지 않는 단일 grant다.
   // (구 설계는 B/C/D를 artifact.editAccess/viewAccess/expectedGiver로 뒀었다 — 전부
   // 폐기했다.)
-  recipients: { departments: string[], users: string[] }
+  recipients: { departments: string[], users: string[] }  // departments는 id(§9)
 
   createdBy: string
   isMock: boolean
@@ -226,12 +226,12 @@ Block {
 
 - `series` / `seriesIdx` / `seriesTotal` 은 **유지**한다(반복 릴리스 일정 개념은 그대로).
 - `recvDept` / `recvContact` / `recvWorkflowId` / `sourceDept` / `sourceContact` 는 **제거**한다 —
-  수신 대상은 이제 block의 `recipients`가 유일한 진실이다(A/B/C 공통).
+  수신 대상은 이제 node의 `recipients`가 유일한 진실이다(A/B/C 공통).
 - `versions` 는 제거하고 `artifactId` 참조로 대체한다.
 - `recipients` 편집 권한은 그 workflow의 **Edit Access**다(04장 §3.3). recipient에 속하는 것과
   recipient를 편집할 수 있는 것은 별개다(01장 §4.2).
 - **`(workflowId, artifactId)` 유일성 제약** ★신규★ — 같은 workflow 안에서 같은 artifact를 두
-  block에 매핑할 수 없다. intent(own/received) 무관하게 적용된다(04장 §6.5). 다른 workflow에서
+  node에 매핑할 수 없다. intent(own/received) 무관하게 적용된다(04장 §6.5). 다른 workflow에서
   같은 artifact를 재사용하는 것은 그대로 허용된다.
 
 ## 4.1 `hpcPathMocks` — 폐기 ★
@@ -244,7 +244,7 @@ HPC망과의 양방향 API 연동이 확정되면서 더 이상 필요 없다 �
 
 ## 5. edges · memos
 
-변경 없음. `edges { fromBlockId, toBlockId, bidirectional }` 로 필드명만 blocks 개명에 맞춘다.
+변경 없음. `edges { fromNodeId, toNodeId, bidirectional }` 로 필드명만 nodes 개명에 맞춘다.
 
 ---
 
@@ -265,19 +265,22 @@ Release {
 
   workflowAt: {                 // 그 시점의 workflow 표기 (이후 이름·부서가 바뀌어도 보존)
     name: string
-    department: string
+    department: string          // Project.departments[].id
+    departmentLabel: string     // ★신규★ 그 순간의 부서 이름 — id가 가리키는 부서가 나중에
+                                 // 삭제됐을 때만 쓰는 대체 표시값(§9.4). 평소엔 department(id)를
+                                 // 지금의 Project.departments에서 찾아 최신 이름을 보여준다
   }
 
   items: [ReleaseItem]
 
   // 조회 최적화용 파생 필드 — items 안의 모든 수신 부서/사용자를 평탄화해 담는다.
-  // 부서별 필터 뷰(05장 §6.2)가 이 필드로 인덱스 조회한다.
+  // 부서별 필터 뷰(05장 §6.2)가 이 필드로 인덱스 조회한다. departments는 id(§9).
   recipientDepartments: string[]
   recipientUsers: string[]
 }
 
 ReleaseItem {
-  blockId: string
+  nodeId: string
   artifactId: string
   artifactName: string          // 그 시점 이름
   tier: 'A'|'B'|'C'
@@ -300,12 +303,13 @@ ReleaseItem {
   firstTime: boolean            // 이 release에서 처음 등장한 산출물인가
 
   recipients: {                 // 그 시점 확정값 (이후 권한이 바뀌어도 이력은 보존)
-    departments: string[]
+    departments: string[]       // id(§9). label은 따로 얼리지 않는다 — 부서가 지워진 극단적인
+                                 // 경우에만 화면에서 id 문자열을 그대로 보여준다(§9.4)
     users: string[]
   }
 
   sources: [{                   // flow 직전 1홉 upstream
-    blockId: string
+    nodeId: string
     artifactId: string
     artifactName: string
     selected: {                 // null 이면 '아직 전달되지 않음'
@@ -347,7 +351,9 @@ ReleaseItem {
 | `PATCH` | `/projects/:id` | **code·revision 필드는 400으로 거부** |
 | `PATCH` | `/projects/:id/milestones` | Manager · Admin |
 | `PATCH` | `/projects/:id/members` | Admin |
-| `PATCH` | `/projects/:id/departments` | Admin |
+| `POST` | `/projects/:id/departments` | Admin. 부서 추가, id 발급(§9.1) |
+| `PATCH` | `/projects/:id/departments/:deptId` | Admin. 개명만, id는 불변(§9.1) ★신규★ |
+| `DELETE` | `/projects/:id/departments/:deptId` | Admin. 그 부서 소속 member가 없을 때만(§9.1) |
 
 ### 7.2 Workflow
 
@@ -360,7 +366,7 @@ ReleaseItem {
 | `PUT` | `/workflows/:id/access` | `{ editAccess, viewAccess }` 통째로 교체 |
 | `POST` | `/workflows/:id/canvas-lock` | 점유 · 갱신 |
 | `DELETE` | `/workflows/:id/canvas-lock` | 해제 (본인 또는 Admin) |
-| `PUT` | `/workflows/:id/canvas` | lock 보유자만. blocks·edges·memos·layout 일괄 저장 |
+| `PUT` | `/workflows/:id/canvas` | lock 보유자만. nodes·edges·memos·layout 일괄 저장 |
 
 `PATCH /workflows/:id` 가 department 변경을 포함하면, 서버가 01장 §3.5의 3단계를 **한 트랜잭션**
 안에서 처리한다. FE가 access를 따로 PUT하지 않는다.
@@ -370,17 +376,17 @@ ReleaseItem {
 | Method | Path | 비고 |
 |---|---|---|
 | `GET` | `/artifacts/:id` | 열람 권한(01장 §4.2) 없으면 403. 버전은 권한에 따라 마스킹 |
-| `PATCH` | `/workflows/:wfId/blocks/:blockId/recipients` | **A/B/C block 공통.** `{ departments, users }`(단일 grant). workflow Edit Access 필요. (구 `PUT /artifacts/:id/access`는 제거 — artifact 단위 권한 자체가 완전히 폐기됐다) |
+| `PATCH` | `/workflows/:wfId/nodes/:nodeId/recipients` | **A/B/C node 공통.** `{ departments, users }`(단일 grant). workflow Edit Access 필요. (구 `PUT /artifacts/:id/access`는 제거 — artifact 단위 권한 자체가 완전히 폐기됐다) |
 | `GET` | `/workflows/:wfId/artifact-candidates` | `?source=live\|file\|hpc&intent=own\|received&serviceKey=&code=&revision=` — pickable까지 판정된 후보 목록 (04장 §6.2). code/revision은 그 workflow가 속한 project에서 그대로 채운다 — 사전 링크 단계 없음(04장 §6.3) |
-| `POST` | `/workflows/:wfId/blocks` | `{ name, phaseId, layout, intent, artifactId? \| newArtifact? }` — newArtifact가 있으면 find-or-create 후 매핑 (04장 §6.7) |
-| `PATCH` | `/blocks/:id` | `{ name?, artifactId? \| newArtifact? }` — 재매핑. 이전 값과 다르면 block.recipients 초기화 (04장 §6.6) |
+| `POST` | `/workflows/:wfId/nodes` | `{ name, phaseId, layout, intent, artifactId? \| newArtifact? }` — newArtifact가 있으면 find-or-create 후 매핑 (04장 §6.7) |
+| `PATCH` | `/nodes/:id` | `{ name?, artifactId? \| newArtifact? }` — 재매핑. 이전 값과 다르면 node.recipients 초기화 (04장 §6.6) |
 
 ### 7.4 Release
 
 | Method | Path | 비고 |
 |---|---|---|
 | `GET` | `/workflows/:id/release/preview` | 지금 release하면 무엇이 나갈지. items·changed·source 후보를 계산해 반환 |
-| `POST` | `/workflows/:id/releases` | 실행. `{ note, sources: { [blockId]: { [sourceBlockId]: versionRef \| null } } }` |
+| `POST` | `/workflows/:id/releases` | 실행. `{ note, sources: { [nodeId]: { [sourceNodeId]: versionRef \| null } } }` |
 | `GET` | `/workflows/:id/releases` | 그 workflow의 release 목록 |
 | `GET` | `/releases/:id` | 상세 (표) |
 | `GET` | `/releases/:id` | 상세 1건. workflow 단위 Guard를 못 거는 경로라 **자기 자신이 자격을 판정한다** — recipient · 실행자 · 그 workflow 소속 부서 · 그 workflow view 권한 중 하나(09장 §4.1). 산출물별 마스킹은 열람 시점 재판정 |
@@ -397,14 +403,14 @@ Project 계층(01장 §2.2)은 그대로 지켜진다. **Admin은 어느 라우�
 |---|---|---|
 | `GET` | `/my/releases/received` | `?page=&size=` 내가/내 부서가 recipient인 release. 최신순 페이지네이션 |
 | `GET` | `/my/releases/published` | `?page=&size=` 내가 실행했거나 내 부서 workflow가 낸 release |
-| `GET` | `/my/artifacts` | 내 부서 workflow의 own block 중 artifact가 매핑된 것. 최근 1년, 최근 갱신순 |
+| `GET` | `/my/artifacts` | 내 부서 workflow의 own node 중 artifact가 매핑된 것. 최근 1년, 최근 갱신순 |
 | `GET` | `/my/calendar` | `?from=&to=` (ISO-8601, 100일 이내) 그 범위의 버전 발행 event + release event |
 
 **새 컬렉션을 만들지 않았다** — 기존 컬렉션에 인덱스만 더해 가로질러 읽는다(09장 §6).
 `releases`에 `{recipientUsers, releasedAt}` · `{releasedBy, releasedAt}` ·
 `{'workflowAt.department', releasedAt}` · `{releasedAt}`,
 `artifacts`에 `{'versions.publishedAt'}` · `{'versions.observedAt'}` · `{updatedAt}`,
-`blocks`에 `{workflowId, intent, artifactId}`.
+`nodes`에 `{workflowId, intent, artifactId}`.
 
 `POST /releases` 는 **멱등하지 않다.** 중복 클릭을 막기 위해 FE는 요청 중 버튼을 잠그고,
 BE는 `releaseSeq` 를 원자적으로 증가시켜 순번 충돌을 막는다.
@@ -417,8 +423,103 @@ BE는 `releaseSeq` 를 원자적으로 증가시켜 순번 충돌을 막는다.
 
 | 값 | api | web |
 |---|---|---|
-| 부서 기본 목록 | `api/src/common/constants/departments.ts` | `web/src/shared/constants/departments.ts` |
+| 부서 기본 목록(★전사 고정 6종, §9와 무관★) | `api/src/common/constants/departments.ts` | `web/src/shared/constants/departments.ts` |
 | 일정 정렬·검증 | `api/src/common/schedule.ts` | `web/src/lib/schedule.ts` |
 | Revision 형식 | `api/src/common/constants/revision.ts` | `web/src/shared/constants/revision.ts` |
 | Tier 상수 | `api/src/common/constants/tier.ts` | `web/src/shared/constants/tier.ts` |
 | 캔버스 lock TTL | `api/src/common/constants/lock.ts` | `web/src/shared/constants/lock.ts` |
+
+---
+
+## 9. `projects.departments` — id 발급 · 개명 ★신규★
+
+과제(project)마다 자유롭게 늘리거나 줄이는 부서 목록(§1)이 **이름 문자열에서 `{id, name}`
+쌍으로 바뀐다.** 위 §8 표의 "부서 기본 목록"(전사 고정 6종, `analog`/`digital`/`aps`/`pipd`/
+`solution`/`pte`)은 이 변경과 **무관한 별개의 축**이다 — 그건 예전 `recvDept` 검증용으로
+남아있던 것이고, 지금 워크플로/노드/Calypso artifact의 권한이 실제로 참조하는 것은 언제나
+`projects.departments`(과제별 자유 목록)다.
+
+```ts
+Project {
+  departments: [{ id: string, name: string }]   // ★변경★ 구 string[]
+}
+```
+
+- `id`는 **부서를 추가하는 시점에 서버가 발급**한다(`new Types.ObjectId().toString()` — 이
+  코드베이스의 다른 모든 Mongo 발급 id와 같은 방식, 별도 의존성 없음). 한번 발급된 id는
+  그 부서가 삭제되기 전까지 절대 바뀌지 않는다.
+- `name`은 **Members 탭에서 언제든 바꿀 수 있다**(신규 기능) — id는 그대로 두고 `name`만
+  갱신한다.
+
+### 9.1 API
+
+기존 `PATCH /projects/:id/departments`(배열 전체 교체)를 세 개의 명시적 라우트로 나눈다 —
+Members 탭 UI가 "추가/개명/삭제" 세 가지 별개의 동작이기 때문이다:
+
+| Method | Path | 비고 |
+|---|---|---|
+| `POST` | `/projects/:id/departments` | `{ name }` → 새 `id` 발급, 목록에 추가 |
+| `PATCH` | `/projects/:id/departments/:deptId` | `{ name }` → 그 id의 `name`만 교체. **id는 그대로** |
+| `DELETE` | `/projects/:id/departments/:deptId` | 그 id를 가진 member가 한 명도 없을 때만 허용(기존 규칙 유지) |
+
+세 라우트 모두 권한은 기존 `PATCH /projects/:id/departments`와 동일하게 유지한다(`ProjectsService.assertManageAccess`
+— 지금 실제로는 Admin 전용이다). ★기존에 발견된 불일치 — FE의 `ProjectMembersPage.tsx`는 이
+버튼을 Project Manager(`canEditMilestones`)에게도 노출하고 있어(`canManageManagers` 게이트),
+Manager가 저장을 누르면 BE가 403을 낸다. 이번 변경은 이 불일치를 새로 만들지도, 고치지도
+않는다 — 세 라우트 모두 지금과 똑같이 Admin만 통과시킨다. FE/BE 권한 기준을 맞추는 것은
+이번 범위 밖의 별도 작업이다.
+`workflow` 생성 시 부서 매칭도 이름 비교가 아니라 **id 비교**로 바뀐다(`candidates.find(d =>
+d.id === wanted)`) — 대소문자 정규화 로직이 통째로 필요 없어진다.
+
+### 9.2 어디가 이름 대신 id를 저장하나
+
+`Project.departments`(정의 자체)를 제외한 **모든** 부서 참조 필드는 이제 이름이 아니라
+**그 프로젝트의 `Project.departments[].id`**를 저장한다:
+
+| 컬렉션 | 필드 |
+|---|---|
+| `projects` | `members[].departments` |
+| `workflows` | `department`, `editAccess.departments`, `viewAccess.departments` |
+| `nodes` | `recipients.departments` |
+| Calypso `artifacts`(별도 DB) | `department`, `editors[].department`, `viewGrants[].department` |
+
+### 9.3 표시 — "id만 들고, 이름은 조회 시점에 해석"
+
+01장 §6의 KnoxID·SDPCommonAPI 패턴과 같은 모양이다: **BE/DB는 id만 저장하고, 화면에 보여줄
+이름은 그때그때 `Project.departments`에서 찾는다.** 차이는 조회 대상이 외부 API가 아니라
+이미 화면이 들고 있는 `project.departments` 배열 하나뿐이라는 것 — 즉 **추가 네트워크
+호출이 전혀 없다.**
+
+FE는 `project`를 이미 들고 있는 모든 화면(워크플로 설정, 노드 recipient 편집기, 캔버스 필터,
+Calypso editor/viewer 선택기 등)에서 아래와 같은 `Map` 하나만 만들면 된다:
+
+```ts
+const nameById = useMemo(
+  () => new Map(project.departments.map((d) => [d.id, d.name])),
+  [project.departments],
+);
+```
+
+부서 이름을 Members 탭에서 바꾸면 `project` 쿼리 캐시 하나가 무효화되고, 그 캐시를 구독하는
+모든 화면이 자동으로 새 이름으로 다시 그려진다 — 별도로 전파할 것이 없다.
+
+### 9.4 release 이력의 부서 표기는 이름도 함께 얼린다
+
+`releases`(§6)만은 예외다 — release는 **그 순간의 사실을 보존**하는 이력이므로,
+`workflowAt.department`(id)와 별도로 **그 순간의 이름을 `workflowAt.departmentLabel`
+(문자열)로 함께 저장**한다. 평소에는(부서가 존재하는 한) id로 `Project.departments`를 찾아
+지금 이름을 보여주지만, 그 부서가 나중에 **삭제**되어 더 이상 `Project.departments`에 없는
+경우에만 `departmentLabel`이 대체 표시값으로 쓰인다 — 이름을 "그때 그대로 얼려서 보여주기"
+위한 것이 아니라(이름이 바뀌면 이력도 새 이름으로 보이는 게 맞다 — 그게 이번 개정의
+취지다), 부서 자체가 없어져 id로 아무것도 못 찾는 극단적인 경우의 안전망이다.
+`releases.items[].recipients.departments`는 별도 label 없이 id만 저장한다 — 화면에서
+매번 해석하고, 정 안 되면(부서 삭제) id 문자열을 그대로 보여준다.
+
+### 9.5 이번 개정으로 함께 바로잡는 것
+
+Calypso 쪽 `web/src/components/artifact/ArtifactSourcePicker.tsx`가 Calypso artifact의
+`department`를 표시할 때 지금까지 §8의 전사 고정 6종(`departmentName()`)으로 잘못 찾고
+있었다 — Calypso 스키마 자신의 주석("SIREN 공용 데이터의 부서 목록에서 고른 값")이 원래
+의도한 대로, 이제 그 artifact가 속한 SIREN project의 `departments`로 올바르게 찾는다. 이건
+이번 개정 범위 밖의 확장이 아니라, 부서 표시 로직을 다시 배선하는 김에 함께 고치는 기존
+버그다.

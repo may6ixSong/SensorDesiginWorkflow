@@ -6,7 +6,7 @@ import { Pager } from '@/components/common/Pager';
 import { NetworkTag } from '@/components/artifact/ArtifactChips';
 import { useMyArtifacts } from '@/api/hooks/useAssignments';
 import { fmtAt } from '@/lib/canvasModel';
-import { canonicalDepartmentLabel } from '@/shared/constants/departments';
+import { useDepartmentLabels } from '@/hooks/useDepartmentLabel';
 import { MyArtifactRowDto } from '@/types/domain';
 import { FONT_MONO, T } from '@/theme/tokens';
 
@@ -15,10 +15,10 @@ import { FONT_MONO, T } from '@/theme/tokens';
 const PAGE_SIZE = 15;
 
 /**
- * 내가/내 부서가 관리하는 산출물 자리(block) 목록 — 모든 과제·모든 workflow를 가로지른다
+ * 내가/내 부서가 관리하는 산출물 자리(node) 목록 — 모든 과제·모든 workflow를 가로지른다
  * (설계서 09장 §3).
  *
- * ★ 행의 정체성은 artifact가 아니라 **block**이다. 같은 산출물이 여러 workflow에 놓이면
+ * ★ 행의 정체성은 artifact가 아니라 **node**이다. 같은 산출물이 여러 workflow에 놓이면
  *   그만큼 행이 나온다 — 그 자리마다 phase도 recipient 구성도 다르기 때문이다(04장 §4.4).
  * ★ 판정 기준은 **workflow 소속 부서 + `intent: 'own'`**이다. Tier A/C는 실제 편집 권한을
  *   그 서비스가 들고 있어 SIREN이 알 수 없고, 산출물마다 물어보면 목록 하나에 수십 번의
@@ -44,7 +44,7 @@ export function MyArtifactsPanel({
     const term = q.trim().toLowerCase();
     if (!term) return byProject;
     return byProject.filter((r) =>
-      `${r.artifactName} ${r.blockName} ${r.workflowName} ${r.projectCode} ${r.projectName}`
+      `${r.artifactName} ${r.nodeName} ${r.workflowName} ${r.projectCode} ${r.projectName}`
         .toLowerCase()
         .includes(term),
     );
@@ -131,7 +131,7 @@ export function MyArtifactsPanel({
         ) : (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
             {paged.map((row) => (
-              <ArtifactRow key={row.blockId} row={row} />
+              <ArtifactRow key={row.nodeId} row={row} />
             ))}
           </Box>
         )}
@@ -158,6 +158,7 @@ export function MyArtifactsPanel({
  */
 function ArtifactRow({ row }: { row: MyArtifactRowDto }) {
   const latest = row.latestVersion;
+  const { label: deptLabel } = useDepartmentLabels([row.projectId]);
 
   return (
     <Box
@@ -174,12 +175,12 @@ function ArtifactRow({ row }: { row: MyArtifactRowDto }) {
       <Box sx={{ minWidth: 0 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
           <Box sx={{ fontSize: 12.5, fontWeight: 700, minWidth: 0, overflowWrap: 'anywhere' }}>
-            {row.blockName}
+            {row.nodeName}
           </Box>
           <NetworkTag network={row.network} />
         </Box>
-        {/* block 이름과 artifact 자신의 이름은 다를 수 있다 — 캔버스는 block 이름을 쓴다. */}
-        {row.artifactName !== row.blockName && (
+        {/* node 이름과 artifact 자신의 이름은 다를 수 있다 — 캔버스는 node 이름을 쓴다. */}
+        {row.artifactName !== row.nodeName && (
           <Box sx={{ fontSize: 10.5, color: T.dm2, mt: '2px', overflowWrap: 'anywhere' }}>
             {row.artifactName}
           </Box>
@@ -194,7 +195,7 @@ function ArtifactRow({ row }: { row: MyArtifactRowDto }) {
         </Box>
         <Box sx={{ color: T.tx2, fontSize: 11.5, overflowWrap: 'anywhere' }}>{row.workflowName}</Box>
         <Box sx={{ color: T.dm2, fontSize: 10.5 }}>
-          {canonicalDepartmentLabel(row.workflowDepartment)}
+          {deptLabel(row.projectId, row.workflowDepartment)}
         </Box>
       </Box>
 
@@ -221,7 +222,7 @@ function ArtifactRow({ row }: { row: MyArtifactRowDto }) {
       <Box sx={{ minWidth: 0, display: 'flex', gap: '3px', flexWrap: 'wrap', alignItems: 'center' }}>
         {row.recipientDepartments.map((d) => (
           <Badge key={d} color={T.recv} bg={T.recvSoft} borderColor={T.recv}>
-            {canonicalDepartmentLabel(d)}
+            {deptLabel(row.projectId, d)}
           </Badge>
         ))}
         {row.recipientUserCount > 0 && (

@@ -6,23 +6,23 @@ import { CurrentProject, CurrentWorkflow } from '../common/decorators/current-wo
 import { Actor } from '../common/actor';
 import { WorkflowDocument } from '../workflows/schemas/workflow.schema';
 import { ProjectDocument } from '../projects/schemas/project.schema';
-import { BlocksService } from './blocks.service';
+import { NodesService } from './nodes.service';
 import { CanvasViewService } from './canvas-view.service';
 import { EdgesService } from '../edges/edges.service';
 import { ArtifactSourceService, CandidateIntent, CandidateSource } from '../artifacts/artifact-source.service';
-import { CreateBlockDto, ReplaceRecipientsDto, UpdateBlockDto } from './dto/block-crud.dto';
+import { CreateNodeDto, ReplaceRecipientsDto, UpdateNodeDto } from './dto/node-crud.dto';
 
 /**
- * 캔버스 블록 라우트. 구 `deliverables` 라우트를 대체한다.
+ * 캔버스 노드 라우트. 구 `deliverables` 라우트를 대체한다.
  *
  * 권한은 전부 WorkflowAccessGuard가 먼저 검증한다 — 그 과제의 member인지, 그리고
  * @WorkflowAccess가 요구하는 수준을 만족하는지(설계서 01장 §2.2, §3.2).
  */
 @Controller()
 @UseGuards(WorkflowAccessGuard)
-export class BlocksController {
+export class NodesController {
   constructor(
-    private readonly blocks: BlocksService,
+    private readonly nodes: NodesService,
     private readonly canvasView: CanvasViewService,
     private readonly edges: EdgesService,
     private readonly sources: ArtifactSourceService,
@@ -54,7 +54,7 @@ export class BlocksController {
     );
   }
 
-  @Get('workflows/:workflowId/blocks')
+  @Get('workflows/:workflowId/nodes')
   @WorkflowAccess('view')
   async listForWorkflow(
     @CurrentWorkflow() workflow: WorkflowDocument,
@@ -67,17 +67,17 @@ export class BlocksController {
   /**
    * 버전 목록 — 이제 SIREN 캐시에서 읽는다(설계서 07장 §3·§4, 04장 §7). A/B/C
    * (OA Service/File Artifacts/HPC Service) 공통이며, 열 때마다 그 서비스에 다시
-   * 묻지 않는다. slide를 열었을 때만 그 block 하나에 대해 호출된다 — 캔버스 목록 조회는
+   * 묻지 않는다. slide를 열었을 때만 그 node 하나에 대해 호출된다 — 캔버스 목록 조회는
    * 절대 이걸 부르지 않는다(설계서 05장 §8).
    */
-  @Get('workflows/:workflowId/blocks/:blockId/live-versions')
+  @Get('workflows/:workflowId/nodes/:nodeId/live-versions')
   @WorkflowAccess('view')
   async liveVersions(
-    @Param('blockId') blockId: string,
+    @Param('nodeId') nodeId: string,
     @CurrentProject() project: ProjectDocument,
     @CurrentActor() me: Actor,
   ) {
-    return this.canvasView.liveVersions(blockId, project, me);
+    return this.canvasView.liveVersions(nodeId, project, me);
   }
 
   /**
@@ -85,70 +85,70 @@ export class BlocksController {
    * Tier에서는 이걸로 대신한다 — slide가 latest version으로 최초 1번, 이후 사용자가 다른
    * (hasHtmlView인) 버전을 고를 때마다 호출한다.
    */
-  @Get('workflows/:workflowId/blocks/:blockId/html-view')
+  @Get('workflows/:workflowId/nodes/:nodeId/html-view')
   @WorkflowAccess('view')
   async htmlView(
-    @Param('blockId') blockId: string,
+    @Param('nodeId') nodeId: string,
     @Query('versionLabel') versionLabel: string,
     @CurrentProject() project: ProjectDocument,
     @CurrentActor() me: Actor,
   ) {
     if (!versionLabel) throw new BadRequestException('versionLabel is required.');
-    return this.canvasView.htmlView(blockId, versionLabel, project, me);
+    return this.canvasView.htmlView(nodeId, versionLabel, project, me);
   }
 
-  @Post('workflows/:workflowId/blocks')
+  @Post('workflows/:workflowId/nodes')
   @WorkflowAccess('edit')
   async create(
-    @Body() dto: CreateBlockDto,
+    @Body() dto: CreateNodeDto,
     @CurrentWorkflow() workflow: WorkflowDocument,
     @CurrentProject() project: ProjectDocument,
     @CurrentActor() me: Actor,
   ) {
-    const block = await this.blocks.create(workflow, project, dto, me);
-    return this.canvasView.assembleOne(block, workflow, project, me);
+    const node = await this.nodes.create(workflow, project, dto, me);
+    return this.canvasView.assembleOne(node, workflow, project, me);
   }
 
-  @Patch('blocks/:id')
+  @Patch('nodes/:id')
   @WorkflowAccess('edit')
   async update(
     @Param('id') id: string,
-    @Body() dto: UpdateBlockDto,
+    @Body() dto: UpdateNodeDto,
     @CurrentWorkflow() workflow: WorkflowDocument,
     @CurrentProject() project: ProjectDocument,
     @CurrentActor() me: Actor,
   ) {
-    const block = await this.blocks.update(project, id, dto, me);
-    return this.canvasView.assembleOne(block, workflow, project, me);
+    const node = await this.nodes.update(project, id, dto, me);
+    return this.canvasView.assembleOne(node, workflow, project, me);
   }
 
-  @Delete('blocks/:id')
+  @Delete('nodes/:id')
   @WorkflowAccess('edit')
   async remove(@Param('id') id: string, @CurrentActor() me: Actor) {
-    // 그 블록이 관여된 flow도 함께 정리한다 — 남겨두면 끊어진 화살표가 된다.
-    await this.edges.deleteByBlockIds([id]);
-    await this.blocks.remove(id, me);
+    // 그 노드가 관여된 flow도 함께 정리한다 — 남겨두면 끊어진 화살표가 된다.
+    await this.edges.deleteByNodeIds([id]);
+    await this.nodes.remove(id, me);
     return { ok: true };
   }
 
   /**
-   * block의 recipient 교체 — A/B/C 전부 공통이다(설계서 04장 §3.3).
+   * node의 recipient 교체 — A/B/C 전부 공통이다(설계서 04장 §3.3).
    *
    * 편집 권한은 그 workflow의 **Edit Access**다. recipient는 이제 slide 열람을 막지
    * 않는다(설계서 01장 §4.2 갱신) — release 알림 대상과 Recipients/Comments 탭에 누구를
    * 보여줄지에만 쓰인다. 그 두 탭 자체도 recipient 소속이 아니라 이 Edit Access로만
    * 노출된다.
    */
-  @Patch('workflows/:workflowId/blocks/:blockId/recipients')
+  @Patch('workflows/:workflowId/nodes/:nodeId/recipients')
   @WorkflowAccess('edit')
   async replaceRecipients(
-    @Param('blockId') blockId: string,
+    @Param('nodeId') nodeId: string,
     @Body() dto: ReplaceRecipientsDto,
     @CurrentWorkflow() workflow: WorkflowDocument,
     @CurrentProject() project: ProjectDocument,
     @CurrentActor() me: Actor,
   ) {
-    const block = await this.blocks.replaceRecipients(blockId, dto, me);
-    return this.canvasView.assembleOne(block, workflow, project, me);
+    const node = await this.nodes.replaceRecipients(nodeId, dto, me);
+    return this.canvasView.assembleOne(node, workflow, project, me);
   }
 }

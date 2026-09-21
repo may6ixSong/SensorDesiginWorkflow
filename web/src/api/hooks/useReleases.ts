@@ -54,8 +54,8 @@ export function useCreateRelease(workflowId: string) {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.releases(workflowId) });
-      // release가 나가면 각 블록의 publish 배지 기준선(마지막 release의 major)이 바뀐다.
-      qc.invalidateQueries({ queryKey: queryKeys.blocks(workflowId) });
+      // release가 나가면 각 노드의 publish 배지 기준선(마지막 release의 major)이 바뀐다.
+      qc.invalidateQueries({ queryKey: queryKeys.nodes(workflowId) });
       qc.invalidateQueries({ queryKey: queryKeys.workflow(workflowId) });
     },
   });

@@ -73,7 +73,7 @@ export class ArtifactsService {
   }
 
   /**
-   * ★ SIREN이 받는(received) 쪽 block을 위해 매핑용 placeholder로 이 엔드포인트를
+   * ★ SIREN이 받는(received) 쪽 node를 위해 매핑용 placeholder로 이 엔드포인트를
    * 호출하는 경우에도 지금은 이 경로 그대로다 — createdBy는 여전히 실제로 호출한
    * 사용자로 기록되고, computeAccess()의 "createdBy는 항상 edit" 규칙도 그대로
    * 적용된다. 즉 받는 쪽이 만든 placeholder도 지금은 그 등록자가 편집할 수 있다.

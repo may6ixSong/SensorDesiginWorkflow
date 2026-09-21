@@ -20,16 +20,19 @@ export class Layout {
 }
 export const LayoutSchema = SchemaFactory.createForClass(Layout);
 
-export type BlockDocument = Block & Document;
+export type WorkflowNodeDocument = WorkflowNode & Document;
 
 /**
  * 캔버스 위의 **자리(placement)**다 — 산출물 그 자체가 아니다(설계서 04장 §1).
  * 버전도, A/B/C의 권한도 갖지 않는다. 전부 Artifact로 옮겼다.
  *
- * 구 `deliverables` 컬렉션이 이것과 `artifacts` 둘로 쪼개진 결과물이다.
+ * 구 `deliverables` 컬렉션이 이것과 `artifacts` 둘로 쪼개진 결과물이다. 그 뒤 이 클래스
+ * 자체도 `Block`에서 `WorkflowNode`로 개명됐다(컬렉션명은 `nodes`로 명시 지정 — 아래
+ * `@Schema({ collection: 'nodes' })` 참고. Mongoose 자동 복수화에 맡기면 클래스명
+ * `WorkflowNode`가 `workflownodes`로 잘못 복수화되기 때문이다).
  */
-@Schema({ timestamps: true })
-export class Block {
+@Schema({ collection: 'nodes', timestamps: true })
+export class WorkflowNode {
   @Prop({ type: SchemaTypes.ObjectId, ref: 'Project', required: true, index: true })
   projectId: Types.ObjectId;
 
@@ -41,7 +44,7 @@ export class Block {
 
   /**
    * null = 아직 출처가 정해지지 않은 **정상 빈 상태**다 — 자리는 캔버스에 잡아두고
-   * 출처는 나중에 지정한다. 이 상태의 블록은 release 대상에서 제외되고, recipient UI도
+   * 출처는 나중에 지정한다. 이 상태의 노드는 release 대상에서 제외되고, recipient UI도
    * 표시하지 않는다(설계서 05장 §2.2).
    *
    * ★ 매핑 시 artifact.projectId === this.projectId 인지 반드시 검증한다 —
@@ -68,11 +71,11 @@ export class Block {
   intent: 'own' | 'received';
 
   /**
-   * artifact가 매핑된 block에서만 의미가 있다 — A/B/C 전부 공통이다(설계서 04장 §3).
+   * artifact가 매핑된 node에서만 의미가 있다 — A/B/C 전부 공통이다(설계서 04장 §3).
    *
    * SIREN은 여기서 "누가 이 자리의 산출물을 받는가"만 관리한다. 이 구성은
    * **workflow마다 독립**이다 — 같은 artifact가 workflow X와 Y에 놓여도 X는 AA·BB 부서에,
-   * Y는 CC 부서에만 갈 수 있다. 그래서 artifact가 아니라 여기(block)에 붙는다.
+   * Y는 CC 부서에만 갈 수 있다. 그래서 artifact가 아니라 여기(node)에 붙는다.
    *
    * ★ edit/view로 나뉘지 않는다 — 실제 edit 여부는 그 서비스가 최종 판정한다.
    *
@@ -85,7 +88,7 @@ export class Block {
   recipients: AccessGrant;
 
   /** null이면 원본. 회차 인스턴스는 원본의 _id를 담는다(반복 릴리스 일정). */
-  @Prop({ type: SchemaTypes.ObjectId, ref: 'Block', default: null })
+  @Prop({ type: SchemaTypes.ObjectId, ref: 'WorkflowNode', default: null })
   series: Types.ObjectId | null;
 
   @Prop({ default: 1 })
@@ -103,9 +106,9 @@ export class Block {
   _id: Types.ObjectId;
 }
 
-export const BlockSchema = SchemaFactory.createForClass(Block);
-BlockSchema.index({ workflowId: 1, phaseId: 1 });
-BlockSchema.index({ series: 1 });
-// My Assignment는 "내 부서 workflow의 own block 중 artifact가 매핑된 것"을 과제 경계를
+export const WorkflowNodeSchema = SchemaFactory.createForClass(WorkflowNode);
+WorkflowNodeSchema.index({ workflowId: 1, phaseId: 1 });
+WorkflowNodeSchema.index({ series: 1 });
+// My Assignment는 "내 부서 workflow의 own node 중 artifact가 매핑된 것"을 과제 경계를
 // 넘어 모은다 — workflow 묶음으로 한 번에 긁는 그 조회를 위한 인덱스다(설계서 09장).
-BlockSchema.index({ workflowId: 1, intent: 1, artifactId: 1 });
+WorkflowNodeSchema.index({ workflowId: 1, intent: 1, artifactId: 1 });

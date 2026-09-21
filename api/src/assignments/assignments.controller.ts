@@ -41,7 +41,7 @@ export class AssignmentsController {
   }
 
   /**
-   * 내 부서가 주는 산출물(artifact가 매핑된 own block)의 목록. 최근 1년, 최근 갱신순.
+   * 내 부서가 주는 산출물(artifact가 매핑된 own node)의 목록. 최근 1년, 최근 갱신순.
    * 페이지네이션이 없다 — 1년 창과 scope로 이미 좁혀져 있고, 화면도 한 패널에 스크롤로
    * 다 담는다(설계서 09장 §3).
    */

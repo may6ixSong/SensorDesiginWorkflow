@@ -8,8 +8,8 @@ import { SirenButton } from '@/components/common/SirenButton';
 import { Ey, Field, TextInput } from '@/components/common/Panel';
 import { Icon } from '@/components/common/Icon';
 import { ArtifactSourcePicker, ArtifactSourceState, emptySourceState, resolveNewArtifact } from '@/components/artifact/ArtifactSourcePicker';
-import { NewArtifactSourceInput } from '@/api/hooks/useBlocks';
-import { ArtifactIntent } from '@/types/domain';
+import { NewArtifactSourceInput } from '@/api/hooks/useNodes';
+import { ArtifactIntent, DepartmentDto } from '@/types/domain';
 import { CURSOR_POINTER, FONT_MONO, R, T } from '@/theme/tokens';
 
 interface Props {
@@ -20,7 +20,7 @@ interface Props {
   projectRevision: string | undefined;
   phases: WorkflowPhase[];
   myDepartments: string[];
-  departmentOptions: string[];
+  departmentOptions: DepartmentDto[];
   onClose: () => void;
   onCreate: (p: {
     name: string;
@@ -32,12 +32,12 @@ interface Props {
 }
 
 /**
- * "새 Artifact 추가" — 캔버스에 자리(block)를 놓는 동시에 실제 산출물 출처까지 그 자리에서
+ * "새 Artifact 추가" — 캔버스에 자리(node)를 놓는 동시에 실제 산출물 출처까지 그 자리에서
  * 확정한다(설계서 04장 §6). Tier 글자(A/B/C)는 화면 어디에도 노출하지 않는다.
  *
  * ★ intent(주는/받는)가 첫 질문이다 — 이후 후보 목록의 pickable 판정(edit-only vs
  *   edit-or-view)이 이 값에 따라 갈린다. 생성 후에는 바꾸지 않는다.
- * ★ 소스 선택 UI(ArtifactSourcePicker)는 캔버스에서 만들 때와 이미 만들어진 block의
+ * ★ 소스 선택 UI(ArtifactSourcePicker)는 캔버스에서 만들 때와 이미 만들어진 node의
  *   artifact를 바꿀 때(ChangeArtifactDialog) 둘 다에서 재사용한다.
  */
 export function AddArtifactDialog({
@@ -52,7 +52,7 @@ export function AddArtifactDialog({
   const [pickedName, setPickedName] = useState('');
   const [phaseId, setPhaseId] = useState<string>(phases[0]?.id ?? '');
   /** true면 이 자리에서 바로 artifact를 매핑하고, false면 자리만 잡아두고 나중에
-   * 매핑한다(사용자 요청 — block은 artifact 없이도 만들 수 있다, 설계서 03장 §2.3). */
+   * 매핑한다(사용자 요청 — node는 artifact 없이도 만들 수 있다, 설계서 03장 §2.3). */
   const [mapNow, setMapNow] = useState(true);
   const [src, setSrc] = useState<ArtifactSourceState>(emptySourceState());
   const [err, setErr] = useState<string | null>(null);
@@ -128,7 +128,7 @@ export function AddArtifactDialog({
         />
       </Field>
 
-      <Field label="Phase — a block sits in exactly one phase">
+      <Field label="Phase — a node sits in exactly one phase">
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
           {phases.map((p) => (
             <Box
@@ -191,7 +191,7 @@ export function AddArtifactDialog({
         />
       ) : (
         <Box sx={{ fontSize: 11.5, color: T.dm2, lineHeight: 1.6, mb: '10px' }}>
-          This just holds a place on the canvas — map it to an artifact later from the block&apos;s detail.
+          This just holds a place on the canvas — map it to an artifact later from the node&apos;s detail.
         </Box>
       )}
 

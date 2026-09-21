@@ -200,7 +200,7 @@ export class VersionPublishedEventDto {
 - **`code`/`revision`/`externalProjectId`** — 안 둔다. `externalArtifactId`가 서비스
   전체에서 유일하므로 project 식별을 따로 실을 필요가 없다(§4.3).
 - **`artifactName`** — 처음엔 있었는데 뺐다. `Artifact.name`은 "새 Artifact 추가" 다이얼로그
-  에서 SIREN 쪽 사용자가 처음 지정한 이름으로 고정된다(`block.name`과 같은 이유 — 화면에
+  에서 SIREN 쪽 사용자가 처음 지정한 이름으로 고정된다(`node.name`과 같은 이유 — 화면에
   보이는 이름은 SIREN 쪽이 관리한다). 이 필드를 이벤트에 실어서 매번 SIREN의 캐시 이름을
   갱신하게 했더니, 서비스가 처음 event를 보내는 순간 그 사용자가 지정한 이름이 그 서비스가
   부르는 이름으로 영구히 덮어써져서 의미가 없어졌다 — 그래서 아예 뺐다. `Artifact.name`을
@@ -266,7 +266,7 @@ event 유실에 대비해, 작업이 없는 야간 시간대에 하루 한 번 �
 - **`Artifact.editAccess`/`viewAccess`(SIREN이 A/B/C 권한을 직접 보관하던 옛 모델)** —
   04장 §3 참고.
 - **`Artifact.editAccess`/`viewAccess`/`expectedGiver`(한때 D 전용으로 마지막까지 남아 있던
-  옛 모델)** — recipient를 A/B/C처럼 `Block.recipients`(단일 grant, edit/view 구분 없음)로
+  옛 모델)** — recipient를 A/B/C처럼 `WorkflowNode.recipients`(단일 grant, edit/view 구분 없음)로
   옮겼다(01장 §4, 04장 §3). D 자체를 폐기한 뒤로는 이 문장이 가리키던 예외도 없다.
 
 ## 8. 명칭

@@ -8,7 +8,7 @@
 예전에는 캔버스의 노드(`deliverables`)가 버전과 권한을 직접 들고 있었다. 이제 분리한다.
 
 ```
-Block (캔버스 위의 자리)  ──artifactId──▶  Artifact (실체)
+WorkflowNode (캔버스 위의 자리)  ──artifactId──▶  Artifact (실체)
   · workflowId, phaseId                     · tier, 권한, recipient
   · layout                                  · publish 이력(versions)
   · intent                                  · 과제 단위로 공유
@@ -19,7 +19,7 @@ Block (캔버스 위의 자리)  ──artifactId──▶  Artifact (실체)
 
 ### 1.1 Mapping은 같은 과제 안에서만
 
-block을 artifact에 매핑할 때(=출처를 지정할 때), 후보는 **그 workflow와 같은 project(=같은
+node를 artifact에 매핑할 때(=출처를 지정할 때), 후보는 **그 workflow와 같은 project(=같은
 `code` + `revision`)의 artifact로 한정**한다. `code`가 같아도 `revision`이 다르면 완전히 다른
 project이므로 후보에 나오지 않는다(02장 §1). Admin이 여러 project를 동시에 조회할 수 있어도
 이 제약은 그대로다 — 다른 project의 artifact를 끌어와 매핑하려 하면 BE가 400으로 거부한다.
@@ -52,7 +52,7 @@ OA Service 목록에 없는 이유는 §3.1·§6.3 참고 — Calypso는 애초�
 - **tier는 산출물이 아니라 버전 엔트리의 속성이다.** 나중에 실연동이 붙어도 과거 기록을
   고치거나 옮기지 않는다 — 다음 엔트리가 다른 tier로 찍힐 뿐이다. 따라서 tier 승격에
   마이그레이션 로직이 필요 없다. (다른 tier로 옮겨가야 하는 경우도 "승격" 기능을 따로 만들지
-  않는다 — 새 tier로 정식 Artifact를 등록하고, 기존 block들이 §6.6의 재매핑으로 하나씩
+  않는다 — 새 tier로 정식 Artifact를 등록하고, 기존 node들이 §6.6의 재매핑으로 하나씩
   갈아타면 된다. workflow마다 전환 시점이 달라도 무방하다.)
 - **HPC Service는 더 이상 "항상 잠김"이 아니다.** HPC망과의 양방향 API 연동이 확정되면서
   OA Service/File Artifacts와 같은 라이브 게이트·event 대상이 됐다(§6.2, §6.3, 07장). 다만
@@ -116,7 +116,7 @@ A와 같은 모델로 통일**했다. 그다음엔 이 모델에서 제외돼 �
 |---|---|
 | Edit / View 권한 | **그 서비스**가 관리한다. SIREN은 전혀 보관하지 않는다 |
 | SIREN에서 권한 편집 | **불가.** 그 서비스에 가서 고쳐야 한다 |
-| Recipient 저장 위치 | **SIREN이 block(=그 workflow의 자리) 단위로 저장** |
+| Recipient 저장 위치 | **SIREN이 node(=그 workflow의 자리) 단위로 저장** |
 | Recipient가 여러 workflow에서 같은가 | **아니다.** 같은 artifact도 workflow마다 recipient 구성이 다를 수 있다 |
 | Recipient와 slide 열람의 관계 | **없다**(사용자 결정, §4.1 갱신) — slide를 열 수 있는지는 오직 그 서비스의 권한 하나로만 정해진다. recipient는 release 알림 대상과 Recipients/Comments 탭 표시 대상일 뿐이다 |
 
@@ -141,16 +141,16 @@ recipient는 **release 알림 대상**이면서 **Recipients/Comments 탭에 누
 "recipient = 그 서비스의 실제 권한"은 여전히 무관하다 — recipient에 들어 있어도 그 서비스에서
 view 권한이 없으면 slide는 (recipient 여부와 무관하게) 막힌다.
 
-### 3.2 recipient는 block에 — A/B/C 공통, 단일 grant
+### 3.2 recipient는 node에 — A/B/C 공통, 단일 grant
 
-`Block.recipients`(02장 §4)에 저장하며, 부서 다중 + 사용자 다중의 **단일 grant**다.
+`WorkflowNode.recipients`(02장 §4)에 저장하며, 부서 다중 + 사용자 다중의 **단일 grant**다.
 edit/view로 나뉘지 않는다 — 실제 edit 여부는 그 서비스가 최종 판정한다(§4.1).
 
 ```ts
-Block.recipients = { departments: string[], users: string[] }
+WorkflowNode.recipients = { departments: string[], users: string[] }
 ```
 
-- 같은 artifact가 workflow X와 workflow Y 양쪽에 놓여 있어도, X의 block과 Y의 block은
+- 같은 artifact가 workflow X와 workflow Y 양쪽에 놓여 있어도, X의 node와 Y의 node는
   **서로 다른 recipients**를 가질 수 있다 — X는 AA·BB 부서에게, Y는 CC 부서에게만 알림이
   가는 식으로 독립적으로 구성한다.
 - **`recipients`에 사람을 넣는 것 자체가 그 서비스의 권한을 부여하지 않는다.** 그 서비스에서
@@ -195,10 +195,10 @@ File Artifacts(B)의 OA-link/HPC-path 콘텐츠(§2.2)가 해결한다 — recip
   있다 → 열린다. canEdit 여부로 버전 트리 깊이가 갈린다(§7).
 ```
 
-- **workflow Edit Access가 있는지, block.recipients에 속하는지는 이 판정에 관여하지 않는다**
+- **workflow Edit Access가 있는지, node.recipients에 속하는지는 이 판정에 관여하지 않는다**
   (사용자 결정 — 이전 버전은 여기가 2단 게이트였고, recipient를 먼저 통과해야 서비스 권한을
   물었다). 그 결과 같은 부서가 만든 workflow이고 artifact 자체는 view 제한이 없는데도, 그
-  block의 recipient가 다른 부서로 지정돼 있으면 못 여는 상황이 나왔다 — recipient의 존재
+  node의 recipient가 다른 부서로 지정돼 있으면 못 여는 상황이 나왔다 — recipient의 존재
   이유(같은 artifact를 workflow마다 다른 대상에게 보여주고 싶을 수 있다, §3.2)는 유효하지만,
   그걸 위해 열람 자체를 막는 대가가 너무 컸다. 지금은 recipient가 release 알림 대상과
   Recipients/Comments 탭 표시 대상으로만 쓰인다(§5).
@@ -237,12 +237,12 @@ artifact 상세 slide 안의 탭 둘이다. **이 둘은 slide 자체(Overview)�
 
 | 열람자 | Overview(§4) | Recipients / Comments |
 |---|---|---|
-| workflow Edit Access | 그 서비스 canView/canEdit로 판정 | **보인다.** Recipients는 편집 가능(`block.recipients`에 부서·사용자 추가·삭제, §3.2), Comments는 읽기·쓰기 모두 가능 |
+| workflow Edit Access | 그 서비스 canView/canEdit로 판정 | **보인다.** Recipients는 편집 가능(`node.recipients`에 부서·사용자 추가·삭제, §3.2), Comments는 읽기·쓰기 모두 가능 |
 | workflow View 권한자 (Edit 아님) | 그 서비스 canView/canEdit로 판정 — Edit 권한자와 동일 기준 | **탭 자체가 없다.** 그 artifact의 편집 권한이 있거나 recipient로 등록돼 있어도 마찬가지다 |
-| 미매핑 블록 | "No source yet" | **탭 자체를 감춘다** |
+| 미매핑 노드 | "No source yet" | **탭 자체를 감춘다** |
 
 > **판정 기준이 완전히 분리된다.** Overview는 그 서비스의 canView/canEdit 하나로만 열리고
-> (§4.1), Recipients/Comments는 block.recipients 소속이나 artifact 자체의 편집 권한과
+> (§4.1), Recipients/Comments는 node.recipients 소속이나 artifact 자체의 편집 권한과
 > 무관하게 **오직 workflow Edit Access**로만 열린다. 그래서 "artifact는 볼 수 있는데 그
 > 두 탭은 안 보이는" 사람과 "workflow는 편집할 수 있지만 그 artifact는 서비스 쪽 권한이
 > 없어 Overview가 막힌 채로 Recipients/Comments만 여는" 사람이 둘 다 있을 수 있다 — 의도된
@@ -261,12 +261,12 @@ artifact 상세 slide 안의 탭 둘이다. **이 둘은 slide 자체(Overview)�
 ## 6. "새 Artifact 추가" — 등록·변경 정책 ★T2 반영★
 
 03장 §5.2의 "새 Artifact 추가" 버튼은 이제 **주는(own) / 받는(received) 양쪽 모두** 만든다.
-이미 만들어진 block의 artifact를 바꾸는 것("변경")도 같은 규칙, 같은 UI를 그대로 재사용한다 —
-Block(자리)과 Artifact(실체)가 분리되어 있으므로(§1) 매핑을 바꾸는 것 자체는 자유롭다.
+이미 만들어진 node의 artifact를 바꾸는 것("변경")도 같은 규칙, 같은 UI를 그대로 재사용한다 —
+WorkflowNode(자리)와 Artifact(실체)가 분리되어 있으므로(§1) 매핑을 바꾸는 것 자체는 자유롭다.
 
 ### 6.1 다이얼로그 흐름
 
-1. **주는지 받는지 고른다** — 이후 모든 pickability 판정이 이 값을 따른다. block 생성 후에는
+1. **주는지 받는지 고른다** — 이후 모든 pickability 판정이 이 값을 따른다. node 생성 후에는
    바꾸지 않는다("변경"은 무엇을 매핑할지만 바꾸지, own/received 방향 자체는 안 바꾼다).
 2. Name, Phase — 기존과 동일.
 3. **출처를 고른다.** Tier 글자(A/B/C)는 화면 어디에도 노출하지 않는다:
@@ -377,16 +377,16 @@ code/revision을 쓸 수 있는 경우)는 이제 **그 서비스 쪽이 필터�
 
 ### 6.5 한 workflow 안에서 같은 artifact 중복 금지
 
-**같은 workflow 안에서 같은 artifact를 두 개의 block에 매핑할 수 없다 — 주는/받는 모두 마찬가지다**
-(사용자 결정). release의 source 버전 지정이 block 단위이기 때문에, 같은 artifact가 두 block에
-걸리면 어느 block이 진짜 upstream인지 flow edge 판정이 모호해지고, release 표에도 같은 산출물이
-중복으로 찍힌다. block 생성·재매핑 양쪽에서 `(workflowId, artifactId)` 조합의 유일성을 서버가
+**같은 workflow 안에서 같은 artifact를 두 개의 node에 매핑할 수 없다 — 주는/받는 모두 마찬가지다**
+(사용자 결정). release의 source 버전 지정이 node 단위이기 때문에, 같은 artifact가 두 node에
+걸리면 어느 node가 진짜 upstream인지 flow edge 판정이 모호해지고, release 표에도 같은 산출물이
+중복으로 찍힌다. node 생성·재매핑 양쪽에서 `(workflowId, artifactId)` 조합의 유일성을 서버가
 검증한다 — **다른 workflow에서 같은 artifact를 재사용하는 것은 여전히 허용된다**(§1의 project 단위
 공유 원칙 그대로).
 
 ### 6.6 재매핑("변경")과 recipient
 
-이미 매핑된 block의 artifact를 바꾸면 **`block.recipients`(A/B/C 공통)를 초기화한다.** 이전
+이미 매핑된 node의 artifact를 바꾸면 **`node.recipients`(A/B/C 공통)를 초기화한다.** 이전
 recipient 구성이 새 artifact에도 유효하다는 보장이 없기 때문이다 — 조용히 남겨두면 의도치 않은
 부서에 알림이 갈 수 있다. Edit Access 보유자가 재매핑 직후 다시 구성해야 한다.
 
@@ -401,11 +401,11 @@ GET /workflows/:workflowId/artifact-candidates
   code/revision은 그 workflow가 속한 SIREN project에서 그대로 채운다(사람이 따로 확정하는
   단계 없음, §6.3). OA/HPC Service는 서비스별 observer 호출이 있어 응답이 느릴 수 있다.
 
-POST /workflows/:workflowId/blocks       { name, phaseId, layout, intent, artifactId? | newArtifact? }
-PATCH /blocks/:id                        { name?, artifactId? | newArtifact? }
+POST /workflows/:workflowId/nodes       { name, phaseId, layout, intent, artifactId? | newArtifact? }
+PATCH /nodes/:id                        { name?, artifactId? | newArtifact? }
 → newArtifact = { source: 'live'|'file'|'hpc', name, serviceKey?, externalArtifactId? }
   둘 다 §6.2를 서버가 다시 검증하고(§6.5의 중복 금지 포함), find-or-create 또는 신규 생성 후
-  block에 매핑한다. 최종 식별은 (serviceKey, externalArtifactId) 조합이다 — externalArtifactId는
+  node에 매핑한다. 최종 식별은 (serviceKey, externalArtifactId) 조합이다 — externalArtifactId는
   그 서비스 전체에서(project를 넘나들어) 유일해야 한다(07장 §3). 매핑이 확정되는 순간 SIREN이
   그 artifact의 전체 버전 이력을 한 번 라이브로 pull해 온다(§6.3, 07장 §3).
 ```

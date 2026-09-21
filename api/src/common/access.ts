@@ -10,7 +10,7 @@
  * 서비스, DTO 마스킹이 전부 같은 판정을 쓰고 어긋나지 않는다. Artifact 계층의 실제 판정
  * (그 서비스에 canView를 물어보는 것 — Calypso 포함)은 I/O가 필요해서 ArtifactAccessService가
  * 담당한다 — 이 파일에는 그 판정을 위한 순수 함수가 없다(과거엔 `recipientLevel()`이
- * 있었으나 정책 변경으로 폐기했다, 아래 §block.recipients 참고).
+ * 있었으나 정책 변경으로 폐기했다, 아래 §node.recipients 참고).
  *
  * ★ artifact 단위로 SIREN이 editAccess/viewAccess를 직접 보관하던 옛 모델은 폐기했다 —
  *   실제 Edit/View는 항상 그 서비스(A/B/C 공통)가 최종 판정한다.
@@ -20,11 +20,11 @@
  *   Artifacts(B, Calypso)가 OA-link/HPC-path 참조형 콘텐츠까지 갖도록 넓어지면서 D가 하던
  *   역할을 대체했다(설계서 04장 §2, §6).
  *
- * ★ **block.recipients는 더 이상 열람 게이트가 아니다**(사용자 결정, 01장 §4.2 갱신).
+ * ★ **node.recipients는 더 이상 열람 게이트가 아니다**(사용자 결정, 01장 §4.2 갱신).
  *   예전엔 이 recipient가 slide 열람의 첫 번째 게이트였고, 그 서비스가 project 전체에
  *   view를 열어둬도 recipient가 아니면 막혔다. 그런데 그 결과 "같은 부서가 만든 workflow,
  *   view 제한 없는 artifact인데도 그 부서 사람이 못 여는" 상황이 나왔고, 이건 recipient를
- *   편집하는 사람이 매 block마다 일일이 채워 넣어야만 풀리는 구조였다. 지금은 recipient가
+ *   편집하는 사람이 매 node마다 일일이 채워 넣어야만 풀리는 구조였다. 지금은 recipient가
  *   **release 알림 대상 + Recipients/Comments 탭의 대상 표시**로만 쓰이고, slide 열람 자체는
  *   그 서비스의 canView/canEdit 하나로만 판정한다(ArtifactAccessService.levelFor 참고).
  *   Recipients/Comments 탭의 **노출 여부**는 recipient 소속과 무관하게 workflow Edit
@@ -43,7 +43,9 @@ export interface GrantLike {
 
 export interface ProjectLike {
   members?: { knoxId: string; departments?: string[] }[];
-  departments?: string[];
+  /** 부서는 `{id, name}` 쌍이다(02장 §9) — `members[].departments`는 여전히 그 id의
+   *  string[]이지만, 이 필드 자체는 이제 name 문자열 배열이 아니다. */
+  departments?: { id: string; name?: string }[];
   managers?: string[];
 }
 
@@ -81,7 +83,7 @@ export function canAccessProject(actor: Actor, project: ProjectLike | null | und
  */
 export function myDepartments(actor: Actor, project: ProjectLike | null | undefined): string[] {
   if (!project) return [];
-  if (actor.isAdmin) return [...(project.departments ?? [])];
+  if (actor.isAdmin) return (project.departments ?? []).map((d) => d.id);
   const me = (project.members ?? []).find((m) => m.knoxId === actor.knoxId);
   return [...(me?.departments ?? [])];
 }

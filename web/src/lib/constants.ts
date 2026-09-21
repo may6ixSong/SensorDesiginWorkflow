@@ -1,6 +1,6 @@
 /**
  * 목업(analog-dashboard-v15.html)의 CONSTANTS 블록을 그대로 옮긴 값에서, 기본 줌을
- * 낮추면서(아래 ZOOM_DEFAULT_FLOOR) 블록/폰트가 작아 보이지 않도록 전체를 약
+ * 낮추면서(아래 ZOOM_DEFAULT_FLOOR) 노드/폰트가 작아 보이지 않도록 전체를 약
  * 1.47배(= 옛 기본 줌 0.75 / 새 기본 줌 0.51) 키운 값이다. 캔버스 좌표계·줌·드래그
  * 동작의 "비율"은 목업과 동일하게 유지되지만 절대 픽셀 값은 다르다.
  * ⚠ api/src/database/seed-data.ts가 이 값들의 사본(GRID/ROW_H/TOP_PAD/NW/NH/
@@ -36,7 +36,7 @@ export const ZOOM_DEFAULT_FLOOR = 0.59;
 
 /** Phase 레인 좌우 여백 — flow 화살표 공간 */
 export const LANE_PAD = 68;
-/** 기본 레인 폭 — NW 기준으로 블록 2열 + 레인 패딩이 들어오는 폭 */
+/** 기본 레인 폭 — NW 기준으로 노드 2열 + 레인 패딩이 들어오는 폭 */
 export const DEFAULT_PW = Math.round((NW + LANE_PAD * 2) * 2 * 0.72);
 
 /** 캔버스 우측 여유폭 (목업의 `G.__tot + 120`) */

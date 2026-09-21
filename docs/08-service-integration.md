@@ -116,7 +116,7 @@ GET {baseUrl}/artifacts/{artifactId}/versions?knoxId={knoxId}[&isAdmin=true]
 `isReleased`와 조회자의 giver 여부로 다시 마스킹한 뒤 내려보낸다. **서비스는 아는 대로
 전부 주면 된다** — 마스킹은 SIREN이 한다.
 
-이 엔드포인트는 두 시점에 불린다: ① block에 이 artifact를 처음 매핑하는 순간(전체 이력을
+이 엔드포인트는 두 시점에 불린다: ① node에 이 artifact를 처음 매핑하는 순간(전체 이력을
 한 번에 채움), ② 그 서비스가 push 이벤트를 못 보냈을 때를 대비한 야간 재동기화(§2.1,
 아직 실제로 스케줄링되지는 않음).
 

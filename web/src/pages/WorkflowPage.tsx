@@ -19,8 +19,8 @@ import { queryKeys } from '@/api/queryKeys';
 import { useProject, useProjectWorkflows, useProjectMilestones, useProjects } from '@/api/hooks/useProjects';
 import { useUpdateWorkflow, useReplaceWorkflowAccess, useWorkflow, useUpdateWorkflowPhases } from '@/api/hooks/useWorkflow';
 import {
-  NewArtifactSourceInput, useBlocks, useCreateBlock, useDeleteBlock, useReplaceBlockRecipients, useUpdateBlock,
-} from '@/api/hooks/useBlocks';
+  NewArtifactSourceInput, useNodes, useCreateNode, useDeleteNode, useReplaceNodeRecipients, useUpdateNode,
+} from '@/api/hooks/useNodes';
 import { useCreateRelease, useReleasePreview, useReleases } from '@/api/hooks/useReleases';
 import { useMemos } from '@/api/hooks/useMemos';
 import { useEdges } from '@/api/hooks/useEdges';
@@ -33,10 +33,10 @@ import { NH, NW } from '@/lib/constants';
 import { getViewMode, setViewMode, ViewMode } from '@/lib/viewMode';
 import { T } from '@/theme/tokens';
 import { canEditWorkflow, myDepartments as myDeptsOf } from '@/lib/access';
-import { ArtifactIntent, BlockDto, WorkflowDto, WorkflowPhase } from '@/types/domain';
+import { ArtifactIntent, NodeDto, WorkflowDto, WorkflowPhase } from '@/types/domain';
 
-const countOrphanBlocks = (blocks: BlockDto[], phases: WorkflowPhase[]) =>
-  blocks.filter((b) => !phases.some((p) => p.id === b.phaseId)).length;
+const countOrphanNodes = (nodes: NodeDto[], phases: WorkflowPhase[]) =>
+  nodes.filter((n) => !phases.some((p) => p.id === n.phaseId)).length;
 
 /**
  * workflow 화면 — canvas view와 list view가 공유하는 하나의 페이지(사용자 요청).
@@ -71,7 +71,7 @@ export function WorkflowPage() {
   const { data: milestones } = useProjectMilestones(projectId);
   const { data: workflows } = useProjectWorkflows(projectId);
   const { data: workflow, isLoading: workflowLoading } = useWorkflow(workflowId);
-  const { data: blocks } = useBlocks(workflowId);
+  const { data: nodes } = useNodes(workflowId);
   const releases = useReleases(workflowId);
 
   const canEdit = canEditWorkflow(workflow, isAdmin);
@@ -91,10 +91,10 @@ export function WorkflowPage() {
   const updateWorkflow = useUpdateWorkflow(workflowId ?? '');
   const replaceAccess = useReplaceWorkflowAccess(workflowId ?? '');
   const updatePhases = useUpdateWorkflowPhases(workflowId ?? '');
-  const createBlock = useCreateBlock(workflowId ?? '');
-  const updateBlock = useUpdateBlock(workflowId ?? '');
-  const deleteBlock = useDeleteBlock(workflowId ?? '');
-  const replaceRecipients = useReplaceBlockRecipients(workflowId ?? '');
+  const createNode = useCreateNode(workflowId ?? '');
+  const updateNode = useUpdateNode(workflowId ?? '');
+  const deleteNode = useDeleteNode(workflowId ?? '');
+  const replaceRecipients = useReplaceNodeRecipients(workflowId ?? '');
   const createRelease = useCreateRelease(workflowId ?? '');
 
   const [saveErr, setSaveErr] = useState<string | null>(null);
@@ -134,9 +134,9 @@ export function WorkflowPage() {
   };
 
   const phaseList = useMemo(() => workflow?.phases ?? [], [workflow?.phases]);
-  const orphanCount = useMemo(() => countOrphanBlocks(blocks ?? [], phaseList), [blocks, phaseList]);
+  const orphanCount = useMemo(() => countOrphanNodes(nodes ?? [], phaseList), [nodes, phaseList]);
 
-  const openBlock = useMemo(() => (blocks ?? []).find((b) => b.id === openId) ?? null, [blocks, openId]);
+  const openNode = useMemo(() => (nodes ?? []).find((n) => n.id === openId) ?? null, [nodes, openId]);
   const closeSlide = () => st.getState().openDeliverable(null);
 
   // ── list view 전용 release 선택 상태 (예전 ReleaseHistoryPage) ──
@@ -160,8 +160,8 @@ export function WorkflowPage() {
   }, [mode, requestedCurrent, canShowCurrent, sortedReleases, projectId, workflowId, navigate]);
 
   /**
-   * 새 artifact(block) 생성 — canvas/list 둘 다 여기 하나로 모았다. y축은 그 Phase에 이미
-   * 있는 block들과 절대 겹치지 않는 자리로 미리 계산해서, 그 좌표를 그대로 생성 요청에
+   * 새 artifact(node) 생성 — canvas/list 둘 다 여기 하나로 모았다. y축은 그 Phase에 이미
+   * 있는 node들과 절대 겹치지 않는 자리로 미리 계산해서, 그 좌표를 그대로 생성 요청에
    * 실어 보낸다(사용자 요청) — list view는 편집 세션/저장 개념이 없어 즉시 확정돼야 한다.
    * canvas view에서 편집 세션 중에 추가한 경우엔 취소 시 삭제할 수 있도록 계속 추적한다.
    */
@@ -170,8 +170,8 @@ export function WorkflowPage() {
   }) => {
     if (!workflow) return;
     const seed = { x: 0, y: 0, phase: phaseId };
-    placeInLane(seed, phaseList, workflow.phaseWidths ?? {}, (blocks ?? []).map(toCanvasNode));
-    createBlock.mutate(
+    placeInLane(seed, phaseList, workflow.phaseWidths ?? {}, (nodes ?? []).map(toCanvasNode));
+    createNode.mutate(
       { name, phaseId, intent, newArtifact, layout: { x: seed.x, y: seed.y, w: NW, h: NH } },
       {
         onSuccess: (created) => {
@@ -183,7 +183,7 @@ export function WorkflowPage() {
             s.setFocusReq(fresh.id);
           }
           // list view의 "Current"는 매핑된 항목을 release preview에서 읽는다 — 방금 만든
-          // block이 artifact까지 매핑됐다면 그 계산도 새로 해야 한다.
+          // node가 artifact까지 매핑됐다면 그 계산도 새로 해야 한다.
           qc.invalidateQueries({ queryKey: queryKeys.releasePreview(workflowId ?? '') });
           st.getState().setAddDlg(false);
           toast('Artifact added');
@@ -248,13 +248,13 @@ export function WorkflowPage() {
               phaseList={phaseList}
               canEdit={canEdit}
               recipientFilter={recipientFilter}
-              blocks={blocks ?? []}
-              deleteBlock={deleteBlock}
+              nodes={nodes ?? []}
+              deleteNode={deleteNode}
             />
           ) : (
             <ArtifactListView
               workflow={workflow}
-              blocks={blocks ?? []}
+              nodes={nodes ?? []}
               sortedReleases={sortedReleases}
               selected={selectedRelease}
               showCurrent={showCurrent}
@@ -271,9 +271,9 @@ export function WorkflowPage() {
             />
           )}
 
-          {openBlock && (
+          {openNode && (
             <ArtifactSlide
-              block={openBlock}
+              node={openNode}
               own={canEdit}
               project={project}
               myDepartments={myDepartments}
@@ -281,15 +281,15 @@ export function WorkflowPage() {
               onClose={closeSlide}
               initialTab={openInitialTab ?? undefined}
               onChangeArtifact={(newArtifact) =>
-                updateBlock.mutate(
-                  { id: openBlock.id, newArtifact },
+                updateNode.mutate(
+                  { id: openNode.id, newArtifact },
                   {
                     onSuccess: () => toast('Artifact changed'),
                     onError: (e: any) => toast(e?.response?.data?.message ?? 'Failed to change artifact'),
                   },
                 )
               }
-              changingArtifact={updateBlock.isPending}
+              changingArtifact={updateNode.isPending}
               releases={releases.data ?? []}
               onOpenRelease={(rid) => {
                 closeSlide();
@@ -298,7 +298,7 @@ export function WorkflowPage() {
               saving={replaceRecipients.isPending}
               onSaveRecipients={(p) =>
                 replaceRecipients.mutate(
-                  { blockId: openBlock.id, ...p },
+                  { nodeId: openNode.id, ...p },
                   {
                     onSuccess: () => toast('Recipients saved'),
                     onError: (e: any) => toast(e?.response?.data?.message ?? 'Failed to save recipients'),
@@ -308,13 +308,13 @@ export function WorkflowPage() {
               onDelete={
                 canEdit
                   ? () =>
-                      deleteBlock.mutate(openBlock.id, {
+                      deleteNode.mutate(openNode.id, {
                         onSuccess: () => {
                           const s = st.getState();
-                          s.setNodes(s.nodes.filter((n) => n.id !== openBlock.id));
-                          s.setEdges(s.edges.filter((e) => e.from !== openBlock.id && e.to !== openBlock.id));
+                          s.setNodes(s.nodes.filter((n) => n.id !== openNode.id));
+                          s.setEdges(s.edges.filter((e) => e.from !== openNode.id && e.to !== openNode.id));
                           closeSlide();
-                          if (s.sel === openBlock.id || s.hlSet) s.select(null, null);
+                          if (s.sel === openNode.id || s.hlSet) s.select(null, null);
                           toast('Removed from canvas');
                         },
                         onError: () => toast('Failed to remove'),
@@ -363,7 +363,7 @@ export function WorkflowPage() {
                 setPhasesErr(null);
                 updatePhases.mutate(next, {
                   onSuccess: (updated) => {
-                    const lost = countOrphanBlocks(blocks ?? [], updated.phases);
+                    const lost = countOrphanNodes(nodes ?? [], updated.phases);
                     toast(
                       lost > 0
                         ? `Schedule updated — ${lost} artifact(s) now have no release schedule`
@@ -389,7 +389,7 @@ export function WorkflowPage() {
               myDepartments={myDepartments}
               departmentOptions={project?.departments ?? []}
               onClose={() => st.getState().setAddDlg(false)}
-              submitting={createBlock.isPending}
+              submitting={createNode.isPending}
               onCreate={handleCreateArtifact}
             />
           )}
@@ -397,7 +397,7 @@ export function WorkflowPage() {
           {recipientMatrixOpen && canEdit && (
             <RecipientMatrixDialog
               workflowId={workflowId ?? ''}
-              blocks={blocks ?? []}
+              nodes={nodes ?? []}
               phases={phaseList}
               departmentOptions={project?.departments ?? []}
               onClose={() => setRecipientMatrixOpen(false)}
@@ -407,6 +407,7 @@ export function WorkflowPage() {
           {releaseOpen && (
             <ReleaseDialog
               workflowName={workflow.name}
+              projectId={workflow.projectId}
               preview={releasePreview.data ?? null}
               loading={releasePreview.isLoading}
               saving={createRelease.isPending}
@@ -438,14 +439,14 @@ export function WorkflowPage() {
  * canvasStore를 그 workflow로 hydrate할 이유가 없어 별도 컴포넌트로 뺐다.
  */
 function CanvasBody({
-  workflow, phaseList, canEdit, recipientFilter, blocks, deleteBlock,
+  workflow, phaseList, canEdit, recipientFilter, nodes: nodeDtos, deleteNode,
 }: {
   workflow: WorkflowDto;
   phaseList: WorkflowPhase[];
   canEdit: boolean;
   recipientFilter: string[];
-  blocks: BlockDto[];
-  deleteBlock: ReturnType<typeof useDeleteBlock>;
+  nodes: NodeDto[];
+  deleteNode: ReturnType<typeof useDeleteNode>;
 }) {
   const { t } = useTranslation();
   const workflowId = workflow.id;
@@ -458,14 +459,14 @@ function CanvasBody({
     if (st.getState().edit) return;
     if (!memos || !edges) return;
     st.getState().hydrate(workflowId, {
-      nodes: blocks.map(toCanvasNode),
+      nodes: nodeDtos.map(toCanvasNode),
       memos: memos.map(toCanvasMemo),
       edges: edges.map(toCanvasEdge),
       phaseWidths: workflow.phaseWidths,
     });
-    st.getState().bumpBlocks();
+    st.getState().bumpNodes();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workflowId, workflow, blocks, memos, edges]);
+  }, [workflowId, workflow, nodeDtos, memos, edges]);
 
   useEffect(() => {
     return () => {
@@ -482,7 +483,7 @@ function CanvasBody({
     const s = st.getState();
     putCanvas.mutate(
       {
-        blocks: s.nodes.map((n) => ({
+        nodes: s.nodes.map((n) => ({
           id: n.id,
           layout: { x: n.x, y: n.y, w: n.w, h: n.h },
           phaseId: n.phase,
@@ -518,7 +519,7 @@ function CanvasBody({
       toast('Changes cancelled');
     };
     if (!sessionAddedIds.length) { finish(); return; }
-    Promise.allSettled(sessionAddedIds.map((id) => deleteBlock.mutateAsync(id))).then(finish);
+    Promise.allSettled(sessionAddedIds.map((id) => deleteNode.mutateAsync(id))).then(finish);
   };
 
   return (

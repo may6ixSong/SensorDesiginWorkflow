@@ -19,11 +19,12 @@ export class Edge {
   @Prop({ type: SchemaTypes.ObjectId, ref: 'Workflow', required: true, index: true })
   workflowId: Types.ObjectId;
 
-  /** 캔버스 블록 id. 구 Deliverable이 Block으로 개명되면서 ref만 바뀌었다. */
-  @Prop({ type: SchemaTypes.ObjectId, ref: 'Block', required: true })
+  /** 캔버스 노드 id. 구 Deliverable이 Block으로, 이후 다시 WorkflowNode로 개명되면서
+   * ref만 그때마다 바뀌었다. */
+  @Prop({ type: SchemaTypes.ObjectId, ref: 'WorkflowNode', required: true })
   fromId: Types.ObjectId;
 
-  @Prop({ type: SchemaTypes.ObjectId, ref: 'Block', required: true })
+  @Prop({ type: SchemaTypes.ObjectId, ref: 'WorkflowNode', required: true })
   toId: Types.ObjectId;
 
   @Prop({ default: false })

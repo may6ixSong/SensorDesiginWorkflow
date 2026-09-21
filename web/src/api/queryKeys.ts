@@ -6,16 +6,16 @@ export const queryKeys = {
   projectWorkflows: (projectId: string) => ['projects', projectId, 'workflows'] as const,
 
   workflow: (workflowId: string) => ['workflows', workflowId] as const,
-  /** 캔버스 블록 — 각 항목에 artifact와 권한 판정 결과가 함께 담겨 온다. */
-  blocks: (workflowId: string) => ['workflows', workflowId, 'blocks'] as const,
+  /** 캔버스 노드 — 각 항목에 artifact와 권한 판정 결과가 함께 담겨 온다. */
+  nodes: (workflowId: string) => ['workflows', workflowId, 'nodes'] as const,
   /** A Tier(Calypso 제외 Hub 등록 서비스)의 라이브 버전 조회 — slide를 열었을 때만 쓴다. */
-  liveVersions: (workflowId: string, blockId: string) =>
-    ['workflows', workflowId, 'blocks', blockId, 'live-versions'] as const,
+  liveVersions: (workflowId: string, nodeId: string) =>
+    ['workflows', workflowId, 'nodes', nodeId, 'live-versions'] as const,
   /** 한 버전의 html preview(A/C Tier, B의 upload/download 자리를 대신한다). */
-  htmlView: (workflowId: string, blockId: string, versionLabel: string) =>
-    ['workflows', workflowId, 'blocks', blockId, 'html-view', versionLabel] as const,
+  htmlView: (workflowId: string, nodeId: string, versionLabel: string) =>
+    ['workflows', workflowId, 'nodes', nodeId, 'html-view', versionLabel] as const,
   memos: (workflowId: string) => ['workflows', workflowId, 'memos'] as const,
-  comments: (workflowId: string, blockId: string) => ['workflows', workflowId, 'blocks', blockId, 'comments'] as const,
+  comments: (workflowId: string, nodeId: string) => ['workflows', workflowId, 'nodes', nodeId, 'comments'] as const,
   edges: (workflowId: string) => ['workflows', workflowId, 'edges'] as const,
 
   /** Release — workflow별 목록, 미리보기, 부서별 필터 뷰, 산출물별 타임라인. */
@@ -39,6 +39,9 @@ export const queryKeys = {
   /** release 한 건에 대한 부서별 댓글 스레드 — department별로 완전히 분리된 키다. */
   releaseFeedback: (releaseId: string, department: string) =>
     ['releases', releaseId, 'feedback', department] as const,
+  /** release 한 건의 **모든** recipient 부서 스레드를 한 번에(설계서 05장 §7.1.1) —
+   *  workflow list view의 대시보드가 "전체 부서" 상태일 때만 쓴다. */
+  releaseFeedbackAll: (releaseId: string) => ['releases', releaseId, 'feedback', 'all'] as const,
 
   hubServices: ['hub', 'services'] as const,
 

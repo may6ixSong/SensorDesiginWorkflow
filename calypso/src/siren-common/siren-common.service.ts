@@ -3,11 +3,19 @@ import { ConfigService } from '@nestjs/config';
 
 export interface SirenCommonMember {
   knoxId: string;
+  /** SIREN `Project.departments[].id` 목록(설계서 02장 §9) — 이름이 아니라 id다. */
   departments: string[];
 }
 
+/** SIREN 과제의 부서 하나 — `id`는 불변, `name`은 SIREN Members 탭에서 개명될 수 있다
+ *  (설계서 02장 §9). 이 응답을 relay할 때마다 그 순간의 최신 이름이 함께 온다. */
+export interface SirenDepartment {
+  id: string;
+  name: string;
+}
+
 export interface SirenDepartmentRoster {
-  departments: string[];
+  departments: SirenDepartment[];
   members: SirenCommonMember[];
 }
 
@@ -47,7 +55,9 @@ export class SirenCommonService {
       const body = await res.json().catch(() => null);
       const data = body?.data ?? {};
       return {
-        departments: Array.isArray(data.departments) ? data.departments : [],
+        departments: Array.isArray(data.departments)
+          ? data.departments.map((d: { id: string; name: string }) => ({ id: d.id, name: d.name }))
+          : [],
         members: Array.isArray(data.members)
           ? data.members.map((m: { knoxId: string; departments?: string[] }) => ({
             knoxId: m.knoxId,

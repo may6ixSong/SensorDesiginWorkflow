@@ -41,7 +41,7 @@ export const ReleasedVersionSchema = SchemaFactory.createForClass(ReleasedVersio
 @Schema({ _id: false })
 export class ReleaseItemSource {
   @Prop({ required: true })
-  blockId: string;
+  nodeId: string;
 
   @Prop({ type: String, default: null })
   artifactId: string | null;
@@ -57,7 +57,7 @@ export const ReleaseItemSourceSchema = SchemaFactory.createForClass(ReleaseItemS
 @Schema({ _id: false })
 export class ReleaseItem {
   @Prop({ required: true })
-  blockId: string;
+  nodeId: string;
 
   @Prop({ required: true })
   artifactId: string;
@@ -93,7 +93,7 @@ export class ReleaseItem {
 
   /**
    * 그 시점 확정값. 이후 권한이 바뀌어도 "그때 누가 받았는지"는 이 값으로 남는다.
-   * A/B/C 전부 그 block.recipients를 그대로 담는다(설계서 05장 §6.2).
+   * A/B/C 전부 그 node.recipients를 그대로 담는다(설계서 05장 §6.2).
    */
   @Prop({ type: AccessGrantSchema, default: emptyAccessGrant })
   recipients: AccessGrant;
@@ -139,9 +139,15 @@ export class Release {
   @Prop({ default: '' })
   note: string;
 
-  /** 그 시점의 workflow 표기 — 이후 이름·부서가 바뀌어도 기록이 흔들리지 않는다. */
-  @Prop({ type: Object, default: () => ({ name: '', department: '' }) })
-  workflowAt: { name: string; department: string };
+  /**
+   * 그 시점의 workflow 표기. `department`는 `Project.departments[].id`이며(설계서
+   * 02장 §9) — 이후 이름이 바뀌어도(id는 불변) 지금 이름을 그대로 다시 찾아 보여준다,
+   * 즉 개명은 자동으로 반영된다(그게 이번 개정의 취지다). `departmentLabel`은 그 순간의
+   * 이름을 **그대로 얼려 둔 대체값**이다(02장 §9.4) — 그 id가 나중에 삭제되어 더 이상
+   * `Project.departments`에서 찾을 수 없는 극단적인 경우에만 쓴다.
+   */
+  @Prop({ type: Object, default: () => ({ name: '', department: '', departmentLabel: '' }) })
+  workflowAt: { name: string; department: string; departmentLabel: string };
 
   @Prop({ type: [ReleaseItemSchema], default: [] })
   items: ReleaseItem[];

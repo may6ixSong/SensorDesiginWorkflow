@@ -3,9 +3,10 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Release, ReleaseDocument, ReleaseItem, ReleasedVersion } from './schemas/release.schema';
 import { Workflow, WorkflowDocument } from '../workflows/schemas/workflow.schema';
-import { BlockDocument } from '../blocks/schemas/block.schema';
+import { Project, ProjectDocument } from '../projects/schemas/project.schema';
+import { WorkflowNodeDocument } from '../nodes/schemas/node.schema';
 import { ArtifactDocument, ArtifactVersion } from '../artifacts/schemas/artifact.schema';
-import { BlocksService } from '../blocks/blocks.service';
+import { NodesService } from '../nodes/nodes.service';
 import { ArtifactsService, majorKeyOf } from '../artifacts/artifacts.service';
 import { EdgesService } from '../edges/edges.service';
 import { NotificationService } from '../notifications/notification.service';
@@ -14,7 +15,7 @@ import { Actor } from '../common/actor';
 
 /** preview 응답의 한 줄. release 실행 결과와 같은 로직으로 만들어진다. */
 export interface ReleasePreviewItem {
-  blockId: string;
+  nodeId: string;
   artifactId: string;
   artifactName: string;
   tier: string;
@@ -32,7 +33,7 @@ export interface ReleasePreviewItem {
    * (설계서 05장 §4.2).
    */
   sources: {
-    blockId: string;
+    nodeId: string;
     artifactId: string;
     artifactName: string;
     /** 최신순 published 목록. 비어 있으면 그 source는 아직 한 번도 publish되지 않았다. */
@@ -64,7 +65,8 @@ export class ReleasesService {
   constructor(
     @InjectModel(Release.name) private readonly model: Model<ReleaseDocument>,
     @InjectModel(Workflow.name) private readonly workflowModel: Model<WorkflowDocument>,
-    private readonly blocks: BlocksService,
+    @InjectModel(Project.name) private readonly projectModel: Model<ProjectDocument>,
+    private readonly nodes: NodesService,
     private readonly artifacts: ArtifactsService,
     private readonly edges: EdgesService,
     private readonly notifications: NotificationService,
@@ -133,13 +135,13 @@ export class ReleasesService {
   }
 
   private async buildItems(workflow: WorkflowDocument): Promise<ReleasePreviewItem[]> {
-    const blocks = await this.blocks.releasableForWorkflow(workflow._id);
-    const artifactMap = await this.artifacts.findMany(blocks.map((b) => b.artifactId!));
+    const nodes = await this.nodes.releasableForWorkflow(workflow._id);
+    const artifactMap = await this.artifacts.findMany(nodes.map((n) => n.artifactId!));
     const prev = await this.previous(workflow._id);
     const prevByArtifact = new Map((prev?.items ?? []).map((i) => [i.artifactId, i]));
     const upstream = await this.edges.upstreamMap(workflow._id);
     const phaseName = new Map((workflow.phases ?? []).map((p) => [p.id, p.name]));
-    const blockById = new Map(blocks.map((b) => [b._id.toString(), b]));
+    const nodeById = new Map(nodes.map((n) => [n._id.toString(), n]));
 
     // 각 artifact의 "지금 최신 published"를 한 번씩만 해석한다 — SIREN 캐시에서 읽는다
     // (설계서 05장 §8, 07장 §3·§4). 라이브 조회는 더 이상 하지 않는다.
@@ -150,8 +152,8 @@ export class ReleasesService {
 
     const items: ReleasePreviewItem[] = [];
 
-    for (const block of blocks) {
-      const artifact = artifactMap.get(block.artifactId!.toString());
+    for (const node of nodes) {
+      const artifact = artifactMap.get(node.artifactId!.toString());
       if (!artifact) continue;
 
       const artifactId = artifact._id.toString();
@@ -164,11 +166,11 @@ export class ReleasesService {
         firstTime || (current.version?.majorKey ?? null) !== (previousItem?.published?.majorKey ?? null);
 
       const sources = changed
-        ? this.buildSourceCandidates(block, upstream, blockById, artifactMap)
+        ? this.buildSourceCandidates(node, upstream, nodeById, artifactMap)
         : // 바뀌지 않은 산출물은 직전 release의 선택을 그대로 이어받는다 — 사용자가 매번
           // 똑같은 선택을 반복하지 않게 한다(설계서 05장 §4.2).
           (previousItem?.sources ?? []).map((s) => ({
-            blockId: s.blockId,
+            nodeId: s.nodeId,
             artifactId: s.artifactId ?? '',
             artifactName: s.artifactName,
             candidates: [] as ReleasedVersion[],
@@ -177,18 +179,18 @@ export class ReleasesService {
           }));
 
       items.push({
-        blockId: block._id.toString(),
+        nodeId: node._id.toString(),
         artifactId,
         artifactName: artifact.name,
         tier: artifact.tier,
         network: artifact.network,
-        phaseId: block.phaseId,
-        phaseName: phaseName.get(block.phaseId) ?? '',
+        phaseId: node.phaseId,
+        phaseName: phaseName.get(node.phaseId) ?? '',
         published: current.version,
         changed,
         firstTime,
         lookupFailed: current.lookupFailed,
-        recipients: this.recipientsFor(block),
+        recipients: this.recipientsFor(node),
         sources,
       });
     }
@@ -202,21 +204,21 @@ export class ReleasesService {
    * **그래도 release는 막지 않는다.**
    */
   private buildSourceCandidates(
-    block: BlockDocument,
+    node: WorkflowNodeDocument,
     upstream: Map<string, string[]>,
-    blockById: Map<string, BlockDocument>,
+    nodeById: Map<string, WorkflowNodeDocument>,
     artifactMap: Map<string, ArtifactDocument>,
   ) {
     // 후보는 그 source의 **published 이력 전체**다(최신순). 지금 라이브로 해석한 "현재
     // 최신"과 달리 과거 버전도 고를 수 있어야 하므로 SIREN 로컬 기록을 그대로 쓴다.
-    const sourceBlockIds = upstream.get(block._id.toString()) ?? [];
+    const sourceNodeIds = upstream.get(node._id.toString()) ?? [];
     const out: ReleasePreviewItem['sources'] = [];
 
-    for (const sourceBlockId of sourceBlockIds) {
-      const sourceBlock = blockById.get(sourceBlockId);
-      // 미매핑 블록은 전달할 실체가 없으므로 source로도 잡지 않는다.
-      if (!sourceBlock?.artifactId) continue;
-      const sourceArtifact = artifactMap.get(sourceBlock.artifactId.toString());
+    for (const sourceNodeId of sourceNodeIds) {
+      const sourceNode = nodeById.get(sourceNodeId);
+      // 미매핑 노드는 전달할 실체가 없으므로 source로도 잡지 않는다.
+      if (!sourceNode?.artifactId) continue;
+      const sourceArtifact = artifactMap.get(sourceNode.artifactId.toString());
       if (!sourceArtifact) continue;
 
       const candidates = this.artifacts
@@ -225,7 +227,7 @@ export class ReleasesService {
       const latest = candidates[0] ?? null;
 
       out.push({
-        blockId: sourceBlockId,
+        nodeId: sourceNodeId,
         artifactId: sourceArtifact._id.toString(),
         artifactName: sourceArtifact.name,
         candidates,
@@ -238,14 +240,14 @@ export class ReleasesService {
   }
 
   /**
-   * 이 산출물이 전달될 대상(설계서 05장 §6.2) — 그 **block**의 recipients. A/B/C 전부
+   * 이 산출물이 전달될 대상(설계서 05장 §6.2) — 그 **node**의 recipients. A/B/C 전부
    * 공통이다(같은 workflow마다 다를 수 있다). artifact 단위로 SIREN이 따로 들고 있던
    * 옛 모델(viewAccess/editAccess)은 폐기했다.
    */
-  private recipientsFor(block: BlockDocument) {
+  private recipientsFor(node: WorkflowNodeDocument) {
     return {
-      departments: [...(block.recipients?.departments ?? [])],
-      users: [...(block.recipients?.users ?? [])],
+      departments: [...(node.recipients?.departments ?? [])],
+      users: [...(node.recipients?.users ?? [])],
     };
   }
 
@@ -282,7 +284,7 @@ export class ReleasesService {
   /**
    * release 실행. 권한은 **Edit Access 전원**이며 컨트롤러가 이미 검증하고 들어온다.
    *
-   * @param sourceSelections blockId → (sourceBlockId → versionRef|null).
+   * @param sourceSelections nodeId → (sourceNodeId → versionRef|null).
    *        changed:true 인 항목에 대해서만 사용자가 고른 값이 온다. 나머지는 무시된다 —
    *        직전 release에서 이어받은 값을 서버가 쓴다.
    */
@@ -296,14 +298,21 @@ export class ReleasesService {
 
     const previewItems = await this.buildItems(workflow);
     if (previewItems.length === 0) {
-      throw new BadRequestException('There is nothing to release — no block has an artifact mapped.');
+      throw new BadRequestException('There is nothing to release — no node has an artifact mapped.');
     }
+
+    // workflowAt.departmentLabel — 그 순간의 부서 이름을 얼려 둔다(02장 §9.4). id
+    // 자체(workflow.department)는 살아있는 한 항상 Project.departments에서 다시 찾아
+    // 최신 이름을 보여주고, 이 label은 그 부서가 나중에 지워졌을 때만 쓰이는 대체값이다.
+    const project = await this.projectModel.findById(workflow.projectId).exec();
+    const departmentLabel =
+      project?.departments.find((d) => d.id === workflow.department)?.name ?? workflow.department;
 
     const selections = input.sources ?? {};
     const items: ReleaseItem[] = previewItems.map((item) => {
-      const picked = selections[item.blockId] ?? {};
+      const picked = selections[item.nodeId] ?? {};
       return {
-        blockId: item.blockId,
+        nodeId: item.nodeId,
         artifactId: item.artifactId,
         artifactName: item.artifactName,
         tier: item.tier as ReleaseItem['tier'],
@@ -316,13 +325,13 @@ export class ReleasesService {
         recipients: item.recipients,
         lookupFailed: item.lookupFailed,
         sources: item.sources.map((s) => ({
-          blockId: s.blockId,
+          nodeId: s.nodeId,
           artifactId: s.artifactId,
           artifactName: s.artifactName,
           // changed 항목만 사용자 선택을 반영한다. 고르지 않았으면 기본값(최신 published),
           // 그마저 없으면 null — 받는 쪽에 "아직 전달되지 않음"으로 보인다.
           selected: item.changed
-            ? this.pickSource(s, picked[s.blockId])
+            ? this.pickSource(s, picked[s.nodeId])
             : s.selected,
         })),
       } as ReleaseItem;
@@ -355,7 +364,7 @@ export class ReleasesService {
         releasedAt: new Date(),
         releasedBy: actor.knoxId,
         note,
-        workflowAt: { name: workflow.name, department: workflow.department },
+        workflowAt: { name: workflow.name, department: workflow.department, departmentLabel },
         items,
         recipientDepartments: [...departments],
         recipientUsers: [...users],

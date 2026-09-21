@@ -9,7 +9,7 @@ import { AddMemberDto } from './dto/add-member.dto';
 import { AddProjectManagerDto } from './dto/manage-project-managers.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { UpdateMilestonesDto } from './dto/update-milestones.dto';
-import { UpdateProjectDepartmentsDto } from './dto/update-project-departments.dto';
+import { UpsertProjectDepartmentDto } from './dto/update-project-departments.dto';
 import { CreateWorkflowDto } from '../workflows/dto/workflow-crud.dto';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { workflowLevel } from '../common/access';
@@ -82,16 +82,39 @@ export class ProjectsController {
   // 버튼 하나로 묶이면서 `PATCH /workflows/:id` 로 옮겨갔다(설계서 02장 §7.2).
 
   /**
-   * 이 과제의 부서 목록 교체(추가/삭제 자유) — 산출물 "Received from" 화면의 후보 목록.
-   * @Patch(':id')보다 위에 있어야 한다 - 아래에 두면 ':id'가 'departments'까지 먹는다.
+   * 이 과제의 부서 관리(설계서 02장 §9.1) — 추가/개명/삭제 셋으로 나뉜다(구
+   * `PATCH :id/departments`의 배열 전체 교체 방식은 폐지 — id를 발급/유지해야 해서
+   * 더는 통째로 바꿔 끼울 수 없다). 전부 `@Patch(':id')`보다 위에 있어야 한다 - 아래에
+   * 두면 ':id'가 'departments'까지 먹는다.
    */
-  @Patch(':id/departments')
-  async updateDepartments(
+  @Post(':id/departments')
+  async addDepartment(
     @Param('id') id: string,
-    @Body() body: UpdateProjectDepartmentsDto,
+    @Body() body: UpsertProjectDepartmentDto,
     @CurrentActor() me: Actor,
   ) {
-    const project = await this.projects.updateDepartments(id, body.departments, me);
+    const project = await this.projects.addDepartment(id, body.name, me);
+    return { data: toProjectDetailDto(project) };
+  }
+
+  @Patch(':id/departments/:deptId')
+  async renameDepartment(
+    @Param('id') id: string,
+    @Param('deptId') deptId: string,
+    @Body() body: UpsertProjectDepartmentDto,
+    @CurrentActor() me: Actor,
+  ) {
+    const project = await this.projects.renameDepartment(id, deptId, body.name, me);
+    return { data: toProjectDetailDto(project) };
+  }
+
+  @Delete(':id/departments/:deptId')
+  async removeDepartment(
+    @Param('id') id: string,
+    @Param('deptId') deptId: string,
+    @CurrentActor() me: Actor,
+  ) {
+    const project = await this.projects.removeDepartment(id, deptId, me);
     return { data: toProjectDetailDto(project) };
   }
 

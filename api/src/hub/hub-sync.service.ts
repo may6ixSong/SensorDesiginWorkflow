@@ -102,7 +102,7 @@ export class HubSyncService {
       if (serviceKey === CALYPSO_SERVICE_KEY) {
         const list = await this.calypso.versions(externalArtifactId, knoxId);
         // Calypso의 network(콘텐츠 종류 — File:null/OA/HPC)는 artifact 단위 값이라
-        // 아무 버전에서나 읽으면 된다. 캔버스 배지(BlockNode.tsx)가 이 값을 그대로 읽는다.
+        // 아무 버전에서나 읽으면 된다. 캔버스 배지(NodeCard.tsx)가 이 값을 그대로 읽는다.
         if (list.length) artifact.network = list[0].network;
         for (const v of list) {
           this.upsertVersionEntry(artifact, 'B', {

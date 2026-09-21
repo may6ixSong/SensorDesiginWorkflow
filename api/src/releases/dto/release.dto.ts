@@ -25,7 +25,7 @@ export function toReleaseDto(release: ReleaseDocument, visibleArtifactIds: Set<s
     items: (release.items ?? []).map((item) => {
       const visible = visibleArtifactIds.has(item.artifactId);
       return {
-        blockId: item.blockId,
+        nodeId: item.nodeId,
         artifactId: item.artifactId,
         artifactName: item.artifactName,
         tier: item.tier,
@@ -39,7 +39,7 @@ export function toReleaseDto(release: ReleaseDocument, visibleArtifactIds: Set<s
         masked: !visible,
         published: visible ? item.published : null,
         sources: (item.sources ?? []).map((s) => ({
-          blockId: s.blockId,
+          nodeId: s.nodeId,
           artifactId: s.artifactId,
           artifactName: s.artifactName,
           selected: visible ? s.selected : null,

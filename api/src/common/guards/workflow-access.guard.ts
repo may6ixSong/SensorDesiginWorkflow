@@ -9,7 +9,7 @@ import { Reflector } from '@nestjs/core';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Workflow, WorkflowDocument } from '../../workflows/schemas/workflow.schema';
-import { Block, BlockDocument } from '../../blocks/schemas/block.schema';
+import { WorkflowNode, WorkflowNodeDocument } from '../../nodes/schemas/node.schema';
 import { Project, ProjectDocument } from '../../projects/schemas/project.schema';
 import { WORKFLOW_ACCESS_KEY, WorkflowAccessLevel } from '../decorators/workflow-access.decorator';
 import { resolveActor } from '../actor';
@@ -36,7 +36,7 @@ export class WorkflowAccessGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     @InjectModel(Workflow.name) private readonly workflowModel: Model<WorkflowDocument>,
-    @InjectModel(Block.name) private readonly blockModel: Model<BlockDocument>,
+    @InjectModel(WorkflowNode.name) private readonly nodeModel: Model<WorkflowNodeDocument>,
     @InjectModel(Project.name) private readonly projectModel: Model<ProjectDocument>,
   ) {}
 
@@ -72,19 +72,19 @@ export class WorkflowAccessGuard implements CanActivate {
   }
 
   /**
-   * workflowId 파라미터가 있는 라우트는 그대로 조회하고, blockId(:id) 파라미터만 있는
-   * 라우트는 block.workflowId로 역추적한다.
+   * workflowId 파라미터가 있는 라우트는 그대로 조회하고, nodeId(:id) 파라미터만 있는
+   * 라우트는 node.workflowId로 역추적한다.
    */
   private async resolveWorkflow(req: any): Promise<WorkflowDocument | null> {
     const params = req.params ?? {};
     if (params.workflowId) {
       return this.workflowModel.findById(params.workflowId).exec();
     }
-    const blockId = params.blockId ?? params.id;
-    if (blockId) {
-      const block = await this.blockModel.findById(blockId).exec();
-      if (!block) throw new NotFoundException('Block not found.');
-      return this.workflowModel.findById(block.workflowId).exec();
+    const nodeId = params.nodeId ?? params.id;
+    if (nodeId) {
+      const node = await this.nodeModel.findById(nodeId).exec();
+      if (!node) throw new NotFoundException('Node not found.');
+      return this.workflowModel.findById(node.workflowId).exec();
     }
     return null;
   }

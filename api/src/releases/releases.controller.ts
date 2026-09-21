@@ -8,7 +8,7 @@ import { CurrentProject, CurrentWorkflow } from '../common/decorators/current-wo
 import { Actor } from '../common/actor';
 import { Workflow, WorkflowDocument } from '../workflows/schemas/workflow.schema';
 import { Project, ProjectDocument } from '../projects/schemas/project.schema';
-import { canAccessProject, myDepartments, workflowLevel } from '../common/access';
+import { canAccessProject, canEditWorkflow, myDepartments, workflowLevel } from '../common/access';
 import { ReleasesService } from './releases.service';
 import { ReleaseFeedbackService } from './release-feedback.service';
 import { CreateReleaseDto } from './dto/release-crud.dto';
@@ -16,7 +16,7 @@ import { toReleaseDto } from './dto/release.dto';
 import { CreateReleaseFeedbackDto } from './dto/release-feedback.dto';
 import { ArtifactsService } from '../artifacts/artifacts.service';
 import { ArtifactAccessService } from '../artifacts/artifact-access.service';
-import { BlocksService } from '../blocks/blocks.service';
+import { NodesService } from '../nodes/nodes.service';
 
 /**
  * Release 라우트 (설계서 05장).
@@ -32,7 +32,7 @@ export class ReleasesController {
     private readonly feedback: ReleaseFeedbackService,
     private readonly artifacts: ArtifactsService,
     private readonly artifactAccess: ArtifactAccessService,
-    private readonly blocks: BlocksService,
+    private readonly nodes: NodesService,
     @InjectModel(Project.name) private readonly projectModel: Model<ProjectDocument>,
     @InjectModel(Workflow.name) private readonly workflowModel: Model<WorkflowDocument>,
   ) {}
@@ -98,8 +98,9 @@ export class ReleasesController {
   /**
    * release 한 건에 대해, 그걸 받은 한 부서가 남긴 댓글 스레드(설계서 09장 §4.2~4.3) —
    * 산출물 단위가 아니라 release 전체에 대한 것이다(사용자 확정). department 쿼리는
-   * 필수다 — 다른 부서 것과 섞여 나오면 안 되기 때문에, "전체"라는 개념 자체가 없다.
-   * 그 department 소속인지는 서비스가 다시 확인한다.
+   * 필수다 — 다른 부서 것과 섞여 나오면 안 되기 때문이다. 그 department 소속인지, 또는
+   * 이 release를 낸 workflow의 Edit Access가 있는지는 서비스가 다시 확인한다(★확장,
+   * 05장 §7.1.1 — workflow 쪽에서 부서별로 필터링해 들여다보는 경로).
    */
   @Get('releases/:releaseId/feedback')
   async listFeedback(
@@ -107,8 +108,25 @@ export class ReleasesController {
     @Query('department') department: string,
     @CurrentActor() me: Actor,
   ) {
-    const { release, project } = await this.loadReleaseForActor(releaseId, me);
-    return { data: await this.feedback.listForRelease(release, department, project, me) };
+    const { release, project, workflow } = await this.loadReleaseForActor(releaseId, me);
+    return { data: await this.feedback.listForRelease(release, department, project, workflow, me) };
+  }
+
+  /**
+   * release 한 건의 **모든** recipient 부서의 스레드를 한 번에(설계서 05장 §7.1.1) —
+   * workflow 쪽 list view의 대시보드가 "전체 부서" 상태로 볼 때 쓴다. §4.3의 department별
+   * 라우트와 달리 여기는 department 파라미터가 없다 — 항상 전체다. 그래서 접근 자격도
+   * 더 좁다: 그 release를 낸 workflow의 Edit Access 또는 Admin만 — 개별 부서 소속만으로는
+   * (자기 부서든 남의 부서든) 이 라우트를 호출할 수 없다. 부서 하나만의 스레드는 여전히
+   * `GET .../feedback?department=` 하나뿐이다.
+   */
+  @Get('releases/:releaseId/feedback/all')
+  async listAllFeedback(@Param('releaseId') releaseId: string, @CurrentActor() me: Actor) {
+    const { release, project, workflow } = await this.loadReleaseForActor(releaseId, me);
+    if (!me.isAdmin && !canEditWorkflow(me, workflow, project)) {
+      throw new ForbiddenException('Only the releasing workflow’s Edit Access can view all departments at once.');
+    }
+    return { data: await this.feedback.listAllForRelease(release) };
   }
 
   @Post('releases/:releaseId/feedback')
@@ -117,14 +135,17 @@ export class ReleasesController {
     @Body() dto: CreateReleaseFeedbackDto,
     @CurrentActor() me: Actor,
   ) {
-    const { release, project } = await this.loadReleaseForActor(releaseId, me);
-    return this.feedback.createForRelease(release, dto, project, me);
+    const { release, project, workflow } = await this.loadReleaseForActor(releaseId, me);
+    return this.feedback.createForRelease(release, dto, project, workflow, me);
   }
 
   /**
-   * release 한 건을 열 자격이 있는지 판정하고, 통과하면 release+project를 함께 돌려준다.
-   * getOne과 feedback 두 라우트가 자격 판정 로직을 공유한다 — feedback도 결국 그 release를
-   * 볼 수 있어야 그 위에 댓글을 남길 자격이 있다(department별 세부 판정은 그 위에 얹힌다).
+   * release 한 건을 열 자격이 있는지 판정하고, 통과하면 release+project+workflow를 함께
+   * 돌려준다. getOne과 feedback 라우트들이 자격 판정 로직을 공유한다 — feedback도 결국
+   * 그 release를 볼 수 있어야 그 위에 댓글을 남기거나 읽을 자격이 있다(department별/
+   * 전체 부서 세부 판정은 그 위에 얹힌다). workflow는 항상 조회한다 — Admin이어도
+   * feedback 라우트들이 workflow Edit Access 판정에 필요로 하기 때문이다(예전엔
+   * `!me.isAdmin`일 때만 조회했다).
    */
   private async loadReleaseForActor(releaseId: string, me: Actor) {
     const release = await this.releases.findOrThrow(releaseId);
@@ -133,9 +154,10 @@ export class ReleasesController {
       throw new ForbiddenException('You do not have access to this project.');
     }
 
+    const workflow = await this.workflowModel.findById(release.workflowId).exec();
+
     if (!me.isAdmin) {
       const myDepts = myDepartments(me, project);
-      const workflow = await this.workflowModel.findById(release.workflowId).exec();
       const allowed =
         (release.recipientUsers ?? []).includes(me.knoxId) ||
         (release.recipientDepartments ?? []).some((d) => myDepts.includes(d)) ||
@@ -145,16 +167,16 @@ export class ReleasesController {
       if (!allowed) throw new ForbiddenException('You do not have access to this release.');
     }
 
-    return { release, project };
+    return { release, project, workflow };
   }
 
   /**
    * 이 사람이 지금 열람 권한을 가진 artifact id 집합.
    * 판정 자체(ArtifactAccessService.levelFor)는 그 서비스의 canView/canEdit 하나로만
-   * 정해진다(설계서 01장 §4.2 갱신) — block은 원본 artifact 문서가 지워졌을 때 지금
+   * 정해진다(설계서 01장 §4.2 갱신) — node는 원본 artifact 문서가 지워졌을 때 지금
    * 매핑된 artifact로 대신 판정하기 위한 대체 경로로만 쓰인다(바로 아래).
    *
-   * ★ Admin은 artifact/block 조회와 무관하게 항상 통과한다(설계서 01장 §2.1 "Admin은
+   * ★ Admin은 artifact/node 조회와 무관하게 항상 통과한다(설계서 01장 §2.1 "Admin은
    *   전 계층 무조건 통과") — 이전엔 이 판정 전에 artifact 조회부터 실패하면(다음 항목
    *   참고) Admin조차 masked로 내려갔다. 그 실패를 이유로 거를 대상이 애초에 아니므로
    *   여기서 I/O 없이 먼저 걸러 낸다.
@@ -162,12 +184,12 @@ export class ReleasesController {
    *   설계서 05장 §5) — item.artifactId가 가리키던 SIREN artifact 문서가 그 뒤 지워져도
    *   (재생성 등) 이력 자체는 읽을 수 있어야 한다. 하지만 이 마스킹 판정은 "지금 권한"을
    *   라이브로 다시 묻는 절차라 물어볼 artifact가 있어야 한다 — 그래서 원래 문서가
-   *   없으면, 같은 block에 지금 매핑돼 있는 artifact(있다면)로 대신 판정한다. 그마저
-   *   없으면(block도 지워졌거나 미매핑) 물어볼 곳이 정말 없으므로 fail-closed(masked)로
+   *   없으면, 같은 node에 지금 매핑돼 있는 artifact(있다면)로 대신 판정한다. 그마저
+   *   없으면(node도 지워졌거나 미매핑) 물어볼 곳이 정말 없으므로 fail-closed(masked)로
    *   남는다 — 이전과 같은 안전한 기본값이다.
    */
   private async visibleArtifactIds(
-    release: { items?: { artifactId: string; blockId: string }[] },
+    release: { items?: { artifactId: string; nodeId: string }[] },
     project: ProjectDocument | null,
     me: Actor,
   ): Promise<Set<string>> {
@@ -179,14 +201,14 @@ export class ReleasesController {
           return;
         }
 
-        const [artifact, block] = await Promise.all([
+        const [artifact, node] = await Promise.all([
           this.artifacts.findOrThrow(item.artifactId).catch(() => null),
-          // 블록이 그새 지워졌을 수 있다 — 그러면 대체 경로(아래)로 물어볼 artifact도 없다.
-          this.blocks.findOrThrow(item.blockId).catch(() => null),
+          // 노드가 그새 지워졌을 수 있다 — 그러면 대체 경로(아래)로 물어볼 artifact도 없다.
+          this.nodes.findOrThrow(item.nodeId).catch(() => null),
         ]);
 
         const liveArtifact = artifact
-          ?? (block?.artifactId ? await this.artifacts.findOrThrow(block.artifactId.toString()).catch(() => null) : null);
+          ?? (node?.artifactId ? await this.artifacts.findOrThrow(node.artifactId.toString()).catch(() => null) : null);
         if (!liveArtifact) return;
 
         const level = await this.artifactAccess.levelFor(me, liveArtifact, project);

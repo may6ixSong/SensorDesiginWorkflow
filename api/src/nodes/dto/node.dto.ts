@@ -1,20 +1,20 @@
-import { BlockDocument } from '../schemas/block.schema';
+import { WorkflowNodeDocument } from '../schemas/node.schema';
 import { ArtifactDocument } from '../../artifacts/schemas/artifact.schema';
 import { AccessLevel } from '../../common/access';
 import { ArtifactDto, MaskedArtifactDto, toArtifactDto, toMaskedArtifactDto } from '../../artifacts/dto/artifact.dto';
 
 /**
- * 캔버스 블록 하나의 공개 모양.
+ * 캔버스 노드 하나의 공개 모양.
  *
  * ★ 캔버스는 Edit/View 권한자가 **완전히 동일한 화면**을 본다(설계서 03장 §1) — 그래서
- *   블록의 존재·좌표·flow는 누구에게나 같다. 다르게 보이는 것은 각 산출물의 **버전**뿐이고,
+ *   노드의 존재·좌표·flow는 누구에게나 같다. 다르게 보이는 것은 각 산출물의 **버전**뿐이고,
  *   그건 artifact 단위로 판정된다.
- * ★ 블록에는 **버전 라벨을 싣지 않는다.** 버전은 상세 slide에서만 보인다(설계서 03장 §2.1).
+ * ★ 노드에는 **버전 라벨을 싣지 않는다.** 버전은 상세 slide에서만 보인다(설계서 03장 §2.1).
  *   대신 publish 3상태 배지를 그릴 수 있도록 publishState만 내려준다.
  */
 export type PublishState = 'unpublished' | 'published' | 'newlyPublished';
 
-export interface BlockDto {
+export interface NodeDto {
   id: string;
   workflowId: string;
   phaseId: string;
@@ -26,7 +26,7 @@ export interface BlockDto {
   artifact: ArtifactDto | MaskedArtifactDto | null;
   publishState: PublishState;
   /**
-   * artifact가 매핑된 block에서만 값이 있을 **수** 있다 — A/B/C 전부 공통이다(설계서 04장
+   * artifact가 매핑된 node에서만 값이 있을 **수** 있다 — A/B/C 전부 공통이다(설계서 04장
    * §3). 그마저도 **이 workflow의 Edit Access가 있는 사람에게만** 내려간다(설계서 01장
    * §3.8 확장) — recipient에 속하거나 그 artifact의 편집 권한이 있어도, workflow Edit
    * Access가 없으면 null이다. slide를 열 수 있는지(overview 탭)와는 별개 판정이다.
@@ -55,24 +55,24 @@ export function publishStateOf(
   return majorKeyOf(latest.versionLabel) === lastReleasedMajorKey ? 'published' : 'newlyPublished';
 }
 
-export function toBlockDto(
-  block: BlockDocument,
+export function toNodeDto(
+  node: WorkflowNodeDocument,
   artifact: ArtifactDocument | null,
   artifactLevel: AccessLevel,
   publishState: PublishState,
   /** 이 workflow에 대한 Edit Access가 있는가 — Recipients 노출 여부의 유일한 기준이다. */
-  canManageBlocks: boolean,
-): BlockDto {
+  canManageNodes: boolean,
+): NodeDto {
   return {
-    id: block._id.toString(),
-    workflowId: block.workflowId.toString(),
-    phaseId: block.phaseId,
-    // 캔버스에는 block 자신의 Name을 쓴다 — artifact 이름은 상세(slide)에서만 보여준다
-    // (사용자 지적). 매핑 이후에도 block.name은 등록/변경 시 입력한 값 그대로 유지된다.
-    name: block.name,
-    layout: { x: block.layout.x, y: block.layout.y, w: block.layout.w, h: block.layout.h },
-    intent: block.intent,
-    artifactId: block.artifactId?.toString() ?? null,
+    id: node._id.toString(),
+    workflowId: node.workflowId.toString(),
+    phaseId: node.phaseId,
+    // 캔버스에는 node 자신의 Name을 쓴다 — artifact 이름은 상세(slide)에서만 보여준다
+    // (사용자 지적). 매핑 이후에도 node.name은 등록/변경 시 입력한 값 그대로 유지된다.
+    name: node.name,
+    layout: { x: node.layout.x, y: node.layout.y, w: node.layout.w, h: node.layout.h },
+    intent: node.intent,
+    artifactId: node.artifactId?.toString() ?? null,
     artifact: !artifact
       ? null
       : artifactLevel === null
@@ -80,14 +80,14 @@ export function toBlockDto(
         : toArtifactDto(artifact, artifactLevel),
     // 열람 권한이 없으면 상태 자체가 정보이므로 배지를 그리지 않는다(설계서 03장 §2.2).
     publishState: artifactLevel === null ? 'unpublished' : publishState,
-    recipients: artifact && canManageBlocks
+    recipients: artifact && canManageNodes
       ? {
-          departments: [...(block.recipients?.departments ?? [])],
-          users: [...(block.recipients?.users ?? [])],
+          departments: [...(node.recipients?.departments ?? [])],
+          users: [...(node.recipients?.users ?? [])],
         }
       : null,
-    series: block.series?.toString() ?? null,
-    seriesIdx: block.seriesIdx,
-    seriesTotal: block.seriesTotal,
+    series: node.series?.toString() ?? null,
+    seriesIdx: node.seriesIdx,
+    seriesTotal: node.seriesTotal,
   };
 }

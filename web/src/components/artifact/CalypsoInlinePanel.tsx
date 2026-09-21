@@ -24,7 +24,7 @@ interface Props {
   artifactId: string;
   /** SIREN project id — BE가 department를 계산하는 데 쓴다(설계서 07장 §2). */
   projectId: string;
-  blockId: string;
+  nodeId: string;
   releases: ReleaseDto[];
   onOpenRelease?: (releaseId: string) => void;
 }
@@ -43,7 +43,7 @@ interface Props {
  * 버전 트리의 "이 workflow에서 release 여부" 배지만 이 컴포넌트가 얹는다 — 독립
  * Artifact page는 특정 workflow에 매인 화면이 아니라 그 배지를 모른다.
  */
-export function CalypsoInlinePanel({ artifactId, projectId, blockId, releases, onOpenRelease }: Props) {
+export function CalypsoInlinePanel({ artifactId, projectId, nodeId, releases, onOpenRelease }: Props) {
   const qc = useQueryClient();
   const [picked, setPicked] = useState<CalypsoVersionView | null>(null);
   const [addOpen, setAddOpen] = useState(false);
@@ -105,7 +105,7 @@ export function CalypsoInlinePanel({ artifactId, projectId, blockId, releases, o
 
   const shown = picked ?? a.latestVersion;
   const versions = a.versions ?? [];
-  const relBadges = releaseBadgeMap(releases, blockId);
+  const relBadges = releaseBadgeMap(releases, nodeId);
   const canEdit = a.myAccess === 'edit';
 
   return (

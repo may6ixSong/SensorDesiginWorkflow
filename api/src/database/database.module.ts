@@ -4,7 +4,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { ProjectSchema } from '../projects/schemas/project.schema';
 import { WorkflowSchema } from '../workflows/schemas/workflow.schema';
 import { ArtifactSchema } from '../artifacts/schemas/artifact.schema';
-import { BlockSchema } from '../blocks/schemas/block.schema';
+import { WorkflowNodeSchema } from '../nodes/schemas/node.schema';
 import { MemoSchema } from '../memos/schemas/memo.schema';
 import { EdgeSchema } from '../edges/schemas/edge.schema';
 import { ReleaseSchema } from '../releases/schemas/release.schema';
@@ -20,7 +20,7 @@ const ALL_MODELS: ModelDef[] = [
   { name: 'Project', schema: ProjectSchema },
   { name: 'Workflow', schema: WorkflowSchema },
   { name: 'Artifact', schema: ArtifactSchema },
-  { name: 'Block', schema: BlockSchema },
+  { name: 'WorkflowNode', schema: WorkflowNodeSchema },
   { name: 'Memo', schema: MemoSchema },
   { name: 'Edge', schema: EdgeSchema },
   { name: 'Release', schema: ReleaseSchema },

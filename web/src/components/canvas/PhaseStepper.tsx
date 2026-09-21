@@ -26,7 +26,7 @@ interface Props {
  *  - 트랙은 translateX(panX)만 적용하고,
  *  - 각 셀의 폭은 getPW(p) * z 로 미리 곱해둔다.
  * 캔버스는 반대로 translateX(panX) scale(z)로 통째로 스케일하고 레인 폭은 원본값을 쓴다.
- * 두 방식의 결과 픽셀 폭이 같아지므로 phase와 블록이 어긋나지 않는다.
+ * 두 방식의 결과 픽셀 폭이 같아지므로 phase와 노드가 어긋나지 않는다.
  */
 export function PhaseStepper({
   phases, phasePW, nodes, z, panX, edit, onPhaseClick, onResizeStart,

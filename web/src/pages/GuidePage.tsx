@@ -18,9 +18,9 @@ const SECTIONS: Section[] = [
     key: 'CANVAS',
     title: 'The canvas',
     body: [
-      'Each workflow has one canvas. Blocks sit left to right across that workflow\'s own phases, and arrows between them show which artifact feeds which.',
-      'A block is a place, not the artifact itself. It holds a spot on the schedule; the real artifact is mapped to it and can be shared by several workflows at once.',
-      'Scroll to zoom, drag empty space to pan. Click a block to trace its flow, then press the eye in its corner to open the details panel.',
+      'Each workflow has one canvas. Nodes sit left to right across that workflow\'s own phases, and arrows between them show which artifact feeds which.',
+      'A node is a place, not the artifact itself. It holds a spot on the schedule; the real artifact is mapped to it and can be shared by several workflows at once.',
+      'Scroll to zoom, drag empty space to pan. Click a node to trace its flow, then press the eye in its corner to open the details panel.',
     ],
   },
   {
@@ -29,7 +29,7 @@ const SECTIONS: Section[] = [
     body: [
       'Anyone with Edit access to the workflow can rearrange it. Press the pencil in the bottom-left toolbox to enter edit mode; the check mark saves and exits, the arrow discards every change made in that session.',
       'Only one person edits a canvas at a time. Entering edit mode takes a lock that lasts ten minutes and renews itself while you work, so a second editor is told who holds it instead of silently overwriting them.',
-      'Drag a block to move it. Pushing it across a phase boundary takes a little force, so a block will not change phase by accident. Drag the bottom-right corner to resize, and use the right-hand pin to draw a link to another block.',
+      'Drag a node to move it. Pushing it across a phase boundary takes a little force, so a node will not change phase by accident. Drag the bottom-right corner to resize, and use the right-hand pin to draw a link to another node.',
       'The canvas has no versions of its own — saving overwrites the layout, and nothing about the layout is kept as history.',
     ],
   },
@@ -37,7 +37,7 @@ const SECTIONS: Section[] = [
     key: 'PUBLISH',
     title: 'Publish',
     body: [
-      'An artifact is published inside the service that owns it — Calypso, a simulation service, or by hand for the lower tiers. SIREN observes that and shows the state on the block: not published, published, or new since the last release.',
+      'An artifact is published inside the service that owns it — Calypso, a simulation service, or by hand for the lower tiers. SIREN observes that and shows the state on the node: not published, published, or new since the last release.',
       'OA Service artifacts are governed entirely by the owning service. SIREN never grants access to them; it only shows what that service says you may see.',
     ],
   },

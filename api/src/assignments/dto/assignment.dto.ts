@@ -81,7 +81,7 @@ export interface MyReleaseRowDto {
   releasedBy: string;
   /** 목록에서는 첫 줄만 쓰지만, 자르는 위치는 FE가 정하도록 통째로 보낸다. */
   note: string;
-  workflowAt: { name: string; department: string };
+  workflowAt: { name: string; department: string; departmentLabel: string };
   itemCount: number;
   changedCount: number;
   /** 이 release의 수신 부서 중 **내가 속한** 것만. Admin은 전체가 들어온다. */
@@ -92,10 +92,10 @@ export interface MyReleaseRowDto {
   published: boolean;
 }
 
-/** 내 부서가 주는 산출물 한 자리(block). 행의 정체성은 artifact가 아니라 block이다. */
+/** 내 부서가 주는 산출물 한 자리(node). 행의 정체성은 artifact가 아니라 node이다. */
 export interface MyArtifactRowDto {
-  blockId: string;
-  blockName: string;
+  nodeId: string;
+  nodeName: string;
   workflowId: string;
   workflowName: string;
   workflowDepartment: string;
@@ -148,7 +148,7 @@ export interface VersionEventDto {
   projectCode: string;
   projectName: string;
   /** 이 산출물이 내 scope 안에서 놓여 있는 자리들. */
-  placements: { workflowId: string; workflowName: string; department: string; blockId: string }[];
+  placements: { workflowId: string; workflowName: string; department: string; nodeId: string }[];
 }
 
 export interface CalendarDto {

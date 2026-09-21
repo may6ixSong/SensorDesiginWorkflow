@@ -20,15 +20,15 @@ import { CALYPSO_SERVICE_KEY, CalypsoClientService } from '../hub/calypso-client
  * │                    맞다  → 연다. 버전 트리 깊이는 canEdit로 갈린다.        │
  * └────────────────────────────────────────────────────────────────────────┘
  *
- * ★ **block.recipients는 이 판정에 관여하지 않는다**(사용자 결정, 01장 §4.2 갱신 — 이전
+ * ★ **node.recipients는 이 판정에 관여하지 않는다**(사용자 결정, 01장 §4.2 갱신 — 이전
  *   버전은 "recipient(게이트 1) → 서비스 권한(게이트 2)"의 2단 게이트였다). 그 결과 같은
- *   부서가 만든 workflow인데도, artifact 자체는 view 제한이 없는데도, 그 block의
+ *   부서가 만든 workflow인데도, artifact 자체는 view 제한이 없는데도, 그 node의
  *   recipient가 다른 부서로 지정돼 있으면 못 여는 상황이 나왔다 — recipient는 이제
  *   **release 알림 대상**과 **Recipients/Comments 탭에 누구를 보여줄지**에만 쓰이고,
  *   slide를 열 수 있는지는 그 서비스의 canView/canEdit 하나로만 정해진다.
  * ★ artifact 단위로 SIREN이 editAccess/viewAccess를 직접 보관하던 옛 모델은 완전히
  *   폐기했다 — 실제 Edit/View는 항상 그 서비스가 최종 판정한다. 여러 workflow가 하나의
- *   artifact를 공유해도 이 판정 자체는 workflow와 무관하다(block을 더 이상 참조하지
+ *   artifact를 공유해도 이 판정 자체는 workflow와 무관하다(node를 더 이상 참조하지
  *   않는다).
  *
  * ★ External/Attested(D) — 서비스가 없어 이 판정 자체가 없던 tier — 는 폐기했다. File
@@ -51,7 +51,7 @@ export class ArtifactAccessService {
    * 없음"과 절대 같은 화면을 쓰지 않는다**(설계서 04장 §4.3).
    *
    * A/B/C(OA Service/File Artifacts/HPC Service) 전부 그 서비스 자신의 canView/canEdit
-   * 하나로만 정해진다 — block/recipient는 더 이상 이 판정의 입력이 아니다.
+   * 하나로만 정해진다 — node/recipient는 더 이상 이 판정의 입력이 아니다.
    */
   async levelFor(
     actor: Actor,

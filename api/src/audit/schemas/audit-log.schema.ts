@@ -17,6 +17,11 @@ import { Document, Types, SchemaTypes } from 'mongoose';
  * 이미 저장된 옛 action 값(예: HLD_RELEASE, DELIVERABLE_DELETE)은 그대로 남는다 —
  * Mongoose enum 제약은 저장 시점에만 걸리고 기존 문서를 다시 검증하지 않으므로
  * 마이그레이션이 필요 없다. 그래서 옛 값도 목록에 남겨 둔다.
+ *
+ * ★ `BLOCK_*` action 값들(BLOCK_RECIPIENTS_REPLACE/BLOCK_ARTIFACT_REMAP/BLOCK_CREATE/
+ *   BLOCK_DELETE)도 같은 이유로 리터럴을 개명하지 않았다 — 캔버스 placement 엔티티
+ *   자체는 Block에서 WorkflowNode/Node로 이름이 바뀌었지만(설계서 전반), 이 값들은 DB에
+ *   영구히 저장되는 이력 문자열이라 이미 쌓인 문서와의 호환을 위해 그대로 둔다.
  */
 export const AUDIT_ACTIONS = [
   // --- Release (workflow → 부서 전달). 철회가 불가능하므로 반드시 남긴다 ---
@@ -35,11 +40,11 @@ export const AUDIT_ACTIONS = [
   /** 부서 변경은 editAccess 교체를 동반하므로 사실상 권한 이양이다. */
   'WORKFLOW_DEPARTMENT_CHANGE',
   'ARTIFACT_ACCESS_REPLACE',
-  /** A/B/C 공통 block.recipients — release 알림 대상이자 Recipients/Comments 탭 표시
+  /** A/B/C 공통 node.recipients — release 알림 대상이자 Recipients/Comments 탭 표시
    * 대상이라 권한 변경과 같은 무게로 남긴다(slide 열람 자체는 더 이상 좌우하지 않는다). */
   'BLOCK_RECIPIENTS_REPLACE',
   /**
-   * 블록이 가리키는 artifact가 바뀌었다. 단순 이름 변경이 아니라 **무엇이 누구에게
+   * 노드가 가리키는 artifact가 바뀌었다. 단순 이름 변경이 아니라 **무엇이 누구에게
    * 전달되는지가 통째로 달라지는** 사건이라(B/C/D는 recipient가 artifact에서 나온다)
    * 권한 변경과 같은 무게로 남긴다.
    */

@@ -7,7 +7,7 @@ import { seedDatabase } from './seed-data';
 import { ProjectDocument } from '../projects/schemas/project.schema';
 import { WorkflowDocument } from '../workflows/schemas/workflow.schema';
 import { ArtifactDocument } from '../artifacts/schemas/artifact.schema';
-import { BlockDocument } from '../blocks/schemas/block.schema';
+import { WorkflowNodeDocument } from '../nodes/schemas/node.schema';
 import { MemoDocument } from '../memos/schemas/memo.schema';
 import { EdgeDocument } from '../edges/schemas/edge.schema';
 import { ReleaseDocument } from '../releases/schemas/release.schema';
@@ -39,7 +39,7 @@ export class SeedRunnerService implements OnModuleInit {
     @Inject(getModelToken('Project')) private readonly projectModel: Model<ProjectDocument>,
     @Inject(getModelToken('Workflow')) private readonly workflowModel: Model<WorkflowDocument>,
     @Inject(getModelToken('Artifact')) private readonly artifactModel: Model<ArtifactDocument>,
-    @Inject(getModelToken('Block')) private readonly blockModel: Model<BlockDocument>,
+    @Inject(getModelToken('WorkflowNode')) private readonly nodeModel: Model<WorkflowNodeDocument>,
     @Inject(getModelToken('Memo')) private readonly memoModel: Model<MemoDocument>,
     @Inject(getModelToken('Edge')) private readonly edgeModel: Model<EdgeDocument>,
     @Inject(getModelToken('Release')) private readonly releaseModel: Model<ReleaseDocument>,
@@ -53,7 +53,7 @@ export class SeedRunnerService implements OnModuleInit {
       this.projectModel,
       this.workflowModel,
       this.artifactModel,
-      this.blockModel,
+      this.nodeModel,
       this.memoModel,
       this.edgeModel,
       this.releaseModel,
@@ -91,7 +91,7 @@ export class SeedRunnerService implements OnModuleInit {
         Project: this.projectModel,
         Workflow: this.workflowModel,
         Artifact: this.artifactModel,
-        Block: this.blockModel,
+        WorkflowNode: this.nodeModel,
         Memo: this.memoModel,
         Edge: this.edgeModel,
         Release: this.releaseModel,

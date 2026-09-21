@@ -12,7 +12,7 @@
 
 `framer-motion` 을 도입한다. 이유:
 - spring 물리 기반 전환을 값으로 다룰 수 있다(감속 곡선을 손으로 흉내내지 않아도 된다).
-- `layout` 프로퍼티로 위치·크기 변화를 자동 보간한다 — 캔버스 블록 재배치, 리스트 정렬 변화,
+- `layout` 프로퍼티로 위치·크기 변화를 자동 보간한다 — 캔버스 노드 재배치, 리스트 정렬 변화,
   패널 크기 변화에 그대로 쓸 수 있다.
 - `AnimatePresence` 로 언마운트 애니메이션(다이얼로그 닫힘)을 처리한다. CSS만으로는 어렵다.
 
@@ -25,7 +25,7 @@
 export const MOTION = {
   // spring — 위치·크기가 움직이는 것
   panel:   { type: 'spring', stiffness: 420, damping: 38, mass: 0.9 },  // 다이얼로그·슬라이드 패널
-  block:   { type: 'spring', stiffness: 520, damping: 42, mass: 0.8 },  // 캔버스 블록 layout 변화
+  node:    { type: 'spring', stiffness: 520, damping: 42, mass: 0.8 },  // 캔버스 노드 layout 변화
   press:   { type: 'spring', stiffness: 700, damping: 30 },             // 버튼 눌림
   // tween — 색·투명도처럼 물리감이 필요 없는 것
   fade:    { duration: 0.18, ease: [0.22, 0.61, 0.36, 1] },
@@ -42,7 +42,7 @@ export const REDUCED = { duration: 0 };   // prefers-reduced-motion 대체값
 | 다이얼로그 · 슬라이드 패널 | `MOTION.panel` — scale 0.96 → 1 + opacity, 배경 dim은 `fade` |
 | 탭 전환 | 내용은 `fade`, 활성 인디케이터는 `layoutId` 로 미끄러지게 |
 | 버튼 | hover는 `fade`, press는 `MOTION.press` 로 scale 0.97 |
-| 캔버스 블록 이동 | 드래그 중에는 애니메이션 없음(직접 추종), 놓은 뒤 스냅만 `MOTION.block` |
+| 캔버스 노드 이동 | 드래그 중에는 애니메이션 없음(직접 추종), 놓은 뒤 스냅만 `MOTION.node` |
 | 캔버스 배경(편집 모드 전환) | `MOTION.surface` |
 | 토스트 | 아래에서 올라오며 `MOTION.panel`, 사라질 때 `fade` |
 | 리스트 정렬·필터 변화 | `layout` 프로퍼티로 자동 보간 |
@@ -87,7 +87,7 @@ export const REDUCED = { duration: 0 };   // prefers-reduced-motion 대체값
   ```
 - **캔버스 드래그 중에는 애니메이션을 걸지 않는다.** 포인터를 그대로 따라가야 한다.
   놓는 순간의 스냅에만 spring을 쓴다.
-- 블록이 수십~수백 개인 캔버스에서 `layout` 을 전부 켜면 느려진다. **뷰포트 안의 블록만** 애니메이션한다.
+- 노드가 수십~수백 개인 캔버스에서 `layout` 을 전부 켜면 느려진다. **뷰포트 안의 노드만** 애니메이션한다.
 - 데이터 로딩 중 스켈레톤이 깜빡이지 않게, 200ms 미만 로딩에는 스켈레톤을 띄우지 않는다.
 
 ---
@@ -175,6 +175,14 @@ i18n 리소스의 `hld.*` 키도 함께 제거한다.
 
 개발 단계 데이터이므로 무겁게 가지 않는다.
 
+> **역사적 기록 — 이 §4는 v2→v3 개정 당시의 변환 규칙을 그대로 남긴다.** 그때 실제로는
+> `deliverables`가 `blocks`(그 뒤 `Node`로 다시 개명됨)와 `artifacts`로 쪼개졌다 — 이 문서를
+> 나중에 개명 후 표기(`nodes`)로 고쳐 썼지만, 실행 당시 컬렉션 이름은 `blocks`였다는 점은
+> 바뀌지 않는 사실이다. `blocks` → `nodes` 개명 자체의 실행 기록은
+> [`docs/prompts/db-migration-v3.md`](prompts/db-migration-v3.md)(그 시점엔 아직 `blocks`)와
+> [`docs/prompts/db-node-department-migration.md`](prompts/db-node-department-migration.md)(이후
+> `blocks`→`nodes` 개명을 수행)를 참고한다.
+
 ### 4.1 폐기
 
 | 컬렉션 | 처리 |
@@ -190,7 +198,7 @@ i18n 리소스의 `hld.*` 키도 함께 제거한다.
 | `workflows.owners` → `ownerKnoxId` + `editAccess.users` | `owners[0]` 을 owner로, 나머지는 editAccess.users로 |
 | `workflows.viewGrants` → `viewAccess.users` | `knoxId` 만. `department` 는 버린다 |
 | `workflows.editAccess.departments` | `[department]` 로 초기화 |
-| `deliverables` → `blocks` + `artifacts` | 문서 하나를 둘로 쪼갠다. 아래 §4.3 |
+| `deliverables` → `nodes` + `artifacts` | 문서 하나를 둘로 쪼갠다. 아래 §4.3 |
 | `deliverables.versions[].isReleased` | → `artifacts.versions[].isPublished` |
 | `projects.revision` | 형식에 안 맞는 값은 `EVT0` 으로 정규화하고 로그를 남긴다 |
 
@@ -200,12 +208,12 @@ i18n 리소스의 `hld.*` 키도 함께 제거한다.
 같은 (serviceKey, externalArtifactId) 를 가진 deliverable 문서들
    → artifacts 1건으로 합친다 (versions는 최신순 병합, 중복 versionRef 제거)
 serviceKey 가 null 인 문서
-   → artifactId = null 인 blocks 로만 남긴다 (artifact를 만들지 않는다)
+   → artifactId = null 인 nodes 로만 남긴다 (artifact를 만들지 않는다)
 serviceKey 는 없고 sourceDept/sourceContact 만 있는 문서 (구 D 티어)
    → artifacts 1건을 tier 'D' 로 생성하고 이름을 그대로 쓴다
 권한 초기값
    → artifacts.viewAccess.departments = 구 recvDept 가 있으면 [recvDept], 없으면 []
-   → artifacts.editAccess.departments = 그 블록이 있던 workflow 의 department
+   → artifacts.editAccess.departments = 그 노드가 있던 workflow 의 department
 ```
 
 ### 4.4 실행
@@ -222,8 +230,8 @@ serviceKey 는 없고 sourceDept/sourceContact 만 있는 문서 (구 D 티어)
 
 | 기존 | 변경 | 이유 |
 |---|---|---|
-| `deliverables` (컬렉션·모듈) | `blocks` + `artifacts` | 자리와 실체의 분리 |
-| `Deliverable` (타입) | `Block` / `Artifact` | 위와 동일 |
+| `deliverables` (컬렉션·모듈) | `nodes` + `artifacts` | 자리와 실체의 분리 |
+| `Deliverable` (타입) | `Node` / `Artifact` | 위와 동일 |
 | `workflow.domain` | `workflow.department` | "설계 도메인" 개념은 이미 폐기됨 |
 | `workflow.owners[]` | `workflow.ownerKnoxId` | Owner는 1명 |
 | `workflow.viewGrants[]` | `workflow.viewAccess` | edit/view 대칭 구조로 |

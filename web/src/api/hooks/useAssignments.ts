@@ -15,7 +15,7 @@ import {
  * My Assignment (설계서 09장) — 과제 경계를 넘어 "내 일"만 모아 오는 조회들.
  *
  * 서버가 이미 scope(내가 member인 과제 → 내 부서가 소속 부서인 workflow → 그 workflow의
- * own block)로 좁혀 주므로, 여기서는 projectId 같은 걸 넘기지 않는다.
+ * own node)로 좁혀 주므로, 여기서는 projectId 같은 걸 넘기지 않는다.
  */
 
 const DEFAULT_PAGE_SIZE = 5;
@@ -138,6 +138,25 @@ export function useReleaseFeedback(releaseId: string, department: string) {
   });
 }
 
+/**
+ * release 한 건의 **모든** recipient 부서 스레드를 한 번에(설계서 05장 §7.1.1) — 이
+ * release를 낸 workflow의 list view가 "전체 부서" 상태일 때만 부른다. 서버가 workflow
+ * Edit Access(또는 Admin)만 통과시키므로, 그 권한이 없는 화면에서는 `enabled`로 아예
+ * 부르지 않는다(불필요한 403을 만들지 않는다).
+ */
+export function useAllReleaseFeedback(releaseId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.releaseFeedbackAll(releaseId),
+    enabled: Boolean(releaseId) && enabled,
+    queryFn: async () => {
+      const res = await apiClient.get<ApiEnvelope<Record<string, ReleaseFeedbackDto[]>>>(
+        `/releases/${releaseId}/feedback/all`,
+      );
+      return res.data.data;
+    },
+  });
+}
+
 export function useCreateReleaseFeedback(releaseId: string) {
   const qc = useQueryClient();
   return useMutation({
@@ -154,6 +173,9 @@ export function useCreateReleaseFeedback(releaseId: string) {
     },
     onSuccess: (_data, variables) => {
       qc.invalidateQueries({ queryKey: queryKeys.releaseFeedback(releaseId, variables.department) });
+      // workflow 쪽 대시보드(전체 부서 요약)도 이 department의 최신 댓글/상태를 봐야
+      // 하므로 같이 무효화한다 — 워크플로에서 다는 답글도 이 mutation을 그대로 쓴다.
+      qc.invalidateQueries({ queryKey: queryKeys.releaseFeedbackAll(releaseId) });
     },
   });
 }

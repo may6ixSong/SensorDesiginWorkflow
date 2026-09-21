@@ -18,7 +18,7 @@
  *
  * DOM 측정은 하지 않는다 — 전부 해석적으로 나온다.
  */
-import { BlockDto, EdgeDto, Milestone, WorkflowDto, isMaskedArtifact } from '@/types/domain';
+import { NodeDto, EdgeDto, Milestone, WorkflowDto, isMaskedArtifact } from '@/types/domain';
 import { DAY_MS, DateRange, dayMs, rangeOf, ratioIn } from './schedule';
 import { DomainGroup, statusOf } from './domainWorkflow';
 
@@ -50,7 +50,7 @@ export const DOMAIN_HEAD_H = 130;
  * 산출물 구체의 기본 지름 — 카드보다 확실히 "구체"로 읽히도록, 그리고 줌아웃한
  * 상태에서도 뭔지 알아볼 수 있도록 예전보다 크게 키웠다.
  */
-export const BLOCK_D = 76;
+export const NODE_D = 76;
 /**
  * z(깊이) 진폭 — ±이 값 안에서 흩어진다. 순수하게 보기 위한 축이지만, 너무 크면
  * perspective 때문에 항목마다 화면상 위치·크기가 크게 튀어 "자유분방"하게 보인다.
@@ -62,15 +62,15 @@ const STACK_Y = 140;
 /** 같은 스택의 위아래 끝과 옆 행 사이에 남겨 둘 여유. */
 const STACK_PAD = 74;
 /** 산출물 이름표의 최대 폭 — 레이아웃과 렌더가 같은 값을 봐야 한다. 폰트를 키운 만큼 같이 넓혔다. */
-export const BLOCK_LABEL_W = 200;
+export const NODE_LABEL_W = 200;
 /**
  * 같은 행에서 두 산출물이 "같은 줄에 있어도 겹치지 않는" 최소 x 간격.
- * 산출물은 구체(중심에서 반지름만큼) + 오른쪽으로 뻗는 이름표(BLOCK_LABEL_W)를
+ * 산출물은 구체(중심에서 반지름만큼) + 오른쪽으로 뻗는 이름표(NODE_LABEL_W)를
  * 차지한다 — 그래서 필요한 간격은 "가장 큰 구체 지름 + 이름표 폭 + 여유"다.
  * 이 값보다 x가 가까운 것들만 세로로 갈라 준다(아래 lane 배정 참고). 한 workflow당
  * 20~30개가 몰려도 확실히 여유 있게 보이도록 여유분을 예전보다 크게 잡았다.
  */
-const MIN_GAP_X = BLOCK_D * 2 + 60 + BLOCK_LABEL_W;
+const MIN_GAP_X = NODE_D * 2 + 60 + NODE_LABEL_W;
 
 /** FNV-1a 32bit 해시 — 항상 같은 입력에 같은 값(새로고침해도 배치가 그대로). */
 function hash32(s: string): number {
@@ -86,13 +86,13 @@ function rand01(seed: string): number {
   return hash32(seed) / 4294967296;
 }
 
-export type BlockStatus = 'released' | 'inProgress' | 'notSubmitted';
+export type NodeStatus = 'released' | 'inProgress' | 'notSubmitted';
 
-export interface BlockNode {
+export interface WorldNode {
   id: string;
   name: string;
   serviceKey: string | null;
-  status: BlockStatus;
+  status: NodeStatus;
   /** 월드 절대 좌표. z는 카메라 평면 기준 깊이(음수=멀리, 양수=가까이). */
   x: number;
   y: number;
@@ -109,7 +109,7 @@ export interface WorkflowRowLayout {
   workflow: WorkflowDto;
   /** 월드 절대 y (행 중심). */
   y: number;
-  blocks: BlockNode[];
+  nodes: WorldNode[];
   released: number;
   total: number;
   orphans: number;
@@ -186,13 +186,13 @@ function bandState(start: string, end: string, now: number): MilestoneBand['stat
  * 도메인 그룹 + 마일스톤 + 산출물로 월드 전체 배치를 만든다.
  *
  * @param milestones 과제 공통 일정 — 배경 밴드이자 날짜축 범위의 일부.
- * @param blocksByWorkflow workflowId → 그 workflow의 캔버스 블록.
+ * @param nodesByWorkflow workflowId → 그 workflow의 캔버스 노드.
  * @param edgesByWorkflow workflowId → 그 workflow 안의 산출물↔산출물 flow.
  */
 export function buildWorldLayout(
   domains: DomainGroup[],
   milestones: Milestone[],
-  blocksByWorkflow: Map<string, BlockDto[]>,
+  nodesByWorkflow: Map<string, NodeDto[]>,
   edgesByWorkflow: Map<string, EdgeDto[]>,
   now = Date.now(),
 ): WorldLayout {
@@ -223,7 +223,7 @@ export function buildWorldLayout(
     let rowCursorY = contentY;
     const rows: WorkflowRowLayout[] = domain.workflows.map((workflow) => {
       const phaseById = new Map((workflow.phases ?? []).map((p) => [p.id, p]));
-      const items = blocksByWorkflow.get(workflow.id) ?? [];
+      const items = nodesByWorkflow.get(workflow.id) ?? [];
 
       // x를 먼저 계산한다 — 실제 필요한 만큼만 세로로 갈라 주려면(아래 lane 배정) x가
       // 먼저 있어야 한다. 지터 없이 phase 종료일 그대로 쓴다 — 같은 날짜에 끝나는
@@ -262,14 +262,14 @@ export function buildWorldLayout(
       // 높이(ROW_H/2)를 쓴다. 그래서 산출물이 몇 개 안 되는 행은 예전처럼 컴팩트하고,
       // 20~30개가 몰린 행만 알아서 넓어져 위아래 행을 침범하지 않는다.
       const maxAbsRel = withOffset.reduce((m, it) => Math.max(m, Math.abs(it.relY)), 0);
-      const rowHalfH = Math.max(ROW_H / 2, maxAbsRel + BLOCK_D / 2 + STACK_PAD);
+      const rowHalfH = Math.max(ROW_H / 2, maxAbsRel + NODE_D / 2 + STACK_PAD);
       const rowH = rowHalfH * 2;
       const rowY = rowCursorY + rowHalfH;
       rowCursorY += rowH + ROW_GAP;
 
       let released = 0;
       let orphans = 0;
-      const blocks: BlockNode[] = withOffset.map(({ d, phase, orphan, x, relY }) => {
+      const nodes: WorldNode[] = withOffset.map(({ d, phase, orphan, x, relY }) => {
         const status = statusOf(d);
         if (status === 'released') released++;
         if (orphan) orphans++;
@@ -279,20 +279,20 @@ export function buildWorldLayout(
         // 가까운 것(z>0)이 조금 더 크게 — perspective가 처리하지만, 지름 자체도
         // 아주 살짝만 섞어 정돈된 느낌을 유지한다(너무 벌리면 크기가 들쭉날쭉해
         // 자유분방하게 보인다).
-        const dia = BLOCK_D * (0.94 + rand01(`${d.id}:d`) * 0.12);
+        const dia = NODE_D * (0.94 + rand01(`${d.id}:d`) * 0.12);
         // serviceKey는 이제 산출물 실체(artifact)의 속성이다 — 미매핑이거나 열람 권한이
-        // 없어 마스킹된 블록은 null로 둔다.
+        // 없어 마스킹된 노드는 null로 둔다.
         const serviceKey =
           d.artifact && !isMaskedArtifact(d.artifact) ? d.artifact.serviceKey : null;
-        const block: BlockNode = {
+        const node: WorldNode = {
           id: d.id, name: d.name, serviceKey, status,
           x, y, z, d: dia, phaseName: phase?.name ?? null, orphan,
         };
         centerOf.set(d.id, { x, y });
-        return block;
+        return node;
       });
 
-      return { workflow, y: rowY, blocks, released, total: items.length, orphans };
+      return { workflow, y: rowY, nodes, released, total: items.length, orphans };
     });
 
     const wires: WireLink[] = domain.workflows.flatMap((workflow) => (

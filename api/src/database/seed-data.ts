@@ -3,14 +3,16 @@
  * 연결(실제 DB든 인메모리든)은 전적으로 호출자 책임이다.
  *
  * ★ v3 구조를 그대로 반영한다:
- *   - 산출물의 **실체(Artifact)**와 캔버스 위의 **자리(Block)**가 분리되어 있다.
+ *   - 산출물의 **실체(Artifact)**와 캔버스 위의 **자리(WorkflowNode)**가 분리되어 있다.
+ *     이 자리 엔티티는 원래 구 `deliverables` 컬렉션에서 `Block`으로 분리됐다가, 이후
+ *     순수 용어 변경으로 `WorkflowNode`(컬렉션명 `nodes`)로 다시 개명됐다 — 동작은 그대로다.
  *   - Artifact는 과제 단위로 스코프되고, 같은 artifact가 여러 workflow에 놓일 수 있다.
  *   - Artifact는 권한을 들고 있지 않는다 — recipient(누가 볼 수 있는지)는 항상
- *     **block마다** 따로 붙는다(A/B/C 공통). 실제 edit/view는 그 서비스가 판정한다.
+ *     **node마다** 따로 붙는다(A/B/C 공통). 실제 edit/view는 그 서비스가 판정한다.
  *   - Release는 부서별 배송 기록이며 캔버스 스냅샷을 담지 않는다.
  *
  * 이 시드는 아래 상황을 일부러 만들어 둔다 — 화면에서 바로 확인할 수 있게:
- *   · 일정을 잃은 블록(그 phase가 지워진 상태)
+ *   · 일정을 잃은 노드(그 phase가 지워진 상태)
  *   · publish된 적 없는 산출물 / 마지막 release 이후 major가 올라간 산출물
  *   · A Tier인데 recipient가 비어 있어 아무도 slide를 못 여는 산출물
  *   · source가 미발행이라 release 표에 `없음(None)`으로 남는 항목
@@ -19,7 +21,7 @@ import { Model, Types } from 'mongoose';
 import { ProjectDocument } from '../projects/schemas/project.schema';
 import { WorkflowDocument } from '../workflows/schemas/workflow.schema';
 import { ArtifactDocument } from '../artifacts/schemas/artifact.schema';
-import { BlockDocument } from '../blocks/schemas/block.schema';
+import { WorkflowNodeDocument } from '../nodes/schemas/node.schema';
 import { MemoDocument } from '../memos/schemas/memo.schema';
 import { EdgeDocument } from '../edges/schemas/edge.schema';
 import { ReleaseDocument } from '../releases/schemas/release.schema';
@@ -39,7 +41,7 @@ export interface SeedModels {
   Project: Model<ProjectDocument>;
   Workflow: Model<WorkflowDocument>;
   Artifact: Model<ArtifactDocument>;
-  Block: Model<BlockDocument>;
+  WorkflowNode: Model<WorkflowNodeDocument>;
   Memo: Model<MemoDocument>;
   Edge: Model<EdgeDocument>;
   Release: Model<ReleaseDocument>;
@@ -47,7 +49,7 @@ export interface SeedModels {
 
 /* ── 캔버스 좌표 상수 ──
  * FE의 web/src/lib/constants.ts 값과 반드시 일치해야 한다. 어긋나면 seedXY()가 계산하는
- * 절대 x좌표와 FE가 그리는 레인 폭이 달라져 블록이 옆 레인과 겹쳐 보인다. */
+ * 절대 x좌표와 FE가 그리는 레인 폭이 달라져 노드가 옆 레인과 겹쳐 보인다. */
 const GRID = 10;
 const ROW_H = 220;
 const TOP_PAD = 60;
@@ -90,6 +92,18 @@ const KNOX: Record<UserKey, string> = {
 
 const DEPTS = ['Analog', 'Digital', 'APS', 'PI/PD', 'Solution', 'PTE'];
 
+/**
+ * 부서 id 발급(설계서 02장 §9) — 시드 데이터 안의 모든 workflow.department/editAccess/
+ * viewAccess/recipients/project.members[].departments/release 스냅샷은 이제 이름이
+ * 아니라 id를 저장해야 한다. 아래 데이터는 그대로 사람이 읽기 좋은 이름으로 적고,
+ * `toDeptId()`를 실제 문서를 만드는 지점에서만 통과시킨다 — 정의부를 전부 id로 바꾸면
+ * 이 파일을 읽기 훨씬 어려워진다.
+ */
+const DEPT_ID: Record<string, string> = Object.fromEntries(
+  DEPTS.map((name) => [name, new Types.ObjectId().toString()]),
+);
+const toDeptId = (name: string): string => DEPT_ID[name] ?? name;
+
 /* ── 과제 공통 일정(마일스톤) ──
  * 이름은 사내에서 쓰는 짧은 표기 그대로다. 약어의 full name은 저장하지 않는다. */
 const MILESTONES = [
@@ -105,7 +119,7 @@ const MILESTONES = [
   { id: 'ms_fab', name: 'Fab out', start: '2026-10-12', end: '2026-12-21' },
 ];
 
-/** 어떤 workflow의 phase 목록에도 없는 id — 이걸 가리키는 블록이 "일정 유실" 상태로 남는다. */
+/** 어떤 workflow의 phase 목록에도 없는 id — 이걸 가리키는 노드가 "일정 유실" 상태로 남는다. */
 const ORPHAN_PHASE_ID = 'ph_cmp_layout_removed';
 
 interface MockWorkflow {
@@ -180,7 +194,7 @@ const MOCK_WORKFLOWS: MockWorkflow[] = [
     phases: [
       { id: 'ph_cmp_ko', name: 'KO', start: '2026-01-05', end: '2026-03-16' },
       { id: 'ph_cmp_design', name: 'Design', start: '2026-03-16', end: '2026-07-20' },
-      // 'ph_cmp_layout_removed' 는 여기 없다 — 아래 블록 두 개가 그걸 가리켜 유실 상태가 된다.
+      // 'ph_cmp_layout_removed' 는 여기 없다 — 아래 노드 두 개가 그걸 가리켜 유실 상태가 된다.
       { id: 'ph_cmp_fdr', name: 'FDR', start: '2026-09-21', end: '2026-12-21' },
     ],
   },
@@ -195,7 +209,7 @@ for (const wf of MOCK_WORKFLOWS) {
       LANE_INDEX[p.id] = i;
     });
 }
-LANE_INDEX[ORPHAN_PHASE_ID] = 2; // 유실된 블록이 놓여 있던 원래 자리
+LANE_INDEX[ORPHAN_PHASE_ID] = 2; // 유실된 노드가 놓여 있던 원래 자리
 
 /* ── Artifact 정의 ──
  * versions는 [label, isPublished, when, note] 형태로 짧게 적고 아래에서 펼친다.
@@ -217,7 +231,7 @@ interface MockArtifact {
 }
 
 const MOCK_ARTIFACTS: MockArtifact[] = [
-  /* ── A Tier — OA Service. recipient는 block마다 따로 붙는다 ── */
+  /* ── A Tier — OA Service. recipient는 node마다 따로 붙는다 ── */
   { key: 'a_pll_sim', project: 'p1', name: 'PLL Pre-layout Simulation', tier: 'A', network: 'OA',
     serviceKey: 'simhub', externalArtifactId: 'SIM-PLL-0421', giver: 'u1',
     versions: [['v2.0', true, '2026-06-03 10:40', '2nd release'], ['v1.0', true, '2026-04-21 13:10', '1st release']] },
@@ -229,7 +243,7 @@ const MOCK_ARTIFACTS: MockArtifact[] = [
     serviceKey: 'rpm', externalArtifactId: 'RPM-ADC-771', giver: 'u4',
     versions: [['v3', true, '2026-05-11 11:00', 'ML3 release'], ['v2', true, '2026-03-20 15:30', 'AR release']] },
 
-  /* ── B Tier — File Artifacts(Calypso). recipient는 block마다 따로 붙는다 ── */
+  /* ── B Tier — File Artifacts(Calypso). recipient는 node마다 따로 붙는다 ── */
   { key: 'b_pll_pex', project: 'p1', name: 'PLL Netlist / PEX', tier: 'B', network: 'OA',
     serviceKey: CALYPSO_SERVICE_KEY, externalArtifactId: 'calypso-pex-pll', giver: 'u1',
     versions: [['r1', true, '2026-06-04 19:55', 'RC extraction']] },
@@ -264,8 +278,8 @@ const MOCK_ARTIFACTS: MockArtifact[] = [
     versions: [['v1.0', true, '2026-02-11 11:00', 'Initial']] },
 ];
 
-/* ── Block 정의 (캔버스 위의 자리) ── */
-interface MockBlock {
+/* ── Node 정의 (캔버스 위의 자리) ── */
+interface MockNode {
   key: string;
   workflow: string;
   phase: string;
@@ -273,14 +287,14 @@ interface MockBlock {
   /** artifact를 가리키지 않는 "정상 빈 상태"면 생략. 그 경우 name이 표시된다. */
   artifact?: string;
   name: string;
-  /** artifact가 매핑된 block에서만 의미가 있다 — A/B/C 공통, workflow마다 독립인 recipient. */
+  /** artifact가 매핑된 node에서만 의미가 있다 — A/B/C 공통, workflow마다 독립인 recipient. */
   recipients?: { departments?: string[]; users?: UserKey[] };
   series?: string;
   seriesIdx?: number;
   seriesTotal?: number;
 }
 
-const MOCK_BLOCKS: MockBlock[] = [
+const MOCK_NODES: MockNode[] = [
   /* ── PLL_MAIN ── */
   { key: 'k01', workflow: 'wf1', phase: 'ph_pll_ko', row: 0, artifact: 'c_pll_req', name: 'PLL Requirements Intake',
     recipients: { departments: ['Digital'] } },
@@ -334,7 +348,7 @@ const MOCK_BLOCKS: MockBlock[] = [
 const MOCK_MEMOS: { workflow: string; phase: string; row: number; text: string }[] = [
   { workflow: 'wf1', phase: 'ph_pll_ml1', row: 0, text: 'ML1 리뷰 코멘트 반영 후 AR 패키지에 합칠 것' },
   { workflow: 'wf2', phase: 'ph_ldo_b', row: 1, text: 'dropout 목표 200mV — 재측정 필요' },
-  { workflow: 'wf6', phase: 'ph_cmp_design', row: 0, text: 'layout phase를 지운 상태 — 위 두 블록이 유실로 표시된다' },
+  { workflow: 'wf6', phase: 'ph_cmp_design', row: 0, text: 'layout phase를 지운 상태 — 위 두 노드가 유실로 표시된다' },
 ];
 
 const MOCK_EDGES: { from: string; to: string; bidirectional?: boolean }[] = [
@@ -357,7 +371,7 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
     Project: ProjectModel,
     Workflow: WorkflowModel,
     Artifact: ArtifactModel,
-    Block: BlockModel,
+    WorkflowNode: NodeModel,
     Memo: MemoModel,
     Edge: EdgeModel,
     Release: ReleaseModel,
@@ -398,29 +412,29 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
   const [p1] = await ProjectModel.insertMany([
     {
       code: 'CIS-A7', revision: 'EVT1', name: '50MP 모바일 CIS',
-      departments: [...DEPTS], departmentsSeeded: true,
+      departments: DEPTS.map((name) => ({ id: toDeptId(name), name })), departmentsSeeded: true,
       milestones: MILESTONES,
       managers: [KNOX.u1],
       members: [
-        { knoxId: KNOX.u1, departments: ['Analog'], addedAt: at('2026-01-02 09:00') },
-        { knoxId: KNOX.u2, departments: ['Analog'], addedAt: at('2026-01-02 09:00') },
-        { knoxId: KNOX.u3, departments: ['Digital'], addedAt: at('2026-01-02 09:00') },
-        { knoxId: KNOX.u4, departments: ['APS'], addedAt: at('2026-01-02 09:00') },
-        { knoxId: KNOX.u5, departments: ['PTE'], addedAt: at('2026-01-02 09:00') },
-        { knoxId: KNOX.u6, departments: ['PI/PD'], addedAt: at('2026-01-02 09:00') },
+        { knoxId: KNOX.u1, departments: [toDeptId('Analog')], addedAt: at('2026-01-02 09:00') },
+        { knoxId: KNOX.u2, departments: [toDeptId('Analog')], addedAt: at('2026-01-02 09:00') },
+        { knoxId: KNOX.u3, departments: [toDeptId('Digital')], addedAt: at('2026-01-02 09:00') },
+        { knoxId: KNOX.u4, departments: [toDeptId('APS')], addedAt: at('2026-01-02 09:00') },
+        { knoxId: KNOX.u5, departments: [toDeptId('PTE')], addedAt: at('2026-01-02 09:00') },
+        { knoxId: KNOX.u6, departments: [toDeptId('PI/PD')], addedAt: at('2026-01-02 09:00') },
         // u7은 두 부서에 동시에 속한다 — workflow 생성 시 dropdown이 실제로 필요한 경우.
-        { knoxId: KNOX.u7, departments: ['Solution', 'PTE'], addedAt: at('2026-01-02 09:00') },
+        { knoxId: KNOX.u7, departments: [toDeptId('Solution'), toDeptId('PTE')], addedAt: at('2026-01-02 09:00') },
       ],
       meta: {}, status: 'ACTIVE', isMock: true,
     },
     {
       code: 'CIS-B3', revision: 'EVT0', name: '108MP 플래그십 CIS',
-      departments: [...DEPTS], departmentsSeeded: true,
+      departments: DEPTS.map((name) => ({ id: toDeptId(name), name })), departmentsSeeded: true,
       milestones: MILESTONES.map((m) => ({ ...m, id: `b3_${m.id}` })),
       managers: [KNOX.u7],
       members: [
-        { knoxId: KNOX.u7, departments: ['Analog'], addedAt: at('2026-01-02 09:00') },
-        { knoxId: KNOX.u8, departments: ['Digital'], addedAt: at('2026-01-02 09:00') },
+        { knoxId: KNOX.u7, departments: [toDeptId('Analog')], addedAt: at('2026-01-02 09:00') },
+        { knoxId: KNOX.u8, departments: [toDeptId('Digital')], addedAt: at('2026-01-02 09:00') },
       ],
       meta: {}, status: 'ACTIVE', isMock: true,
     },
@@ -433,22 +447,23 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
   /* ── Workflow ──
    * 소속 부서는 editAccess.departments에 자동으로 들어간다(서버와 같은 규칙을 시드도 지킨다). */
   const grant = (g?: { departments?: string[]; users?: UserKey[] }) => ({
-    departments: [...(g?.departments ?? [])],
+    departments: (g?.departments ?? []).map(toDeptId),
     users: (g?.users ?? []).map((u) => KNOX[u]),
   });
 
   const workflowDocs = await WorkflowModel.insertMany(
     MOCK_WORKFLOWS.map((wf) => {
       const extra = grant(wf.editExtra);
+      const deptId = toDeptId(wf.department);
       return {
         projectId: projectIds.p1,
         name: wf.name,
         description: wf.description,
-        department: wf.department,
+        department: deptId,
         ownerKnoxId: KNOX[wf.owner],
         editAccess: {
           // 소속 부서가 항상 맨 앞에 온다 — 이 항목은 화면에서 삭제할 수 없다.
-          departments: [wf.department, ...extra.departments.filter((d) => d !== wf.department)],
+          departments: [deptId, ...extra.departments.filter((d) => d !== deptId)],
           users: extra.users,
         },
         viewAccess: grant(wf.viewAccess),
@@ -506,9 +521,9 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
     artifactIds[a.key] = (artifactDocs[i] as any)._id;
   });
 
-  /* ── Block ── */
-  const blockDocs = await BlockModel.insertMany(
-    MOCK_BLOCKS.map((b) => ({
+  /* ── Node ── */
+  const nodeDocs = await NodeModel.insertMany(
+    MOCK_NODES.map((b) => ({
       projectId: projectIds.p1,
       workflowId: workflowIds[b.workflow],
       phaseId: b.phase,
@@ -524,13 +539,13 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
       isMock: true,
     })),
   );
-  const blockIds: Record<string, Types.ObjectId> = {};
-  MOCK_BLOCKS.forEach((b, i) => {
-    blockIds[b.key] = (blockDocs[i] as any)._id;
+  const nodeIds: Record<string, Types.ObjectId> = {};
+  MOCK_NODES.forEach((b, i) => {
+    nodeIds[b.key] = (nodeDocs[i] as any)._id;
   });
 
-  // series 연결 — 원본 블록의 _id를 회차 인스턴스가 가리킨다.
-  await BlockModel.updateOne({ _id: blockIds['k06'] }, { $set: { series: blockIds['k05'] } }).exec();
+  // series 연결 — 원본 노드의 _id를 회차 인스턴스가 가리킨다.
+  await NodeModel.updateOne({ _id: nodeIds['k06'] }, { $set: { series: nodeIds['k05'] } }).exec();
 
   /* ── Memo ── */
   await MemoModel.insertMany(
@@ -547,11 +562,11 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
   /* ── Edge ── */
   await EdgeModel.insertMany(
     MOCK_EDGES.map((e) => {
-      const wfKey = MOCK_BLOCKS.find((b) => b.key === e.from)!.workflow;
+      const wfKey = MOCK_NODES.find((b) => b.key === e.from)!.workflow;
       return {
         workflowId: workflowIds[wfKey],
-        fromId: blockIds[e.from],
-        toId: blockIds[e.to],
+        fromId: nodeIds[e.from],
+        toId: nodeIds[e.to],
         bidirectional: e.bidirectional ?? false,
         auto: false,
         isMock: true,
@@ -582,20 +597,20 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
       releasedAt: at('2026-05-04 11:00'),
       releasedBy: KNOX.u1,
       note: 'ML2 산출물 1차 전달',
-      workflowAt: { name: 'PLL_MAIN', department: 'Analog' },
+      workflowAt: { name: 'PLL_MAIN', department: toDeptId('Analog'), departmentLabel: 'Analog' },
       items: [
         {
-          blockId: blockIds['k02'].toString(),
+          nodeId: nodeIds['k02'].toString(),
           artifactId: artifactIds['a_pll_sim'].toString(),
           artifactName: 'PLL Pre-layout Simulation',
           tier: 'A', network: 'OA',
           phaseId: 'ph_pll_ml2', phaseName: 'ML2',
           published: releasedVersion('v1.0', '2026-04-21 13:10', '1'),
           changed: true, firstTime: true,
-          recipients: { departments: ['Digital', 'PTE'], users: [KNOX.u1] },
+          recipients: { departments: ['Digital', 'PTE'].map(toDeptId), users: [KNOX.u1] },
           sources: [
             {
-              blockId: blockIds['k01'].toString(),
+              nodeId: nodeIds['k01'].toString(),
               artifactId: artifactIds['c_pll_req'].toString(),
               artifactName: 'PLL Requirements Intake',
               selected: {
@@ -607,7 +622,7 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
           lookupFailed: false,
         },
       ],
-      recipientDepartments: ['Digital', 'PTE'],
+      recipientDepartments: ['Digital', 'PTE'].map(toDeptId),
       recipientUsers: [KNOX.u1],
       isMock: true,
     },
@@ -618,10 +633,10 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
       releasedAt: at('2026-06-10 15:30'),
       releasedBy: KNOX.u1,
       note: 'ML3 PEX 및 시뮬레이션 갱신본 전달',
-      workflowAt: { name: 'PLL_MAIN', department: 'Analog' },
+      workflowAt: { name: 'PLL_MAIN', department: toDeptId('Analog'), departmentLabel: 'Analog' },
       items: [
         {
-          blockId: blockIds['k02'].toString(),
+          nodeId: nodeIds['k02'].toString(),
           artifactId: artifactIds['a_pll_sim'].toString(),
           artifactName: 'PLL Pre-layout Simulation',
           tier: 'A', network: 'OA',
@@ -629,10 +644,10 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
           published: releasedVersion('v2.0', '2026-06-03 10:40', '2'),
           // major가 1 → 2로 바뀌었다.
           changed: true, firstTime: false,
-          recipients: { departments: ['Digital', 'PTE'], users: [KNOX.u1] },
+          recipients: { departments: ['Digital', 'PTE'].map(toDeptId), users: [KNOX.u1] },
           sources: [
             {
-              blockId: blockIds['k01'].toString(),
+              nodeId: nodeIds['k01'].toString(),
               artifactId: artifactIds['c_pll_req'].toString(),
               artifactName: 'PLL Requirements Intake',
               selected: {
@@ -644,7 +659,7 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
           lookupFailed: false,
         },
         {
-          blockId: blockIds['k03'].toString(),
+          nodeId: nodeIds['k03'].toString(),
           artifactId: artifactIds['b_pll_pex'].toString(),
           artifactName: 'PLL Netlist / PEX',
           tier: 'B', network: 'OA',
@@ -655,10 +670,10 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
             hpcPath: null, giverKnoxId: KNOX.u1,
           },
           changed: true, firstTime: true,
-          recipients: { departments: ['Digital', 'PTE', 'Analog'], users: [] },
+          recipients: { departments: ['Digital', 'PTE', 'Analog'].map(toDeptId), users: [] },
           sources: [
             {
-              blockId: blockIds['k02'].toString(),
+              nodeId: nodeIds['k02'].toString(),
               artifactId: artifactIds['a_pll_sim'].toString(),
               artifactName: 'PLL Pre-layout Simulation',
               selected: {
@@ -670,7 +685,7 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
           lookupFailed: false,
         },
         {
-          blockId: blockIds['k04'].toString(),
+          nodeId: nodeIds['k04'].toString(),
           artifactId: artifactIds['a_pll_post'].toString(),
           artifactName: 'PLL Post-layout Simulation',
           tier: 'A', network: 'OA',
@@ -682,7 +697,7 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
           recipients: { departments: [], users: [] },
           sources: [
             {
-              blockId: blockIds['k03'].toString(),
+              nodeId: nodeIds['k03'].toString(),
               artifactId: artifactIds['b_pll_pex'].toString(),
               artifactName: 'PLL Netlist / PEX',
               selected: {
@@ -695,7 +710,7 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
           lookupFailed: false,
         },
       ],
-      recipientDepartments: ['Digital', 'PTE', 'Analog'],
+      recipientDepartments: ['Digital', 'PTE', 'Analog'].map(toDeptId),
       recipientUsers: [KNOX.u1],
       isMock: true,
     },

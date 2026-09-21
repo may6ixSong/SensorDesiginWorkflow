@@ -1,6 +1,6 @@
 import { Box } from '@mui/material';
 import { useTranslation } from 'react-i18next';
-import { AccessGrant, WorkflowDto } from '@/types/domain';
+import { AccessGrant, DepartmentDto, WorkflowDto } from '@/types/domain';
 import { useDirectory } from '@/app/providers/DirectoryProvider';
 import { Card, Ey } from '@/components/common/Panel';
 import { Icon } from '@/components/common/Icon';
@@ -13,7 +13,7 @@ interface Props {
   /** 편집 가능한가 — View 권한자에게는 애초에 이 탭이 열리지 않지만, 방어적으로 받는다. */
   own: boolean;
   /** 부서 후보 — 그 과제에 등록된 부서(Project.departments). */
-  departmentOptions: string[];
+  departmentOptions: DepartmentDto[];
   editAccess: AccessGrant;
   viewAccess: AccessGrant;
   onChangeEdit: (next: AccessGrant) => void;

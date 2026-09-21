@@ -7,7 +7,7 @@ import { UserAvatar } from '@/components/common/Avatar';
 import { useDirectory } from '@/app/providers/DirectoryProvider';
 import { useMyReleases } from '@/api/hooks/useAssignments';
 import { fmtAt } from '@/lib/canvasModel';
-import { canonicalDepartmentLabel } from '@/shared/constants/departments';
+import { useDepartmentLabels } from '@/hooks/useDepartmentLabel';
 import { MyReleaseRowDto } from '@/types/domain';
 import { CURSOR_POINTER, FONT_MONO, T } from '@/theme/tokens';
 
@@ -38,6 +38,7 @@ export function ReleaseFeedPanel({
   const { data, isLoading, isError, isPlaceholderData } = useMyReleases(direction, page, undefined, projectIds);
   const meta = data?.meta;
   const rows = data?.items ?? [];
+  const { label: deptLabel } = useDepartmentLabels(rows.map((r) => r.projectId));
 
   return (
     <Box
@@ -104,7 +105,7 @@ export function ReleaseFeedPanel({
             }}
           >
             {rows.map((row) => (
-              <ReleaseRow key={row.id} row={row} direction={direction} onOpen={() => onOpen(row)} />
+              <ReleaseRow key={row.id} row={row} direction={direction} onOpen={() => onOpen(row)} deptLabel={deptLabel} />
             ))}
           </Box>
         )}
@@ -125,11 +126,12 @@ export function ReleaseFeedPanel({
 }
 
 function ReleaseRow({
-  row, direction, onOpen,
+  row, direction, onOpen, deptLabel,
 }: {
   row: MyReleaseRowDto;
   direction: 'received' | 'published';
   onOpen: () => void;
+  deptLabel: (projectId: string, deptId: string) => string;
 }) {
   const { resolveUser } = useDirectory();
   const by = resolveUser(row.releasedBy);
@@ -161,7 +163,7 @@ function ReleaseRow({
         </Box>
         <ProjectChip projectId={row.projectId} name={row.projectName} />
         <Badge color={T.dm} bg={T.sf3} borderColor={T.ln}>
-          {canonicalDepartmentLabel(row.workflowAt.department)}
+          {deptLabel(row.projectId, row.workflowAt.department)}
         </Badge>
         {row.changedCount > 0 && (
           <Badge color={T.warn} bg={T.warnSoft} borderColor={T.warnLine}>
@@ -184,7 +186,7 @@ function ReleaseRow({
           <Box sx={{ display: 'flex', gap: '3px', flexWrap: 'wrap' }}>
             {row.myRecipientDepartments.map((d) => (
               <Badge key={d} color={T.recv} bg={T.recvSoft} borderColor={T.recv}>
-                {canonicalDepartmentLabel(d)}
+                {deptLabel(row.projectId, d)}
               </Badge>
             ))}
           </Box>

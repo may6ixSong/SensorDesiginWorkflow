@@ -11,7 +11,7 @@ import { ArtifactsModule } from '../artifacts/artifacts.module';
 import { EdgesModule } from '../edges/edges.module';
 import { HubModule } from '../hub/hub.module';
 import { NotificationsModule } from '../notifications/notifications.module';
-import { BlocksModule } from '../blocks/blocks.module';
+import { NodesModule } from '../nodes/nodes.module';
 
 const Models = registerModels([
   { name: Release.name, schema: ReleaseSchema },
@@ -27,7 +27,7 @@ const Models = registerModels([
     EdgesModule,
     HubModule,
     NotificationsModule,
-    forwardRef(() => BlocksModule),
+    forwardRef(() => NodesModule),
   ],
   providers: [ReleasesService, ReleaseFeedbackService],
   controllers: [ReleasesController],

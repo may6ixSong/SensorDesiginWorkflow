@@ -64,9 +64,9 @@ CIS(CMOS Image Sensor) 설계 산출물을 workflow 캔버스 위에서 흐름�
 | **Milestone** | 과제 공통 일정. workflow 생성 시 phase의 초기값으로 복사된다 |
 | **Phase** | workflow 자기 일정. 복사된 뒤로는 milestone과 독립 |
 | **Workflow** | 설계 흐름 하나. 캔버스 하나에 대응하며 **반드시 부서 하나에 소속**된다 |
-| **Block** | 캔버스 위의 노드. 산출물 블록 ∪ 메모 블록 |
-| **Artifact(산출물)** | 버전 관리 대상 실체. Block은 artifact를 가리키는 **자리(placement)**일 뿐이다 |
-| **Flow(Edge)** | 블록 간 흐름 선 |
+| **Node** | 캔버스 위의 노드. 산출물 노드 ∪ 메모 노드 |
+| **Artifact(산출물)** | 버전 관리 대상 실체. Node는 artifact를 가리키는 **자리(placement)**일 뿐이다 |
+| **Flow(Edge)** | 노드 간 흐름 선 |
 | **Tier** | 산출물의 연동 신뢰도 A~C (04장). **사람이 보는 이름은 A=OA Service, B=File Artifacts, C=HPC Service다** — 글자(A/B/C)는 DB에 저장되는 내부 값으로만 남고, UI·문서·주석은 전부 이 이름을 쓴다. (★ Tier D/External·Attested는 폐기했다 — File Artifacts(B)가 OA-link/HPC-path 참조형 콘텐츠까지 갖도록 넓어지면서 그 역할을 대체했다, 04장 §2) |
 | **Recipient** | release 시 그 산출물을 **전달받는** 부서/사용자 |
 | **Owner** | workflow의 대표 담당자. **정확히 1명**, 현재 이양 불가 |
@@ -82,12 +82,12 @@ CIS(CMOS Image Sensor) 설계 산출물을 workflow 캔버스 위에서 흐름�
 2. **캔버스에서 version 개념 제거.** 캔버스 편집은 항상 overwrite이고, 스냅샷을 찍지 않는다.
    Edit 권한자와 View 권한자가 **완전히 동일한 실시간 캔버스**를 본다.
 3. **Artifact가 1급 실체로 승격.** 산출물의 버전 이력은 artifact 단위로 SIREN이 보관하고 여러
-   workflow가 공유한다. Block은 그 artifact를 가리키는 자리다. (Edit/View **권한**은 SIREN이
+   workflow가 공유한다. Node는 그 artifact를 가리키는 자리다. (Edit/View **권한**은 SIREN이
    보관하지 않는다 — 아래 4 참고. 이건 v3 설계 도중 두 번 바뀐 결정이다 — 처음엔 B/C/D 권한을
    SIREN이 보관하기로 했었다가 A와 같은 방식으로 통일했고, 그다음엔 D 자체를 폐기했다.)
 4. **Recipient 개념 신설, 전 tier에 통일 적용.** SIREN은 Edit/View **권한**을 전혀 들고 있지
    않는다 — OA Service·File Artifacts·HPC Service 모두 그 서비스(Calypso 포함)가 매번 라이브로
-   canView/canEdit를 판정한다. SIREN에는 **block(=그 workflow 안의 자리) 단위 recipient**만
+   canView/canEdit를 판정한다. SIREN에는 **node(=그 workflow 안의 자리) 단위 recipient**만
    따로 둔다 — release 알림 대상이자 상세 slide 열람의 첫 번째 게이트다(04장 §3, §4). A/B/C
    전부 예외 없이 이 모델을 쓴다 — 한때 있었던 External/Attested(D)는 폐기했다(04장 §2, §6).
 5. **Release는 산출물 단위 배송.** 부서마다 자기가 받을 산출물만 전달받는다. 이전 release 대비
@@ -151,12 +151,12 @@ CIS(CMOS Image Sensor) 설계 산출물을 workflow 캔버스 위에서 흐름�
 | 항목 | 결정 |
 |---|---|
 | 버전 개념 | **없음.** 모든 편집은 overwrite. 스냅샷도 찍지 않는다 |
-| Edit / View가 보는 화면 | **완전히 동일**. 블록에 버전 숫자를 쓰지 않고, publish 상태 배지만 표시 |
+| Edit / View가 보는 화면 | **완전히 동일**. 노드에 버전 숫자를 쓰지 않고, publish 상태 배지만 표시 |
 | 동시 편집 | **lock으로 단독 점유.** TTL 10분, 편집 중 자동 갱신, 만료 후 자유 점유, Admin 강제 해제 |
-| Lock의 범위 | **캔버스(blocks/edges/memos/layout)에만.** `Workflow` 문서의 `canvasLock` 필드만 원자적으로 갱신 |
+| Lock의 범위 | **캔버스(nodes/edges/memos/layout)에만.** `Workflow` 문서의 `canvasLock` 필드만 원자적으로 갱신 |
 | Schedule · Edit Information | **lock 대상 아님.** A가 캔버스를 편집 중이어도 B는 Name/Description/Phase를 동시에 바꿀 수 있다. 항상 latest overwrite |
 | 새 Artifact 추가 | **버튼 1개**로 통합. 다이얼로그 첫 질문이 주는/받는(intent)이고, 이어서 Name/Phase/출처(OA Service·File Artifacts·HPC Service — 이제 give/receive 양쪽 다 이 3개뿐이다)를 고른다 — 04장 §6 |
-| Flow 클릭 | 연결된 블록을 highlight → **confirm 후 삭제** |
+| Flow 클릭 | 연결된 노드를 highlight → **confirm 후 삭제** |
 | 편집 모드 표시 | 캔버스 배경색을 편집용으로 전환 (light/dark 각각) |
 | 편집 중 잠금 | app bar를 제외한 **캔버스 밖 모든 액션 버튼 비활성** (앞으로 추가될 버튼 포함) |
 | 저장 / 취소 | 둘 다 confirm 후 실행 |
@@ -167,24 +167,24 @@ CIS(CMOS Image Sensor) 설계 산출물을 workflow 캔버스 위에서 흐름�
 | 항목 | 결정 |
 |---|---|
 | OA Service/File Artifacts/HPC Service(A/B/C) 권한 | **SIREN이 보관하지 않는다.** 그 서비스(Calypso 포함)가 매번 라이브로 canView/canEdit를 판정한다 — 셋 다 같은 규칙. Tier D 폐기 후 예외가 완전히 없어졌다 |
-| OA Service/File Artifacts/HPC Service(A/B/C) recipient | SIREN이 **block(=그 workflow 안의 자리) 단위로 저장**. 같은 artifact도 workflow마다 recipient 구성이 다를 수 있다 — 셋 다 같은 규칙(옛 결정은 B/C/D를 artifact 단위로 뒀었는데, 여러 workflow가 동시에 고치면 꼬이는 문제가 있어 폐기했다) |
+| OA Service/File Artifacts/HPC Service(A/B/C) recipient | SIREN이 **node(=그 workflow 안의 자리) 단위로 저장**. 같은 artifact도 workflow마다 recipient 구성이 다를 수 있다 — 셋 다 같은 규칙(옛 결정은 B/C/D를 artifact 단위로 뒀었는데, 여러 workflow가 동시에 고치면 꼬이는 문제가 있어 폐기했다) |
 | File Artifacts(B)의 콘텐츠 종류 | **File(실물, 여러 개 가능) / OA-link(웹 링크 하나) / HPC-path(HPC망 경로 하나)** 중 등록 시 하나로 고정된다(04장 §2). 예전 Tier D(External/Attested — 실물도 판정할 서비스도 없던 tier)가 하던 역할을, 이제는 이 OA-link/HPC-path 콘텐츠가 대신한다 |
 | Recipient 설정(편집) 권한 | workflow **Edit Access** (전 tier 동일 — 이제 A만의 예외가 아니다) |
-| Recipients/Comments 탭 열람 | **workflow Edit Access가 있는 사람에게만** 노출된다(정책 변경) — View 권한자에게는 탭 자체가 없다. artifact 자체의 편집 권한이 있거나 block의 recipient로 등록돼 있어도 마찬가지다 |
-| 상세 slide 열람 (A/B/C) | **그 서비스의 canView/canEdit 하나로만 정해진다, 3 tier 공통, 예외 없음**(정책 변경 — 예전엔 SIREN recipient를 먼저 통과해야 하는 2단 게이트였다). block.recipients는 이제 slide 열람에 관여하지 않는다 — release 알림 대상과 Recipients/Comments 탭 표시 대상일 뿐이다 |
-| Mapping 범위 | block을 artifact에 매핑할 때, **같은 project(code+revision)의 artifact만** 후보로 나온다 |
+| Recipients/Comments 탭 열람 | **workflow Edit Access가 있는 사람에게만** 노출된다(정책 변경) — View 권한자에게는 탭 자체가 없다. artifact 자체의 편집 권한이 있거나 node의 recipient로 등록돼 있어도 마찬가지다 |
+| 상세 slide 열람 (A/B/C) | **그 서비스의 canView/canEdit 하나로만 정해진다, 3 tier 공통, 예외 없음**(정책 변경 — 예전엔 SIREN recipient를 먼저 통과해야 하는 2단 게이트였다). node.recipients는 이제 slide 열람에 관여하지 않는다 — release 알림 대상과 Recipients/Comments 탭 표시 대상일 뿐이다 |
+| Mapping 범위 | node를 artifact에 매핑할 때, **같은 project(code+revision)의 artifact만** 후보로 나온다 |
 | 버전 정보의 출처 | A/B/C 전부 **push event + 야간 전체 재동기화**로 SIREN이 직접 보관한다(07장). details·release 열람은 이 SIREN 캐시를 읽는다 — **canView/canEdit·html-view만 그때그때 라이브로** 그 서비스에 묻는다 |
 | A/B/C 버전 보고 | 서비스는 **official한 버전만** SIREN에 전달. minor가 없는 snapshot형(RPM 등)은 release 버전 + `latest(+)` 하나만 |
-| 미매핑 블록 | recipient UI를 감추고, release 대상에서 제외 |
+| 미매핑 노드 | recipient UI를 감추고, release 대상에서 제외 |
 | slide 내부 콘텐츠 | **TODO** — 이번 범위 밖. 대규모 개편 예정 |
 | 주는/받는 산출물의 선택 범위 | **대칭 규칙** — 주는 쪽은 그 서비스의 edit 게이트, 받는 쪽은 view 게이트. OA Service/File Artifacts/HPC Service **셋 다 라이브 조회**하며, 이제 give/receive 양쪽 다 이 3개뿐이다(04장 §6) |
-| 한 workflow 안 artifact 중복 매핑 | **금지.** 주는/받는 모두 — 같은 workflow의 두 block이 같은 artifact를 가리킬 수 없다(04장 §6.5) |
+| 한 workflow 안 artifact 중복 매핑 | **금지.** 주는/받는 모두 — 같은 workflow의 두 node가 같은 artifact를 가리킬 수 없다(04장 §6.5) |
 
 ### 3.6 Release
 
 | 항목 | 결정 |
 |---|---|
-| 대상 | tier 매핑이 끝난 산출물 **전체 자동 포함** (미매핑 블록·메모 제외) |
+| 대상 | tier 매핑이 끝난 산출물 **전체 자동 포함** (미매핑 노드·메모 제외) |
 | Highlight | 이전 release 대비 **major(=publish) 버전이 달라진 것**만. minor는 비교하지 않는다 |
 | Source 버전 선택 | **이전 release 대비 변경된(`changed:true`) 산출물만** 고른다. 변경 없는 산출물은 직전 release의 선택을 그대로 이어받아 다시 묻지 않는다. 선택 대상은 flow로 연결된 **직전 1홉** upstream. 기본값은 그 산출물의 **최신 published** |
 | Source가 미발행일 때 | **release는 그대로 진행.** 해당 칸을 `없음(None)`으로 남기고, 받는 쪽에는 "아직 전달되지 않음"으로 표시 |
