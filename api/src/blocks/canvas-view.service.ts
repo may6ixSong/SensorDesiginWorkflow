@@ -8,6 +8,7 @@ import { ArtifactsService, majorKeyOf } from '../artifacts/artifacts.service';
 import { ArtifactAccessService } from '../artifacts/artifact-access.service';
 import { ReleasesService } from '../releases/releases.service';
 import { Actor } from '../common/actor';
+import { workflowLevel } from '../common/access';
 import { BlockDto, publishStateOf, toBlockDto } from './dto/block.dto';
 
 /**
@@ -44,6 +45,10 @@ export class CanvasViewService {
       (lastRelease?.items ?? []).map((i) => [i.artifactId, i.published?.majorKey ?? null]),
     );
 
+    // Recipients/Comments 탭 노출 여부의 기준(설계서 01장 §3.8 확장) — workflow 전체에 대해
+    // 한 번만 판정하면 된다. block마다 다르지 않다.
+    const canManageBlocks = workflowLevel(actor, workflow, project) === 'edit';
+
     return Promise.all(
       blocks.map(async (block) => {
         const artifact = block.artifactId
@@ -51,7 +56,7 @@ export class CanvasViewService {
           : null;
 
         const level = artifact
-          ? await this.artifactAccess.levelFor(actor, artifact, block, project)
+          ? await this.artifactAccess.levelFor(actor, artifact, project)
           : null;
 
         return toBlockDto(
@@ -59,6 +64,7 @@ export class CanvasViewService {
           artifact,
           level,
           this.publishState(artifact, lastMajorByArtifact, lastRelease !== null),
+          canManageBlocks,
         );
       }),
     );
@@ -82,9 +88,9 @@ export class CanvasViewService {
    * 원칙대로 라이브 버전을 절대 묻지 않는다 — 이건 slide를 실제로 열었을 때만, 그 block
    * 하나에 대해서만 호출되는 별도 경로다.
    *
-   * 게이트 1(recipient)을 판정할 근거인 block 맥락이 필요해서 artifact 단독 라우트가
-   * 아니라 여기(block 경유)에 둔다 — ArtifactAccessService.assertCanOpen이 이미 하는
-   * 두 게이트 판정을 그대로 재사용한다.
+   * artifact 단독 라우트가 아니라 block 경유로 두는 건 artifactId를 block에서 꺼내야
+   * 해서일 뿐이다 — 권한 판정 자체(ArtifactAccessService.assertCanOpen)는 이제 block
+   * 맥락이 필요 없다(설계서 01장 §4.2 갱신).
    */
   async liveVersions(blockId: string, project: ProjectDocument | null, actor: Actor) {
     const block = await this.blocks.findOrThrow(blockId);
@@ -92,7 +98,7 @@ export class CanvasViewService {
       ? await this.artifacts.findOrThrow(block.artifactId.toString())
       : null;
     if (!artifact) return [];
-    const level = await this.artifactAccess.assertCanOpen(actor, artifact, block, project);
+    const level = await this.artifactAccess.assertCanOpen(actor, artifact, project);
     return this.artifactAccess.liveVersions(actor, artifact, level);
   }
 
@@ -107,7 +113,7 @@ export class CanvasViewService {
       ? await this.artifacts.findOrThrow(block.artifactId.toString())
       : null;
     if (!artifact) return null;
-    const level = await this.artifactAccess.assertCanOpen(actor, artifact, block, project);
+    const level = await this.artifactAccess.assertCanOpen(actor, artifact, project);
     return this.artifactAccess.htmlView(actor, artifact, level, versionLabel);
   }
 
@@ -122,12 +128,19 @@ export class CanvasViewService {
       ? await this.artifacts.findOrThrow(block.artifactId.toString())
       : null;
     const level = artifact
-      ? await this.artifactAccess.levelFor(actor, artifact, block, project)
+      ? await this.artifactAccess.levelFor(actor, artifact, project)
       : null;
     const lastRelease = await this.releases.previous(workflow._id);
     const lastMajorByArtifact = new Map<string, string | null>(
       (lastRelease?.items ?? []).map((i) => [i.artifactId, i.published?.majorKey ?? null]),
     );
-    return toBlockDto(block, artifact, level, this.publishState(artifact, lastMajorByArtifact, lastRelease !== null));
+    const canManageBlocks = workflowLevel(actor, workflow, project) === 'edit';
+    return toBlockDto(
+      block,
+      artifact,
+      level,
+      this.publishState(artifact, lastMajorByArtifact, lastRelease !== null),
+      canManageBlocks,
+    );
   }
 }

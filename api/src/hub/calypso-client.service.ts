@@ -94,9 +94,10 @@ export class CalypsoClientService {
   }
 
   /**
-   * File Artifacts(B)의 **게이트 2** — Calypso 자신의 canView/canEdit(설계서 04장 §3, §4.1).
-   * A/C와 동일한 2단 게이트 패턴을 쓰기로 하면서 새로 필요해졌다 — 이전엔 B의 권한을
-   * SIREN이 artifact 단위로 보관해서 이 라이브 호출 자체가 없었다.
+   * File Artifacts(B)의 slide 열람 판정 — Calypso 자신의 canView/canEdit(설계서 04장 §3,
+   * §4.1). A/C와 동일하게 그 서비스에 라이브로 물어보는 패턴을 쓰기로 하면서 새로
+   * 필요해졌다 — 이전엔 B의 권한을 SIREN이 artifact 단위로 보관해서 이 라이브 호출 자체가
+   * 없었다.
    *
    * fail-closed다: Calypso가 죽었거나 느리면 access:false를 돌려준다 — ObserverClientService.access()와
    * 같은 원칙이다(권한 판정에서 실패를 관대하게 처리하지 않는다).

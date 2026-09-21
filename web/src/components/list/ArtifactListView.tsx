@@ -249,9 +249,9 @@ export function ArtifactListView({
 
         {(showCurrent || selected) && (
           <>
-            <ArtifactGroup title="Deliverable" rows={ownRows} workflowId={workflowId} onOpen={onOpenArtifact} />
+            <ArtifactGroup title="Deliverable" rows={ownRows} workflowId={workflowId} canEdit={canEdit} onOpen={onOpenArtifact} />
             <Box sx={{ height: '18px' }} />
-            <ArtifactGroup title="Prerequisite" rows={receivedRows} workflowId={workflowId} onOpen={onOpenArtifact} />
+            <ArtifactGroup title="Prerequisite" rows={receivedRows} workflowId={workflowId} canEdit={canEdit} onOpen={onOpenArtifact} />
           </>
         )}
       </Box>
@@ -260,11 +260,12 @@ export function ArtifactListView({
 }
 
 function ArtifactGroup({
-  title, rows, workflowId, onOpen,
+  title, rows, workflowId, canEdit, onOpen,
 }: {
   title: string;
   rows: ListRow[];
   workflowId: string;
+  canEdit: boolean;
   onOpen: (blockId: string, tab?: OpenTab) => void;
 }) {
   return (
@@ -288,7 +289,7 @@ function ArtifactGroup({
             <Box sx={{ flex: '2 1 0', minWidth: 0 }}>Comments</Box>
           </Box>
           {rows.map((row) => (
-            <ListArtifactRow key={row.blockId} row={row} workflowId={workflowId} onOpen={onOpen} />
+            <ListArtifactRow key={row.blockId} row={row} workflowId={workflowId} canEdit={canEdit} onOpen={onOpen} />
           ))}
         </Box>
       )}
@@ -297,10 +298,11 @@ function ArtifactGroup({
 }
 
 function ListArtifactRow({
-  row, workflowId, onOpen,
+  row, workflowId, canEdit, onOpen,
 }: {
   row: ListRow;
   workflowId: string;
+  canEdit: boolean;
   onOpen: (blockId: string, tab?: OpenTab) => void;
 }) {
   return (
@@ -371,7 +373,9 @@ function ListArtifactRow({
       </Box>
 
       <Box sx={{ flex: '2 1 0', minWidth: 0 }} onClick={(e) => e.stopPropagation()}>
-        {!row.masked && (
+        {/* Comments는 이 workflow의 Edit Access가 있을 때만 열린다(설계서 01장 §3.8
+            확장) — canEdit이 아니면 API 자체가 403이라 아예 물어보지 않는다. */}
+        {!row.masked && canEdit && (
           <LatestCommentCell workflowId={workflowId} blockId={row.blockId} onOpen={() => onOpen(row.blockId, 'comments')} />
         )}
       </Box>

@@ -4,21 +4,32 @@
  *   Admin ─────────────────────────── 전 계층 무조건 통과
  *     ├─ Project    members 에 있는가?          ← 없으면 그 아래는 볼 것도 없다
  *     │   ├─ Workflow  Owner / Edit / View 인가?
- *     │   └─ Artifact  A/B/C(OA Service/File Artifacts/HPC Service): recipient(게이트1) → 서비스 권한(게이트2)
+ *     │   └─ Artifact  A/B/C(OA Service/File Artifacts/HPC Service): 그 서비스 자신의 canView/canEdit
  *
  * 이 파일은 **순수 함수만** 담는다 — 모델 조회도, 외부 호출도 하지 않는다. 그래야 Guard,
- * 서비스, DTO 마스킹이 전부 같은 판정을 쓰고 어긋나지 않는다. 게이트 2(그 서비스에 canView를
- * 물어보는 것 — Calypso 포함)만 I/O가 필요해서 ArtifactAccessService가 담당한다.
+ * 서비스, DTO 마스킹이 전부 같은 판정을 쓰고 어긋나지 않는다. Artifact 계층의 실제 판정
+ * (그 서비스에 canView를 물어보는 것 — Calypso 포함)은 I/O가 필요해서 ArtifactAccessService가
+ * 담당한다 — 이 파일에는 그 판정을 위한 순수 함수가 없다(과거엔 `recipientLevel()`이
+ * 있었으나 정책 변경으로 폐기했다, 아래 §block.recipients 참고).
  *
  * ★ artifact 단위로 SIREN이 editAccess/viewAccess를 직접 보관하던 옛 모델은 폐기했다 —
- *   recipient는 항상 block(그 workflow 안의 자리) 단위이고, A/B/C 전부 공통이다. 여러
- *   workflow가 하나의 artifact를 공유할 때 한 workflow의 수정이 다른 workflow까지 번지는
- *   문제 때문이다.
+ *   실제 Edit/View는 항상 그 서비스(A/B/C 공통)가 최종 판정한다.
  *
  * ★ Tier D(External/Attested — 물어볼 서비스가 없어 recipient만으로 view, edit은
  *   createdBy로 판정하던 tier)는 폐기했다. `attestedLevel()`도 함께 제거했다 — File
  *   Artifacts(B, Calypso)가 OA-link/HPC-path 참조형 콘텐츠까지 갖도록 넓어지면서 D가 하던
  *   역할을 대체했다(설계서 04장 §2, §6).
+ *
+ * ★ **block.recipients는 더 이상 열람 게이트가 아니다**(사용자 결정, 01장 §4.2 갱신).
+ *   예전엔 이 recipient가 slide 열람의 첫 번째 게이트였고, 그 서비스가 project 전체에
+ *   view를 열어둬도 recipient가 아니면 막혔다. 그런데 그 결과 "같은 부서가 만든 workflow,
+ *   view 제한 없는 artifact인데도 그 부서 사람이 못 여는" 상황이 나왔고, 이건 recipient를
+ *   편집하는 사람이 매 block마다 일일이 채워 넣어야만 풀리는 구조였다. 지금은 recipient가
+ *   **release 알림 대상 + Recipients/Comments 탭의 대상 표시**로만 쓰이고, slide 열람 자체는
+ *   그 서비스의 canView/canEdit 하나로만 판정한다(ArtifactAccessService.levelFor 참고).
+ *   Recipients/Comments 탭의 **노출 여부**는 recipient 소속과 무관하게 workflow Edit
+ *   Access로만 판정한다(§3.8 확장) — recipient에 속하거나 그 artifact의 편집 권한이 있어도
+ *   workflow Edit Access가 없으면 그 두 탭은 보이지 않는다.
  */
 import { Actor } from './actor';
 
@@ -155,40 +166,12 @@ export function canViewWorkflow(
 }
 
 /* ------------------------------------------------------------------ *
- * Artifact 계층 — 1단계(SIREN 쪽)
+ * Artifact 계층
  * ------------------------------------------------------------------ */
 
 export interface ArtifactLike {
   tier?: string;
   createdBy?: string;
-}
-
-export interface BlockLike {
-  recipients?: GrantLike;
-}
-
-/**
- * A/B/C 공통 **게이트 1** — SIREN이 관리하는 recipient. 그 workflow의 block에 저장되어
- * 있어 같은 artifact라도 workflow마다 다를 수 있다(설계서 01장 §4.1).
- *
- * recipient는 더 이상 edit/view로 나뉘지 않는다 — 속하면 'view'(=볼 자격이 있다)이고,
- * 실제 edit 여부는 그 서비스(게이트 2)가 최종 판정한다.
- *
- * ★ workflow Edit Access가 있어도 recipient가 아니면 null이다 — "workflow Edit Access는
- *   항상 통과"라는 예전의 넓은 규칙은 폐지된 그대로다. 다만 **그 artifact 자신의
- *   owner/editor**(게이트 2가 canEdit이라고 답하는 경우)는 이 게이트 자체를 아예 거치지
- *   않는다 — ArtifactAccessService.levelFor()가 게이트 1보다 먼저 그 판정을 본다(사용자
- *   결정, 04장 §4.1 갱신). 그래서 이 함수 자체는 여전히 "recipient가 아니면 null"이라는
- *   원래 뜻 그대로다 — owner 예외는 이 함수가 아니라 그걸 부르는 쪽의 책임이다.
- */
-export function recipientLevel(
-  actor: Actor,
-  block: BlockLike | null | undefined,
-  myDepts: string[],
-): AccessLevel {
-  if (actor.isAdmin) return 'edit';
-  if (matchesGrant(actor, block?.recipients, myDepts)) return 'view';
-  return null;
 }
 
 /* ------------------------------------------------------------------ *

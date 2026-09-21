@@ -170,8 +170,8 @@ CIS(CMOS Image Sensor) 설계 산출물을 workflow 캔버스 위에서 흐름�
 | OA Service/File Artifacts/HPC Service(A/B/C) recipient | SIREN이 **block(=그 workflow 안의 자리) 단위로 저장**. 같은 artifact도 workflow마다 recipient 구성이 다를 수 있다 — 셋 다 같은 규칙(옛 결정은 B/C/D를 artifact 단위로 뒀었는데, 여러 workflow가 동시에 고치면 꼬이는 문제가 있어 폐기했다) |
 | File Artifacts(B)의 콘텐츠 종류 | **File(실물, 여러 개 가능) / OA-link(웹 링크 하나) / HPC-path(HPC망 경로 하나)** 중 등록 시 하나로 고정된다(04장 §2). 예전 Tier D(External/Attested — 실물도 판정할 서비스도 없던 tier)가 하던 역할을, 이제는 이 OA-link/HPC-path 콘텐츠가 대신한다 |
 | Recipient 설정(편집) 권한 | workflow **Edit Access** (전 tier 동일 — 이제 A만의 예외가 아니다) |
-| Recipient 탭 열람 | View 권한자에게 **읽기 전용**으로 노출 |
-| 상세 slide 열람 (A/B/C) | **2단 게이트, 3 tier 공통, 예외 없음.** ① SIREN recipient(edit/view)에 속하는가 → ② 그 서비스에서 view 권한이 있는가(라이브 조회). 둘 다 통과해야 열린다. **workflow Edit Access만으로는 더 이상 열리지 않는다** |
+| Recipients/Comments 탭 열람 | **workflow Edit Access가 있는 사람에게만** 노출된다(정책 변경) — View 권한자에게는 탭 자체가 없다. artifact 자체의 편집 권한이 있거나 block의 recipient로 등록돼 있어도 마찬가지다 |
+| 상세 slide 열람 (A/B/C) | **그 서비스의 canView/canEdit 하나로만 정해진다, 3 tier 공통, 예외 없음**(정책 변경 — 예전엔 SIREN recipient를 먼저 통과해야 하는 2단 게이트였다). block.recipients는 이제 slide 열람에 관여하지 않는다 — release 알림 대상과 Recipients/Comments 탭 표시 대상일 뿐이다 |
 | Mapping 범위 | block을 artifact에 매핑할 때, **같은 project(code+revision)의 artifact만** 후보로 나온다 |
 | 버전 정보의 출처 | A/B/C 전부 **push event + 야간 전체 재동기화**로 SIREN이 직접 보관한다(07장). details·release 열람은 이 SIREN 캐시를 읽는다 — **canView/canEdit·html-view만 그때그때 라이브로** 그 서비스에 묻는다 |
 | A/B/C 버전 보고 | 서비스는 **official한 버전만** SIREN에 전달. minor가 없는 snapshot형(RPM 등)은 release 버전 + `latest(+)` 하나만 |
@@ -224,7 +224,7 @@ CIS(CMOS Image Sensor) 설계 산출물을 workflow 캔버스 위에서 흐름�
 | ~~T15~~ | ~~File Artifacts(Calypso) 다중 파일 다운로드/업로드 UI~~ | **완료.** 업로드는 `<input multiple>`로 여러 파일을 한 번에 보내고, 다운로드는 `GET .../download/:versionRef` 하나로 통일 — Calypso가 파일이 하나면 그대로, 여러 개면 zip(`archiver`)으로 묶어서 내려준다. FE는 파일 개수를 몰라도 된다 |
 | ~~T16~~ | ~~File Artifacts(Calypso) OA-link/HPC-path 등록 UI~~ | **완료, 단 다이얼로그가 아니라 contents 화면에.** "새 Artifact 추가"는 이름만 받는 빈 artifact를 만들고, 그 artifact에 버전이 하나도 없을 때 `ArtifactVersionContents.tsx`(SIREN 슬라이드의 `CalypsoInlinePanel`과 Calypso 독립 페이지 `ArtifactDetailPage`가 공유하는 화면)가 File/Link(OA)/Path(HPC) 중 하나를 고르게 한다. 그 첫 버전 추가가 `Artifact.network`를 그 자리에서 확정하고, 이후로는 바뀌지 않는다(`calypso/src/artifacts/artifacts.service.ts#lockNetworkOnFirstVersion`) |
 | T5 | Owner 이양 | 현재 불가. 요청이 오면 열 수 있도록 코드에 TODO 주석 유지 |
-| T6 | OA Service/HPC Service 연동 서비스의 slide 차단 규칙 반영 | SIREN 쪽은 완료(게이트 1·2 모두 동작, A/C 공통). 남은 것은 **각 서비스 쪽 `access` 구현**이다 — `prompts/rpm-access-endpoint.md` 를 그 서비스 세션에 전달 (HPC Service는 이제 A와 같은 라이브 게이트 대상이라, HPC 쪽에도 같은 요청이 추가로 필요하다) |
+| T6 | OA Service/HPC Service 연동 서비스의 slide 차단 규칙 반영 | SIREN 쪽은 완료(그 서비스의 access 응답 하나로 판정, A/C 공통). 남은 것은 **각 서비스 쪽 `access` 구현**이다 — `prompts/rpm-access-endpoint.md` 를 그 서비스 세션에 전달 (HPC Service는 이제 A와 같은 라이브 게이트 대상이라, HPC 쪽에도 같은 요청이 추가로 필요하다) |
 | T8 | 실 DB 마이그레이션 | 인메모리 모드는 시드가 새 스키마로 다시 만들어져 해당 없음. 실 DB 환경에서만 `prompts/db-migration-v3.md` 를 desktop 세션에 전달. **코드 변경 없이 데이터만 바꾸는 작업**이다 |
 | T7 | Release Revoke | **열지 않기로 약속된 시나리오.** 요청이 와도 재논의 대상 |
 | T9 | Hub sync 주기 구체화 | A/B/C 모두 **version 발행 이벤트를 즉시 SIREN에 전송**하고, 유실 대비로 작업 없는 야간 시간대에 **1일 1회 전체 재동기화**를 하기로 잠정 합의. 정확한 실행 시각·윈도우·재시도 정책은 추후 확정 |

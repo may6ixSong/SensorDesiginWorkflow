@@ -158,8 +158,9 @@ export function ArtifactSlide({
   const htmlView = useHtmlView(block?.workflowId, block?.id, requestedVersionLabel, !!requestedVersion?.hasHtmlView);
 
   /** 탭 배지 숫자용 — CommentsTab이 같은 queryKey로 다시 불러도 캐시를 재사용할 뿐 추가
-   * 네트워크 요청은 없다. */
-  const comments = useComments(block?.workflowId, block?.id);
+   * 네트워크 요청은 없다. own이 아니면 Comments 탭 자체가 없으니 아예 물어보지 않는다
+   * (설계서 01장 §3.8 확장) — 안 그러면 view 권한자 화면에서 이 훅이 403을 받는다. */
+  const comments = useComments(block?.workflowId, block?.id, own);
   
   useEffect(() => {
     setSelectedVersionLabel(undefined);
@@ -167,15 +168,19 @@ export function ArtifactSlide({
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    setTab(initialTab ?? 'overview');
+    // Recipients/Comments 탭은 이 workflow의 Edit Access(own)가 있을 때만 존재한다
+    // (설계서 01장 §3.8 확장) — deep-link(예: 목록의 Comments 칸)로 그 탭을 요청받아도
+    // own이 아니면 Overview로 접는다.
+    setTab(initialTab && (own || initialTab === 'overview') ? initialTab : 'overview');
   }, [block?.id]);
 
   if (!block) return null;
   const artifact = block.artifact;
 
   /* ── 열람 차단 ──
-     서버가 권한을 판정해 masked로 내려보냈다는 뜻이다. A Tier라면 recipient가 아니거나
-     그 서비스에서 view 권한이 없는 것이고, B/C/D라면 artifact 권한이 없는 것이다. */
+     서버가 권한을 판정해 masked로 내려보냈다는 뜻이다 — A/B/C 전부 그 서비스에서
+     canView/canEdit이 없는 것이다(설계서 01장 §4.2 갱신, block.recipients는 더 이상
+     이 판정에 관여하지 않는다). */
   if (isMaskedArtifact(artifact)) {
     return (
       <SlidePanel open onClose={onClose} width="560px" header={<SlideHeader name={artifact.name} />}>
@@ -183,9 +188,7 @@ export function ArtifactSlide({
           icon="lock"
           tone="locked"
           title={t('artifact.noAccess')}
-          body={artifact.tier === 'A'
-            ? 'Access to this artifact is granted by the owning service and by this workflow’s recipient list.'
-            : 'Ask the artifact owner to grant you view access.'}
+          body="Ask the artifact owner to grant you view access."
         />
       </SlidePanel>
     );
@@ -314,12 +317,20 @@ export function ArtifactSlide({
         </Box>
       )}
 
-      {/* ── 탭 ── */}
+      {/* ── 탭 ──
+          Recipients/Comments는 이 workflow의 Edit Access(own)가 있는 사람에게만 보인다
+          (사용자 결정, 설계서 01장 §3.8 확장) — artifact 자체의 view/edit 권한이나
+          block.recipients 소속과 무관하다. 탭 자체를 아예 목록에서 뺀다 — 읽기 전용으로
+          보여주던 예전 동작(view 권한자에게 recipient를 읽기 전용 노출)은 폐지했다. */}
       <Tabs
         tabs={[
           { key: 'overview' as Tab, label: 'Overview' },
-          { key: 'recipients' as Tab, label: t('artifact.recipients') },
-          { key: 'comments' as Tab, label: 'Comments', badge: comments.data?.length || undefined },
+          ...(own
+            ? [
+                { key: 'recipients' as Tab, label: t('artifact.recipients') },
+                { key: 'comments' as Tab, label: 'Comments', badge: comments.data?.length || undefined },
+              ]
+            : []),
         ]}
         value={tab}
         onChange={setTab}
@@ -666,10 +677,12 @@ function VersionList({
  *
  * ★ **A/B/C 전부 공통** — recipient는 그 workflow의 block에 붙는다. 같은 artifact라도
  *   workflow마다 다를 수 있기 때문이다(같은 artifact가 workflow X·Y 양쪽에 있어도 서로
- *   다른 recipient를 가질 수 있다). 이 목록은 알림 대상이자 **slide 열람의 첫 게이트**다
- *   (§4.1). recipient는 더 이상 edit/view로 나뉘지 않는다 — 속하면 볼 수 있고, 실제
- *   edit 여부는 그 서비스가 정한다.
- * ★ View 권한자에게는 **읽기 전용**으로 노출한다 — 누가 받는지는 볼 수 있어야 한다.
+ *   다른 recipient를 가질 수 있다). 이 목록은 **release 알림 대상**일 뿐, slide를 열 수
+ *   있는지와는 무관하다(정책 변경, 01장 §4.2) — recipient는 더 이상 edit/view로 나뉘지도
+ *   않는다.
+ * ★ 이 탭 자체가 이제 **workflow Edit Access가 있을 때만** 렌더링된다(호출부 참고, 01장
+ *   §3.8) — View 권한자에게 읽기 전용으로 열어주던 예전 동작은 폐지했다. 그래서 이 컴포넌트
+ *   안에서는 `canEdit`가 사실상 항상 `own`(=true)이다.
  */
 function RecipientsTab({
   block, canEdit, departmentOptions, onSaveRecipients, saving,

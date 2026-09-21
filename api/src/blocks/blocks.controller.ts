@@ -134,9 +134,10 @@ export class BlocksController {
   /**
    * block의 recipient 교체 — A/B/C 전부 공통이다(설계서 04장 §3.3).
    *
-   * 편집 권한은 그 workflow의 **Edit Access**다 — recipient에 **속하는 것**과 recipient를
-   * **편집하는 것**은 별개다(설계서 01장 §4.2). 즉 자기가 recipient가 아니어도 목록은
-   * 고칠 수 있고, 대신 자기를 넣지 않으면 그 산출물의 slide는 못 연다.
+   * 편집 권한은 그 workflow의 **Edit Access**다. recipient는 이제 slide 열람을 막지
+   * 않는다(설계서 01장 §4.2 갱신) — release 알림 대상과 Recipients/Comments 탭에 누구를
+   * 보여줄지에만 쓰인다. 그 두 탭 자체도 recipient 소속이 아니라 이 Edit Access로만
+   * 노출된다.
    */
   @Patch('workflows/:workflowId/blocks/:blockId/recipients')
   @WorkflowAccess('edit')

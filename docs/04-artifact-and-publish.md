@@ -75,7 +75,7 @@ Calypso에 등록하는 순간 콘텐츠 종류를 하나 고르고, **그 artif
   OA"였는데 이제 아니다).
 - **OA-link/HPC-path는 Tier D가 하던 역할을 대체한다** — 물어볼 서비스도 실물도 없이 "어디
   있는지"만 기록하던 산출물이 이제는 진짜 Calypso 산출물이 되어, 실제 governance(editors/
-  viewGrants), 진짜 버전(major.minor), recipient 게이트, release 참여를 전부 그대로 받는다.
+  viewGrants), 진짜 버전(major.minor), recipient 구성, release 참여를 전부 그대로 받는다.
   Tier D 때 고민했던 "recipient가 없어야 하나", "release에서 빼야 하나" 같은 질문 자체가
   없어진다 — File Artifacts는 이미 답이 정해진 tier이기 때문이다.
 - **give/receive 양쪽 모두 새 File Artifacts를 등록할 수 있다**(§6.1) — 회사 안에서 만든
@@ -118,7 +118,7 @@ A와 같은 모델로 통일**했다. 그다음엔 이 모델에서 제외돼 �
 | SIREN에서 권한 편집 | **불가.** 그 서비스에 가서 고쳐야 한다 |
 | Recipient 저장 위치 | **SIREN이 block(=그 workflow의 자리) 단위로 저장** |
 | Recipient가 여러 workflow에서 같은가 | **아니다.** 같은 artifact도 workflow마다 recipient 구성이 다를 수 있다 |
-| Recipient와 slide 열람의 관계 | **게이트로 쓰인다** — recipient가 아니면 slide가 막힌다(§4.1). 실제 데이터 접근은 그 서비스가 최종 판정한다 |
+| Recipient와 slide 열람의 관계 | **없다**(사용자 결정, §4.1 갱신) — slide를 열 수 있는지는 오직 그 서비스의 권한 하나로만 정해진다. recipient는 release 알림 대상과 Recipients/Comments 탭 표시 대상일 뿐이다 |
 
 ### 3.1 왜 SIREN이 권한에 관여하지 않는가
 
@@ -136,14 +136,15 @@ project 멤버십을 먼저 확인)를 통과한 요청이면 그대로 view가 
 viewGrants에 없는 사람은 다시 `none`(list에서 빠지고 detail은 403)이 된다. A/C(OA/HPC
 Service)는 이 변경과 무관하다 — 그 서비스 자체의 view 게이트를 그대로 쓴다.
 
-recipient는 **release 알림 대상**이면서 동시에 **SIREN 쪽 slide 열람의 첫 번째 게이트**로도
-쓰인다(§4.1). "recipient = 알림 대상"과 "recipient = 그 서비스의 실제 권한"은 여전히 무관하다 —
-recipient에 들어 있어도 그 서비스에서 view 권한이 없으면 결국 slide는 막힌다.
+recipient는 **release 알림 대상**이면서 **Recipients/Comments 탭에 누구를 보여줄지**를
+정한다(§4.1, §5) — 더 이상 slide 열람 자체를 막지는 않는다. "recipient = 알림·탭 표시 대상"과
+"recipient = 그 서비스의 실제 권한"은 여전히 무관하다 — recipient에 들어 있어도 그 서비스에서
+view 권한이 없으면 slide는 (recipient 여부와 무관하게) 막힌다.
 
 ### 3.2 recipient는 block에 — A/B/C 공통, 단일 grant
 
 `Block.recipients`(02장 §4)에 저장하며, 부서 다중 + 사용자 다중의 **단일 grant**다.
-edit/view로 나뉘지 않는다 — 실제 edit 여부는 그 서비스가 최종 판정한다(게이트 2, §4.1).
+edit/view로 나뉘지 않는다 — 실제 edit 여부는 그 서비스가 최종 판정한다(§4.1).
 
 ```ts
 Block.recipients = { departments: string[], users: string[] }
@@ -154,7 +155,8 @@ Block.recipients = { departments: string[], users: string[] }
   가는 식으로 독립적으로 구성한다.
 - **`recipients`에 사람을 넣는 것 자체가 그 서비스의 권한을 부여하지 않는다.** 그 서비스에서
   실제로 view/edit 권한이 없는 사람을 recipient에 넣으면, 그 사람은 여전히 slide가 막힌다
-  (§4.1 게이트 2). recipient 관리자가 이를 인지하고 구성해야 한다.
+  (§4.1) — recipient는 이제 slide 열람의 필요조건도 아니고 충분조건도 아니다. recipient
+  관리자가 이를 인지하고 구성해야 한다.
 - `Artifact.editAccess`/`viewAccess`/`expectedGiver`(`AccessGrant`) 필드는 완전히 제거했다 —
   artifact는 더 이상 권한을 전혀 들고 있지 않는다.
 
@@ -185,30 +187,29 @@ File Artifacts(B)의 OA-link/HPC-path 콘텐츠(§2.2)가 해결한다 — recip
 
 판정 로직은 [01-permissions.md §4.2](01-permissions.md)에 있다. 화면 관점에서 다시 정리한다.
 
-### 4.1 OA Service / File Artifacts / HPC Service — 2단 게이트 (A/B/C 공통, 예외 없음)
+### 4.1 OA Service / File Artifacts / HPC Service — 서비스 권한 하나로 (A/B/C 공통, 예외 없음)
 
 ```
-게이트 1 (SIREN)   그 block의 recipients(edit 또는 view)에 속하는가?
-                     아니다 → 막힌다. 서비스에 물어보지도 않는다.
-                     맞다   → 게이트 2로
-
-게이트 2 (서비스)   그 서비스에서 view 권한이 있는가? (라이브 조회)
-                     없다 → 막힌다.
-                     있다 → 열린다. canEdit 여부로 버전 트리 깊이가 갈린다(§7).
+그 서비스에서 view 권한이 있는가? (라이브 조회)
+  없다 → 막힌다.
+  있다 → 열린다. canEdit 여부로 버전 트리 깊이가 갈린다(§7).
 ```
 
-- **workflow Edit Access가 있어도 recipient가 아니면 막힌다.** 이건 기존 설계("workflow Edit
-  Access는 항상 열린다")에서 바뀐 부분이다 — 지금은 recipient에 먼저 속해야 한다.
-- recipient에 속해도 그 서비스에서 view 권한이 없으면 역시 막힌다 — recipient는 SIREN 쪽
-  게이트일 뿐, 실제 데이터 접근은 그 서비스가 최종 판정한다.
-- 연동 서비스에 `access` 엔드포인트가 필요하다 —
+- **workflow Edit Access가 있는지, block.recipients에 속하는지는 이 판정에 관여하지 않는다**
+  (사용자 결정 — 이전 버전은 여기가 2단 게이트였고, recipient를 먼저 통과해야 서비스 권한을
+  물었다). 그 결과 같은 부서가 만든 workflow이고 artifact 자체는 view 제한이 없는데도, 그
+  block의 recipient가 다른 부서로 지정돼 있으면 못 여는 상황이 나왔다 — recipient의 존재
+  이유(같은 artifact를 workflow마다 다른 대상에게 보여주고 싶을 수 있다, §3.2)는 유효하지만,
+  그걸 위해 열람 자체를 막는 대가가 너무 컸다. 지금은 recipient가 release 알림 대상과
+  Recipients/Comments 탭 표시 대상으로만 쓰인다(§5).
+- 연동 서비스에 `access` 엔드포인트가 필요하다는 점은 그대로다 —
   [prompts/a-tier-recipient-integration.md](prompts/a-tier-recipient-integration.md)로 전달한다.
   File Artifacts(Calypso)는 SIREN BE가 대신 물어보되(FE는 직접 호출하지 않는다, 07장 §2),
   판정 로직 자체는 같다.
 
 ### 4.2 (폐기) External / Attested — §4.1로 흡수됨
 
-D가 없어지면서 "게이트 2가 없는 tier"라는 예외 자체가 없어졌다. §4.1이 A/B/C 전부를 커버한다.
+D가 없어지면서 "물어볼 서비스가 없는 tier"라는 예외 자체가 없어졌다. §4.1이 A/B/C 전부를 커버한다.
 
 ### 4.3 "권한 없음" 과 "아직 publish 없음" 은 다른 화면이다
 
@@ -229,25 +230,31 @@ D가 없어지면서 "게이트 2가 없는 tier"라는 예외 자체가 없어�
 
 ---
 
-## 5. Recipient 탭
+## 5. Recipients / Comments 탭
 
-artifact 상세 slide 안의 탭 하나로 둔다.
+artifact 상세 slide 안의 탭 둘이다. **이 둘은 slide 자체(Overview)와 노출 기준이 다르다**
+(사용자 결정, 01장 §3.8 갱신).
 
-| 열람자 | 표시 |
-|---|---|
-| workflow Edit Access (A/B/C 공통) | 편집 가능 — `block.recipients`에 부서·사용자 추가·삭제 (§3.2) |
-| View 권한자 | **읽기 전용으로 노출.** 누가 받는지는 볼 수 있고, 추가/삭제 버튼이 없다 |
-| 미매핑 블록 | **탭 자체를 감춘다** |
+| 열람자 | Overview(§4) | Recipients / Comments |
+|---|---|---|
+| workflow Edit Access | 그 서비스 canView/canEdit로 판정 | **보인다.** Recipients는 편집 가능(`block.recipients`에 부서·사용자 추가·삭제, §3.2), Comments는 읽기·쓰기 모두 가능 |
+| workflow View 권한자 (Edit 아님) | 그 서비스 canView/canEdit로 판정 — Edit 권한자와 동일 기준 | **탭 자체가 없다.** 그 artifact의 편집 권한이 있거나 recipient로 등록돼 있어도 마찬가지다 |
+| 미매핑 블록 | "No source yet" | **탭 자체를 감춘다** |
 
-> 이 탭을 여는 것과 §4.1의 게이트 1을 통과하는 것은 별개다 — workflow Edit Access는 탭을
-> **열어 recipient를 편집**할 수 있게 하지만, 그 사람이 slide 자체를 볼 수 있는지는 여전히
-> 자신이 recipient에 속하는지 + 서비스 권한으로 판정한다.
+> **판정 기준이 완전히 분리된다.** Overview는 그 서비스의 canView/canEdit 하나로만 열리고
+> (§4.1), Recipients/Comments는 block.recipients 소속이나 artifact 자체의 편집 권한과
+> 무관하게 **오직 workflow Edit Access**로만 열린다. 그래서 "artifact는 볼 수 있는데 그
+> 두 탭은 안 보이는" 사람과 "workflow는 편집할 수 있지만 그 artifact는 서비스 쪽 권한이
+> 없어 Overview가 막힌 채로 Recipients/Comments만 여는" 사람이 둘 다 있을 수 있다 — 의도된
+> 동작이다.
+> (예전 버전은 Recipients 탭을 View 권한자에게도 읽기 전용으로 열어줬다. 그 근거였던
+> "recipient 소속 = slide 열람 게이트" 자체가 §4.1에서 폐지되면서, 그 읽기 전용 노출도
+> 함께 걷어냈다.)
 
-- View 권한자에게 열어주는 이유: 그건 workflow 설정이 아니라 산출물 정보이고, 별도의 view 권한
-  근거가 있기 때문이다. **서비스 권한이 없어도 읽기 전용 열람은 허용한다** — 실제 데이터 접근은
-  그 서비스가 차단하므로 SIREN이 이중으로 막을 이유가 없다.
 - 부서 후보는 `Project.departments`, 개별 사용자는 전사 검색(KnoxID 또는 이름).
 - 사용자 표시는 KnoxID 저장 + SDPCommonAPI 이름 조회(한/영).
+- Comments는 항상 publish된 버전에만 달 수 있다(working 버전 불가) — 이 규칙은 이번 변경과
+  무관하게 그대로다.
 
 ---
 
@@ -424,11 +431,11 @@ PATCH /blocks/:id                        { name?, artifactId? | newArtifact? }
 - **버전 목록 자체는 SIREN 캐시에서 읽는다** — OA Service/File Artifacts/HPC Service 전부
   event + 야간 재동기화로 SIREN이 미리 갖고 있다(07장 §3, §4). 상세 slide를 열 때마다 그
   서비스에 버전을 다시 물어보지 않는다. **canView/canEdit·html-view만 열 때마다 라이브로
-  묻는다**(§4.1 게이트 2, 07장 §5).
-- **giver 여부는 §4.1 게이트 2의 `access.canEdit` 로 판정한다** — recipient에 edit로 들어
-  있어도, 그 서비스에서 edit 권한이 없으면 working 버전은 안 보인다. 즉 버전 트리 깊이는
-  최종적으로 **그 서비스의 (라이브) 응답**이 결정하고, 버전 목록 자체는 캐시를 쓴다 — 이
-  둘은 서로 다른 축이다.
+  묻는다**(§4.1, 07장 §5).
+- **giver 여부는 §4.1의 `access.canEdit` 로 판정한다** — recipient 소속 여부와는 무관하다.
+  그 서비스에서 edit 권한이 없으면(recipient이든 아니든) working 버전은 안 보인다. 즉 버전
+  트리 깊이는 최종적으로 **그 서비스의 (라이브) 응답**이 결정하고, 버전 목록 자체는 캐시를
+  쓴다 — 이 둘은 서로 다른 축이다.
 
 ---
 

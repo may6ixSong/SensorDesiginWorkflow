@@ -12,7 +12,6 @@ import {
   canAccessProject,
   canEditMilestones,
   myDepartments,
-  recipientLevel,
   workflowLevel,
 } from './access';
 
@@ -49,8 +48,6 @@ const workflow = {
   editAccess: { departments: ['Design'], users: [] },
   viewAccess: { departments: ['Layout'], users: [] },
 };
-
-const block = { recipients: { departments: ['Layout'], users: [] } };
 
 describe('resolveActor', () => {
   it('X-Knox-Id가 없으면 401', () => {
@@ -126,11 +123,6 @@ describe('시뮬레이션 중의 권한 판정 (access.ts)', () => {
   it('workflow 편집 권한이 생기지 않는다', () => {
     expect(workflowLevel(realAdmin, workflow, project)).toBe('edit');
     expect(workflowLevel(simulated, workflow, project)).toBeNull();
-  });
-
-  it('recipient가 아닌 artifact는 열리지 않는다', () => {
-    expect(recipientLevel(realAdmin, block, [])).toBe('edit');
-    expect(recipientLevel(simulated, block, [])).toBeNull();
   });
 
   it('마일스톤 편집 권한도 사라진다', () => {

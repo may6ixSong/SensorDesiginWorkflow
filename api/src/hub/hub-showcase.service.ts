@@ -13,10 +13,10 @@ export interface ShowcaseItem {
 /**
  * 대문이 슬랩 위에 실제 산출물 카드를 띄우기 위한 순수 표시용 조회.
  *
- * workflow 맥락(= 어느 block에 놓였는가)이 없어 A Tier의 recipient 게이트를 물어볼 수
- * 없으므로, 누가 봐도 안전한 **published 버전만** 사용한다 — artifact.dto.ts의 마스킹
- * 통로를 우회하는 게 아니라, 애초에 그 판정이 성립하지 않는 자리라 더 보수적인 규칙을
- * 쓰는 것이다(설계서 04장 §4.1).
+ * 특정 사용자를 대상으로 한 조회가 아니다 — 그 서비스에 라이브로 canView/canEdit를 물어볼
+ * 대상(actor.knoxId)조차 없다. 그래서 누가 봐도 안전한 **published 버전만** 사용한다 —
+ * artifact.dto.ts의 마스킹 통로를 우회하는 게 아니라, 애초에 그 판정이 성립하지 않는
+ * 자리라 더 보수적인 규칙을 쓰는 것이다(설계서 04장 §4.1).
  */
 @Injectable()
 export class HubShowcaseService {
