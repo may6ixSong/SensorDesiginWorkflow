@@ -134,7 +134,9 @@ export interface WorkflowDto {
    * app bar의 select는 null인 항목을 option에서 뺀다.
    */
   myAccess: AccessLevel;
-  /** myAccess가 null이면 아래 값들은 서버가 비워서 내려준다. */
+  /** myAccess가 null이면 아래 값들은 서버가 비워서 내려준다 — 단 phases/phaseWidths는
+   * 예외다(사용자 결정). ProjectTimeline이 권한 없는 workflow도 실제 일정을 그리고
+   * 그 위에 잠금 표시만 얹기 위해서다. */
   ownerKnoxId: string | null;
   editAccess: AccessGrant | null;
   viewAccess: AccessGrant | null;

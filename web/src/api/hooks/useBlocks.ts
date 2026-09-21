@@ -23,10 +23,10 @@ export interface NewArtifactSourceInput {
  * ★ Edit/View 권한자가 **완전히 동일한 캔버스**를 본다(설계서 03장 §1). 다르게 보이는
  *   것은 각 산출물의 버전뿐이고, 그건 산출물 하나하나마다 판정된다.
  */
-export function useBlocks(workflowId: string | undefined) {
+export function useBlocks(workflowId: string | undefined, enabled = true) {
   return useQuery({
     queryKey: queryKeys.blocks(workflowId ?? ''),
-    enabled: Boolean(workflowId),
+    enabled: Boolean(workflowId) && enabled,
     queryFn: async () => {
       const res = await apiClient.get<BlockDto[]>(`/workflows/${workflowId}/blocks`);
       return res.data;

@@ -180,6 +180,12 @@ UI에서도 양쪽에 동시에 표시하고, 경고를 띄우지 않는다.
 
 > 요약하면 **"목록·정보성 화면은 존재를 보여주되 잠근다. 이동 수단(app bar)에서는 아예 뺀다."**
 
+**Information page의 일정표(`ProjectTimeline`)는 "보여주되 잠근다"를 phase 단위까지 그대로
+적용한다**(사용자 결정) — `WorkflowDto.phases`/`phaseWidths`는 권한이 없어도(`myAccess ===
+null`) 실제 값이 내려간다(`toWorkflowDto()`가 "이름·부서 외엔 담지 않는다"고 두는 값 중
+**유일한 예외**). 그 위에 행 전체를 시각적으로 잠그고(음영) 클릭을 막는 것은 FE 책임이다 —
+phase는 이름·날짜뿐이라 공개해도 캔버스·산출물·권한 목록이 새는 게 아니다.
+
 ### 3.8 Workflow Settings 접근
 
 - Settings 진입 버튼(연필)은 **Edit 권한자에게만** 보인다. View 권한자는 버튼 자체가 없다.
