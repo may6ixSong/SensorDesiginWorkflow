@@ -51,9 +51,14 @@ export class AssignmentsService {
    * `recipientDepartments`/`recipientUsers`는 release 생성 시 items 안의 수신 대상을
    * 평탄화해 둔 파생 필드라(02장 §6) 인덱스 하나로 과제 경계를 넘어 조회된다.
    */
-  async receivedReleases(actor: Actor, page: number, size: number): Promise<PagedDto<MyReleaseRowDto>> {
+  async receivedReleases(
+    actor: Actor,
+    page: number,
+    size: number,
+    projectIds?: string[],
+  ): Promise<PagedDto<MyReleaseRowDto>> {
     const scope = await this.scopeService.resolve(actor);
-    return this.pagedReleases(scope, this.receivedFilter(scope), page, size);
+    return this.pagedReleases(scope, this.receivedFilter(scope, projectIds), page, size);
   }
 
   /**
@@ -62,9 +67,14 @@ export class AssignmentsService {
    * 부서는 release 시점에 얼려둔 `workflowAt.department`로 맞춘다. 내 소속은 지금
    * 기준이다 — 발행 당시 그 부서가 아니었어도 지금 속해 있으면 내 것으로 본다(사용자 확정).
    */
-  async publishedReleases(actor: Actor, page: number, size: number): Promise<PagedDto<MyReleaseRowDto>> {
+  async publishedReleases(
+    actor: Actor,
+    page: number,
+    size: number,
+    projectIds?: string[],
+  ): Promise<PagedDto<MyReleaseRowDto>> {
     const scope = await this.scopeService.resolve(actor);
-    return this.pagedReleases(scope, this.publishedFilter(scope), page, size);
+    return this.pagedReleases(scope, this.publishedFilter(scope, projectIds), page, size);
   }
 
   private async pagedReleases(
@@ -321,9 +331,27 @@ export class AssignmentsService {
    * 무관하지만, 그것도 내가 member인 과제 안으로 먼저 좁힌 뒤에 본다 — Project 계층이
    * 최종 관문이라 member가 아닌 과제의 release는 이름조차 보이면 안 된다(01장 §2.2).
    */
-  private receivedFilter(scope: MyScope): Scoped<FilterQuery<ReleaseDocument>> {
-    if (scope.isAdmin) return {};
+  /**
+   * `projectIds`가 오면(FE legend 필터, 사용자 요청) scope가 이미 허용한 project
+   * 집합과 교집합만 취한다 — 필터가 scope보다 넓은 project를 몰래 열어주지 않는다.
+   * 교집합이 빈 배열이면(0개 선택, 또는 scope 밖 id만 보냄) 호출부가 "결과 없음"으로 다룬다.
+   */
+  private effectiveProjectIds(scope: MyScope, projectIds?: string[]): string[] {
+    if (!projectIds) return scope.isAdmin ? [] : scope.projectIds;
+    if (scope.isAdmin) return projectIds;
+    const allowed = new Set(scope.projectIds);
+    return projectIds.filter((id) => allowed.has(id));
+  }
+
+  private receivedFilter(scope: MyScope, projectIds?: string[]): Scoped<FilterQuery<ReleaseDocument>> {
+    if (scope.isAdmin) {
+      if (!projectIds) return {};
+      const ids = this.effectiveProjectIds(scope, projectIds);
+      return ids.length ? ({ projectId: { $in: ids } } as FilterQuery<ReleaseDocument>) : null;
+    }
     if (!scope.projectIds.length) return null;
+    const ids = this.effectiveProjectIds(scope, projectIds);
+    if (!ids.length) return null;
 
     const clauses: FilterQuery<ReleaseDocument>[] = [{ recipientUsers: scope.knoxId }];
     for (const [projectId, departments] of scope.departmentsByProject) {
@@ -331,12 +359,18 @@ export class AssignmentsService {
         clauses.push({ projectId, recipientDepartments: { $in: departments } } as FilterQuery<ReleaseDocument>);
       }
     }
-    return { projectId: { $in: scope.projectIds }, $or: clauses } as FilterQuery<ReleaseDocument>;
+    return { projectId: { $in: ids }, $or: clauses } as FilterQuery<ReleaseDocument>;
   }
 
-  private publishedFilter(scope: MyScope): Scoped<FilterQuery<ReleaseDocument>> {
-    if (scope.isAdmin) return {};
+  private publishedFilter(scope: MyScope, projectIds?: string[]): Scoped<FilterQuery<ReleaseDocument>> {
+    if (scope.isAdmin) {
+      if (!projectIds) return {};
+      const ids = this.effectiveProjectIds(scope, projectIds);
+      return ids.length ? ({ projectId: { $in: ids } } as FilterQuery<ReleaseDocument>) : null;
+    }
     if (!scope.projectIds.length) return null;
+    const ids = this.effectiveProjectIds(scope, projectIds);
+    if (!ids.length) return null;
 
     const clauses: FilterQuery<ReleaseDocument>[] = [{ releasedBy: scope.knoxId }];
     for (const [projectId, departments] of scope.departmentsByProject) {
@@ -344,7 +378,7 @@ export class AssignmentsService {
         clauses.push({ projectId, 'workflowAt.department': { $in: departments } } as FilterQuery<ReleaseDocument>);
       }
     }
-    return { projectId: { $in: scope.projectIds }, $or: clauses } as FilterQuery<ReleaseDocument>;
+    return { projectId: { $in: ids }, $or: clauses } as FilterQuery<ReleaseDocument>;
   }
 
   /* ---------------------------------------------------------------- *

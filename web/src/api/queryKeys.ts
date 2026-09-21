@@ -30,8 +30,8 @@ export const queryKeys = {
    * 않는다. 달력은 화면에 그리는 격자 범위를 그대로 키에 담아, 달을 앞뒤로 오갈 때
    * 이미 본 달은 다시 부르지 않는다.
    */
-  myReleases: (direction: 'received' | 'published', page: number, size: number) =>
-    ['my', 'releases', direction, page, size] as const,
+  myReleases: (direction: 'received' | 'published', page: number, size: number, projectIds?: string[]) =>
+    ['my', 'releases', direction, page, size, projectIds ? [...projectIds].sort() : undefined] as const,
   myArtifacts: ['my', 'artifacts'] as const,
   myCalendar: (from: string, to: string) => ['my', 'calendar', from, to] as const,
   /** release 한 건의 상세 — 목록 행을 눌러 다이얼로그를 열 때만 부른다. */

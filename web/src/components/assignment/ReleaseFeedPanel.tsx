@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Box } from '@mui/material';
 import { Badge } from '@/components/common/SirenButton';
 import { Pager } from '@/components/common/Pager';
+import { ProjectChip } from './ProjectChip';
 import { UserAvatar } from '@/components/common/Avatar';
 import { useDirectory } from '@/app/providers/DirectoryProvider';
 import { useMyReleases } from '@/api/hooks/useAssignments';
@@ -19,15 +20,22 @@ import { CURSOR_POINTER, FONT_MONO, T } from '@/theme/tokens';
  *   페이지씩 잘라 주고, 여기서는 페이지 번호만 옮긴다.
  */
 export function ReleaseFeedPanel({
-  direction, title, onOpen, sx,
+  direction, title, onOpen, sx, projectIds,
 }: {
   direction: 'received' | 'published';
   title: string;
   onOpen: (row: MyReleaseRowDto) => void;
   sx?: object;
+  /** project 필터(Overview 탭 공통 필터, 사용자 요청) — undefined면 전체, 빈 배열이면
+   * 아무 project도 고르지 않은 것이라 서버를 부르지 않고 빈 목록으로 둔다. */
+  projectIds?: string[];
 }) {
   const [page, setPage] = useState(1);
-  const { data, isLoading, isError, isPlaceholderData } = useMyReleases(direction, page);
+  const projectIdsKey = projectIds?.join(',');
+  // project 필터가 바뀌면 이전 필터 기준의 페이지 번호가 새 결과 집합 밖일 수 있어
+  // 1페이지로 되돌린다(MyArtifactsPanel의 검색어 처리와 같은 이유).
+  useEffect(() => setPage(1), [projectIdsKey]);
+  const { data, isLoading, isError, isPlaceholderData } = useMyReleases(direction, page, undefined, projectIds);
   const meta = data?.meta;
   const rows = data?.items ?? [];
 
@@ -141,18 +149,17 @@ function ReleaseRow({
       }}
     >
       <Box sx={{ display: 'flex', alignItems: 'center', gap: '7px', flexWrap: 'wrap', mb: '4px' }}>
-        {/* project name이 가장 중요한 식별 정보다(사용자 확정) — 이 화면은 과제를
-            가로지르므로, 어느 project인지가 workflow 이름보다 먼저 눈에 들어와야 한다. */}
+        {/* title(workflow명)이 이제 이 줄의 첫머리다(사용자 요청) — project명이 있던 그
+            자리에 대신 들어간다. project명은 아래 chip으로 옮겨 department보다 강조되게
+            (색+굵은 글씨) 보여준다. */}
         <Box sx={{ fontSize: 13.5, fontWeight: 800, color: T.tx, minWidth: 0, overflowWrap: 'anywhere' }}>
-          {row.projectName}
+          {row.workflowAt.name}
         </Box>
         <Box sx={{ color: T.ln2 }}>·</Box>
         <Box sx={{ fontFamily: FONT_MONO, fontSize: 12, fontWeight: 700, color: T.pr }}>
           {row.label}
         </Box>
-        <Box sx={{ fontSize: 12.5, fontWeight: 700, minWidth: 0, overflowWrap: 'anywhere' }}>
-          {row.workflowAt.name}
-        </Box>
+        <ProjectChip projectId={row.projectId} name={row.projectName} />
         <Badge color={T.dm} bg={T.sf3} borderColor={T.ln}>
           {canonicalDepartmentLabel(row.workflowAt.department)}
         </Badge>

@@ -5,6 +5,18 @@ import { AssignmentsService } from './assignments.service';
 import { CalendarRangeDto, PageQueryDto } from './dto/assignment.dto';
 
 /**
+ * `projectIds` 쿼리 파라미터(콤마로 이은 id 목록)를 배열로 푼다. 파라미터가 아예 없으면
+ * `undefined`(필터 없음)를, 빈 문자열이면 빈 배열(project 0개 선택 — 결과도 0건)을 준다.
+ */
+function parseProjectIds(raw: string | undefined): string[] | undefined {
+  if (raw === undefined) return undefined;
+  return raw
+    .split(',')
+    .map((id) => id.trim())
+    .filter(Boolean);
+}
+
+/**
  * My Assignment (설계서 09장) — 과제를 가로질러 "내 일"만 모아 보는 화면의 라우트.
  *
  * ★ 여기에는 workflow 단위 Guard(`WorkflowAccessGuard`)가 붙지 않는다 — 애초에 특정
@@ -19,13 +31,13 @@ export class AssignmentsController {
   /** 내가/내 부서가 recipient로 전달받은 release. 최신순. */
   @Get('releases/received')
   async received(@Query() q: PageQueryDto, @CurrentActor() me: Actor) {
-    return this.assignments.receivedReleases(me, q.page ?? 1, q.size ?? 20);
+    return this.assignments.receivedReleases(me, q.page ?? 1, q.size ?? 20, parseProjectIds(q.projectIds));
   }
 
   /** 내가 실행했거나 내 부서 workflow가 낸 release. 최신순. */
   @Get('releases/published')
   async published(@Query() q: PageQueryDto, @CurrentActor() me: Actor) {
-    return this.assignments.publishedReleases(me, q.page ?? 1, q.size ?? 20);
+    return this.assignments.publishedReleases(me, q.page ?? 1, q.size ?? 20, parseProjectIds(q.projectIds));
   }
 
   /**

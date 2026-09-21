@@ -1,4 +1,4 @@
-import { IsISO8601, IsInt, IsOptional, Max, Min } from 'class-validator';
+import { IsISO8601, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 import { Tier } from '../../common/constants/tier';
 
@@ -20,6 +20,15 @@ export class PageQueryDto {
   @Min(1)
   @Max(100)
   size?: number;
+
+  /**
+   * project 필터(FE의 legend 체크박스, 사용자 요청) — 콤마로 이은 projectId 목록.
+   * 생략하면 필터 없이 scope 전체다. 빈 문자열이면 어느 project도 고르지 않은
+   * 것이므로 서버가 빈 결과로 응답한다.
+   */
+  @IsOptional()
+  @IsString()
+  projectIds?: string;
 }
 
 /**

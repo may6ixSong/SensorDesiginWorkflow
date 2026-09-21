@@ -1,15 +1,22 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Box } from '@mui/material';
 import { AppShell } from '@/components/layout/AppShell';
 import { Tabs, TabPanel } from '@/components/common/Tabs';
 import { ReleaseFeedPanel } from '@/components/assignment/ReleaseFeedPanel';
 import { MyArtifactsPanel } from '@/components/assignment/MyArtifactsPanel';
 import { AssignmentCalendar } from '@/components/assignment/AssignmentCalendar';
+import { ProjectFilterLegend } from '@/components/assignment/ProjectFilterLegend';
 import { ReleaseDetailDialog } from '@/components/assignment/ReleaseDetailDialog';
+import { useProjects } from '@/api/hooks/useProjects';
+import { useProjectFilter } from '@/lib/projectFilter';
 import { MyReleaseRowDto } from '@/types/domain';
 import { T } from '@/theme/tokens';
 
 type View = 'overview' | 'calendar';
+
+/** Overview 탭의 release/artifact 목록에 공통으로 적용되는 project 필터(사용자 요청) —
+ * 다음 접속에도 이어간다. */
+const OVERVIEW_PROJECT_FILTER_COOKIE = 'siren-my-assignment-overview-project-filter';
 
 /**
  * My Assignment (설계서 09장) — 과제를 가로질러 "내 일"만 한 화면에 모은다.
@@ -25,6 +32,17 @@ type View = 'overview' | 'calendar';
 export function MyAssignmentPage() {
   const [view, setView] = useState<View>('overview');
   const [openRelease, setOpenRelease] = useState<MyReleaseRowDto | null>(null);
+
+  const { data: projects = [] } = useProjects();
+  const { excludedIds: excludedProjectIds, toggle: toggleProjectFilter } = useProjectFilter(
+    OVERVIEW_PROJECT_FILTER_COOKIE,
+  );
+  // ReleaseFeedPanel(서버 페이지네이션)에는 "포함할 project id 배열"을 넘긴다 — 아무것도
+  // 안 뺐으면 undefined로 둬서 필터 없는 조회 그대로(캐시 재사용) 나가게 한다.
+  const includedProjectIds = useMemo(() => {
+    if (!excludedProjectIds.size) return undefined;
+    return projects.filter((p) => !excludedProjectIds.has(p._id)).map((p) => p._id);
+  }, [projects, excludedProjectIds]);
 
   return (
     <AppShell>
@@ -46,8 +64,26 @@ export function MyAssignmentPage() {
               { key: 'overview', label: 'Overview' },
               { key: 'calendar', label: 'Calendar' },
             ]}
-            sx={{ mb: '16px' }}
+            sx={{ mb: view === 'overview' ? '10px' : '16px' }}
           />
+
+          {/* Overview 탭의 release/artifact 목록에 공통으로 적용되는 project 필터
+              (사용자 요청) — legend겸 체크박스다. */}
+          {view === 'overview' && Boolean(projects.length) && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: '10px', mb: '14px' }}>
+              <Box sx={{ fontSize: 10.5, fontWeight: 700, color: T.dm2, textTransform: 'uppercase', letterSpacing: '.04em', flex: '0 0 auto' }}>
+                Projects
+              </Box>
+              <ProjectFilterLegend
+                projects={projects}
+                excludedIds={excludedProjectIds}
+                onToggle={toggleProjectFilter}
+                direction="horizontal"
+                dense
+                sx={{ flex: 1 }}
+              />
+            </Box>
+          )}
         </Box>
 
         {/* display:grid + gridTemplateRows:'minmax(0,1fr)' 는 TabPanel(framer-motion div, 자기
@@ -92,14 +128,16 @@ export function MyAssignmentPage() {
                   title="Inbox"
                   onOpen={setOpenRelease}
                   sx={{ gridArea: 'received' }}
+                  projectIds={includedProjectIds}
                 />
                 <ReleaseFeedPanel
                   direction="published"
                   title="Outbox"
                   onOpen={setOpenRelease}
                   sx={{ gridArea: 'published' }}
+                  projectIds={includedProjectIds}
                 />
-                <MyArtifactsPanel sx={{ gridArea: 'artifacts' }} />
+                <MyArtifactsPanel sx={{ gridArea: 'artifacts' }} excludedProjectIds={excludedProjectIds} />
               </Box>
             ) : (
               <AssignmentCalendar onOpenRelease={setOpenRelease} />

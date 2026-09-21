@@ -3,14 +3,20 @@ import { Box } from '@mui/material';
 import Cookies from 'js-cookie';
 import { Badge } from '@/components/common/SirenButton';
 import { NetworkTag } from '@/components/artifact/ArtifactChips';
+import { ProjectFilterLegend } from './ProjectFilterLegend';
 import { VersionEventDialog } from './VersionEventDialog';
 import { colorForKnoxId } from '@/app/providers/DirectoryProvider';
 import { useMyCalendar } from '@/api/hooks/useAssignments';
 import { useProjects } from '@/api/hooks/useProjects';
 import { fmtAt } from '@/lib/canvasModel';
+import { withAlpha } from '@/lib/domainWorkflow';
+import { useProjectFilter } from '@/lib/projectFilter';
 import { canonicalDepartmentLabel } from '@/shared/constants/departments';
 import { MyReleaseRowDto, ProjectDto, VersionEventDto } from '@/types/domain';
 import { CURSOR_POINTER, FONT_MONO, T } from '@/theme/tokens';
+
+/** legend의 project 체크박스 필터 — 다음 접속에도 이어간다(사용자 요청). */
+const PROJECT_FILTER_COOKIE = 'siren-my-assignment-calendar-project-filter';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -114,6 +120,7 @@ export function AssignmentCalendar({ onOpenRelease }: { onOpenRelease: (row: MyR
   const [openVersion, setOpenVersion] = useState<VersionEventDto | null>(null);
 
   const { data: projects = [] } = useProjects();
+  const { excludedIds: excludedProjectIds, toggle: toggleProjectFilter } = useProjectFilter(PROJECT_FILTER_COOKIE);
 
   const { start, end, days } = useMemo(
     () => (viewMode === 'month' ? gridRange(focusDate.getFullYear(), focusDate.getMonth()) : weekRange(focusDate)),
@@ -121,9 +128,12 @@ export function AssignmentCalendar({ onOpenRelease }: { onOpenRelease: (row: MyR
   );
   const { data, isLoading, isError, isPlaceholderData } = useMyCalendar(start.toISOString(), end.toISOString());
 
+  // legend겸 filter다(사용자 요청) — 체크를 끈 project의 event는 달력 칸에서도, 오른쪽
+  // 상세 리스트(C 패널, byDay에서 파생)에서도 함께 빠진다.
   const byDay = useMemo(() => {
     const map = new Map<string, DayEvent[]>();
     const push = (e: DayEvent) => {
+      if (excludedProjectIds.has(e.data.projectId)) return;
       const key = dayKey(new Date(e.at));
       const list = map.get(key) ?? [];
       list.push(e);
@@ -133,7 +143,7 @@ export function AssignmentCalendar({ onOpenRelease }: { onOpenRelease: (row: MyR
     for (const r of data?.releaseEvents ?? []) push({ kind: 'release', at: r.releasedAt, data: r });
     for (const list of map.values()) list.sort((a, b) => a.at.localeCompare(b.at));
     return map;
-  }, [data]);
+  }, [data, excludedProjectIds]);
 
   const todayKey = dayKey(today);
   const selectedEvents = byDay.get(selectedKey) ?? [];
@@ -177,6 +187,8 @@ export function AssignmentCalendar({ onOpenRelease }: { onOpenRelease: (row: MyR
       >
         <ProjectLegendPanel
           projects={projects}
+          excludedProjectIds={excludedProjectIds}
+          onToggleProject={toggleProjectFilter}
           viewMode={viewMode}
           focusMonth={focusDate}
           selectedKey={selectedKey}
@@ -223,9 +235,11 @@ export function AssignmentCalendar({ onOpenRelease }: { onOpenRelease: (row: MyR
  * ------------------------------------------------------------------ */
 
 function ProjectLegendPanel({
-  projects, viewMode, focusMonth, selectedKey, todayKey, onSelectDay,
+  projects, excludedProjectIds, onToggleProject, viewMode, focusMonth, selectedKey, todayKey, onSelectDay,
 }: {
   projects: ProjectDto[];
+  excludedProjectIds: Set<string>;
+  onToggleProject: (projectId: string) => void;
   viewMode: ViewMode;
   focusMonth: Date;
   selectedKey: string;
@@ -241,31 +255,23 @@ function ProjectLegendPanel({
       }}
     >
       <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '12px' }}>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: '6px', mb: '14px' }}>
-          {projects.map((p) => (
-            <Box key={p._id} title={p.name} sx={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
-              {/* 이니셜도, 옆의 표시 텍스트도 전부 project name 기준이다(사용자 확정) —
-                  project code는 이 범례에서 더 이상 쓰지 않는다. */}
-              <InitialBadge color={colorForKnoxId(p._id)} label={p.name} />
-              <Box
-                sx={{
-                  fontSize: 10.5, color: T.tx2, minWidth: 0,
-                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                }}
-              >
-                {p.name}
-              </Box>
-            </Box>
-          ))}
-          {!projects.length && <Box sx={{ fontSize: 10.5, color: T.dm2 }}>No projects</Box>}
-        </Box>
+        {/* legend겸 filter다(사용자 요청) — 체크를 끄면 달력과 오른쪽 상세 리스트에서
+            그 project가 함께 빠진다. 표시 기준은 project code가 아니라 name이다. */}
+        <ProjectFilterLegend
+          projects={projects}
+          excludedIds={excludedProjectIds}
+          onToggle={onToggleProject}
+          dense
+          sx={{ mb: '14px' }}
+        />
 
         <Box sx={{ height: '1px', background: T.ln, mb: '12px' }} />
 
+        {/* Release는 이제 칸 배경 자체로 표시하므로(사용자 요청) 여기 도형 범례가
+            필요 없다 — version/working을 가르는 원만 남긴다(사용자 확정: 유지). */}
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <TypeLegendRow shape="square" filled label="Release" />
-          <TypeLegendRow shape="circle" filled label="Version" />
-          <TypeLegendRow shape="circle" filled={false} label="Working" />
+          <TypeLegendRow filled label="Version" />
+          <TypeLegendRow filled={false} label="Working" />
         </Box>
 
         {viewMode === 'week' && (
@@ -279,24 +285,10 @@ function ProjectLegendPanel({
   );
 }
 
-function InitialBadge({ color, label }: { color: string; label: string }) {
-  const initial = (label.trim()[0] ?? '?').toUpperCase();
-  return (
-    <Box
-      sx={{
-        width: 18, height: 18, borderRadius: '5px', background: color, color: '#fff',
-        fontSize: 9.5, fontWeight: 800, display: 'grid', placeItems: 'center', flex: '0 0 auto',
-      }}
-    >
-      {initial}
-    </Box>
-  );
-}
-
-function TypeLegendRow({ shape, filled, label }: { shape: 'square' | 'circle'; filled: boolean; label: string }) {
+function TypeLegendRow({ filled, label }: { filled: boolean; label: string }) {
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-      <EventMarker color={T.dm2} shape={shape} filled={filled} />
+      <EventMarker color={T.dm2} filled={filled} />
       <Box sx={{ fontSize: 10.5, color: T.dm }}>{label}</Box>
     </Box>
   );
@@ -598,6 +590,19 @@ function DayCell({
   const shown = events.slice(0, maxChips);
   const hidden = events.length - shown.length;
 
+  // release는 이제 도형이 아니라 칸 배경 자체로 알린다(사용자 요청) — 그 날의 release가
+  // 걸린 project 색(들)을 옅게 tint한다. project가 둘 이상이면 색을 나란히 나눠 칠한다.
+  const releaseColors = Array.from(
+    new Set(
+      events
+        .filter((e): e is Extract<DayEvent, { kind: 'release' }> => e.kind === 'release')
+        .map((e) => colorForKnoxId(e.data.projectId)),
+    ),
+  );
+  const releaseBg = releaseHighlight(releaseColors);
+  const restBg = inMonth ? T.sf : T.sf2;
+  const restHoverBg = inMonth ? T.sf2 : T.sf3;
+
   return (
     <Box
       onClick={onClick}
@@ -608,13 +613,13 @@ function DayCell({
           : { minHeight: cellSize, flex: 1 }),
         borderRight: showRightBorder ? `1px solid ${T.ln}` : 'none',
         borderBottom: `1px solid ${T.ln}`,
-        background: isSelected ? T.prSoft : inMonth ? T.sf : T.sf2,
+        background: isSelected ? T.prSoft : releaseBg ?? restBg,
         outline: isSelected ? `1.5px solid ${T.pr}` : 'none',
         outlineOffset: '-1.5px',
         cursor: CURSOR_POINTER,
         display: 'flex', flexDirection: 'column', gap: '3px',
         ...(showRightBorder ? { '&:nth-of-type(7n)': { borderRight: 'none' } } : {}),
-        '&:hover': { background: isSelected ? T.prSoft : inMonth ? T.sf2 : T.sf3 },
+        '&:hover': { background: isSelected ? T.prSoft : releaseBg ?? restHoverBg },
       }}
     >
       <Box
@@ -636,16 +641,26 @@ function DayCell({
   );
 }
 
+/** release가 걸린 날의 칸 배경 — project 색을 옅게 tint한다. 둘 이상이면 나란히 나눠 칠한다. */
+function releaseHighlight(colors: string[]): string | null {
+  if (!colors.length) return null;
+  if (colors.length === 1) return withAlpha(colors[0], 0.18);
+  const step = 100 / colors.length;
+  const stops = colors
+    .map((c, i) => `${withAlpha(c, 0.22)} ${(i * step).toFixed(2)}%, ${withAlpha(c, 0.22)} ${((i + 1) * step).toFixed(2)}%`)
+    .join(', ');
+  return `linear-gradient(90deg, ${stops})`;
+}
+
 /**
- * 색은 project, 모양은 종류다 — release는 각진 마커, version은 원형 마커. 미발행 버전만
- * 그 원을 점선으로 비워 구분한다(색을 하나 더 늘리지 않는다).
+ * version만 도형으로 구분한다(사용자 확정: 유지) — 발행 버전은 채운 원, 미발행(working)은
+ * 점선으로 비운 원. release는 더 이상 도형을 쓰지 않는다 — 칸 배경 자체가 그 표시다.
  */
-function EventMarker({ color, shape, filled }: { color: string; shape: 'square' | 'circle'; filled: boolean }) {
+function EventMarker({ color, filled }: { color: string; filled: boolean }) {
   return (
     <Box
       sx={{
-        width: 7, height: 7, flex: '0 0 auto',
-        borderRadius: shape === 'circle' ? '50%' : '2px',
+        width: 7, height: 7, borderRadius: '50%', flex: '0 0 auto',
         background: filled ? color : 'transparent',
         border: `1.3px ${filled ? 'solid' : 'dashed'} ${color}`,
       }}
@@ -655,10 +670,20 @@ function EventMarker({ color, shape, filled }: { color: string; shape: 'square' 
 
 function EventChip({ event }: { event: DayEvent }) {
   const color = colorForKnoxId(event.data.projectId);
-  const label = event.kind === 'release'
-    ? `${event.data.label} ${event.data.workflowAt.name}`
-    : `${event.data.artifactName} · ${event.data.versionLabel}`;
-  const filled = event.kind === 'release' ? true : event.data.isPublished;
+
+  if (event.kind === 'release') {
+    return (
+      <Box
+        sx={{
+          fontSize: 9.5, borderRadius: '4px', padding: '1.5px 5px 1.5px 6px',
+          background: T.sf, border: `1px solid ${T.ln}`, borderLeft: `3px solid ${color}`,
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: T.tx2,
+        }}
+      >
+        {event.data.label} {event.data.workflowAt.name}
+      </Box>
+    );
+  }
 
   return (
     <Box
@@ -668,9 +693,9 @@ function EventChip({ event }: { event: DayEvent }) {
         background: T.sf2, border: `1px solid ${T.ln}`, overflow: 'hidden',
       }}
     >
-      <EventMarker color={color} shape={event.kind === 'release' ? 'square' : 'circle'} filled={filled} />
+      <EventMarker color={color} filled={event.data.isPublished} />
       <Box sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: T.tx2 }}>
-        {label}
+        {event.data.artifactName} · {event.data.versionLabel}
       </Box>
     </Box>
   );
@@ -751,12 +776,12 @@ function ReleaseEventRow({ row, onClick }: { row: MyReleaseRowDto; onClick: () =
       onClick={onClick}
       sx={{
         textAlign: 'left', width: '100%', fontFamily: 'inherit',
-        border: `1px solid ${T.recv}`, background: T.recvSoft, borderRadius: '10px',
-        padding: '9px 11px', cursor: CURSOR_POINTER, overflow: 'hidden',
+        border: `1px solid ${T.recv}`, borderLeft: `3px solid ${color}`, background: T.recvSoft,
+        borderRadius: '10px', padding: '9px 11px', cursor: CURSOR_POINTER, overflow: 'hidden',
         '&:hover': { filter: 'brightness(0.98)' },
       }}
     >
-      {/* project name이 가장 중요한 식별 정보다(사용자 확정) — 이 마커와 같은 project
+      {/* project name이 가장 중요한 식별 정보다(사용자 확정) — 이 왼쪽 accent와 같은 project
           색(범례와 같은 값)을 그대로 써서 "이 색 = 이 project"를 강화한다. */}
       <Box
         sx={{
@@ -767,7 +792,6 @@ function ReleaseEventRow({ row, onClick }: { row: MyReleaseRowDto; onClick: () =
         {row.projectName}
       </Box>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
-        <EventMarker color={color} shape="square" filled />
         <Box sx={{ fontFamily: FONT_MONO, fontSize: 11.5, fontWeight: 700, flex: '0 0 auto' }}>
           {row.label}
         </Box>
@@ -824,7 +848,7 @@ function VersionEventRow({ event, onClick }: { event: VersionEventDto; onClick: 
         {event.projectName}
       </Box>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
-        <EventMarker color={color} shape="circle" filled={event.isPublished} />
+        <EventMarker color={color} filled={event.isPublished} />
         <Box
           sx={{
             fontSize: 12, fontWeight: 700, minWidth: 0, flex: 1,
