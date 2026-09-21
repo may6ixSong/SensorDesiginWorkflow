@@ -25,23 +25,33 @@ const PAGE_SIZE = 15;
  *   외부 호출이 나간다 — 그래서 A/B/C를 가리지 않고 이 기준 하나로 통일했다(사용자 확정).
  * ★ **최근 1년** 안에 움직인 것만 온다. 그보다 오래된 것은 서버가 아예 싣지 않는다.
  */
-export function MyArtifactsPanel({ sx }: { sx?: object }) {
+export function MyArtifactsPanel({
+  sx, excludedProjectIds,
+}: {
+  sx?: object;
+  /** project 필터(Overview 탭 공통 필터, 사용자 요청) — 체크 해제한 project의 산출물은
+   * 빠진다. */
+  excludedProjectIds?: Set<string>;
+}) {
   const { data = [], isLoading, isError } = useMyArtifacts();
   const [q, setQ] = useState('');
   const [page, setPage] = useState(1);
 
   const rows = useMemo(() => {
+    const byProject = excludedProjectIds?.size
+      ? data.filter((r) => !excludedProjectIds.has(r.projectId))
+      : data;
     const term = q.trim().toLowerCase();
-    if (!term) return data;
-    return data.filter((r) =>
+    if (!term) return byProject;
+    return byProject.filter((r) =>
       `${r.artifactName} ${r.blockName} ${r.workflowName} ${r.projectCode} ${r.projectName}`
         .toLowerCase()
         .includes(term),
     );
-  }, [data, q]);
+  }, [data, q, excludedProjectIds]);
 
-  // 검색어가 바뀌면 결과 집합이 통째로 바뀌므로 1페이지로 되돌린다.
-  useEffect(() => setPage(1), [q]);
+  // 검색어·project 필터가 바뀌면 결과 집합이 통째로 바뀌므로 1페이지로 되돌린다.
+  useEffect(() => setPage(1), [q, excludedProjectIds]);
 
   const pageCount = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
   const safePage = Math.min(page, pageCount);

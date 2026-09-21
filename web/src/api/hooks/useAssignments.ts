@@ -24,15 +24,24 @@ const DEFAULT_PAGE_SIZE = 5;
  * @param size 기본 5(My Assignment의 Inbox/Outbox 패널, 사용자 요청). bell 팝업처럼 더 큰
  *   페이지가 필요한 호출부는 직접 넘긴다 — 페이지 크기가 다르면 다른 조회이므로 쿼리
  *   키에도 함께 담는다(queryKeys.myReleases).
+ * @param projectIds project 필터(legend 체크박스, 사용자 요청) — `undefined`면 필터
+ *   없음(전체), 빈 배열이면 "0개 선택"이라 서버를 부르지 않고 그대로 빈 결과로 둔다.
  */
-export function useMyReleases(direction: 'received' | 'published', page: number, size = DEFAULT_PAGE_SIZE) {
+export function useMyReleases(
+  direction: 'received' | 'published',
+  page: number,
+  size = DEFAULT_PAGE_SIZE,
+  projectIds?: string[],
+) {
+  const noProjectSelected = projectIds !== undefined && projectIds.length === 0;
   return useQuery({
-    queryKey: queryKeys.myReleases(direction, page, size),
+    queryKey: queryKeys.myReleases(direction, page, size, projectIds),
+    enabled: !noProjectSelected,
     // 페이지를 넘길 때 목록이 빈 화면으로 깜빡이지 않게 이전 페이지를 잠깐 유지한다.
     placeholderData: keepPreviousData,
     queryFn: async () => {
       const res = await apiClient.get<PagedDto<MyReleaseRowDto>>(`/my/releases/${direction}`, {
-        params: { page, size },
+        params: { page, size, projectIds: projectIds?.length ? projectIds.join(',') : undefined },
       });
       return res.data;
     },

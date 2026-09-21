@@ -4,11 +4,15 @@ import { useTranslation } from 'react-i18next';
 import { Icon } from '@/components/common/Icon';
 import { Badge } from '@/components/common/SirenButton';
 import { UserAvatar } from '@/components/common/Avatar';
+import { ProjectChip } from '@/components/assignment/ProjectChip';
+import { ProjectFilterLegend } from '@/components/assignment/ProjectFilterLegend';
 import { ReleaseDetailDialog } from '@/components/assignment/ReleaseDetailDialog';
 import { useDirectory } from '@/app/providers/DirectoryProvider';
 import { useMyReceivedFeed } from '@/api/hooks/useAssignments';
+import { useProjects } from '@/api/hooks/useProjects';
 import { useSignalRNotice } from '@/hooks/useSignalRNotice';
 import { getReadReleaseIds, RELEASE_READ_EVENT } from '@/lib/releaseReadTracker';
+import { useProjectFilter } from '@/lib/projectFilter';
 import { fmtAt } from '@/lib/canvasModel';
 import { canonicalDepartmentLabel } from '@/shared/constants/departments';
 import { CURSOR_POINTER, FONT_MONO, T } from '@/theme/tokens';
@@ -21,6 +25,8 @@ const UNREAD_WINDOW_DAYS = 10;
 /** 팝업에 보여줄 최근 release 개수 — My Assignment의 Inbox처럼 페이지를 넘기지 않는다,
  * 알림 팝업은 "최근 몇 개"면 충분하다(사용자 요청: "release 받은 목록"). */
 const FEED_SIZE = 30;
+/** 팝업 상단 project legend겸 필터(사용자 요청) — 다음 접속에도 이어간다. */
+const PROJECT_FILTER_COOKIE = 'siren-notice-bell-project-filter';
 
 /**
  * app bar의 bell — **release 알림 전용**으로 바뀌었다(사용자 요청). 이 프로젝트의
@@ -56,6 +62,11 @@ export function NoticeBell({ clientId }: { clientId: string }) {
   // data가 실제로 바뀔 때만 참조가 바뀌도록 여기서 한 번 고정한다.
   const releases = useMemo(() => data?.items ?? [], [data]);
 
+  // legend겸 filter다(사용자 요청) — 배지 숫자(unreadCount)는 전체 기준을 유지하고,
+  // 필터는 팝업에 "보이는" 목록만 좁힌다.
+  const { data: projects = [] } = useProjects();
+  const { excludedIds: excludedProjectIds, toggle: toggleProjectFilter } = useProjectFilter(PROJECT_FILTER_COOKIE);
+
   // 쿠키는 리액트 상태가 아니라서, 읽음 이벤트가 뜰 때마다(다른 release를 열어 확인
   // 처리될 때) 이 값을 다시 계산해 배지를 즉시 갱신한다.
   const [readVersion, setReadVersion] = useState(0);
@@ -84,6 +95,11 @@ export function NoticeBell({ clientId }: { clientId: string }) {
   const sortedReleases = useMemo(
     () => [...releases].sort((a, b) => Number(unreadIds.has(b.id)) - Number(unreadIds.has(a.id))),
     [releases, unreadIds],
+  );
+
+  const visibleReleases = useMemo(
+    () => sortedReleases.filter((r) => !excludedProjectIds.has(r.projectId)),
+    [sortedReleases, excludedProjectIds],
   );
 
   useSignalRNotice({
@@ -149,6 +165,20 @@ export function NoticeBell({ clientId }: { clientId: string }) {
           <Typography sx={{ fontSize: 11, color: T.dm2 }}>released to me or my departments</Typography>
         </Box>
 
+        {/* legend겸 filter(사용자 요청) — project별 색을 name 기준으로 구분해 보여주고,
+            체크를 끄면 아래 목록에서 그 project가 빠진다. */}
+        {Boolean(projects.length) && (
+          <Box sx={{ px: '16px', py: '10px', borderBottom: `1px solid ${T.ln}` }}>
+            <ProjectFilterLegend
+              projects={projects}
+              excludedIds={excludedProjectIds}
+              onToggle={toggleProjectFilter}
+              direction="horizontal"
+              dense
+            />
+          </Box>
+        )}
+
         {isError ? (
           <Typography sx={{ px: 2, py: 3, fontSize: 12.5, color: T.danger, textAlign: 'center' }}>
             Could not load releases.
@@ -169,9 +199,13 @@ export function NoticeBell({ clientId }: { clientId: string }) {
           <Typography sx={{ px: 2, py: 4, fontSize: 12.5, color: T.dm, textAlign: 'center' }}>
             Nothing has been released to you or your departments yet.
           </Typography>
+        ) : visibleReleases.length === 0 ? (
+          <Typography sx={{ px: 2, py: 4, fontSize: 12.5, color: T.dm, textAlign: 'center' }}>
+            No releases match the selected projects.
+          </Typography>
         ) : (
           <Box sx={{ maxHeight: 480, overflowY: 'auto', p: '8px' }}>
-            {sortedReleases.map((row) => (
+            {visibleReleases.map((row) => (
               <ReleaseFeedRow
                 key={row.id}
                 row={row}
@@ -236,9 +270,10 @@ function ReleaseFeedRow({
       />
       <Box sx={{ minWidth: 0, flex: 1 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', mb: '2px' }}>
-          {/* project name이 가장 중요한 식별 정보다(사용자 확정) — 크고 진하게, 맨 앞. */}
-          <Box sx={{ fontSize: 13, fontWeight: 800, color: T.tx, minWidth: 0, overflowWrap: 'anywhere' }}>
-            {row.projectName}
+          {/* title(workflow명)이 이제 맨 앞이다(사용자 요청) — project명이 있던 자리를
+              대신 차지한다. */}
+          <Box sx={{ fontSize: 13, fontWeight: unread ? 800 : 700, color: T.tx, minWidth: 0, overflowWrap: 'anywhere' }}>
+            {row.workflowAt.name}
           </Box>
           {unread && (
             <Badge color={T.danger} bg={T.dangerSoft} borderColor={T.dangerLine}>{unreadLabel}</Badge>
@@ -246,12 +281,12 @@ function ReleaseFeedRow({
         </Box>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
           <Box sx={{ fontFamily: FONT_MONO, fontSize: 11.5, fontWeight: 700, color: T.pr }}>{row.label}</Box>
+          {/* project명과 department의 자리를 서로 바꿨다(사용자 요청) — project는 chip
+              형태로 department보다 굵게 써서 더 눈에 띄게 한다. */}
+          <ProjectChip projectId={row.projectId} name={row.projectName} size="sm" />
           <Badge color={T.dm} bg={T.sf3} borderColor={T.ln}>
             {canonicalDepartmentLabel(row.workflowAt.department)}
           </Badge>
-          <Box sx={{ fontSize: 12.5, fontWeight: unread ? 700 : 600, minWidth: 0, overflowWrap: 'anywhere' }}>
-            {row.workflowAt.name}
-          </Box>
         </Box>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: '6px', mt: '4px' }}>
           <UserAvatar user={by} size={16} />
