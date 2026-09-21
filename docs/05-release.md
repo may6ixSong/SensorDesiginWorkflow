@@ -23,15 +23,15 @@
 
 ### 2.1 포함
 
-- 캔버스의 블록 중 **artifact가 매핑된 것 전부**(tier A~C 무관).
+- 캔버스의 노드 중 **artifact가 매핑된 것 전부**(tier A~C 무관).
 - **자동으로 전부 포함된다.** 사용자가 개별로 빼거나 넣을 수 없다.
 
 ### 2.2 제외
 
 | 대상 | 이유 |
 |---|---|
-| artifact 미매핑 블록 | 전달할 실체가 없다 |
-| 메모 블록 | 산출물이 아니다 |
+| artifact 미매핑 노드 | 전달할 실체가 없다 |
+| 메모 노드 | 산출물이 아니다 |
 
 ### 2.3 publish되지 않은 산출물
 
@@ -126,7 +126,7 @@ Source 버전을 다시 고르는 것은 **이번 release에서 `changed: true` 
 
 ### 4.6 (폐기) Tier B 자동 view 권한 부여
 
-한때 release 실행 시 그 block의 recipient 부서에 File Artifact(Calypso) view 권한을 자동
+한때 release 실행 시 그 node의 recipient 부서에 File Artifact(Calypso) view 권한을 자동
 upsert하는 규칙이 있었다. **Calypso의 view가 기본적으로 project member 전원에게 열려
 있도록 바뀌면서(`restrictView` 플래그, 04장 §3.1) 더 이상 필요 없어져 폐기했다** — 이제
 recipient 부서는 사실상 항상 이미 view 권한을 갖고 있다. 특정 artifact를 여전히 좁혀야
@@ -149,7 +149,7 @@ release 이후에도 workflow는 계속 바뀌고, 부서도 바뀐다. 그래�
 | `changed` · `firstTime` | 나중에 다시 열어도 highlight를 재현할 수 있다 |
 | phase id · 이름 | 표를 phase 순으로 묶어 보여줄 수 있다 |
 | 날짜 · release note · 실행자 | 기본 이력 |
-| workflow 이름 · 부서 (그 시점) | workflow가 개명·부서 이동해도 기록이 흔들리지 않는다 |
+| workflow 이름 · 부서 (그 시점) | workflow가 개명·부서 이동해도 기록이 흔들리지 않는다 — 부서는 id로 저장하고 지금의 부서명을 실시간으로 찾아 보여주되, 그 부서 자체가 나중에 지워진 경우만을 위해 그 순간의 이름도 `departmentLabel`로 같이 얼려 둔다(02장 §9.4) |
 
 **저장하지 않는 것**: 캔버스 좌표, flow edge, phase 날짜, 메모. 재현 요구가 없다.
 
@@ -173,7 +173,7 @@ CC·DD 부서는 A가 있었다는 사실조차 알림에서 보지 못한다.
 
 ### 6.2 수신자 계산
 
-**A/B/C 전부 공통** — **그 block**의 `recipients`(부서 + 사용자, workflow별로 다를 수
+**A/B/C 전부 공통** — **그 node**의 `recipients`(부서 + 사용자, workflow별로 다를 수
 있다) — 04장 §3 참고. artifact 단위로 따로 두던 옛 모델(D 전용)은 폐기했다.
 
 - 부서 → 실제 사람은 **그 과제 members 중 해당 부서 전원**으로 전개한다.
@@ -215,8 +215,12 @@ export interface NotificationSender {
 ### 7.1 workflow별 목록 · 상세
 
 - **목록**: 그 workflow의 release를 최신순으로. 각 행에 `v{seq}`, 날짜, 실행자, 산출물 수,
-  변경된 산출물 수, note 첫 줄.
+  변경된 산출물 수, note 첫 줄. 맨 위에 **Current**(지금 캔버스 상태의 실시간 미리보기)가
+  Edit Access자에게만 고정으로 붙는다.
 - **상세**: 그 시점의 **표**. 캔버스는 재현하지 않는다.
+- **"새 Node 추가" 버튼은 Current를 보고 있을 때만 노출된다** — 과거 release는 그 시점의
+  스냅샷이라 여기서 새 node를 만드는 게 의미가 없다(사용자 확정). 과거 release를 보는 동안은
+  이 버튼 자체가 렌더되지 않는다.
 
 | 컬럼 | 내용 |
 |---|---|
@@ -229,6 +233,32 @@ export interface NotificationSender {
 
 - 변경된 행은 단일 highlight 색으로 표시한다.
 - 행 클릭 시 그 artifact의 상세 slide가 열린다(권한 판정은 04장 §4).
+
+#### 7.1.1 부서별 status/comment 대시보드 ★신규★
+
+과거 release를 상세에서 열면(=Current가 아니라 특정 `v{seq}`를 골랐을 때), 위 산출물 표
+**위쪽**에 그 release에 대해 부서들이 남긴 status/comment(09장 §4.2~4.3의 `releaseFeedback`)를
+요약하는 패널을 얹는다. Current를 볼 때는 그리지 않는다 — release가 실제로 나간 뒤에야
+받는 쪽이 status/comment를 남기기 시작하기 때문이다.
+
+이 패널은 **workflow Edit Access(=이 release를 낸 쪽)에게만 보인다** — 같은 화면의 Comments
+컬럼(01장 §3.8)과 같은 기준이다. View 권한자에게는 렌더되지 않는다.
+
+| 상황(그 화면의 수신 부서 필터, 캔버스와 공유하는 `recipientFilter`) | 보여주는 것 |
+|---|---|
+| **필터 없음(전체 부서)** | 그 release의 recipient 부서 **전체**를 한 번에 — 부서마다 카드 하나, 최신 top-level status(없으면 `accepted` 기본값) + comment 개수만 요약 |
+| **부서 1개 이상 필터** | 필터된 부서(들)**만** — 09장 §4.3의 status dot + 댓글 스레드 전체(답글 포함), 그 자리에서 **답글도 달 수 있다**(release를 낸 쪽에서 다는 답글) |
+
+- 필터 없는 요약 카드는 새 엔드포인트 `GET /releases/:id/feedback/all`을 쓴다 — 부서별로
+  묶어서 한 번에 돌려준다. 권한은 위와 동일(workflow Edit Access 또는 Admin).
+- 부서로 좁혔을 때는 기존 09장 §4.3의 `GET /releases/:id/feedback?department=`를 그대로 쓴다.
+  다만 그 라우트의 접근 판정이 확장된다(09장 §4.3 갱신) — **그 부서 소속이 아니어도, 이
+  release의 workflow에 Edit Access가 있으면** 읽을 수 있다(기존엔 그 부서 소속이거나 Admin만
+  가능했다). 부서 소속 사용자가 자기 부서 것만 보는 기존 경로(My Assignment의
+  `ReleaseDetailDialog`)는 그대로 유지된다 — 이번 확장은 workflow 쪽에서 남의 부서 스레드를
+  "읽을 수 있는" 새 경로를 **추가**하는 것이지, 기존 부서 전용 격리를 없애는 게 아니다.
+- 이 패널이 09장 §4의 assumption A4("workflow가 여러 부서의 상태를 한눈에 모아보는 화면은
+  아직 없다")를 완성한다 — A4는 이제 해소됨으로 표시한다(09장 §4).
 
 ### 7.2 부서별 필터 뷰
 
@@ -260,7 +290,7 @@ export interface NotificationSender {
 `GET /workflows/:id/release/preview` 는 실제 release와 **같은 로직**으로 항목을 계산해 돌려준다.
 그래야 미리보기와 결과가 어긋나지 않는다.
 
-1. 그 workflow의 블록 중 `artifactId !== null` 인 것을 모은다.
+1. 그 workflow의 노드 중 `artifactId !== null` 인 것을 모은다.
 2. 각 artifact의 **최신 published 버전**을 확인한다.
    - **OA Service/File Artifacts/HPC Service(A/B/C) 전부 SIREN 캐시에서 읽는다** — event +
      야간 재동기화로 채워진 값이다(04장 §7, 07장 §3·§4). release/preview 시점에 그 서비스로

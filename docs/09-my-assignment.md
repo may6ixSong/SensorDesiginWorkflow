@@ -19,9 +19,9 @@ app bar의 `My Assignment`(Project List 왼쪽) → `/my`.
 
 ```
 내가 member인 과제                                   ← Project 계층이 언제나 먼저다(01장 §2.2)
-  ├─ release를 "받았다"   block.recipients가 평탄화된 release.recipientDepartments / recipientUsers
+  ├─ release를 "받았다"   node.recipients가 평탄화된 release.recipientDepartments / recipientUsers
   ├─ release를 "냈다"     release.releasedBy == 나  또는  release.workflowAt.department ∈ 내 부서
-  └─ 산출물을 "관리한다"  workflow.department ∈ 내 부서  AND  block.intent == 'own'  AND  artifactId != null
+  └─ 산출물을 "관리한다"  workflow.department ∈ 내 부서  AND  node.intent == 'own'  AND  artifactId != null
 ```
 
 ### 1.1 산출물 기준이 왜 `workflow.department + intent:'own'`인가
@@ -31,7 +31,7 @@ Tier B(Calypso)만 물어볼 수 있는데, 그 하나 때문에 tier마다 다�
 안에서 A/B/C가 서로 다른 뜻으로 섞인다. 게다가 목록 하나를 그리자고 산출물 수만큼 외부
 호출을 낼 수는 없다.
 
-그래서 **"내 부서 workflow가 주는 산출물로 만든 block에 매핑된 artifact"** 하나를 A/B/C
+그래서 **"내 부서 workflow가 주는 산출물로 만든 node에 매핑된 artifact"** 하나를 A/B/C
 공통 기준으로 삼는다(사용자 확정). 산출물의 실제 편집자가 누구인지가 아니라, **그 산출물을
 내보내기로 되어 있는 자리가 내 부서 workflow 안에 있는가**를 본다.
 
@@ -51,7 +51,7 @@ release가 나갈 당시 내가 그 부서가 아니었어도, **지금 그 부�
 
 ### 1.4 Admin
 
-**모든 엔드포인트에서 필터가 통째로 없다.** 전 과제·전 workflow·전 block이 scope다
+**모든 엔드포인트에서 필터가 통째로 없다.** 전 과제·전 workflow·전 node가 scope다
 (01장 §1, 사용자 요청). 달력의 1개월 범위와 산출물 목록의 1년 창만 Admin에게도 그대로 적용된다 —
 그건 권한이 아니라 화면이 요구하는 범위이기 때문이다.
 
@@ -73,8 +73,8 @@ release가 나갈 당시 내가 그 부서가 아니었어도, **지금 그 부�
 
 ## 3. 내 부서가 주는 산출물 (Overview ③)
 
-- 모든 과제·모든 workflow를 가로질러, §1의 산출물 기준을 통과한 **block**을 나열한다.
-- **행의 정체성은 artifact가 아니라 block이다.** 같은 산출물이 여러 workflow에 놓이면 그만큼
+- 모든 과제·모든 workflow를 가로질러, §1의 산출물 기준을 통과한 **node**를 나열한다.
+- **행의 정체성은 artifact가 아니라 node이다.** 같은 산출물이 여러 workflow에 놓이면 그만큼
   행이 나온다 — 그 자리마다 phase도 recipient 구성도 다르다(01장 §4.4).
 - **최근 1년 안에 움직인 것만** 가져온다(사용자 요청). "움직였다"는
   `artifact.updatedAt`과 **마지막 버전 사건** 중 더 최근 쪽이다 — 버전은 문서 안의 배열에서
@@ -151,10 +151,16 @@ release별". 추후 workflow에서 부서별로 release status를 보기 위함�
   시작해서, 그대로 두고 코멘트만 써도 자연히 "전부 수용"이 된다.
 - `GET/POST /releases/:releaseId/feedback` (department는 쿼리/바디로 필수).
   판정 순서: ① 그 release를 볼 자격(§4.1) → ② 그 department가 실제로 그 release의
-  recipient인가(아니면 400) → ③ actor가 지금 이 과제에서 그 department 소속인가, 또는
-  Admin(아니면 403).
-- **다른 부서에는 이 스레드 자체가 보이지 않는다** — 조회가 항상 department 하나로
-  좁혀지고, 다른 department 파라미터로는 위 ②/③에서 걸러진다. "전체 부서" 조회는 없다.
+  recipient인가(아니면 400) → ③ actor가 지금 이 과제에서 그 department 소속이거나, **그
+  release의 workflow에 Edit Access가 있거나**(★신규, 05장 §7.1.1), Admin(아니면 403).
+- **My Assignment의 이 화면(받는 쪽)에서는 여전히 다른 부서의 스레드가 보이지 않는다** — 위
+  ③의 새 경로(workflow Edit Access)는 **workflow 쪽 화면**(05장 §7.1.1의 대시보드)에서만
+  실제로 쓰인다. My Assignment는 그 release를 "받은" 사용자의 화면이므로 `viewerDepartments`가
+  여전히 자기 소속 부서로만 좁혀져 있고, 이 다이얼로그가 다른 부서 파라미터로 조회를 시도하는
+  경로 자체가 없다 — 판정 규칙이 넓어졌을 뿐 이 화면의 동작은 바뀌지 않는다.
+- **"전체 부서" 조회**는 별도 신규 라우트 `GET /releases/:releaseId/feedback/all`이다(05장
+  §7.1.1) — department 부서별로 묶어 한 번에 돌려주며, workflow Edit Access 또는 Admin만
+  호출할 수 있다.
 
 ---
 
@@ -207,7 +213,7 @@ release별". 추후 workflow에서 부서별로 release status를 보기 위함�
 |---|---|---|
 | `releases` | `{recipientUsers, releasedAt}` · `{releasedBy, releasedAt}` · `{'workflowAt.department', releasedAt}` · `{releasedAt}` | §2, §5 |
 | `artifacts` | `{'versions.publishedAt'}` · `{'versions.observedAt'}` · `{updatedAt}` | §3, §5 |
-| `blocks` | `{workflowId, intent, artifactId}` | §1의 scope 계산 |
+| `nodes` | `{workflowId, intent, artifactId}` | §1의 scope 계산 |
 
 **denormalize한 event 사본을 두지 않은 진짜 이유는 성능이 아니라 정합성이다.** audience는
 살아 움직인다 — 부서 이동, workflow 권한 변경, recipient 수정, 그리고 **같은 artifact가
@@ -224,4 +230,6 @@ release별". 추후 workflow에서 부서별로 release status를 보기 위함�
 | A1 | 산출물 행·달력의 버전 event **클릭 동작**이 없다. 무엇을 열지 정해지지 않았다(사용자: "나중에 구체화") |
 | A2 | workflow의 **owner지만 그 부서 소속은 아닌** 사람은 §1의 산출물 기준에서 빠진다. 기준을 부서로 좁힌 결정(사용자 확정)의 직접적 결과이며, 필요해지면 `wf.ownerKnoxId == 나`를 OR로 더하면 된다 |
 | A3 | 05장 §6.4(T3)의 알림 인프라와 아직 연결돼 있지 않다 — 이 화면은 알림을 **받는 곳**이 아니라 release 기록을 **다시 읽는 곳**이다 |
-| A4 | §4.3의 부서별 상태/코멘트는 지금은 **받는 부서가 남기는 쪽만** 있다. workflow(낸 쪽)이 여러 부서의 상태를 한눈에 모아보는 화면은 아직 없다(사용자: "추후 workflow에서") |
+| ~~A4~~ | **해소됨.** §4.3의 부서별 상태/코멘트는 예전엔 받는 부서가 남기는 쪽만 있었다 — 이제
+workflow(낸 쪽)이 여러 부서의 상태를 한눈에 모아보는 대시보드가 workflow의 list view(release
+상세) 안에 생겼다. 05장 §7.1.1, §4.3(위) 갱신분 참고 |

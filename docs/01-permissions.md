@@ -69,10 +69,18 @@ canAccessProject(user, project) = isAdmin(user) || project.members.some(m => m.k
 `Project.members[].departments` — 즉 **그 과제의 로스터 기준**으로 판정한다. 같은 사람이 과제마다
 다른 부서일 수 있으므로 전사 소속을 쓰지 않는다. **(가정 P2)**
 
+★ **부서는 이름 문자열이 아니라 `Project.departments[].id`를 저장한다**(02장 §1, §9) — 아래
+`myDepartments()`는 project의 전체 부서 목록에서든 그 멤버의 소속에서든 **id 배열**을 돌려준다.
+표시할 때는 그 id를 `Project.departments`에서 찾아 `name`을 보여준다 — KnoxID를 SDPCommonAPI로
+이름 조회하는 것(§6)과 같은 모양의 판단이다: **BE는 id만 들고 있고, 표시용 이름은 조회 시점에
+해석한다.** 차이는 조회 대상이 외부 API가 아니라 이미 FE가 들고 있는 `project.departments` 배열
+하나뿐이라 **네트워크 호출이 전혀 없다**는 점이다(02장 §9).
+
 ```ts
 myDepartments(user, project) =
-  isAdmin(user) ? project.departments            // Admin은 그 과제의 전체 부서
+  isAdmin(user) ? project.departments.map(d => d.id)   // Admin은 그 과제의 전체 부서 id
                 : project.members.find(m => m.knoxId === user.knoxId)?.departments ?? []
+                  // ★ 여기 담긴 것도 이름이 아니라 id 배열이다
 ```
 
 이 값이 쓰이는 곳:
@@ -88,16 +96,21 @@ myDepartments(user, project) =
 
 ```ts
 Workflow {
-  department: string,            // 이 workflow가 소속된 부서 (반드시 1개, 빈 값 불가)
+  department: string,            // ★ Project.departments[].id. 이 workflow가 소속된 부서 (반드시 1개, 빈 값 불가)
   ownerKnoxId: string,           // 정확히 1명
-  editAccess: { departments: string[], users: string[] },
-  viewAccess: { departments: string[], users: string[] },
+  editAccess: { departments: string[], users: string[] },  // departments도 전부 id
+  viewAccess: { departments: string[], users: string[] },  // departments도 전부 id
 }
 ```
 
 - `departments` / `users` 는 **둘 다 다중**이다. 부서를 여러 개 넣을 수 있다.
 - `users` 는 KnoxID 문자열만 담는다. 표시용 이름은 SDPCommonAPI로 조회한다(§6).
 - 예전 `owners: string[]`, `viewGrants: [{knoxId, department}]`, `domain` 은 전부 이 구조로 대체된다.
+- ★ **`departments`에 담기는 값은 부서 이름이 아니라 그 프로젝트의 `Project.departments[].id`다**
+  (02장 §1, §9) — Node의 `recipients.departments`(02장 §4), Calypso artifact의 `department`/
+  `editors[].department`/`viewGrants[].department`(04장 §3.2)도 전부 같은 규칙이다. 이렇게 하면
+  Members 탭에서 부서 이름을 바꿔도(02장 §9) 이 필드들을 하나도 고칠 필요가 없다 — 다음에 읽을 때
+  `Project.departments`에서 그 id의 최신 `name`을 그대로 보여주면 된다.
 
 ### 3.2 판정
 
@@ -209,17 +222,17 @@ SIREN이 artifact 단위로 보관한다"였는데, 여러 workflow가 하나의
 workflow의 수정이 다른 workflow까지 번지는 문제, 그리고 HPC Service는 HPC망 안에서 사실상
 권한 자체가 무의미하다는 점 때문에 **A/B/C(OA Service/File Artifacts/HPC Service) 전부 A의
 방식으로 통일**했다(04장 §3). 이어서 D(External/Attested)의 artifact 단위 SIREN 보관 권한
-(editAccess/viewAccess/expectedGiver)도 완전히 폐기하고 recipient를 block 단위로 통일했다.
+(editAccess/viewAccess/expectedGiver)도 완전히 폐기하고 recipient를 node 단위로 통일했다.
 **마지막으로 D 자체를 폐기했다** — 실제 접근 통제·버전 이력을 가질 근거가 없던 tier를 두는
 대신, File Artifacts(B, Calypso)가 OA-link/HPC-path 참조형 콘텐츠까지 갖도록 넓혀 그 역할을
-대체했다(04장 §2, §6). 그 결과 recipient는 이제 **A/B/C 전부 예외 없이 block 단위**다 —
+대체했다(04장 §2, §6). 그 결과 recipient는 이제 **A/B/C 전부 예외 없이 node 단위**다 —
 artifact는 권한을 전혀 들고 있지 않는다.
 
 | Tier | 실제 Edit/View를 누가 판정하나 | Recipient |
 |---|---|---|
-| **A/B/C** (OA Service/File Artifacts/HPC Service) | **그 서비스**가 관리. SIREN은 관여하지 않는다 | SIREN이 **block(=workflow 안의 자리) 단위로 저장**. 같은 artifact도 workflow마다 recipient 구성이 다를 수 있다 |
+| **A/B/C** (OA Service/File Artifacts/HPC Service) | **그 서비스**가 관리. SIREN은 관여하지 않는다 | SIREN이 **node(=workflow 안의 자리) 단위로 저장**. 같은 artifact도 workflow마다 recipient 구성이 다를 수 있다 |
 
-recipient를 **그 workflow의 block에** 붙이는 이유는, 권한을 그 서비스가 관리하고 SIREN은 알
+recipient를 **그 workflow의 node에** 붙이는 이유는, 권한을 그 서비스가 관리하고 SIREN은 알
 방법이 없기 때문이다 — 같은 artifact라도 workflow X에서는 AA·BB 부서가 받고, workflow Y에서는
 CC 부서만 받는 식으로 **workflow마다 구성이 다를 수 있다.** (recipient의 **역할**은 §4.2에서
 바뀌었다 — 지금은 release 알림 대상 + Recipients/Comments 탭 표시 대상일 뿐, slide 열람 게이트가
@@ -228,7 +241,7 @@ CC 부서만 받는 식으로 **workflow마다 구성이 다를 수 있다.** (r
 ### 4.2 상세 slide 열람 판정
 
 **A/B/C(OA Service/File Artifacts/HPC Service) 전부 그 서비스 자신의 권한 하나로만 정해진다.**
-block.recipients는 여기 관여하지 않는다.
+node.recipients는 여기 관여하지 않는다.
 
 ```ts
 canOpenArtifactSlide(user, artifact, project):
@@ -242,12 +255,12 @@ canOpenArtifactSlide(user, artifact, project):
   return false
 ```
 
-- **이전 버전(v3 초안)은 여기가 2단 게이트였다** — SIREN이 관리하는 block.recipients를 먼저
+- **이전 버전(v3 초안)은 여기가 2단 게이트였다** — SIREN이 관리하는 node.recipients를 먼저
   통과해야 그다음 서비스 권한을 물었다. 그 결과 "같은 부서가 만든 workflow인데, artifact
-  자체는 view 제한이 없는데도, 그 block의 recipient가 다른 부서로 지정돼 있으면 못 여는"
+  자체는 view 제한이 없는데도, 그 node의 recipient가 다른 부서로 지정돼 있으면 못 여는"
   상황이 나왔다(사용자 보고, `api/src/common/actor.spec.ts`/`artifact-access.service.spec.ts`에
   이 시나리오의 회귀 테스트가 있다). recipient 게이트가 있던 이유(같은 artifact도 workflow마다
-  다른 대상에게 보여주고 싶을 수 있다, §4.1)는 여전히 유효하지만, 그 필요를 위해 매 block마다
+  다른 대상에게 보여주고 싶을 수 있다, §4.1)는 여전히 유효하지만, 그 필요를 위해 매 node마다
   recipient를 일일이 채워 넣어야만 열리는 대가가 너무 컸다 — 그래서 **"열람 자체"는 서비스
   권한 하나로 풀고, recipient는 그 위에 얹는 표시/알림 레이어로 좁혔다**(사용자 결정).
 - 열지 못할 때는 "권한 없음"을 명확히 렌더한다. **"아직 publish된 버전이 없음"과 절대 같은 화면을
@@ -262,7 +275,7 @@ canOpenArtifactSlide(user, artifact, project):
 | 부서 | `Project.departments`. **다중** |
 | 개별 사용자 | **전사 검색**. **다중** |
 
-workflow와 동일한 규칙이다(§3.3). A/B/C 전부 block별 `recipients`(부서 다중 + 사용자 다중
+workflow와 동일한 규칙이다(§3.3). A/B/C 전부 node별 `recipients`(부서 다중 + 사용자 다중
 단일 grant) 모양을 따른다.
 
 - recipient 목록을 **편집**하는 권한은 그 workflow의 **Edit Access**다(04장 §3.3) — 지금까지와
@@ -277,7 +290,7 @@ workflow와 동일한 규칙이다(§3.3). A/B/C 전부 block별 `recipients`(�
 
 | Tier | 공유 범위 |
 |---|---|
-| A/B/C의 `recipients` | **block(=그 workflow 안의 자리)에 붙는다.** 같은 artifact가 여러 workflow에 놓이면 각 workflow가 **독립된 recipient 구성**을 갖는다(§4.1). 실제 Edit/View 권한은 SIREN이 아니라 그 서비스가 판정하므로 여기서 "공유"할 것 자체가 없다 |
+| A/B/C의 `recipients` | **node(=그 workflow 안의 자리)에 붙는다.** 같은 artifact가 여러 workflow에 놓이면 각 workflow가 **독립된 recipient 구성**을 갖는다(§4.1). 실제 Edit/View 권한은 SIREN이 아니라 그 서비스가 판정하므로 여기서 "공유"할 것 자체가 없다 |
 
 ---
 
