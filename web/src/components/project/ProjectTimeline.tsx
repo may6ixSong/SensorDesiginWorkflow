@@ -262,14 +262,21 @@ export function ProjectTimeline({
  * workflow 한 줄 — 자기 phase 막대를 날짜축 위에 깔고, 막대 안에 그 phase 산출물의
  * released/in-progress 비율을 얇은 띠로 채운다. 일정을 잃은 산출물은 어느 막대에도
  * 속하지 않으므로 행 오른쪽 끝에 따로 세어서 붙인다.
+ *
+ * ★ 권한이 없는(myAccess === null) workflow도 phase 자체는 서버가 그대로 준다(사용자
+ *   결정, 설계서 01장 §3.7) — "존재를 보여주되 잠근다"를 phase 일정까지 적용한다. 그
+ *   안의 산출물(block)은 여전히 완전히 가려야 하므로 useBlocks 자체를 부르지 않는다 —
+ *   `@WorkflowAccess('view')` 가드가 어차피 403을 줄 호출을 미리 걸러낸다. 행 전체는
+ *   음영 처리하고 클릭을 막는다(canOpen).
  */
 function WorkflowTimelineRow({
   projectId, workflow, geo,
 }: {
   projectId: string; workflow: WorkflowDto; geo: Geometry;
 }) {
-  const { data: blocks } = useBlocks(workflow.id);
-  const deliverables = blocks;
+  const canOpen = workflow.myAccess !== null;
+  const { data: blocks } = useBlocks(workflow.id, canOpen);
+  const deliverables = canOpen ? blocks : undefined;
 
   const byPhase = useMemo(() => {
     const m = new Map<string, BlockDto[]>();
@@ -293,26 +300,41 @@ function WorkflowTimelineRow({
   const height = rows * (BAR_H + BAR_GAP) + ROW_PAD * 2 - BAR_GAP;
 
   return (
-    <Box sx={{ display: 'flex', borderBottom: `1px solid ${T.ln}` }}>
+    <Box
+      sx={{
+        display: 'flex', borderBottom: `1px solid ${T.ln}`,
+        // 권한 없는 workflow는 행 전체를 흐리게 — phase 막대는 그대로 보이되 "잠긴" 상태임을
+        // 한눈에 알 수 있게 한다(사용자 요청).
+        opacity: canOpen ? 1 : 0.5,
+        filter: canOpen ? 'none' : 'grayscale(70%)',
+      }}
+    >
       <Box
-        component={Link}
-        to={`/details/${projectId}/${workflow.id}`}
+        component={canOpen ? Link : 'div'}
+        to={canOpen ? `/details/${projectId}/${workflow.id}` : undefined}
+        title={canOpen ? undefined : 'No access'}
         sx={{
           flex: `0 0 ${LABEL_W}px`, position: 'sticky', left: 0, zIndex: 3, background: T.sf,
           borderRight: `1px solid ${T.ln}`, borderLeft: `3px solid ${workflow.color || T.pr}`,
           padding: '10px 12px', textDecoration: 'none', color: 'inherit',
           display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0,
-          '&:hover': { background: T.sf2 },
+          cursor: canOpen ? 'pointer' : 'not-allowed',
+          ...(canOpen ? { '&:hover': { background: T.sf2 } } : {}),
         }}
       >
-        <Box sx={{ fontSize: 12.5, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {workflow.name}
+        <Box sx={{ fontSize: 12.5, fontWeight: 700, overflow: 'hidden', display: 'flex', alignItems: 'center', gap: '5px' }}>
+          {!canOpen && <Icon name="lock" size={11} />}
+          <Box sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{workflow.name}</Box>
         </Box>
         <Box sx={{ fontSize: 10, color: T.dm2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {phases.length} phase{phases.length === 1 ? '' : 's'}
-          {orphans.length > 0 && (
-            <Box component="span" sx={{ color: T.danger, ml: '6px' }}>· {orphans.length} unscheduled</Box>
-          )}
+          {canOpen ? (
+            <>
+              {phases.length} phase{phases.length === 1 ? '' : 's'}
+              {orphans.length > 0 && (
+                <Box component="span" sx={{ color: T.danger, ml: '6px' }}>· {orphans.length} unscheduled</Box>
+              )}
+            </>
+          ) : 'No access'}
         </Box>
       </Box>
 
@@ -326,16 +348,18 @@ function WorkflowTimelineRow({
             xOf(geo, span.end) + (DAY_MS / (geo.range.endMs - geo.range.startMs)) * geo.trackW - left,
           );
           const pct = (n: number) => (c.total ? (n / c.total) * 100 : 0);
-          const title = items.length
-            ? items
-                .map((d) => {
-                  const label = d.publishState === 'published' ? 'Published'
-                    : d.publishState === 'newlyPublished' ? 'New since last release'
-                    : 'Not published';
-                  return `${d.name} — ${label}`;
-                })
-                .join('\n')
-            : 'No artifacts in this phase';
+          const title = !canOpen
+            ? 'No access'
+            : items.length
+              ? items
+                  .map((d) => {
+                    const label = d.publishState === 'published' ? 'Published'
+                      : d.publishState === 'newlyPublished' ? 'New since last release'
+                      : 'Not published';
+                    return `${d.name} — ${label}`;
+                  })
+                  .join('\n')
+              : 'No artifacts in this phase';
 
           return (
             <Box
