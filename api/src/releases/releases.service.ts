@@ -3,6 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Release, ReleaseDocument, ReleaseItem, ReleasedVersion } from './schemas/release.schema';
 import { Workflow, WorkflowDocument } from '../workflows/schemas/workflow.schema';
+import { Project, ProjectDocument } from '../projects/schemas/project.schema';
 import { WorkflowNodeDocument } from '../nodes/schemas/node.schema';
 import { ArtifactDocument, ArtifactVersion } from '../artifacts/schemas/artifact.schema';
 import { NodesService } from '../nodes/nodes.service';
@@ -64,6 +65,7 @@ export class ReleasesService {
   constructor(
     @InjectModel(Release.name) private readonly model: Model<ReleaseDocument>,
     @InjectModel(Workflow.name) private readonly workflowModel: Model<WorkflowDocument>,
+    @InjectModel(Project.name) private readonly projectModel: Model<ProjectDocument>,
     private readonly nodes: NodesService,
     private readonly artifacts: ArtifactsService,
     private readonly edges: EdgesService,
@@ -299,6 +301,13 @@ export class ReleasesService {
       throw new BadRequestException('There is nothing to release — no node has an artifact mapped.');
     }
 
+    // workflowAt.departmentLabel — 그 순간의 부서 이름을 얼려 둔다(02장 §9.4). id
+    // 자체(workflow.department)는 살아있는 한 항상 Project.departments에서 다시 찾아
+    // 최신 이름을 보여주고, 이 label은 그 부서가 나중에 지워졌을 때만 쓰이는 대체값이다.
+    const project = await this.projectModel.findById(workflow.projectId).exec();
+    const departmentLabel =
+      project?.departments.find((d) => d.id === workflow.department)?.name ?? workflow.department;
+
     const selections = input.sources ?? {};
     const items: ReleaseItem[] = previewItems.map((item) => {
       const picked = selections[item.nodeId] ?? {};
@@ -355,7 +364,7 @@ export class ReleasesService {
         releasedAt: new Date(),
         releasedBy: actor.knoxId,
         note,
-        workflowAt: { name: workflow.name, department: workflow.department },
+        workflowAt: { name: workflow.name, department: workflow.department, departmentLabel },
         items,
         recipientDepartments: [...departments],
         recipientUsers: [...users],

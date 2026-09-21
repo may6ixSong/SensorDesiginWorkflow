@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { Box } from '@mui/material';
-import { NodeDto } from '@/types/domain';
+import { DepartmentDto, NodeDto } from '@/types/domain';
 import { ModalShell } from '@/components/common/ModalShell';
 import { SirenButton } from '@/components/common/SirenButton';
 import { Ey, Field, TextInput } from '@/components/common/Panel';
 import { Icon } from '@/components/common/Icon';
 import { ArtifactSourcePicker, ArtifactSourceState, emptySourceState, resolveNewArtifact } from '@/components/artifact/ArtifactSourcePicker';
 import { NewArtifactSourceInput } from '@/api/hooks/useNodes';
+import { DepartmentDto } from '@/types/domain';
 import { R, T } from '@/theme/tokens';
 
 interface Props {
@@ -15,7 +16,7 @@ interface Props {
   projectCode: string | undefined;
   projectRevision: string | undefined;
   myDepartments: string[];
-  departmentOptions: string[];
+  departmentOptions: DepartmentDto[];
   onClose: () => void;
   onSave: (newArtifact: NewArtifactSourceInput) => void;
   submitting?: boolean;

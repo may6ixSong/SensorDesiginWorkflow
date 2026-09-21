@@ -407,6 +407,7 @@ export function WorkflowPage() {
           {releaseOpen && (
             <ReleaseDialog
               workflowName={workflow.name}
+              projectId={workflow.projectId}
               preview={releasePreview.data ?? null}
               loading={releasePreview.isLoading}
               saving={createRelease.isPending}

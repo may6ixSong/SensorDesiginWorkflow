@@ -11,7 +11,7 @@ import { useProjects } from '@/api/hooks/useProjects';
 import { fmtAt } from '@/lib/canvasModel';
 import { withAlpha } from '@/lib/domainWorkflow';
 import { useProjectFilter } from '@/lib/projectFilter';
-import { canonicalDepartmentLabel } from '@/shared/constants/departments';
+import { useDepartmentLabels } from '@/hooks/useDepartmentLabel';
 import { MyReleaseRowDto, ProjectDto, VersionEventDto } from '@/types/domain';
 import { CURSOR_POINTER, FONT_MONO, T } from '@/theme/tokens';
 
@@ -748,6 +748,7 @@ function DayEventListPanel({
  */
 function ReleaseEventRow({ row, onClick }: { row: MyReleaseRowDto; onClick: () => void }) {
   const color = colorForKnoxId(row.projectId);
+  const { label: deptLabel } = useDepartmentLabels([row.projectId]);
   return (
     <Box
       component="button"
@@ -789,7 +790,7 @@ function ReleaseEventRow({ row, onClick }: { row: MyReleaseRowDto; onClick: () =
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}
       >
-        {canonicalDepartmentLabel(row.workflowAt.department)} · {fmtAt(row.releasedAt)}
+        {deptLabel(row.projectId, row.workflowAt.department)} · {fmtAt(row.releasedAt)}
       </Box>
       <Box
         sx={{

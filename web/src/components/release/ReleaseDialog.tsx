@@ -8,7 +8,7 @@ import { Ey } from '@/components/common/Panel';
 import { Icon } from '@/components/common/Icon';
 import { NetworkTag } from '@/components/artifact/ArtifactChips';
 import { ConfirmDialog } from '@/components/dialogs/ConfirmDialog';
-import { canonicalDepartmentLabel } from '@/shared/constants/departments';
+import { useDepartmentLabel } from '@/hooks/useDepartmentLabel';
 import { CURSOR_POINTER, FONT_MONO, R, T, TNUM } from '@/theme/tokens';
 
 /** nodeId → (sourceNodeId → versionRef | null) */
@@ -16,6 +16,7 @@ type SourceSelection = Record<string, Record<string, string | null>>;
 
 interface Props {
   workflowName: string;
+  projectId: string;
   preview: ReleasePreviewDto | null;
   loading?: boolean;
   saving?: boolean;
@@ -34,8 +35,9 @@ interface Props {
  * ★ release는 **철회할 수 없다** — 그래서 실행 전 반드시 confirm을 거치고, 요청 중에는
  *   버튼을 잠가 중복 클릭을 막는다.
  */
-export function ReleaseDialog({ workflowName, preview, loading, saving, onClose, onRelease }: Props) {
+export function ReleaseDialog({ workflowName, projectId, preview, loading, saving, onClose, onRelease }: Props) {
   const { t } = useTranslation();
+  const { label: deptLabel } = useDepartmentLabel(projectId);
   const [note, setNote] = useState('');
   const [noteErr, setNoteErr] = useState(false);
   const [selection, setSelection] = useState<SourceSelection>({});
@@ -147,7 +149,7 @@ export function ReleaseDialog({ workflowName, preview, loading, saving, onClose,
                     border: `1px solid ${deptTab === d ? T.pr : T.ln2}`,
                   }}
                 >
-                  {canonicalDepartmentLabel(d)}
+                  {deptLabel(d)}
                 </Box>
               ))}
             </Box>
@@ -156,7 +158,7 @@ export function ReleaseDialog({ workflowName, preview, loading, saving, onClose,
           <Box sx={{ maxHeight: 380, overflowY: 'auto', mb: '16px' }}>
             {visibleItems.length === 0 ? (
               <Box sx={{ padding: '20px 4px', textAlign: 'center', color: T.dm2, fontSize: 12.5 }}>
-                Nothing goes to {deptTab ? canonicalDepartmentLabel(deptTab) : 'anyone'} in this release.
+                Nothing goes to {deptTab ? deptLabel(deptTab) : 'anyone'} in this release.
               </Box>
             ) : (
               visibleItems.map((item) => (
@@ -165,6 +167,7 @@ export function ReleaseDialog({ workflowName, preview, loading, saving, onClose,
                   item={item}
                   selection={selection[item.nodeId] ?? {}}
                   onPick={(sourceNodeId, ref) => pick(item.nodeId, sourceNodeId, ref)}
+                  deptLabel={deptLabel}
                 />
               ))
             )}
@@ -220,11 +223,12 @@ export function ReleaseDialog({ workflowName, preview, loading, saving, onClose,
 
 /** 표의 한 줄. 변경된 항목만 배경으로 강조하고 source picker를 띄운다. */
 function ReleaseRow({
-  item, selection, onPick,
+  item, selection, onPick, deptLabel,
 }: {
   item: ReleasePreviewItemDto;
   selection: Record<string, string | null>;
   onPick: (sourceNodeId: string, versionRef: string | null) => void;
+  deptLabel: (deptId: string) => string;
 }) {
   const { t } = useTranslation();
 
@@ -264,7 +268,7 @@ function ReleaseRow({
           <>
             {item.recipients.departments.map((d) => (
               <Box key={d} sx={{ fontSize: 10.5, color: T.dm, background: T.sf3, padding: '2px 7px', borderRadius: `${R.pill}px` }}>
-                {canonicalDepartmentLabel(d)}
+                {deptLabel(d)}
               </Box>
             ))}
             {item.recipients.users.length > 0 && (

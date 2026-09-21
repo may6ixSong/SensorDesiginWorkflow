@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Box, CircularProgress } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
-import { CalypsoArtifact, CalypsoGrant, CalypsoGrantInput, getCalypsoDepartmentRoster } from '@/api/calypsoClient';
+import { CalypsoArtifact, CalypsoDepartment, CalypsoGrant, CalypsoGrantInput, getCalypsoDepartmentRoster } from '@/api/calypsoClient';
 import { queryKeys } from '@/api/queryKeys';
 import { UserSearchDialog } from '@/components/dialogs/UserSearchDialog';
 import { useDirectory } from '@/app/providers/DirectoryProvider';
@@ -9,7 +9,6 @@ import { UserAvatar } from '@/components/common/Avatar';
 import { SirenButton, Badge } from '@/components/common/SirenButton';
 import { Card, Ey } from '@/components/common/Panel';
 import { Icon } from '@/components/common/Icon';
-import { canonicalDepartmentLabel } from '@/shared/constants/departments';
 import { CURSOR_POINTER, T } from '@/theme/tokens';
 
 interface Props {
@@ -133,7 +132,7 @@ function GrantList({
   grants: CalypsoGrant[];
   /** 등록자는 목록에 없어도 항상 이 등급이라 별도 chip으로 보여준다(edit 목록에서만). */
   registrant?: string;
-  deptOptions: string[];
+  deptOptions: CalypsoDepartment[];
   /** 부서 → 그 부서 소속 knoxId 목록 — 펼쳤을 때만 실명 조회에 쓴다. */
   membersByDept: Record<string, string[]>;
   loadingDepts?: boolean;
@@ -151,7 +150,8 @@ function GrantList({
   const [expandedDepts, setExpandedDepts] = useState<Set<string>>(new Set());
 
   const grantedDepts = new Set(grants.filter((g) => g.type === 'department').map((g) => g.department));
-  const pickableDepts = deptOptions.filter((d) => !grantedDepts.has(d));
+  const pickableDepts = deptOptions.filter((d) => !grantedDepts.has(d.id));
+  const deptNameById = new Map(deptOptions.map((d) => [d.id, d.name]));
 
   const toggleExpanded = (d: string) => {
     setExpandedDepts((prev) => {
@@ -191,7 +191,7 @@ function GrantList({
                 <Box sx={{ fontSize: 12 }}>{resolveUser(g.knoxId as string).name}</Box>
               </>
             ) : (
-              <Box sx={{ fontSize: 12 }}>{canonicalDepartmentLabel(g.department as string)} <Box component="span" sx={{ color: T.dm2 }}>(dept)</Box></Box>
+              <Box sx={{ fontSize: 12 }}>{deptNameById.get(g.department as string) ?? g.department} <Box component="span" sx={{ color: T.dm2 }}>(dept)</Box></Box>
             )}
             <SirenButton variant="ghost" onClick={() => onRemove(grantInput(g))} sx={{ minWidth: 0, padding: '2px' }}>
               <Icon name="x" size={11} />
@@ -225,23 +225,23 @@ function GrantList({
       {deptPickerOpen && pickableDepts.length > 0 && (
         <Box sx={{ mt: '8px', border: `1px solid ${T.ln}`, borderRadius: '8px', overflow: 'hidden' }}>
           {pickableDepts.map((d) => {
-            const members = membersByDept[d] ?? [];
-            const expanded = expandedDepts.has(d);
+            const members = membersByDept[d.id] ?? [];
+            const expanded = expandedDepts.has(d.id);
             return (
-              <Box key={d} sx={{ borderBottom: `1px solid ${T.ln}`, '&:last-child': { borderBottom: 'none' } }}>
+              <Box key={d.id} sx={{ borderBottom: `1px solid ${T.ln}`, '&:last-child': { borderBottom: 'none' } }}>
                 <Box
-                  onClick={() => toggleExpanded(d)}
+                  onClick={() => toggleExpanded(d.id)}
                   sx={{
                     display: 'flex', alignItems: 'center', gap: '7px', padding: '7px 9px',
                     cursor: CURSOR_POINTER, background: expanded ? T.sf2 : T.sf, '&:hover': { background: T.sf2 },
                   }}
                 >
                   <Icon name={expanded ? 'up' : 'dn'} size={10} />
-                  <Box sx={{ flex: 1, fontSize: 12, fontWeight: 600 }}>{canonicalDepartmentLabel(d)}</Box>
+                  <Box sx={{ flex: 1, fontSize: 12, fontWeight: 600 }}>{d.name}</Box>
                   <Box sx={{ fontSize: 10, color: T.dm2 }}>{members.length} member{members.length === 1 ? '' : 's'}</Box>
                   <SirenButton
                     variant="ghost"
-                    onClick={(e: React.MouseEvent) => { e.stopPropagation(); onAdd({ type: 'department', department: d }); }}
+                    onClick={(e: React.MouseEvent) => { e.stopPropagation(); onAdd({ type: 'department', department: d.id }); }}
                     sx={{ minWidth: 0, padding: '3px' }}
                     title="Add this department"
                   >

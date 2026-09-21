@@ -6,7 +6,7 @@ import { Pager } from '@/components/common/Pager';
 import { NetworkTag } from '@/components/artifact/ArtifactChips';
 import { useMyArtifacts } from '@/api/hooks/useAssignments';
 import { fmtAt } from '@/lib/canvasModel';
-import { canonicalDepartmentLabel } from '@/shared/constants/departments';
+import { useDepartmentLabels } from '@/hooks/useDepartmentLabel';
 import { MyArtifactRowDto } from '@/types/domain';
 import { FONT_MONO, T } from '@/theme/tokens';
 
@@ -158,6 +158,7 @@ export function MyArtifactsPanel({
  */
 function ArtifactRow({ row }: { row: MyArtifactRowDto }) {
   const latest = row.latestVersion;
+  const { label: deptLabel } = useDepartmentLabels([row.projectId]);
 
   return (
     <Box
@@ -194,7 +195,7 @@ function ArtifactRow({ row }: { row: MyArtifactRowDto }) {
         </Box>
         <Box sx={{ color: T.tx2, fontSize: 11.5, overflowWrap: 'anywhere' }}>{row.workflowName}</Box>
         <Box sx={{ color: T.dm2, fontSize: 10.5 }}>
-          {canonicalDepartmentLabel(row.workflowDepartment)}
+          {deptLabel(row.projectId, row.workflowDepartment)}
         </Box>
       </Box>
 
@@ -221,7 +222,7 @@ function ArtifactRow({ row }: { row: MyArtifactRowDto }) {
       <Box sx={{ minWidth: 0, display: 'flex', gap: '3px', flexWrap: 'wrap', alignItems: 'center' }}>
         {row.recipientDepartments.map((d) => (
           <Badge key={d} color={T.recv} bg={T.recvSoft} borderColor={T.recv}>
-            {canonicalDepartmentLabel(d)}
+            {deptLabel(row.projectId, d)}
           </Badge>
         ))}
         {row.recipientUserCount > 0 && (

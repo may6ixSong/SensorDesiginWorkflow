@@ -97,14 +97,22 @@ export interface ProjectMemberDto {
   addedAt: string;
 }
 
+/** 과제 안에서 자유롭게 추가·개명·삭제되는 부서 하나(설계서 02장 §9). `id`는 불변,
+ *  `name`만 Members 탭에서 바뀐다 — 그래서 workflow/node/Calypso artifact 등은
+ *  전부 이 `id`를 저장하고, 화면은 `useDepartmentLabel()`로 이름을 찾는다. */
+export interface DepartmentDto {
+  id: string;
+  name: string;
+}
+
 export interface ProjectDetailDto extends ProjectDto {
   members: ProjectMemberDto[];
   /**
    * 이 과제가 인정하는 부서 목록. 새 과제는 기본 6개로 시작한다.
    * workflow/artifact의 Edit·View Access에 넣을 수 있는 부서 후보이자,
-   * workflow가 소속될 수 있는 부서 후보다.
+   * workflow가 소속될 수 있는 부서 후보다. ★개명★ 이제 id도 함께 온다(구 string[]).
    */
-  departments: string[];
+  departments: DepartmentDto[];
   /** 마일스톤을 수정할 수 있는 Project Manager. workflow Edit Access와는 별개 role. */
   managers: string[];
 }

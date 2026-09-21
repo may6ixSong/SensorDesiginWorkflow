@@ -14,7 +14,7 @@ import { useSignalRNotice } from '@/hooks/useSignalRNotice';
 import { getReadReleaseIds, RELEASE_READ_EVENT } from '@/lib/releaseReadTracker';
 import { useProjectFilter } from '@/lib/projectFilter';
 import { fmtAt } from '@/lib/canvasModel';
-import { canonicalDepartmentLabel } from '@/shared/constants/departments';
+import { useDepartmentLabels } from '@/hooks/useDepartmentLabel';
 import { CURSOR_POINTER, FONT_MONO, T } from '@/theme/tokens';
 import type { Notice } from '@/types/notice';
 import type { MyReleaseRowDto } from '@/types/domain';
@@ -261,6 +261,7 @@ function ReleaseFeedRow({
   resolveUser: ReturnType<typeof useDirectory>['resolveUser'];
 }) {
   const by = resolveUser(row.releasedBy);
+  const { label: deptLabel } = useDepartmentLabels([row.projectId]);
   return (
     <Box
       component="button"
@@ -296,7 +297,7 @@ function ReleaseFeedRow({
               형태로 department보다 굵게 써서 더 눈에 띄게 한다. */}
           <ProjectChip projectId={row.projectId} name={row.projectName} size="sm" />
           <Badge color={T.dm} bg={T.sf3} borderColor={T.ln}>
-            {canonicalDepartmentLabel(row.workflowAt.department)}
+            {deptLabel(row.projectId, row.workflowAt.department)}
           </Badge>
         </Box>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: '6px', mt: '4px' }}>

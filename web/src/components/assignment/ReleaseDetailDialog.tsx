@@ -12,7 +12,7 @@ import { useDirectory } from '@/app/providers/DirectoryProvider';
 import { useRelease } from '@/api/hooks/useAssignments';
 import { markReleaseRead } from '@/lib/releaseReadTracker';
 import { fmtAt } from '@/lib/canvasModel';
-import { canonicalDepartmentLabel } from '@/shared/constants/departments';
+import { useDepartmentLabel } from '@/hooks/useDepartmentLabel';
 import { MyReleaseRowDto, ReleaseItemDto } from '@/types/domain';
 import { FONT_MONO, T } from '@/theme/tokens';
 
@@ -41,6 +41,7 @@ export function ReleaseDetailDialog({
   const { resolveUser } = useDirectory();
   const { data, isLoading, isError } = useRelease(row.id);
   const releasedBy = resolveUser(row.releasedBy);
+  const { label: deptLabel } = useDepartmentLabel(row.projectId);
 
   // 부서 필터 — "받은 release"에서, 내가 여러 부서에 속해 있을 때 그중 한 부서로
   // artifact 목록을 좁힌다(설계서 09장 §4.1, 사용자 확정). 낸(Outbox) release나 내가
@@ -88,7 +89,7 @@ export function ReleaseDetailDialog({
             </Box>
             <Box sx={{ fontSize: 14, fontWeight: 700 }}>{row.workflowAt.name}</Box>
             <Badge color={T.dm} bg={T.sf3} borderColor={T.ln}>
-              {canonicalDepartmentLabel(row.workflowAt.department)}
+              {deptLabel(row.workflowAt.department)}
             </Badge>
             <DirectionBadges row={row} />
           </Box>
@@ -123,7 +124,7 @@ export function ReleaseDetailDialog({
             <SelectInput
               value={selectedDept}
               onChange={setSelectedDept}
-              options={viewerDepartments.map((d) => ({ value: d, label: canonicalDepartmentLabel(d) }))}
+              options={viewerDepartments.map((d) => ({ value: d, label: deptLabel(d) }))}
             />
           </Box>
         )}
@@ -153,7 +154,7 @@ export function ReleaseDetailDialog({
       ) : (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
           {visibleItems.map((item) => (
-            <ItemCard key={item.nodeId} item={item} />
+            <ItemCard key={item.nodeId} item={item} projectId={row.projectId} />
           ))}
           {!visibleItems.length && (
             <Box sx={{ fontSize: 12, color: T.dm2, padding: '18px 0', textAlign: 'center' }}>
@@ -167,7 +168,7 @@ export function ReleaseDetailDialog({
           release 하나에 그 부서 하나의 스레드가 있다. "받은 release"에서 지금 필터로
           고른 그 부서에 대해서만이다 — 낸(Outbox) release나 필터가 없는 경우는 렌더하지 않는다. */}
       {showDeptFilter && (
-        <ReleaseFeedbackSection releaseId={row.id} department={selectedDept} />
+        <ReleaseFeedbackSection releaseId={row.id} department={selectedDept} projectId={row.projectId} />
       )}
     </ModalShell>
   );
@@ -194,7 +195,8 @@ function DirectionBadges({ row }: { row: MyReleaseRowDto }) {
  *   전자는 "아직 확정된 버전이 없다", 후자는 "있는지 없는지도 알려줄 수 없다"이고,
  *   둘을 같게 그리면 받는 쪽이 사실을 오해한다.
  */
-function ItemCard({ item }: { item: ReleaseItemDto }) {
+function ItemCard({ item, projectId }: { item: ReleaseItemDto; projectId: string }) {
+  const { label: deptLabel } = useDepartmentLabel(projectId);
   return (
     <Box
       sx={{
@@ -273,7 +275,7 @@ function ItemCard({ item }: { item: ReleaseItemDto }) {
         <Box sx={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
           {item.recipients.departments.map((d) => (
             <Badge key={d} color={T.dm} bg={T.sf3} borderColor={T.ln}>
-              {canonicalDepartmentLabel(d)}
+              {deptLabel(d)}
             </Badge>
           ))}
           {item.recipients.users.length > 0 && (

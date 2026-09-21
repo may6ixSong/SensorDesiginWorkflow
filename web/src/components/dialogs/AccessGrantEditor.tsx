@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Box, Menu, MenuItem } from '@mui/material';
 import { useTranslation } from 'react-i18next';
-import { AccessGrant } from '@/types/domain';
+import { AccessGrant, DepartmentDto } from '@/types/domain';
 import { useDirectory } from '@/app/providers/DirectoryProvider';
 import { Icon } from '@/components/common/Icon';
 import { UserAvatar } from '@/components/common/Avatar';
@@ -11,8 +11,8 @@ import { CURSOR_POINTER, R, T } from '@/theme/tokens';
 interface Props {
   value: AccessGrant;
   onChange: (next: AccessGrant) => void;
-  /** 고를 수 있는 부서 — 그 과제에 등록된 부서 목록(Project.departments). */
-  departmentOptions: string[];
+  /** 고를 수 있는 부서 — 그 과제에 등록된 부서 목록(Project.departments, 설계서 02장 §9). */
+  departmentOptions: DepartmentDto[];
   /**
    * 삭제할 수 없는 부서. workflow 소속 부서가 여기 들어온다 — **Admin도 못 지운다**.
    * 교체는 오직 Department 변경으로만 일어난다(설계서 01장 §3.4).
@@ -39,7 +39,8 @@ export function AccessGrantEditor({
   const [deptAnchor, setDeptAnchor] = useState<HTMLElement | null>(null);
   const [userOpen, setUserOpen] = useState(false);
 
-  const addableDepts = departmentOptions.filter((d) => !value.departments.includes(d));
+  const addableDepts = departmentOptions.filter((d) => !value.departments.includes(d.id));
+  const deptName = (id: string) => departmentOptions.find((d) => d.id === id)?.name ?? id;
 
   const removeDept = (d: string) => onChange({ ...value, departments: value.departments.filter((x) => x !== d) });
   const addDept = (d: string) => {
@@ -77,7 +78,7 @@ export function AccessGrantEditor({
               }}
             >
               {pinned && <Icon name="lock" />}
-              {d}
+              {deptName(d)}
               {/* 소속 부서 항목에는 삭제 버튼을 아예 그리지 않는다 — 서버도 거부한다. */}
               {!readOnly && !pinned ? (
                 <Box
@@ -183,8 +184,8 @@ export function AccessGrantEditor({
         anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
       >
         {addableDepts.map((d) => (
-          <MenuItem key={d} onClick={() => addDept(d)} sx={{ fontSize: 13 }}>
-            {d}
+          <MenuItem key={d.id} onClick={() => addDept(d.id)} sx={{ fontSize: 13 }}>
+            {d.name}
           </MenuItem>
         ))}
       </Menu>

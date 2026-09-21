@@ -33,7 +33,11 @@ function makeService(calypsoAccess: { canView: boolean; canEdit: boolean }) {
 }
 
 const artifact = { serviceKey: CALYPSO_SERVICE_KEY, externalArtifactId: 'ext-1' };
-const project = { members: [{ knoxId: 'user.k', departments: ['A'] }], departments: ['A', 'B'] };
+// 부서는 {id, name} 쌍이다(02장 §9) — id로 이름을 그대로 재사용한다.
+const project = {
+  members: [{ knoxId: 'user.k', departments: ['A'] }],
+  departments: [{ id: 'A', name: 'A' }, { id: 'B', name: 'B' }],
+};
 
 describe('ArtifactAccessService.levelFor', () => {
   it('Admin은 서비스 응답과 무관하게 항상 edit', async () => {

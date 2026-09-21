@@ -7,7 +7,7 @@ import { NetworkTag } from '@/components/artifact/ArtifactChips';
 import { Location } from './Location';
 import { useDirectory } from '@/app/providers/DirectoryProvider';
 import { fmtAt } from '@/lib/canvasModel';
-import { canonicalDepartmentLabel } from '@/shared/constants/departments';
+import { useDepartmentLabels } from '@/hooks/useDepartmentLabel';
 import { VersionEventDto } from '@/types/domain';
 import { FONT_MONO, T } from '@/theme/tokens';
 
@@ -22,6 +22,9 @@ import { FONT_MONO, T } from '@/theme/tokens';
 export function VersionEventDialog({ event, onClose }: { event: VersionEventDto; onClose: () => void }) {
   const { resolveUser } = useDirectory();
   const giver = event.giverKnoxId ? resolveUser(event.giverKnoxId) : null;
+  // placements는 전부 같은 project(event.projectId) 소속 workflow다(artifact는 project
+  // 단위로 스코프된다, 04장 §1.1) — 부서 id 해석도 그 project 하나로 충분하다.
+  const { label: deptLabel } = useDepartmentLabels([event.projectId]);
 
   return (
     <ModalShell
@@ -71,7 +74,7 @@ export function VersionEventDialog({ event, onClose }: { event: VersionEventDto;
             {event.placements.map((p) => (
               <Box key={p.nodeId} sx={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 11.5 }}>
                 <Box sx={{ fontWeight: 600 }}>{p.workflowName}</Box>
-                <Box sx={{ fontSize: 10.5, color: T.dm2 }}>{canonicalDepartmentLabel(p.department)}</Box>
+                <Box sx={{ fontSize: 10.5, color: T.dm2 }}>{deptLabel(event.projectId, p.department)}</Box>
               </Box>
             ))}
           </Box>

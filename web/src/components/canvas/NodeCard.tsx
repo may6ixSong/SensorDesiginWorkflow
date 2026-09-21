@@ -3,7 +3,6 @@ import { CanvasNode, stOf } from '@/lib/canvasModel';
 import { WorkflowPhase } from '@/types/domain';
 import { Icon, IconName } from '@/components/common/Icon';
 import { NetworkTag } from '@/components/artifact/ArtifactChips';
-import { canonicalDepartmentLabel } from '@/shared/constants/departments';
 import { CURSOR_POINTER, R, T, TNUM } from '@/theme/tokens';
 
 /**
@@ -43,6 +42,7 @@ interface Props {
   onPointerMove: (e: React.PointerEvent) => void;
   onPointerUp: (e: React.PointerEvent) => void;
   onClick: (e: React.MouseEvent) => void;
+  deptLabel: (deptId: string) => string;
 }
 
 /**
@@ -56,7 +56,7 @@ interface Props {
 export function NodeCard({
   d, phase, orphan = false, edit, canEdit, isSel, onHl, dimLink, hasHl, filteredOut = false,
   onOpen, onPinClick, onGripDown, linkActive, registerRef,
-  onPointerDown, onPointerMove, onPointerUp, onClick,
+  onPointerDown, onPointerMove, onPointerUp, onClick, deptLabel,
 }: Props) {
   const st = stOf(d);
   const compact = d.h < 150;
@@ -247,7 +247,7 @@ export function NodeCard({
                     {/* 저장된 값이 (옛 데이터 등으로) 소문자 id일 수 있다 — 6개 고정
                         부서면 항상 정식 이름으로, 그 외 자유 입력 부서명은 원래 그대로
                         보여준다(사용자 지적: 일부러 소문자로 바꾸면 안 된다). */}
-                    {canonicalDepartmentLabel(dep)}
+                    {deptLabel(dep)}
                   </Box>
                 ))}
                 {d.recipientDepartments.length > 2 && (

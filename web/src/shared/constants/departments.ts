@@ -25,15 +25,8 @@ export function departmentName(id: string | null | undefined): string {
   return DEPARTMENTS.find((d) => d.id === id)?.name ?? '-';
 }
 
-/**
- * recipient 부서 문자열을 정식 표기로 맞춘다 — 데이터가 (대소문자가 섞인) id로
- * 저장돼 있든 이름으로 저장돼 있든, 6개 고정 부서 중 하나로 알아볼 수 있으면 항상 그
- * 정식 이름(`DEPARTMENTS[].name`)으로 보여준다(사용자 지적 — "digital"처럼 소문자로
- * 저장된 옛 데이터가 그대로 소문자로 보이면 안 된다). 그 6개에 없는 project 자유 입력
- * 부서명은 **원래 설정된 문자열 그대로** 둔다 — 대소문자를 일부러 바꾸지 않는다.
- */
-export function canonicalDepartmentLabel(raw: string): string {
-  const key = raw.trim().toLowerCase();
-  const hit = DEPARTMENTS.find((d) => d.id === key || d.name.toLowerCase() === key);
-  return hit?.name ?? raw;
-}
+// ★ 예전에 여기 있던 canonicalDepartmentLabel()은 project별 자유 부서(Project.departments)의
+// 표시 이름을 이 전사 고정 6종에서 찾으려 했다 — 그 프로젝트 부서는 이 목록과 무관한 별개
+// 축이었으므로 애초에 잘못된 조회였다. 이제 project 부서는 `{id, name}`으로 저장되고
+// (설계서 02장 §9), 표시는 `web/src/hooks/useDepartmentLabel.ts`가 그 project의
+// departments 배열에서 직접 id→name을 찾는다 — 이 파일의 몫이 아니다.

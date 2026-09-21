@@ -43,7 +43,9 @@ export interface GrantLike {
 
 export interface ProjectLike {
   members?: { knoxId: string; departments?: string[] }[];
-  departments?: string[];
+  /** 부서는 `{id, name}` 쌍이다(02장 §9) — `members[].departments`는 여전히 그 id의
+   *  string[]이지만, 이 필드 자체는 이제 name 문자열 배열이 아니다. */
+  departments?: { id: string; name?: string }[];
   managers?: string[];
 }
 
@@ -81,7 +83,7 @@ export function canAccessProject(actor: Actor, project: ProjectLike | null | und
  */
 export function myDepartments(actor: Actor, project: ProjectLike | null | undefined): string[] {
   if (!project) return [];
-  if (actor.isAdmin) return [...(project.departments ?? [])];
+  if (actor.isAdmin) return (project.departments ?? []).map((d) => d.id);
   const me = (project.members ?? []).find((m) => m.knoxId === actor.knoxId);
   return [...(me?.departments ?? [])];
 }

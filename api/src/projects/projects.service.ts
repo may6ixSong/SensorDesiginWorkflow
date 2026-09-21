@@ -1,7 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { Project, ProjectDocument } from './schemas/project.schema';
+import { Model, Types } from 'mongoose';
+import { Project, ProjectDocument, Department } from './schemas/project.schema';
 import { WorkflowsService } from '../workflows/workflows.service';
 import { AuditService } from '../audit/audit.service';
 import { Actor } from '../common/actor';
@@ -69,8 +69,9 @@ export class ProjectsService {
     if (!wanted) {
       throw new BadRequestException('Select the department this workflow belongs to.');
     }
-    // 목록에 등록된 표기를 그대로 저장한다 — 사용자가 'analog'로 보내도 'Analog'로.
-    const match = candidates.find((d) => d.trim().toUpperCase() === wanted.toUpperCase());
+    // candidates는 이제 부서 id 배열이다(myDepartments, 02장 §9.2) — 이름 대소문자
+    // 비교가 필요 없다, id는 정확히 일치해야 한다.
+    const match = candidates.find((d) => d === wanted);
     if (!match) {
       throw new BadRequestException(`'${wanted}' is not one of your departments in this project.`);
     }
@@ -78,7 +79,7 @@ export class ProjectsService {
     return this.workflows.create(
       project._id,
       project.milestones ?? [],
-      { ...dto, department: match.trim() },
+      { ...dto, department: match },
       actor,
     );
   }
@@ -117,28 +118,58 @@ export class ProjectsService {
   }
 
   /**
-   * 이 과제의 부서 목록을 통째로 교체한다. "아직 쓰이는 중이면 삭제 거부" 규칙은 두지
-   * 않는다 - 목록에서 부서를 지워도 그 부서를 이미 가진 ProjectMember.departments나
-   * Workflow.domain, 산출물의 sourceDept 문자열은 그대로 남는다(전부 자유 텍스트라 이
-   * 목록과 강결합되지 않는다) - 다음부터 이 목록(멤버 추가, workflow domain 재배정,
-   * "Received from" 후보)에만 안 보이면 된다.
+   * 새 부서를 추가한다 — id는 여기서 새로 발급하고(설계서 02장 §9.1), 그 뒤로는 절대
+   * 바뀌지 않는다. 이름 중복은 막지 않는다(부서 자유 입력, 대소문자도 정규화하지 않는다
+   * — "부서 문자열을 임의로 정규화하지 말 것"은 마이그레이션 프롬프트에도 명시된 원칙과
+   * 같다).
    */
-  async updateDepartments(id: string, input: string[], actor: Actor) {
+  async addDepartment(id: string, name: string, actor: Actor) {
+    const project = await this.assertManageAccess(id, actor);
+    const trimmed = name.trim();
+    if (!trimmed) throw new BadRequestException('Department name is required.');
+
+    project.departments.push({ id: new Types.ObjectId().toString(), name: trimmed } as Department);
+    project.departmentsSeeded = true;
+    await project.save();
+    return this.findDetailOrThrow(id);
+  }
+
+  /**
+   * 부서 이름만 바꾼다 — id는 그대로다(설계서 02장 §9.1). 이 과제의 workflow/node/
+   * Calypso artifact 등 어디에도 이름을 복제해 두지 않으므로(id만 저장) 따로 전파할
+   * 것이 없다 — 다음에 그 id를 조회하는 모든 화면이 이 새 이름을 그대로 보여준다.
+   */
+  async renameDepartment(id: string, deptId: string, name: string, actor: Actor) {
+    const project = await this.assertManageAccess(id, actor);
+    const trimmed = name.trim();
+    if (!trimmed) throw new BadRequestException('Department name is required.');
+
+    const dept = project.departments.find((d) => d.id === deptId);
+    if (!dept) throw new NotFoundException('Department not found in this project.');
+
+    dept.name = trimmed;
+    await project.save();
+    return this.findDetailOrThrow(id);
+  }
+
+  /**
+   * 부서를 목록에서 지운다. "아직 쓰이는 중이면 삭제 거부" 규칙은 그 부서에 지금 소속된
+   * member가 있을 때만 적용한다(기존 FE 가드와 동일 — `DepartmentsDialog.tsx`가 멤버가
+   * 있으면 삭제 버튼 자체를 비활성화한다, 여기서 그 전제를 BE도 다시 확인한다). 그 밖에
+   * 이 id를 참조하고 있을 workflow.department/node.recipients/Calypso artifact 등은
+   * 그대로 남는다(전부 id 참조라 문자열처럼 "그 목록과 강결합"되지 않는다) — 다음부터
+   * 이 id가 이름 후보 목록(멤버 추가, workflow department 재배정, recipient 선택)에만
+   * 안 보이면 된다.
+   */
+  async removeDepartment(id: string, deptId: string, actor: Actor) {
     const project = await this.assertManageAccess(id, actor);
 
-    const next: string[] = [];
-    const seen = new Set<string>();
-    for (const raw of input) {
-      const name = raw.trim();
-      if (!name) continue;
-      const key = name.toUpperCase();
-      if (seen.has(key)) continue;
-      seen.add(key);
-      next.push(name);
+    const stillHasMembers = project.members.some((m) => m.departments.includes(deptId));
+    if (stillHasMembers) {
+      throw new BadRequestException('Remove all members from this department first.');
     }
 
-    project.departments = next;
-    project.departmentsSeeded = true;
+    project.departments = project.departments.filter((d) => d.id !== deptId);
     await project.save();
     return this.findDetailOrThrow(id);
   }
@@ -184,7 +215,9 @@ export class ProjectsService {
    */
   private async ensureDepartments(project: ProjectDocument): Promise<ProjectDocument> {
     if (!project.departmentsSeeded) {
-      project.departments = DEPARTMENTS.map((d) => d.name);
+      project.departments = DEPARTMENTS.map(
+        (d) => ({ id: new Types.ObjectId().toString(), name: d.name }) as Department,
+      );
       project.departmentsSeeded = true;
       await project.save();
     }
@@ -268,7 +301,7 @@ export class ProjectsService {
       code,
       revision,
       name: dto.name.trim(),
-      departments: DEPARTMENTS.map((d) => d.name),
+      departments: DEPARTMENTS.map((d) => ({ id: new Types.ObjectId().toString(), name: d.name })),
       departmentsSeeded: true,
       milestones,
       members: [],
@@ -283,48 +316,49 @@ export class ProjectsService {
 
   /**
    * 과제 팀원 명단(부서별 로스터)에 인원을 추가한다 — Workflow owners/viewGrants(접근 권한)와는
-   * 별개 개념. department는 이 과제의 자유 부서 목록(Project.departments)에 있는 값이어야
-   * 한다 - 전사 고정 6부서(DEPARTMENTS)는 더 이상 이 명단의 검증 기준이 아니다. 이미 다른
-   * 부서에 속한 멤버를 또 다른 부서 카드에서 추가하면 그 부서가 목록에 더해진다(한 멤버가
-   * 여러 부서에 속할 수 있다) — 완전히 새 멤버일 때만 새 로스터 항목을 만든다.
+   * 별개 개념. department는 이 과제의 부서 목록(Project.departments)의 **id**여야 한다
+   * (설계서 02장 §9.2) — 전사 고정 6부서(DEPARTMENTS)는 더 이상 이 명단의 검증 기준이
+   * 아니다. 이미 다른 부서에 속한 멤버를 또 다른 부서 카드에서 추가하면 그 부서가 목록에
+   * 더해진다(한 멤버가 여러 부서에 속할 수 있다) — 완전히 새 멤버일 때만 새 로스터
+   * 항목을 만든다.
    */
   async addMember(id: string, knoxId: string, department: string, actor: Actor) {
     const project = await this.assertManageAccess(id, actor);
 
-    const wanted = department.trim();
-    const match = project.departments.find((d) => d.trim().toUpperCase() === wanted.toUpperCase());
+    const deptId = department.trim();
+    const match = project.departments.find((d) => d.id === deptId);
     if (!match) {
       throw new BadRequestException(`'${department}' is not one of this project's departments.`);
     }
-    const dept = match.trim();
 
     const existing = project.members.find((m) => m.knoxId === knoxId);
     if (existing) {
-      if (!existing.departments.some((d) => d.trim().toUpperCase() === dept.toUpperCase())) {
-        existing.departments.push(dept);
+      if (!existing.departments.includes(deptId)) {
+        existing.departments.push(deptId);
         await project.save();
       }
     } else {
-      project.members.push({ knoxId, departments: [dept], addedAt: new Date() });
+      project.members.push({ knoxId, departments: [deptId], addedAt: new Date() });
       await project.save();
-      await this.audit.log(actor, 'PROJECT_MEMBER_ADD', 'project', project._id, { knoxId, department: dept });
+      await this.audit.log(actor, 'PROJECT_MEMBER_ADD', 'project', project._id, { knoxId, department: deptId });
     }
     return this.findDetailOrThrow(id);
   }
 
-  /** 멤버를 지정한 부서 카드에서 뺀다 — 그 부서가 마지막 소속이었으면 명단에서 완전히 사라진다. */
+  /** 멤버를 지정한 부서 카드에서 뺀다 — 그 부서가 마지막 소속이었으면 명단에서 완전히 사라진다.
+   *  department는 id다(위 addMember와 동일). */
   async removeMember(id: string, knoxId: string, department: string, actor: Actor) {
     const project = await this.assertManageAccess(id, actor);
 
     const member = project.members.find((m) => m.knoxId === knoxId);
     if (member) {
-      const wanted = department.trim().toUpperCase();
-      member.departments = member.departments.filter((d) => d.trim().toUpperCase() !== wanted);
+      const deptId = department.trim();
+      member.departments = member.departments.filter((d) => d !== deptId);
       if (member.departments.length === 0) {
         project.members = project.members.filter((m) => m.knoxId !== knoxId);
       }
       await project.save();
-      await this.audit.log(actor, 'PROJECT_MEMBER_REMOVE', 'project', project._id, { knoxId, department });
+      await this.audit.log(actor, 'PROJECT_MEMBER_REMOVE', 'project', project._id, { knoxId, department: deptId });
     }
     return this.findDetailOrThrow(id);
   }

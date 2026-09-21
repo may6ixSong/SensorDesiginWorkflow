@@ -10,7 +10,7 @@ import { useDirectory } from '@/app/providers/DirectoryProvider';
 import { useComments } from '@/api/hooks/useComments';
 import { useAllReleaseFeedback } from '@/api/hooks/useAssignments';
 import { fmtAt } from '@/lib/canvasModel';
-import { canonicalDepartmentLabel } from '@/shared/constants/departments';
+import { useDepartmentLabel } from '@/hooks/useDepartmentLabel';
 import { NodeDto, NetworkKind, ReleaseDto, ReleaseFeedbackStatus, ReleasePreviewItemDto, WorkflowDto } from '@/types/domain';
 import { CURSOR_POINTER, FONT_MONO, R, T, TNUM } from '@/theme/tokens';
 
@@ -68,6 +68,7 @@ export function ArtifactListView({
   onSelectRelease, onSelectCurrent, onOpenArtifact, onAddArtifact,
 }: Props) {
   const { resolveUser } = useDirectory();
+  const { label: deptLabel } = useDepartmentLabel(workflow.projectId);
   const nodeById = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
   const phaseNameById = useMemo(
     () => new Map(workflow.phases.map((p) => [p.id, p.name])),
@@ -256,8 +257,10 @@ export function ArtifactListView({
             {canEdit && (
               <ReleaseFeedbackDashboard
                 releaseId={selected.id}
+                projectId={workflow.projectId}
                 recipientDepartments={selected.recipientDepartments}
                 recipientFilter={recipientFilter}
+                deptLabel={deptLabel}
               />
             )}
           </>
@@ -265,9 +268,9 @@ export function ArtifactListView({
 
         {(showCurrent || selected) && (
           <>
-            <ArtifactGroup title="Deliverable" rows={ownRows} workflowId={workflowId} canEdit={canEdit} onOpen={onOpenArtifact} />
+            <ArtifactGroup title="Deliverable" rows={ownRows} workflowId={workflowId} canEdit={canEdit} onOpen={onOpenArtifact} deptLabel={deptLabel} />
             <Box sx={{ height: '18px' }} />
-            <ArtifactGroup title="Prerequisite" rows={receivedRows} workflowId={workflowId} canEdit={canEdit} onOpen={onOpenArtifact} />
+            <ArtifactGroup title="Prerequisite" rows={receivedRows} workflowId={workflowId} canEdit={canEdit} onOpen={onOpenArtifact} deptLabel={deptLabel} />
           </>
         )}
       </Box>
@@ -286,11 +289,13 @@ export function ArtifactListView({
  * 컴포넌트를 재사용하므로 여기서 다는 답글도 완전히 동작한다.
  */
 function ReleaseFeedbackDashboard({
-  releaseId, recipientDepartments, recipientFilter,
+  releaseId, projectId, recipientDepartments, recipientFilter, deptLabel,
 }: {
   releaseId: string;
+  projectId: string;
   recipientDepartments: string[];
   recipientFilter: string[];
+  deptLabel: (deptId: string) => string;
 }) {
   if (!recipientDepartments.length) return null;
 
@@ -301,22 +306,29 @@ function ReleaseFeedbackDashboard({
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: '18px', mb: '18px' }}>
         {filtered.map((dept) => (
           <Box key={dept} sx={{ border: `1px solid ${T.ln}`, borderRadius: `${R.sm}px`, padding: '12px 14px', background: T.sf2 }}>
-            <ReleaseFeedbackSection releaseId={releaseId} department={dept} />
+            <ReleaseFeedbackSection releaseId={releaseId} department={dept} projectId={projectId} />
           </Box>
         ))}
       </Box>
     );
   }
 
-  return <ReleaseFeedbackSummary releaseId={releaseId} recipientDepartments={recipientDepartments} />;
+  return (
+    <ReleaseFeedbackSummary
+      releaseId={releaseId}
+      recipientDepartments={recipientDepartments}
+      deptLabel={deptLabel}
+    />
+  );
 }
 
 /** "전체 부서" 요약 — 부서마다 최신 top-level status + 댓글 수만 카드로. */
 function ReleaseFeedbackSummary({
-  releaseId, recipientDepartments,
+  releaseId, recipientDepartments, deptLabel,
 }: {
   releaseId: string;
   recipientDepartments: string[];
+  deptLabel: (deptId: string) => string;
 }) {
   const { data, isLoading } = useAllReleaseFeedback(releaseId, true);
 
@@ -344,7 +356,7 @@ function ReleaseFeedbackSummary({
               >
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
                   <StatusDot status={latestStatus} selected={false} />
-                  <Box sx={{ fontSize: 12.5, fontWeight: 700 }}>{canonicalDepartmentLabel(dept)}</Box>
+                  <Box sx={{ fontSize: 12.5, fontWeight: 700 }}>{deptLabel(dept)}</Box>
                 </Box>
                 <Box sx={{ fontSize: 11, color: T.dm2 }}>
                   {entries.length === 0
@@ -361,13 +373,14 @@ function ReleaseFeedbackSummary({
 }
 
 function ArtifactGroup({
-  title, rows, workflowId, canEdit, onOpen,
+  title, rows, workflowId, canEdit, onOpen, deptLabel,
 }: {
   title: string;
   rows: ListRow[];
   workflowId: string;
   canEdit: boolean;
   onOpen: (nodeId: string, tab?: OpenTab) => void;
+  deptLabel: (deptId: string) => string;
 }) {
   return (
     <Card>
@@ -390,7 +403,7 @@ function ArtifactGroup({
             <Box sx={{ flex: '2 1 0', minWidth: 0 }}>Comments</Box>
           </Box>
           {rows.map((row) => (
-            <ListArtifactRow key={row.nodeId} row={row} workflowId={workflowId} canEdit={canEdit} onOpen={onOpen} />
+            <ListArtifactRow key={row.nodeId} row={row} workflowId={workflowId} canEdit={canEdit} onOpen={onOpen} deptLabel={deptLabel} />
           ))}
         </Box>
       )}
@@ -399,12 +412,13 @@ function ArtifactGroup({
 }
 
 function ListArtifactRow({
-  row, workflowId, canEdit, onOpen,
+  row, workflowId, canEdit, onOpen, deptLabel,
 }: {
   row: ListRow;
   workflowId: string;
   canEdit: boolean;
   onOpen: (nodeId: string, tab?: OpenTab) => void;
+  deptLabel: (deptId: string) => string;
 }) {
   return (
     <Box
@@ -457,7 +471,7 @@ function ListArtifactRow({
               maxWidth: 90,
             }}
           >
-            {canonicalDepartmentLabel(d)}
+            {deptLabel(d)}
           </Box>
         ))}
         {row.recipientDepartments.length > 2 && (

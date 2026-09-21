@@ -185,8 +185,16 @@ export async function removeCalypsoViewGrant(id: string, projectId: string, gran
   return data.data;
 }
 
+/** SIREN 과제의 부서 하나 — `id`가 grant/필터에 쓰는 값이고, `name`은 그 순간의
+ *  표시 이름이다(설계서 02장 §9). SIREN을 거쳐 오므로 이름은 항상 최신이다. */
+export interface CalypsoDepartment {
+  id: string;
+  name: string;
+}
+
 export interface CalypsoDepartmentRoster {
-  departments: string[];
+  departments: CalypsoDepartment[];
+  /** departments는 각 멤버가 속한 부서 **id** 목록이다. */
   members: { knoxId: string; departments: string[] }[];
 }
 

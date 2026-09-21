@@ -1,14 +1,9 @@
-import { ArrayMaxSize, IsArray, IsString, MaxLength } from 'class-validator';
+import { IsString, MaxLength, MinLength } from 'class-validator';
 
-/**
- * 목록 전체 교체 방식(PUT 의미) - update-workflow-domains.dto.ts와 같은 패턴이다.
- * 빈 배열도 허용한다(부서를 전부 지우는 것도 사용자가 선택할 수 있다).
- * 공백 제거·중복 제거는 ProjectsService.updateDepartments가 한다.
- */
-export class UpdateProjectDepartmentsDto {
-  @IsArray()
-  @ArrayMaxSize(40)
-  @IsString({ each: true })
-  @MaxLength(40, { each: true })
-  departments: string[];
+/** 부서 추가/개명 — 이름 하나만 받는다. id는 서버가 발급/식별한다(설계서 02장 §9.1). */
+export class UpsertProjectDepartmentDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(40)
+  name: string;
 }

@@ -4,8 +4,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useArtifactCandidates, useArtifactServices } from '@/api/hooks/useHub';
 import { CalypsoArtifact, createCalypsoArtifact, listCalypsoArtifacts } from '@/api/calypsoClient';
 import { queryKeys } from '@/api/queryKeys';
-import { ArtifactIntent } from '@/types/domain';
-import { departmentName } from '@/shared/constants/departments';
+import { ArtifactIntent, DepartmentDto } from '@/types/domain';
+import { useDepartmentLabel } from '@/hooks/useDepartmentLabel';
 import { Field, SelectInput, TextInput } from '@/components/common/Panel';
 import { SirenButton } from '@/components/common/SirenButton';
 import { Icon } from '@/components/common/Icon';
@@ -34,7 +34,7 @@ interface Props {
   projectId: string | undefined;
   intent: ArtifactIntent;
   myDepartments: string[];
-  departmentOptions: string[];
+  departmentOptions: DepartmentDto[];
   state: ArtifactSourceState;
   onChange: (next: ArtifactSourceState) => void;
   /** 후보를 고르면 이름 필드가 비어 있을 때만 자동으로 채워 준다. */
@@ -169,6 +169,10 @@ export function ArtifactSourcePicker({
   state, onChange, onSelectName,
 }: Props) {
   const qc = useQueryClient();
+  // Calypso artifact의 department 표시는 전사 고정 6종이 아니라 이 artifact가 속한
+  // SIREN project의 부서 목록에서 찾아야 한다(설계서 02장 §9.5 — 이전엔 잘못된 테이블을
+  // 봤던 기존 버그를 여기서 함께 고친다).
+  const { label: deptLabel } = useDepartmentLabel(projectId);
   const [query, setQuery] = useState('');
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState('');
@@ -237,7 +241,7 @@ export function ArtifactSourcePicker({
   };
 
   const needsDeptPicker = myDepartments.length !== 1;
-  const fallbackDept = departmentOptions[0] ?? myDepartments[0] ?? '';
+  const fallbackDept = departmentOptions[0]?.id ?? myDepartments[0] ?? '';
   const effectiveDept = needsDeptPicker ? (newDept || fallbackDept) : myDepartments[0];
 
   const pickLive = (serviceKey: string, source: 'live' | 'hpc', id: string, name: string) => {
@@ -288,7 +292,7 @@ export function ArtifactSourcePicker({
               <SelectInput
                 value={effectiveDept}
                 onChange={setNewDept}
-                options={departmentOptions.map((d) => ({ value: d, label: departmentName(d) }))}
+                options={departmentOptions.map((d) => ({ value: d.id, label: d.name }))}
               />
             )}
             <Box>
@@ -380,7 +384,7 @@ export function ArtifactSourcePicker({
                   {a.name}
                 </Box>
                 <Box sx={{ fontFamily: FONT_MONO, fontSize: 10, color: T.dm2, mt: '2px' }}>
-                  {departmentName(a.department)}
+                  {deptLabel(a.department)}
                   {!pickable ? ' · view only — needs edit access to give this' : ''}
                 </Box>
               </Box>

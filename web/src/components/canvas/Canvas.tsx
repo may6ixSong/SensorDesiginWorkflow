@@ -13,6 +13,7 @@ import {
   CANVAS_TAIL, CH, MAXH, MAXW, MINH, MINW, PAD, ZOOM_DEFAULT_FLOOR, ZOOM_MAX, ZOOM_MIN, ZOOM_STEP, snp,
 } from '@/lib/constants';
 import { DEFAULT_MEMO_COLOR } from '@/lib/memoColors';
+import { useDepartmentLabel } from '@/hooks/useDepartmentLabel';
 import { FONT_MONO, T } from '@/theme/tokens';
 import { Icon } from '@/components/common/Icon';
 import { ConfirmDialog } from '@/components/dialogs/ConfirmDialog';
@@ -55,6 +56,7 @@ export function Canvas({
   workflow, phases, canEdit, recipientFilter, onSaveLayout, onCancelEdit,
 }: Props) {
   const { t } = useTranslation();
+  const { label: deptLabel } = useDepartmentLabel(workflow.projectId);
   /**
    * 수신 부서 필터 — 걸린 노드는 흐려질 뿐 사라지지 않는다. 필터가 비어 있으면 아무것도
    * 흐리게 하지 않는다(설계서 03장 §6.1).
@@ -698,6 +700,7 @@ export function Canvas({
               onPointerMove={onBlockPointerMove(d.id)}
               onPointerUp={onBlockPointerUp(d.id)}
               onClick={onNodeClick(d.id)}
+              deptLabel={deptLabel}
             />
           ))}
         </Box>

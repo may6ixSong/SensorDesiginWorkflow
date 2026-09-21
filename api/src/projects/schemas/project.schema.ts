@@ -33,19 +33,36 @@ export class Milestone {
 export const MilestoneSchema = SchemaFactory.createForClass(Milestone);
 
 /**
+ * 과제 안에서 자유롭게 추가·개명·삭제되는 부서 하나(설계서 02장 §9). `id`는 발급된 뒤
+ * 절대 바뀌지 않는다 — Workflow.department, Node.recipients.departments, Calypso
+ * artifact의 department/editors/viewGrants 등 이 과제 범위의 모든 부서 참조 필드가
+ * 이름이 아니라 이 `id`를 저장한다. `name`만 Members 탭에서 언제든 바꿀 수 있고,
+ * id가 그대로이므로 그 순간 모든 참조가 새 이름으로 다시 보인다(별도 전파 불필요).
+ */
+@Schema({ _id: false })
+export class Department {
+  @Prop({ required: true })
+  id: string;
+
+  @Prop({ required: true, trim: true })
+  name: string;
+}
+export const DepartmentSchema = SchemaFactory.createForClass(Department);
+
+/**
  * 과제(Project) 단위 부서별 팀원 로스터 — workflow의 owners/viewGrants(접근 권한)와는
  * 별개 개념이다. 이 프로젝트에 실제로 참여하는 인원을 부서별로 보여주기 위한
- * 정보성 명단이며, departments는 부여 시점에 자유 입력(사용자의 실제 소속과
- * 다를 수 있음 — ViewGrant.department와 동일한 패턴). 한 멤버가 여러 부서(팀)에
- * 동시에 속할 수 있어 배열이다.
+ * 정보성 명단이다. 한 멤버가 여러 부서(팀)에 동시에 속할 수 있어 배열이다.
  *
- * 사용자는 KnoxID 문자열로만 참조한다 (api에는 users 컬렉션이 없다).
+ * 사용자는 KnoxID 문자열로만 참조한다 (api에는 users 컬렉션이 없다). `departments`는
+ * `Project.departments[].id` 배열이다(설계서 02장 §9.2) — 이름 문자열이 아니다.
  */
 @Schema({ _id: false })
 export class ProjectMember {
   @Prop({ required: true, trim: true })
   knoxId: string;
 
+  /** `Project.departments[].id` 배열. */
   @Prop({ type: [String], default: [] })
   departments: string[];
 
@@ -81,19 +98,24 @@ export class Project {
   /**
    * 이 과제가 인정하는 부서(팀) 목록 — 전사 고정 DEPARTMENTS(analog 등 6종,
    * common/constants/departments.ts)와는 별개 축이며, 프로젝트마다 자유롭게
-   * 추가/삭제한다(PATCH /projects/:id/departments). 세 가지 용도로 쓰인다:
-   *  1) workflow / artifact 의 Edit·View Access 에 넣을 수 있는 부서 후보
+   * 추가/개명/삭제한다(`POST`/`PATCH`/`DELETE /projects/:id/departments`, 02장 §9.1).
+   * 세 가지 용도로 쓰인다:
+   *  1) workflow / node 의 Edit·View Access·recipients 에 넣을 수 있는 부서 후보
    *     (설계서 01장 §3.3, §4.3 — 부서는 어디서나 다중 선택이다)
    *  2) 프로젝트 멤버(ProjectMember.departments)가 속할 수 있는 부서 후보
    *  3) workflow 가 소속되는 부서(Workflow.department)의 후보. 예전의 "설계 도메인"
    *     시스템은 완전히 폐지되었고, 이 필드가 그 자리를 대신한다.
    *
+   * ★개명★ 부서 하나하나는 이제 `{id, name}` 쌍이다(구 `string[]`, 02장 §9) — 위 세 용도
+   * 전부 이제 `id`를 저장하고, 화면은 그 id를 이 배열에서 찾아 `name`을 보여준다.
+   *
    * 신규 과제는 늘 이 6개로 시작한다: Analog · Digital · APS · PI/PD · Solution · PTE.
    * 이 필드가 없는(과거) 과제 문서는 ProjectsService.ensureDepartments가 처음 조회되는
-   * 시점에 이 기본값으로 채워 저장한다 - 별도 마이그레이션 스크립트를 두지 않는다.
+   * 시점에 이 기본값으로(각각 새 id를 발급해) 채워 저장한다 - 별도 마이그레이션
+   * 스크립트를 두지 않는다.
    */
-  @Prop({ type: [String], default: [] })
-  departments: string[];
+  @Prop({ type: [DepartmentSchema], default: [] })
+  departments: Department[];
 
   /**
    * 내부 마이그레이션 플래그 — departments를 한 번이라도 기본값으로 채운 적이 있는지.

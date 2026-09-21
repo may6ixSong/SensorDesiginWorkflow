@@ -419,6 +419,7 @@ export class AssignmentsService {
       workflowAt: {
         name: release.workflowAt?.name ?? '',
         department: release.workflowAt?.department ?? '',
+        departmentLabel: release.workflowAt?.departmentLabel ?? '',
       },
       itemCount: (release.items ?? []).length,
       changedCount: (release.items ?? []).filter((i) => i.changed).length,

@@ -9,7 +9,7 @@ import { Ey, Field, TextInput } from '@/components/common/Panel';
 import { Icon } from '@/components/common/Icon';
 import { ArtifactSourcePicker, ArtifactSourceState, emptySourceState, resolveNewArtifact } from '@/components/artifact/ArtifactSourcePicker';
 import { NewArtifactSourceInput } from '@/api/hooks/useNodes';
-import { ArtifactIntent } from '@/types/domain';
+import { ArtifactIntent, DepartmentDto } from '@/types/domain';
 import { CURSOR_POINTER, FONT_MONO, R, T } from '@/theme/tokens';
 
 interface Props {
@@ -20,7 +20,7 @@ interface Props {
   projectRevision: string | undefined;
   phases: WorkflowPhase[];
   myDepartments: string[];
-  departmentOptions: string[];
+  departmentOptions: DepartmentDto[];
   onClose: () => void;
   onCreate: (p: {
     name: string;

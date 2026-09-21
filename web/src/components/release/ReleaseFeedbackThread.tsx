@@ -6,7 +6,7 @@ import { UserAvatar } from '@/components/common/Avatar';
 import { useDirectory } from '@/app/providers/DirectoryProvider';
 import { useCreateReleaseFeedback, useReleaseFeedback } from '@/api/hooks/useAssignments';
 import { fmtAt } from '@/lib/canvasModel';
-import { canonicalDepartmentLabel } from '@/shared/constants/departments';
+import { useDepartmentLabel } from '@/hooks/useDepartmentLabel';
 import { ReleaseFeedbackDto, ReleaseFeedbackStatus } from '@/types/domain';
 import { T } from '@/theme/tokens';
 
@@ -137,16 +137,19 @@ export function FeedbackThread({
  *   매 posting을 다시 검증하므로 이 플래그는 순수 UX 편의일 뿐이다.
  */
 export function ReleaseFeedbackSection({
-  releaseId, department, title, readOnly = false,
+  releaseId, department, projectId, title, readOnly = false,
 }: {
   releaseId: string;
   department: string;
+  /** 부서 id → 이름 해석용(설계서 02장 §9.3). */
+  projectId: string;
   /** 헤더 문구 — 기본은 "{부서명} status & comments". 대시보드에서는 부서 카드 헤더를
    *  이미 그리므로 빈 문자열로 넘겨 생략할 수 있다. */
   title?: string;
   readOnly?: boolean;
 }) {
   const { resolveUser } = useDirectory();
+  const { label: deptLabel } = useDepartmentLabel(projectId);
   const { data, isLoading } = useReleaseFeedback(releaseId, department);
   const createFeedback = useCreateReleaseFeedback(releaseId);
 
@@ -189,7 +192,7 @@ export function ReleaseFeedbackSection({
     <Box>
       {title !== '' && (
         <Ey sx={{ mb: '7px' }}>
-          {title ?? `${canonicalDepartmentLabel(department)} status & comments`}
+          {title ?? `${deptLabel(department)} status & comments`}
         </Ey>
       )}
 

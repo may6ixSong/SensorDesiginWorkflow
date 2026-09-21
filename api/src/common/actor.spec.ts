@@ -33,12 +33,18 @@ const ADMIN = { [KNOX_ID_HEADER]: 'admin.kim', [USER_GROUP_HEADER]: 'Admin' };
 /** 그 과제의 member도 아니고 아무 권한도 없는 사람. */
 const OUTSIDER = 'nobody.lee';
 
+// 부서는 {id, name} 쌍이다(02장 §9) — 이 테스트에서는 id로 이름을 그대로 재사용해
+// 판정 로직(전부 id 기준)을 그대로 검증한다.
 const project = {
   members: [
     { knoxId: 'member.park', departments: ['Design'] },
     { knoxId: 'admin.kim', departments: ['Design'] },
   ],
-  departments: ['Design', 'Layout', 'Verification'],
+  departments: [
+    { id: 'Design', name: 'Design' },
+    { id: 'Layout', name: 'Layout' },
+    { id: 'Verification', name: 'Verification' },
+  ],
   managers: ['member.park'],
 };
 
