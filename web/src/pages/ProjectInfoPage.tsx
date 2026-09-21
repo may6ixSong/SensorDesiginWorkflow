@@ -60,8 +60,9 @@ function MilestonesSection({
   const [createOpen, setCreateOpen] = useState(false);
   const [createErr, setCreateErr] = useState<string | null>(null);
   /**
-   * My Task 필터 (Hub 설계서 §14.3). 기본은 꺼짐(전체 보기) — 처음 들어와서 자기 것이
-   * 하나도 없어 빈 화면을 보는 것보다, 켜고 끄는 토글이 눈에 띄는 편이 낫다.
+   * My Workflow 필터(설계서 01장 §3.7) — 내가 edit 또는 view 권한을 가진 workflow만
+   * 남긴다. 기본은 꺼짐(전체 보기) — 처음 들어와서 자기 것이 하나도 없어 빈 화면을 보는
+   * 것보다, 켜고 끄는 토글이 눈에 띄는 편이 낫다.
    */
   const [mineOnly, setMineOnly] = useState(false);
   const canEditSchedule = canEditMilestones({ managers }, isAdmin, user?.KnoxID);
@@ -102,7 +103,6 @@ function MilestonesSection({
         milestones={milestones}
         workflows={workflows}
         mineOnly={mineOnly}
-        myKnoxId={user?.KnoxID}
       />
 
       {createOpen && (
