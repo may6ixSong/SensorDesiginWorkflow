@@ -150,8 +150,9 @@ export class ReleasesController {
 
   /**
    * 이 사람이 지금 열람 권한을 가진 artifact id 집합.
-   * A Tier는 그 산출물이 놓인 block의 recipient + 그 서비스 권한을 함께 봐야 하므로
-   * block을 같이 넘긴다(설계서 04장 §4.1).
+   * 판정 자체(ArtifactAccessService.levelFor)는 그 서비스의 canView/canEdit 하나로만
+   * 정해진다(설계서 01장 §4.2 갱신) — block은 원본 artifact 문서가 지워졌을 때 지금
+   * 매핑된 artifact로 대신 판정하기 위한 대체 경로로만 쓰인다(바로 아래).
    *
    * ★ Admin은 artifact/block 조회와 무관하게 항상 통과한다(설계서 01장 §2.1 "Admin은
    *   전 계층 무조건 통과") — 이전엔 이 판정 전에 artifact 조회부터 실패하면(다음 항목
@@ -180,7 +181,7 @@ export class ReleasesController {
 
         const [artifact, block] = await Promise.all([
           this.artifacts.findOrThrow(item.artifactId).catch(() => null),
-          // 블록이 그새 지워졌을 수 있다 — 그러면 A Tier는 recipient를 물어볼 곳이 없어 막힌다.
+          // 블록이 그새 지워졌을 수 있다 — 그러면 대체 경로(아래)로 물어볼 artifact도 없다.
           this.blocks.findOrThrow(item.blockId).catch(() => null),
         ]);
 
@@ -188,7 +189,7 @@ export class ReleasesController {
           ?? (block?.artifactId ? await this.artifacts.findOrThrow(block.artifactId.toString()).catch(() => null) : null);
         if (!liveArtifact) return;
 
-        const level = await this.artifactAccess.levelFor(me, liveArtifact, block, project);
+        const level = await this.artifactAccess.levelFor(me, liveArtifact, project);
         if (level !== null) visible.add(item.artifactId);
       }),
     );

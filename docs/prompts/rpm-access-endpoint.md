@@ -160,21 +160,22 @@ async access(@Param('id') id: string, @Query('knoxId') knoxId: string) {
 
 ---
 
-## 부록 — SIREN 쪽 2단 게이트 (이 서비스가 구현할 것은 없음)
+## 부록 — SIREN 쪽 열람 판정 (이 서비스가 구현할 것은 없음)
 
-혼동을 막기 위해 적어 둔다. SIREN 화면에서 A Tier 산출물 상세를 열려면 둘 다 통과해야 한다.
+혼동을 막기 위해 적어 둔다.
+
+> ★ **업데이트(이후 정책 변경)** — 이 문서를 처음 보낼 당시엔 SIREN이 recipient를 먼저 확인하는
+> 2단계 게이트였다. 그 규칙은 이후 폐지됐다 — 지금은 아래처럼 이 서비스의 access 응답 하나로만
+> 열람 여부가 정해진다. 최신 규칙은 SIREN 저장소의 `docs/01-permissions.md` §4.2를 참고한다.
 
 ```
-1단계 (SIREN)    이 workflow의 block에 등록된 recipient(부서 또는 개인)에 속하는가?
-                   아니다 → 여기서 막힌다. 이 서비스에 물어보지도 않는다.
-                   (workflow의 Edit 권한자여도, 산출물을 준 본인이어도 recipient가 아니면 막힌다.)
-
-2단계 (이 서비스) 위 access 응답의 canView 가 true 인가?
-                   아니다 → 막힌다 (실패·타임아웃도 여기 포함 — fail-closed)
-                   맞다  → 열린다. canEdit 여부로 작업중 버전까지 보이는지가 갈린다.
+이 서비스의 access 응답의 canView 가 true 인가?
+  아니다 → 막힌다 (실패·타임아웃도 여기 포함 — fail-closed)
+  맞다  → 열린다. canEdit 여부로 작업중 버전까지 보이는지가 갈린다.
 ```
 
-recipient는 **workflow마다 독립**이다 — 같은 산출물이라도 workflow X에서는 AA 부서가,
-workflow Y에서는 BB 부서가 recipient일 수 있다. 그래서 SIREN은 이 목록을 산출물이 아니라
-캔버스 블록에 붙여 둔다. 이 서비스가 알아야 할 것은 아니지만, "SIREN에서는 왜 안 보이지"라는
-문의가 들어왔을 때의 1차 원인이 대개 여기다.
+SIREN은 이 workflow의 block에 recipient(부서 또는 개인)도 별도로 저장하지만, 이제는 release
+알림 대상과 SIREN 화면의 Recipients/Comments 탭 표시 대상으로만 쓰인다 — **위 열람 판정에는
+관여하지 않는다.** 그래서 "이 서비스에서는 view가 되는데 SIREN에서는 안 보인다"는 문의가 오면,
+원인은 이제 recipient가 아니라 이 access 응답(또는 project/workflow 자체의 접근 권한) 쪽에서
+찾아야 한다.

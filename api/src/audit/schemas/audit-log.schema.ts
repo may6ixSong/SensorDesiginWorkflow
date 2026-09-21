@@ -35,7 +35,8 @@ export const AUDIT_ACTIONS = [
   /** 부서 변경은 editAccess 교체를 동반하므로 사실상 권한 이양이다. */
   'WORKFLOW_DEPARTMENT_CHANGE',
   'ARTIFACT_ACCESS_REPLACE',
-  /** A Tier의 recipient — 알림 대상이자 slide 열람 게이트라 권한 변경으로 취급한다. */
+  /** A/B/C 공통 block.recipients — release 알림 대상이자 Recipients/Comments 탭 표시
+   * 대상이라 권한 변경과 같은 무게로 남긴다(slide 열람 자체는 더 이상 좌우하지 않는다). */
   'BLOCK_RECIPIENTS_REPLACE',
   /**
    * 블록이 가리키는 artifact가 바뀌었다. 단순 이름 변경이 아니라 **무엇이 누구에게

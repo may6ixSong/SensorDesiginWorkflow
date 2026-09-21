@@ -290,7 +290,9 @@ const MOCK_BLOCKS: MockBlock[] = [
   { key: 'k03', workflow: 'wf1', phase: 'ph_pll_ml3', row: 0, artifact: 'b_pll_pex', name: 'PLL Netlist / PEX',
     recipients: { departments: ['Digital', 'PTE'] } },
   { key: 'k04', workflow: 'wf1', phase: 'ph_pll_ml4', row: 0, artifact: 'a_pll_post', name: 'PLL Post-layout Simulation',
-    // 일부러 recipient를 비워 둔다 — 게이트 1에서 막히는 상황을 화면에서 확인할 수 있다.
+    // 일부러 recipient를 비워 둔다 — recipient가 없어도(slide는 서비스 권한만으로 열린다,
+    // 설계서 01장 §4.2) Recipients/Comments 탭은 workflow Edit Access가 있으면 여전히 보이고,
+    // 그 탭 안의 목록이 빈 상태를 화면에서 확인할 수 있다.
     recipients: {} },
   { key: 'k05', workflow: 'wf1', phase: 'ph_pll_mdr', row: 0, name: 'Design Review Package',
     series: 'k05', seriesIdx: 1, seriesTotal: 2 },

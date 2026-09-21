@@ -25,7 +25,12 @@ export interface BlockDto {
   /** 열람 권한이 없으면 masked 형태로만 온다. 미매핑이면 null. */
   artifact: ArtifactDto | MaskedArtifactDto | null;
   publishState: PublishState;
-  /** artifact가 매핑된 block에서만 값이 있다 — A/B/C 전부 공통이다(설계서 04장 §3). */
+  /**
+   * artifact가 매핑된 block에서만 값이 있을 **수** 있다 — A/B/C 전부 공통이다(설계서 04장
+   * §3). 그마저도 **이 workflow의 Edit Access가 있는 사람에게만** 내려간다(설계서 01장
+   * §3.8 확장) — recipient에 속하거나 그 artifact의 편집 권한이 있어도, workflow Edit
+   * Access가 없으면 null이다. slide를 열 수 있는지(overview 탭)와는 별개 판정이다.
+   */
   recipients: { departments: string[]; users: string[] } | null;
   series: string | null;
   seriesIdx: number;
@@ -55,6 +60,8 @@ export function toBlockDto(
   artifact: ArtifactDocument | null,
   artifactLevel: AccessLevel,
   publishState: PublishState,
+  /** 이 workflow에 대한 Edit Access가 있는가 — Recipients 노출 여부의 유일한 기준이다. */
+  canManageBlocks: boolean,
 ): BlockDto {
   return {
     id: block._id.toString(),
@@ -73,7 +80,7 @@ export function toBlockDto(
         : toArtifactDto(artifact, artifactLevel),
     // 열람 권한이 없으면 상태 자체가 정보이므로 배지를 그리지 않는다(설계서 03장 §2.2).
     publishState: artifactLevel === null ? 'unpublished' : publishState,
-    recipients: artifact
+    recipients: artifact && canManageBlocks
       ? {
           departments: [...(block.recipients?.departments ?? [])],
           users: [...(block.recipients?.users ?? [])],

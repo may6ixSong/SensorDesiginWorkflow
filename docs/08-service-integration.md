@@ -39,8 +39,10 @@
 
 ### 1.1 `GET /artifacts/{artifactId}/access` — 필수
 
-**게이트 2**다(설계서 04장 §4.1) — SIREN 쪽 recipient(게이트 1)를 통과한 사람에 한해, 이
-서비스가 실제로 그 사람에게 view/edit을 줄지 최종 판정한다.
+**SIREN 상세 slide 열람 여부를 그대로 결정하는 판정이다**(설계서 04장 §4.1) — 이 응답
+하나로 canView/canEdit이 정해지고, 그게 곧 그 사람이 SIREN에서 이 산출물을 열 수 있는지다.
+SIREN 쪽 recipient는 더 이상 이 판정 앞에 별도로 있지 않다(정책 변경 — 예전엔 recipient를
+먼저 통과해야 이 응답을 물었다, 01장 §4.2).
 
 ```
 GET {baseUrl}/artifacts/{artifactId}/access?knoxId={knoxId}[&isAdmin=true]

@@ -74,11 +74,12 @@ export class Block {
    * **workflow마다 독립**이다 — 같은 artifact가 workflow X와 Y에 놓여도 X는 AA·BB 부서에,
    * Y는 CC 부서에만 갈 수 있다. 그래서 artifact가 아니라 여기(block)에 붙는다.
    *
-   * ★ edit/view로 나뉘지 않는다 — recipient는 오직 "볼 수 있는가"의 게이트 1일 뿐이고,
-   *   실제 edit 여부는 그 서비스가 최종 판정한다(그래서 recipient를 편집하는 권한과
-   *   recipient에 속하는 것은 여전히 별개다).
+   * ★ edit/view로 나뉘지 않는다 — 실제 edit 여부는 그 서비스가 최종 판정한다.
    *
-   * 이 목록은 release 알림 대상이자 **slide 열람의 첫 번째 게이트**다(설계서 04장 §4.1).
+   * ★ slide를 열 수 있는지는 이 목록과 무관하다(설계서 01장 §4.2 갱신) — 그 서비스의
+   *   canView/canEdit 하나로만 정해진다. 이 목록은 **release 알림 대상**이면서, Recipients/
+   *   Comments 탭에 누구를 보여줄지를 정한다(그 두 탭 자체의 노출 여부는 여기 속하는 것과
+   *   무관하게 workflow Edit Access로만 판정한다, 01장 §3.8).
    */
   @Prop({ type: AccessGrantSchema, default: emptyAccessGrant })
   recipients: AccessGrant;

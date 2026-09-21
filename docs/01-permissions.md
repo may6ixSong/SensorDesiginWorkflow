@@ -10,8 +10,8 @@ Admin ────────────────────────�
   │    │
   │    ├─ Workflow  Owner / Edit / View 인가?    ← app bar 노출 · 캔버스 편집 판정
   │    │
-  │    └─ Artifact  A/B/C(OA Service/File Artifacts/HPC Service): recipient(게이트) → 서비스 권한(게이트)
-  │                 (예외 없음 — 셋 다 같은 2단 게이트)              ← 상세 slide · 버전 열람 판정
+  │    └─ Artifact  A/B/C(OA Service/File Artifacts/HPC Service): 그 서비스 자신의 canView/canEdit
+  │                 (예외 없음 — 셋 다 동일. recipient는 관여하지 않는다)  ← 상세 slide · 버전 열람 판정
 ```
 
 ---
@@ -184,8 +184,11 @@ UI에서도 양쪽에 동시에 표시하고, 경고를 띄우지 않는다.
 
 - Settings 진입 버튼(연필)은 **Edit 권한자에게만** 보인다. View 권한자는 버튼 자체가 없다.
 - Permissions 탭도 View 권한자에게 열지 않는다.
-- 단 **artifact 상세 slide의 Recipient 정보는 View 권한자도 읽기 전용으로 볼 수 있다**
-  (04장 §5) — 그건 workflow 설정이 아니라 산출물 정보이기 때문이다.
+- **artifact 상세 slide의 Recipients 탭과 Comments 탭도 이 절과 같은 기준**으로 닫는다
+  (사용자 결정, 04장 §4.2 갱신 — 예전엔 "View 권한자도 Recipient는 읽기 전용으로
+  본다"였다). View 권한자, 그리고 그 artifact 자체의 편집 권한이 있거나 recipient로
+  등록된 사람이어도 workflow Edit Access가 없으면 두 탭 모두 아예 노출되지 않는다 —
+  slide를 열 수 있는지(overview)와는 완전히 별개의 판정이다.
 
 ---
 
@@ -212,41 +215,39 @@ artifact는 권한을 전혀 들고 있지 않는다.
 
 recipient를 **그 workflow의 block에** 붙이는 이유는, 권한을 그 서비스가 관리하고 SIREN은 알
 방법이 없기 때문이다 — 같은 artifact라도 workflow X에서는 AA·BB 부서가 받고, workflow Y에서는
-CC 부서만 받는 식으로 **workflow마다 구성이 다를 수 있다.**
+CC 부서만 받는 식으로 **workflow마다 구성이 다를 수 있다.** (recipient의 **역할**은 §4.2에서
+바뀌었다 — 지금은 release 알림 대상 + Recipients/Comments 탭 표시 대상일 뿐, slide 열람 게이트가
+아니다.)
 
 ### 4.2 상세 slide 열람 판정
 
-**A/B/C(OA Service/File Artifacts/HPC Service) 전부 2단 게이트다, 예외 없이.** SIREN이
-관리하는 recipient를 먼저 통과해야 하고, 그다음 그 서비스 자신의 권한을 다시 통과해야 한다.
-어느 한쪽이라도 없으면 막힌다 — **workflow Edit Access가 있어도 recipient가 아니면 막힌다.**
-(예전 설계에서 "workflow Edit Access는 항상 통과"였던 규칙은 폐지한다.)
+**A/B/C(OA Service/File Artifacts/HPC Service) 전부 그 서비스 자신의 권한 하나로만 정해진다.**
+block.recipients는 여기 관여하지 않는다.
 
 ```ts
-canOpenArtifactSlide(user, block, artifact, workflow, project):
+canOpenArtifactSlide(user, artifact, project):
   if (isAdmin) return true
   if (!canAccessProject(user, project)) return false
 
-  // A / B / C 공통 — 게이트 1: SIREN이 관리하는 recipient (그 workflow의 block에 저장, §4.1)
-  if (!matches(user, block.recipients, project)) return false   // 여기서 막히면 그 아래는 물어보지도 않는다
-
-  // 게이트 2 — 그 서비스 자신의 권한 (라이브 조회. File Artifacts는 SIREN BE가 Calypso에 대신 묻는다)
+  // A / B / C 공통 — 그 서비스 자신의 권한 (라이브 조회. File Artifacts는 SIREN BE가 Calypso에 대신 묻는다)
   const access = observer.access(artifact.serviceKey, artifact.externalArtifactId, user.knoxId)
-  if (!access.canView) return false           // recipient여도 서비스 권한이 없으면 막힌다
-
-  return true   // 열린다. 버전 트리의 깊이는 access.canEdit 여부로 갈린다 (§7)
+  if (access.canEdit) return true
+  if (access.canView) return true
+  return false
 ```
 
-- recipient는 **더 이상 edit/view로 나뉘지 않는다** — 부서 다중 + 사용자 다중의 단일 grant다.
-  recipient에 없으면 그 자리에서 차단되고, 서비스에 물어보지도 않는다. recipient에 있어도
-  **그 서비스에서 view 권한이 없으면 역시 막힌다**(A/B/C) — recipient는 SIREN 쪽 게이트일 뿐,
-  실제 데이터 접근은 여전히 그 서비스가 최종 판정한다.
-  - 이 규칙 때문에 workflow를 만든 사람이 자기가 등록한 artifact의 slide를 못 여는 상황이
-    생길 수 있다(recipient에 아직 자신을 안 넣었다면). **의도된 동작이다** — recipient를
-    편집하는 권한(§4.3, workflow Edit Access)과 recipient에 속하는 것은 별개다.
-  - 연동 서비스 쪽에 `access` 엔드포인트가 필요하다 —
-    [prompts/a-tier-recipient-integration.md](prompts/a-tier-recipient-integration.md) 로 전달한다.
+- **이전 버전(v3 초안)은 여기가 2단 게이트였다** — SIREN이 관리하는 block.recipients를 먼저
+  통과해야 그다음 서비스 권한을 물었다. 그 결과 "같은 부서가 만든 workflow인데, artifact
+  자체는 view 제한이 없는데도, 그 block의 recipient가 다른 부서로 지정돼 있으면 못 여는"
+  상황이 나왔다(사용자 보고, `api/src/common/actor.spec.ts`/`artifact-access.service.spec.ts`에
+  이 시나리오의 회귀 테스트가 있다). recipient 게이트가 있던 이유(같은 artifact도 workflow마다
+  다른 대상에게 보여주고 싶을 수 있다, §4.1)는 여전히 유효하지만, 그 필요를 위해 매 block마다
+  recipient를 일일이 채워 넣어야만 열리는 대가가 너무 컸다 — 그래서 **"열람 자체"는 서비스
+  권한 하나로 풀고, recipient는 그 위에 얹는 표시/알림 레이어로 좁혔다**(사용자 결정).
 - 열지 못할 때는 "권한 없음"을 명확히 렌더한다. **"아직 publish된 버전이 없음"과 절대 같은 화면을
   쓰지 않는다.**
+- 연동 서비스 쪽에 `access` 엔드포인트가 필요하다는 점은 그대로다 —
+  [prompts/a-tier-recipient-integration.md](prompts/a-tier-recipient-integration.md) 로 전달한다.
 
 ### 4.3 Artifact 권한 부여
 
@@ -258,8 +259,13 @@ canOpenArtifactSlide(user, block, artifact, workflow, project):
 workflow와 동일한 규칙이다(§3.3). A/B/C 전부 block별 `recipients`(부서 다중 + 사용자 다중
 단일 grant) 모양을 따른다.
 
-- **편집 권한**(누가 이 recipient 목록을 고칠 수 있는가)은 여기서 다루는 "recipient에 속하는
-  것"과 별개다 — recipient 목록을 편집하는 권한은 그 workflow의 **Edit Access**다(04장 §3.3).
+- recipient 목록을 **편집**하는 권한은 그 workflow의 **Edit Access**다(04장 §3.3) — 지금까지와
+  같다.
+- recipient 목록을 **읽는(보는) 것도 이제 같은 기준**이다(§3.8, 04장 §4.2 갱신) — recipient에
+  **속하는 것**(과거엔 이게 열람 게이트였다)은 더 이상 어떤 권한도 주지 않는다. Recipients 탭
+  자체가 workflow Edit Access가 없으면 노출되지 않으므로, "내가 recipient인지 확인하러 그
+  탭을 연다"는 시나리오는 더 이상 성립하지 않는다 — recipient 여부는 이제 순수하게 release
+  알림이 오는지로만 체감된다.
 
 ### 4.4 Artifact 권한의 공유 범위
 

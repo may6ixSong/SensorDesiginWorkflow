@@ -62,14 +62,14 @@ function fakeHtmlView(artifactName: string, versionLabel: string) {
  * ★ 개발 전용 ★ — Observer 계약을 구현한 **가짜 OA Service**다(HPC Service가 이 mock을
  * 가리키도록 시드해도 그대로 동작한다 — 둘은 이제 같은 계약을 쓴다).
  *
- * OA/HPC Service의 slide 열람은 2단 게이트인데(설계서 04장 §4.1), 게이트 2는 그 서비스에
- * 실제로 HTTP로 물어본다. 그런데 개발 환경에는 SimHub/RPM 같은 실서비스가 없어서 그 호출이
- * 항상 실패하고, fail-closed 규칙에 따라 **그 산출물이 아무에게도 안 보이게 된다.** 그러면
- * 이 UI를 만들 수도 확인할 수도 없다.
+ * OA/HPC Service의 slide 열람은 그 서비스의 access 응답 하나로 정해지는데(설계서 04장
+ * §4.1), 그 판정은 실제로 HTTP로 물어본다. 그런데 개발 환경에는 SimHub/RPM 같은 실서비스가
+ * 없어서 그 호출이 항상 실패하고, fail-closed 규칙에 따라 **그 산출물이 아무에게도 안 보이게
+ * 된다.** 그러면 이 UI를 만들 수도 확인할 수도 없다.
  *
  * 그래서 SIREN이 스스로 이 엔드포인트를 띄우고, 시드가 mock 서비스의 baseUrl을 여기로
  * 향하게 한다. 덕분에 **실제 코드 경로가 그대로 실행된다** — ObserverClientService가
- * fetch를 하고, 응답을 파싱하고, 게이트 2를 판정한다. 권한 로직을 우회하지 않는다.
+ * fetch를 하고, 응답을 파싱하고, 그 판정을 그대로 쓴다. 권한 로직을 우회하지 않는다.
  *
  * ★ MOCKUP_ENABLED=true 일 때만 등록된다(HubModule). 운영에서는 아예 존재하지 않는다.
  *
