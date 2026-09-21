@@ -75,24 +75,24 @@ function xOf(g: Geometry, iso: string) { return ratioIn(g.range, dayMs(iso)) * g
  * 화면에서 잘려 사라지면 안 되기 때문이다.
  */
 export function ProjectTimeline({
-  projectId, milestones, workflows, mineOnly = false, myKnoxId,
+  projectId, milestones, workflows, mineOnly = false,
 }: {
   projectId: string; milestones: Milestone[]; workflows: WorkflowDto[];
-  /** My Task 필터 (Hub 설계서 §14.3) — 내가 owner인 workflow만 남긴다. */
+  /** My Workflow 필터(설계서 01장 §3.7) — 내가 **권한을 가진**(edit 또는 view) workflow만 남긴다. */
   mineOnly?: boolean;
-  myKnoxId?: string;
 }) {
   const sortedMilestones = useMemo(() => sortSchedule(milestones), [milestones]);
 
   /**
-   * 목록이 길어지면 자기 것만 보고 싶어진다 (§14.3). 기준은 owner(=Edit 권한자)이며,
-   * 축 범위는 필터와 무관하게 전체 일정을 덮는다 — 필터를 켰다고 날짜축이 널뛰면
-   * 같은 화면을 보고 있다는 감각이 깨진다.
+   * 목록이 길어지면 자기 것만 보고 싶어진다. 기준은 `myAccess`(owner든 editAccess든
+   * viewAccess든, 서버가 이미 계산해 둔 실효 권한) — owner로만 좁히면 편집 권한을
+   * 받은 사람이나 조회 권한만 있는 사람이 이 필터에서 빠지는 문제가 있었다(사용자
+   * 보고). 축 범위는 필터와 무관하게 전체 일정을 덮는다 — 필터를 켰다고 날짜축이
+   * 널뛰면 같은 화면을 보고 있다는 감각이 깨진다.
    */
   const shown = useMemo(
-    // Owner는 workflow마다 정확히 1명이다(설계서 01장 §3.6).
-    () => (mineOnly && myKnoxId ? workflows.filter((w) => w.ownerKnoxId === myKnoxId) : workflows),
-    [workflows, mineOnly, myKnoxId],
+    () => (mineOnly ? workflows.filter((w) => w.myAccess !== null) : workflows),
+    [workflows, mineOnly],
   );
 
   const geo = useMemo<Geometry | null>(() => {
