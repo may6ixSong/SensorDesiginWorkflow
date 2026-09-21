@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { Block, BlockDocument } from './schemas/block.schema';
+import { WorkflowNode, WorkflowNodeDocument } from './schemas/node.schema';
 import { Actor } from '../common/actor';
 import { AuditService } from '../audit/audit.service';
 import { ArtifactsService } from '../artifacts/artifacts.service';
@@ -10,21 +10,21 @@ import { ArtifactDocument } from '../artifacts/schemas/artifact.schema';
 import { normalizeGrant } from '../common/access';
 import { WorkflowDocument } from '../workflows/schemas/workflow.schema';
 import { ProjectDocument } from '../projects/schemas/project.schema';
-import { NewArtifactSourceDto } from './dto/block-crud.dto';
+import { NewArtifactSourceDto } from './dto/node-crud.dto';
 
 const EMPTY_RECIPIENTS = () => ({ departments: [], users: [] });
 
 @Injectable()
-export class BlocksService {
+export class NodesService {
   constructor(
-    @InjectModel(Block.name) private readonly model: Model<BlockDocument>,
+    @InjectModel(WorkflowNode.name) private readonly model: Model<WorkflowNodeDocument>,
     private readonly artifacts: ArtifactsService,
     private readonly sources: ArtifactSourceService,
     private readonly audit: AuditService,
   ) {}
 
   /**
-   * 한 workflow 안에서 같은 artifact를 두 block에 걸 수 없다 — 주는/받는 모두다
+   * 한 workflow 안에서 같은 artifact를 두 node에 걸 수 없다 — 주는/받는 모두다
    * (사용자 결정: source 버전을 지정하는 flow-upstream 판정이 모호해지기 때문).
    *
    * ★ `$ne`는 안 쓴다 — 인메모리 목업 드라이버(database/in-memory-driver.ts)가 지원하는
@@ -34,13 +34,13 @@ export class BlocksService {
   private async assertNotDuplicateInWorkflow(
     workflowId: Types.ObjectId,
     artifactId: Types.ObjectId,
-    excludeBlockId?: string,
+    excludeNodeId?: string,
   ): Promise<void> {
     const matches = await this.model.find({ workflowId, artifactId }).exec();
-    const dupe = matches.some((b) => b._id.toString() !== excludeBlockId);
+    const dupe = matches.some((n) => n._id.toString() !== excludeNodeId);
     if (dupe) {
       throw new BadRequestException(
-        'This artifact is already mapped to another block in this workflow.',
+        'This artifact is already mapped to another node in this workflow.',
       );
     }
   }
@@ -80,10 +80,10 @@ export class BlocksService {
     return this.model.find({ workflowId }).exec();
   }
 
-  async findOrThrow(blockId: string): Promise<BlockDocument> {
-    const block = await this.model.findById(blockId).exec();
-    if (!block) throw new NotFoundException('Block not found.');
-    return block;
+  async findOrThrow(nodeId: string): Promise<WorkflowNodeDocument> {
+    const node = await this.model.findById(nodeId).exec();
+    if (!node) throw new NotFoundException('Node not found.');
+    return node;
   }
 
   countForWorkflow(workflowId: string | Types.ObjectId) {
@@ -91,7 +91,7 @@ export class BlocksService {
   }
 
   /**
-   * 새 블록. artifact 없이 만들 수 있다 — 자리는 캔버스에 잡아두고 출처는 나중에
+   * 새 노드. artifact 없이 만들 수 있다 — 자리는 캔버스에 잡아두고 출처는 나중에
    * 지정하는 것이 **정상 빈 상태**다(설계서 03장 §2.3).
    *
    * intent는 "새 Artifact 추가" 다이얼로그의 첫 질문이다 — 내가 주는 산출물(own)인지
@@ -109,7 +109,7 @@ export class BlocksService {
       newArtifact?: NewArtifactSourceDto;
     },
     actor: Actor,
-  ): Promise<BlockDocument> {
+  ): Promise<WorkflowNodeDocument> {
     if (!(workflow.phases ?? []).some((p) => p.id === input.phaseId)) {
       throw new BadRequestException(`Unknown phase: ${input.phaseId}`);
     }
@@ -122,7 +122,7 @@ export class BlocksService {
       await this.assertNotDuplicateInWorkflow(workflow._id, artifactId);
     }
 
-    const block = await this.model.create({
+    const node = await this.model.create({
       projectId: workflow.projectId,
       workflowId: workflow._id,
       phaseId: input.phaseId,
@@ -137,93 +137,93 @@ export class BlocksService {
       createdBy: actor.knoxId,
       isMock: false,
     });
-    await this.audit.log(actor, 'BLOCK_CREATE', 'block', block._id, {
+    await this.audit.log(actor, 'BLOCK_CREATE', 'block', node._id, {
       workflowId: workflow._id.toString(),
       intent,
       artifactId: artifactId?.toString() ?? null,
     });
-    return block;
+    return node;
   }
 
-  /** 블록 이름 변경 / artifact 매핑 변경(재매핑). intent는 생성 후 바꾸지 않는다. */
+  /** 노드 이름 변경 / artifact 매핑 변경(재매핑). intent는 생성 후 바꾸지 않는다. */
   async update(
     project: ProjectDocument,
-    blockId: string,
+    nodeId: string,
     input: { name?: string; artifactId?: string | null; newArtifact?: NewArtifactSourceDto },
     actor: Actor,
-  ): Promise<BlockDocument> {
-    const block = await this.findOrThrow(blockId);
+  ): Promise<WorkflowNodeDocument> {
+    const node = await this.findOrThrow(nodeId);
 
-    if (input.name !== undefined) block.name = input.name.trim();
+    if (input.name !== undefined) node.name = input.name.trim();
 
     if (input.artifactId !== undefined || input.newArtifact) {
-      const before = block.artifactId?.toString() ?? null;
+      const before = node.artifactId?.toString() ?? null;
 
-      const resolved = await this.resolveArtifact(project, actor, block.intent, input);
+      const resolved = await this.resolveArtifact(project, actor, node.intent, input);
       const nextArtifactId = resolved ? resolved._id : null;
 
       if (nextArtifactId) {
-        await this.assertNotDuplicateInWorkflow(block.workflowId, nextArtifactId, blockId);
+        await this.assertNotDuplicateInWorkflow(node.workflowId, nextArtifactId, nodeId);
       }
-      block.artifactId = nextArtifactId;
+      node.artifactId = nextArtifactId;
 
-      const after = block.artifactId?.toString() ?? null;
+      const after = node.artifactId?.toString() ?? null;
       if (before !== after) {
         // 다른 산출물로 바뀌면 recipient도 초기화한다 — 이전 값이 새 산출물에도 유효한
         // 구성이라는 보장이 없다(사용자 결정: 조용히 남기면 잘못된 부서에 알림이 갈 수 있다).
-        block.recipients = EMPTY_RECIPIENTS();
+        node.recipients = EMPTY_RECIPIENTS();
         // 무엇이 누구에게 전달되는지가 통째로 달라지는 사건이라 반드시 남긴다.
-        await this.audit.log(actor, 'BLOCK_ARTIFACT_REMAP', 'block', block._id, {
-          workflowId: block.workflowId.toString(),
+        await this.audit.log(actor, 'BLOCK_ARTIFACT_REMAP', 'block', node._id, {
+          workflowId: node.workflowId.toString(),
           from: before,
           to: after,
         });
       }
     }
 
-    await block.save();
-    return this.findOrThrow(blockId);
+    await node.save();
+    return this.findOrThrow(nodeId);
   }
 
-  async remove(blockId: string, actor: Actor): Promise<void> {
-    const block = await this.findOrThrow(blockId);
-    await this.model.findByIdAndDelete(blockId).exec();
-    await this.audit.log(actor, 'BLOCK_DELETE', 'block', block._id, {
-      workflowId: block.workflowId.toString(),
+  async remove(nodeId: string, actor: Actor): Promise<void> {
+    const node = await this.findOrThrow(nodeId);
+    await this.model.findByIdAndDelete(nodeId).exec();
+    await this.audit.log(actor, 'BLOCK_DELETE', 'block', node._id, {
+      workflowId: node.workflowId.toString(),
     });
   }
 
   /**
-   * block의 recipient 교체 — A/B/C 전부 공통이다(설계서 04장 §3.2). SIREN은 여기서
+   * node의 recipient 교체 — A/B/C 전부 공통이다(설계서 04장 §3.2). SIREN은 여기서
    * "누가 볼 수 있는지"만 보관하고, 실제 edit 여부는 그 서비스가 판정한다.
    *
    * ★ 편집 권한은 그 workflow의 Edit Access다 — 컨트롤러가 이미 검증하고 들어온다.
    *   recipient에 **속하는 것**과 recipient를 **편집하는 것**은 별개다(설계서 01장 §4.2).
    */
   async replaceRecipients(
-    blockId: string,
+    nodeId: string,
     input: { departments?: string[]; users?: string[] },
     actor: Actor,
-  ): Promise<BlockDocument> {
-    const block = await this.findOrThrow(blockId);
-    if (!block.artifactId) {
-      throw new BadRequestException('This block has no artifact mapped yet.');
+  ): Promise<WorkflowNodeDocument> {
+    const node = await this.findOrThrow(nodeId);
+    if (!node.artifactId) {
+      throw new BadRequestException('This node has no artifact mapped yet.');
     }
-    block.recipients = normalizeGrant(input);
-    await block.save();
-    await this.audit.log(actor, 'BLOCK_RECIPIENTS_REPLACE', 'block', block._id, {
-      recipients: block.recipients,
+    node.recipients = normalizeGrant(input);
+    await node.save();
+    await this.audit.log(actor, 'BLOCK_RECIPIENTS_REPLACE', 'block', node._id, {
+      recipients: node.recipients,
     });
-    return this.findOrThrow(blockId);
+    return this.findOrThrow(nodeId);
   }
 
   /**
-   * 이 workflow의 블록 중 **release 대상**만 (설계서 05장 §2).
-   * artifact가 매핑된 것 전부다 — 미매핑 블록은 전달할 실체가 없어 제외된다.
+   * 이 workflow의 노드 중 **release 대상**만 (설계서 05장 §2).
+   * artifact가 매핑된 것 전부다 — 미매핑 노드는 전달할 실체가 없어 제외된다.
    */
-  async releasableForWorkflow(workflowId: string | Types.ObjectId): Promise<BlockDocument[]> {
-    const blocks = await this.model.find({ workflowId }).exec();
-    return blocks.filter((b) => Boolean(b.artifactId));
+  async releasableForWorkflow(workflowId: string | Types.ObjectId): Promise<WorkflowNodeDocument[]> {
+    const nodes = await this.model.find({ workflowId }).exec();
+    return nodes.filter((n) => Boolean(n.artifactId));
   }
 
   async deleteForWorkflow(workflowId: string | Types.ObjectId): Promise<void> {

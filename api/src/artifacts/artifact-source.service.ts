@@ -33,7 +33,7 @@ export interface CandidateListResult {
  * "새 Artifact 추가" 다이얼로그의 3개 소스(OA Service·File Artifacts·HPC Service)를
  * 후보 목록과 pickability로 통일해서 다루는 오케스트레이션 계층(설계서 04장 §6).
  *
- * ★ pickable 판정은 여기서 **한 번만** 한다 — FE도 같은 값을 그대로 그리고, BlocksService의
+ * ★ pickable 판정은 여기서 **한 번만** 한다 — FE도 같은 값을 그대로 그리고, NodesService의
  *   실제 매핑도 같은 판정을 다시 태워서(재검증 원칙, 설계서 01장 §5) 신뢰하지 않는다.
  *
  *   주는(own)   → edit 권한이 있어야 고를 수 있다.
@@ -192,7 +192,7 @@ export class ArtifactSourceService {
   }
 
   /**
-   * 이미 있는 artifact를 **재사용**할 때의 재검증(설계서 01장 §5) — block 생성/재매핑
+   * 이미 있는 artifact를 **재사용**할 때의 재검증(설계서 01장 §5) — node 생성/재매핑
    * 양쪽에서 쓴다. 새로 만드는 경로(resolveLiveOrFile)와 판정 기준은 같지만, 이미
    * SIREN에 존재하는 artifact라 tier로 분기해서 다시 확인한다.
    */

@@ -12,9 +12,9 @@ import { AccessGrant, AccessGrantSchema, emptyAccessGrant } from '../../common/s
  * 캔버스에서의 좌→우 순서는 저장하지 않고 start 오름차순으로 파생한다
  * (src/common/schedule.ts).
  *
- * ★ id는 블록(Block.phaseId)이 가리키는 식별자라 절대 재사용/변경하지 않는다.
- *   phase를 지우면 그 phase를 가리키던 블록은 "일정을 잃은" 상태로 남는다 — 서버는
- *   그 블록을 지우지도, 다른 phase로 옮기지도 않는다. 그래야 캔버스에서 원래 좌표
+ * ★ id는 노드(WorkflowNode.phaseId)가 가리키는 식별자라 절대 재사용/변경하지 않는다.
+ *   phase를 지우면 그 phase를 가리키던 노드는 "일정을 잃은" 상태로 남는다 — 서버는
+ *   그 노드를 지우지도, 다른 phase로 옮기지도 않는다. 그래야 캔버스에서 원래 좌표
  *   그대로 남아 "유실됨" 표시를 달 수 있다.
  */
 @Schema({ _id: false })
@@ -42,7 +42,7 @@ export const WorkflowPhaseSchema = SchemaFactory.createForClass(WorkflowPhase);
  * ★ 이 lock의 범위는 **캔버스뿐**이다. Workflow 문서 안에 같이 들어 있지만 workflow
  *   전체를 잠그지 않는다 — A가 캔버스를 편집하는 동안에도 B는 Name/Description/
  *   Department/Phase를 얼마든지 바꿀 수 있다. lock을 확인하는 것은 오직
- *   `PUT /workflows/:id/canvas`(blocks/edges/memos/layout 저장)뿐이다.
+ *   `PUT /workflows/:id/canvas`(nodes/edges/memos/layout 저장)뿐이다.
  * ★ 점유/갱신/해제는 이 필드만 원자적으로 $set 한다 — 문서 전체를 다시 쓰지 않는다.
  *   그래서 위의 다른 PATCH들과 서로 경쟁하지 않고, 트랜잭션도 필요 없다.
  */

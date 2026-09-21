@@ -121,10 +121,10 @@ export const ArtifactVersionSchema = SchemaFactory.createForClass(ArtifactVersio
 export type ArtifactDocument = Artifact & Document;
 
 /**
- * 산출물의 **실체**다 — 캔버스 위의 자리(Block)와 분리되어 있다(설계서 04장 §1).
+ * 산출물의 **실체**다 — 캔버스 위의 자리(WorkflowNode)와 분리되어 있다(설계서 04장 §1).
  * 같은 artifact가 여러 workflow의 캔버스에 놓여도 권한과 버전 이력은 하나다.
  *
- * ★ 스코프는 과제(project) 단위다. block을 매핑할 때 artifact.projectId가 그 workflow의
+ * ★ 스코프는 과제(project) 단위다. node를 매핑할 때 artifact.projectId가 그 workflow의
  *   projectId와 다르면 거부한다 — `code`가 같아도 `revision`이 다르면 다른 project이므로
  *   자연히 후보에서 빠진다(설계서 04장 §1.1).
  */
@@ -165,7 +165,7 @@ export class Artifact {
 
   // 권한은 artifact가 들고 있지 않는다 — A/B/C(OA Service/File Artifacts/HPC Service)는
   // 그 서비스가 실시간으로 판정하고, recipient(누가 볼 수 있는지)는 workflow마다 달라질 수
-  // 있어 Block.recipients에 있다.
+  // 있어 WorkflowNode.recipients에 있다.
 
   /** publish 이력. 최신 버전이 배열 앞(index 0)에 오도록 유지한다. */
   @Prop({ type: [ArtifactVersionSchema], default: [] })

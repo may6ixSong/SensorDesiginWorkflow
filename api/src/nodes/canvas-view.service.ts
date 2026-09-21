@@ -1,18 +1,18 @@
 import { Injectable } from '@nestjs/common';
 import { WorkflowDocument } from '../workflows/schemas/workflow.schema';
 import { ProjectDocument } from '../projects/schemas/project.schema';
-import { BlockDocument } from './schemas/block.schema';
+import { WorkflowNodeDocument } from './schemas/node.schema';
 import { ArtifactDocument } from '../artifacts/schemas/artifact.schema';
-import { BlocksService } from './blocks.service';
+import { NodesService } from './nodes.service';
 import { ArtifactsService, majorKeyOf } from '../artifacts/artifacts.service';
 import { ArtifactAccessService } from '../artifacts/artifact-access.service';
 import { ReleasesService } from '../releases/releases.service';
 import { Actor } from '../common/actor';
 import { workflowLevel } from '../common/access';
-import { BlockDto, publishStateOf, toBlockDto } from './dto/block.dto';
+import { NodeDto, publishStateOf, toNodeDto } from './dto/node.dto';
 
 /**
- * 캔버스 응답을 조립한다 — 블록 + 각 산출물의 권한 판정 + publish 배지 상태.
+ * 캔버스 응답을 조립한다 — 노드 + 각 산출물의 권한 판정 + publish 배지 상태.
  *
  * ★ 여기서 외부 서비스를 호출하는 경우는 **A Tier 산출물의 권한 게이트뿐**이다. 버전을
  *   물어보지는 않는다 — 평소 캔버스 렌더링은 라이브 버전 조회를 하지 않는 것이 원칙이고
@@ -23,7 +23,7 @@ import { BlockDto, publishStateOf, toBlockDto } from './dto/block.dto';
 @Injectable()
 export class CanvasViewService {
   constructor(
-    private readonly blocks: BlocksService,
+    private readonly nodes: NodesService,
     private readonly artifacts: ArtifactsService,
     private readonly artifactAccess: ArtifactAccessService,
     private readonly releases: ReleasesService,
@@ -33,10 +33,10 @@ export class CanvasViewService {
     workflow: WorkflowDocument,
     project: ProjectDocument | null,
     actor: Actor,
-  ): Promise<BlockDto[]> {
-    const blocks = await this.blocks.listForWorkflow(workflow._id);
+  ): Promise<NodeDto[]> {
+    const nodes = await this.nodes.listForWorkflow(workflow._id);
     const artifactMap = await this.artifacts.findMany(
-      blocks.map((b) => b.artifactId).filter(Boolean) as any[],
+      nodes.map((n) => n.artifactId).filter(Boolean) as any[],
     );
 
     // publish 배지의 기준점 — 마지막 release가 그 산출물을 어떤 major로 실어 보냈는가.
@@ -46,25 +46,25 @@ export class CanvasViewService {
     );
 
     // Recipients/Comments 탭 노출 여부의 기준(설계서 01장 §3.8 확장) — workflow 전체에 대해
-    // 한 번만 판정하면 된다. block마다 다르지 않다.
-    const canManageBlocks = workflowLevel(actor, workflow, project) === 'edit';
+    // 한 번만 판정하면 된다. node마다 다르지 않다.
+    const canManageNodes = workflowLevel(actor, workflow, project) === 'edit';
 
     return Promise.all(
-      blocks.map(async (block) => {
-        const artifact = block.artifactId
-          ? (artifactMap.get(block.artifactId.toString()) ?? null)
+      nodes.map(async (node) => {
+        const artifact = node.artifactId
+          ? (artifactMap.get(node.artifactId.toString()) ?? null)
           : null;
 
         const level = artifact
           ? await this.artifactAccess.levelFor(actor, artifact, project)
           : null;
 
-        return toBlockDto(
-          block,
+        return toNodeDto(
+          node,
           artifact,
           level,
           this.publishState(artifact, lastMajorByArtifact, lastRelease !== null),
-          canManageBlocks,
+          canManageNodes,
         );
       }),
     );
@@ -85,17 +85,17 @@ export class CanvasViewService {
 
   /**
    * A Tier의 라이브 버전 조회(설계서 04장 §19.5/§19.6 복원). 평소 캔버스 조립(assemble)은
-   * 원칙대로 라이브 버전을 절대 묻지 않는다 — 이건 slide를 실제로 열었을 때만, 그 block
+   * 원칙대로 라이브 버전을 절대 묻지 않는다 — 이건 slide를 실제로 열었을 때만, 그 node
    * 하나에 대해서만 호출되는 별도 경로다.
    *
-   * artifact 단독 라우트가 아니라 block 경유로 두는 건 artifactId를 block에서 꺼내야
-   * 해서일 뿐이다 — 권한 판정 자체(ArtifactAccessService.assertCanOpen)는 이제 block
+   * artifact 단독 라우트가 아니라 node 경유로 두는 건 artifactId를 node에서 꺼내야
+   * 해서일 뿐이다 — 권한 판정 자체(ArtifactAccessService.assertCanOpen)는 이제 node
    * 맥락이 필요 없다(설계서 01장 §4.2 갱신).
    */
-  async liveVersions(blockId: string, project: ProjectDocument | null, actor: Actor) {
-    const block = await this.blocks.findOrThrow(blockId);
-    const artifact = block.artifactId
-      ? await this.artifacts.findOrThrow(block.artifactId.toString())
+  async liveVersions(nodeId: string, project: ProjectDocument | null, actor: Actor) {
+    const node = await this.nodes.findOrThrow(nodeId);
+    const artifact = node.artifactId
+      ? await this.artifacts.findOrThrow(node.artifactId.toString())
       : null;
     if (!artifact) return [];
     const level = await this.artifactAccess.assertCanOpen(actor, artifact, project);
@@ -107,25 +107,25 @@ export class CanvasViewService {
    * 방금 고른) 버전 하나에 대해서만 호출된다. liveVersions와 같은 이유로 캔버스 조립에는
    * 절대 섞이지 않는다.
    */
-  async htmlView(blockId: string, versionLabel: string, project: ProjectDocument | null, actor: Actor) {
-    const block = await this.blocks.findOrThrow(blockId);
-    const artifact = block.artifactId
-      ? await this.artifacts.findOrThrow(block.artifactId.toString())
+  async htmlView(nodeId: string, versionLabel: string, project: ProjectDocument | null, actor: Actor) {
+    const node = await this.nodes.findOrThrow(nodeId);
+    const artifact = node.artifactId
+      ? await this.artifacts.findOrThrow(node.artifactId.toString())
       : null;
     if (!artifact) return null;
     const level = await this.artifactAccess.assertCanOpen(actor, artifact, project);
     return this.artifactAccess.htmlView(actor, artifact, level, versionLabel);
   }
 
-  /** 블록 하나만 다시 조립한다 — 생성/수정 응답용. */
+  /** 노드 하나만 다시 조립한다 — 생성/수정 응답용. */
   async assembleOne(
-    block: BlockDocument,
+    node: WorkflowNodeDocument,
     workflow: WorkflowDocument,
     project: ProjectDocument | null,
     actor: Actor,
-  ): Promise<BlockDto> {
-    const artifact = block.artifactId
-      ? await this.artifacts.findOrThrow(block.artifactId.toString())
+  ): Promise<NodeDto> {
+    const artifact = node.artifactId
+      ? await this.artifacts.findOrThrow(node.artifactId.toString())
       : null;
     const level = artifact
       ? await this.artifactAccess.levelFor(actor, artifact, project)
@@ -134,13 +134,13 @@ export class CanvasViewService {
     const lastMajorByArtifact = new Map<string, string | null>(
       (lastRelease?.items ?? []).map((i) => [i.artifactId, i.published?.majorKey ?? null]),
     );
-    const canManageBlocks = workflowLevel(actor, workflow, project) === 'edit';
-    return toBlockDto(
-      block,
+    const canManageNodes = workflowLevel(actor, workflow, project) === 'edit';
+    return toNodeDto(
+      node,
       artifact,
       level,
       this.publishState(artifact, lastMajorByArtifact, lastRelease !== null),
-      canManageBlocks,
+      canManageNodes,
     );
   }
 }

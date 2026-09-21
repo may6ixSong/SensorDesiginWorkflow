@@ -61,8 +61,8 @@ export class WorkflowsController {
   }
 
   /**
-   * 이 workflow만의 일정 교체. 사라진 phase를 가리키던 블록은 그대로 남는다 —
-   * 서버는 블록을 절대 옮기거나 지우지 않는다.
+   * 이 workflow만의 일정 교체. 사라진 phase를 가리키던 노드는 그대로 남는다 —
+   * 서버는 노드를 절대 옮기거나 지우지 않는다.
    * ★ 이 PATCH도 canvasLock과 무관하다.
    */
   @WorkflowAccess('edit')

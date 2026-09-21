@@ -1,7 +1,7 @@
 /**
  * 캔버스 편집 lock (설계서 03장 §3).
  *
- * ★ 이 lock의 범위는 **캔버스뿐**이다 — blocks/edges/memos/layout 저장에만 관여하고,
+ * ★ 이 lock의 범위는 **캔버스뿐**이다 — nodes/edges/memos/layout 저장에만 관여하고,
  *   workflow의 Name/Description/Department/Phase 수정은 lock과 무관하게 언제든 가능하다.
  *
  * SOURCE OF TRUTH: docs/03-canvas.md §3

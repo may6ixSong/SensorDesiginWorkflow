@@ -16,7 +16,7 @@ import { toReleaseDto } from './dto/release.dto';
 import { CreateReleaseFeedbackDto } from './dto/release-feedback.dto';
 import { ArtifactsService } from '../artifacts/artifacts.service';
 import { ArtifactAccessService } from '../artifacts/artifact-access.service';
-import { BlocksService } from '../blocks/blocks.service';
+import { NodesService } from '../nodes/nodes.service';
 
 /**
  * Release 라우트 (설계서 05장).
@@ -32,7 +32,7 @@ export class ReleasesController {
     private readonly feedback: ReleaseFeedbackService,
     private readonly artifacts: ArtifactsService,
     private readonly artifactAccess: ArtifactAccessService,
-    private readonly blocks: BlocksService,
+    private readonly nodes: NodesService,
     @InjectModel(Project.name) private readonly projectModel: Model<ProjectDocument>,
     @InjectModel(Workflow.name) private readonly workflowModel: Model<WorkflowDocument>,
   ) {}
@@ -151,10 +151,10 @@ export class ReleasesController {
   /**
    * 이 사람이 지금 열람 권한을 가진 artifact id 집합.
    * 판정 자체(ArtifactAccessService.levelFor)는 그 서비스의 canView/canEdit 하나로만
-   * 정해진다(설계서 01장 §4.2 갱신) — block은 원본 artifact 문서가 지워졌을 때 지금
+   * 정해진다(설계서 01장 §4.2 갱신) — node는 원본 artifact 문서가 지워졌을 때 지금
    * 매핑된 artifact로 대신 판정하기 위한 대체 경로로만 쓰인다(바로 아래).
    *
-   * ★ Admin은 artifact/block 조회와 무관하게 항상 통과한다(설계서 01장 §2.1 "Admin은
+   * ★ Admin은 artifact/node 조회와 무관하게 항상 통과한다(설계서 01장 §2.1 "Admin은
    *   전 계층 무조건 통과") — 이전엔 이 판정 전에 artifact 조회부터 실패하면(다음 항목
    *   참고) Admin조차 masked로 내려갔다. 그 실패를 이유로 거를 대상이 애초에 아니므로
    *   여기서 I/O 없이 먼저 걸러 낸다.
@@ -162,12 +162,12 @@ export class ReleasesController {
    *   설계서 05장 §5) — item.artifactId가 가리키던 SIREN artifact 문서가 그 뒤 지워져도
    *   (재생성 등) 이력 자체는 읽을 수 있어야 한다. 하지만 이 마스킹 판정은 "지금 권한"을
    *   라이브로 다시 묻는 절차라 물어볼 artifact가 있어야 한다 — 그래서 원래 문서가
-   *   없으면, 같은 block에 지금 매핑돼 있는 artifact(있다면)로 대신 판정한다. 그마저
-   *   없으면(block도 지워졌거나 미매핑) 물어볼 곳이 정말 없으므로 fail-closed(masked)로
+   *   없으면, 같은 node에 지금 매핑돼 있는 artifact(있다면)로 대신 판정한다. 그마저
+   *   없으면(node도 지워졌거나 미매핑) 물어볼 곳이 정말 없으므로 fail-closed(masked)로
    *   남는다 — 이전과 같은 안전한 기본값이다.
    */
   private async visibleArtifactIds(
-    release: { items?: { artifactId: string; blockId: string }[] },
+    release: { items?: { artifactId: string; nodeId: string }[] },
     project: ProjectDocument | null,
     me: Actor,
   ): Promise<Set<string>> {
@@ -179,14 +179,14 @@ export class ReleasesController {
           return;
         }
 
-        const [artifact, block] = await Promise.all([
+        const [artifact, node] = await Promise.all([
           this.artifacts.findOrThrow(item.artifactId).catch(() => null),
-          // 블록이 그새 지워졌을 수 있다 — 그러면 대체 경로(아래)로 물어볼 artifact도 없다.
-          this.blocks.findOrThrow(item.blockId).catch(() => null),
+          // 노드가 그새 지워졌을 수 있다 — 그러면 대체 경로(아래)로 물어볼 artifact도 없다.
+          this.nodes.findOrThrow(item.nodeId).catch(() => null),
         ]);
 
         const liveArtifact = artifact
-          ?? (block?.artifactId ? await this.artifacts.findOrThrow(block.artifactId.toString()).catch(() => null) : null);
+          ?? (node?.artifactId ? await this.artifacts.findOrThrow(node.artifactId.toString()).catch(() => null) : null);
         if (!liveArtifact) return;
 
         const level = await this.artifactAccess.levelFor(me, liveArtifact, project);

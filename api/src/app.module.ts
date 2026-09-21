@@ -6,7 +6,7 @@ import { DatabaseModule } from './database/database.module';
 import { ProjectsModule } from './projects/projects.module';
 import { WorkflowsModule } from './workflows/workflows.module';
 import { ArtifactsModule } from './artifacts/artifacts.module';
-import { BlocksModule } from './blocks/blocks.module';
+import { NodesModule } from './nodes/nodes.module';
 import { MemosModule } from './memos/memos.module';
 import { CommentsModule } from './comments/comments.module';
 import { EdgesModule } from './edges/edges.module';
@@ -25,7 +25,7 @@ import { AssignmentsModule } from './assignments/assignments.module';
     ProjectsModule,
     WorkflowsModule,
     ArtifactsModule,
-    BlocksModule,
+    NodesModule,
     MemosModule,
     CommentsModule,
     EdgesModule,

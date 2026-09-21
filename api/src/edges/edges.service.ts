@@ -12,13 +12,13 @@ export class EdgesService {
   }
 
   /** series 인스턴스 생성 시 회차 순서대로 자동 연결. isMock은 소속 workflow에서 상속. */
-  async createAutoChain(workflowId: Types.ObjectId, orderedBlockIds: Types.ObjectId[], isMock = false) {
+  async createAutoChain(workflowId: Types.ObjectId, orderedNodeIds: Types.ObjectId[], isMock = false) {
     const docs = [];
-    for (let i = 0; i < orderedBlockIds.length - 1; i++) {
+    for (let i = 0; i < orderedNodeIds.length - 1; i++) {
       docs.push({
         workflowId,
-        fromId: orderedBlockIds[i],
-        toId: orderedBlockIds[i + 1],
+        fromId: orderedNodeIds[i],
+        toId: orderedNodeIds[i + 1],
         bidirectional: false,
         auto: true,
         isMock,
@@ -27,15 +27,15 @@ export class EdgesService {
     if (docs.length) await this.model.insertMany(docs);
   }
 
-  /** 블록 삭제 시 그 블록이 관여된 edge를 함께 정리한다. */
-  deleteByBlockIds(blockIds: (Types.ObjectId | string)[]) {
+  /** 노드 삭제 시 그 노드가 관여된 edge를 함께 정리한다. */
+  deleteByNodeIds(nodeIds: (Types.ObjectId | string)[]) {
     return this.model
-      .deleteMany({ $or: [{ fromId: { $in: blockIds } }, { toId: { $in: blockIds } }] })
+      .deleteMany({ $or: [{ fromId: { $in: nodeIds } }, { toId: { $in: nodeIds } }] })
       .exec();
   }
 
   /**
-   * release의 source 계산용 — 각 블록의 **직전 1홉 upstream** 블록 id 목록.
+   * release의 source 계산용 — 각 노드의 **직전 1홉 upstream** 노드 id 목록.
    *
    * 단방향 edge는 from → to 방향만 upstream으로 친다. 양방향(bidirectional) edge는
    * 서로가 서로의 source가 될 수 있으므로 양쪽 모두에 넣는다.

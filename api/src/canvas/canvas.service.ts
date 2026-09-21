@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { Block, BlockDocument } from '../blocks/schemas/block.schema';
+import { WorkflowNode, WorkflowNodeDocument } from '../nodes/schemas/node.schema';
 import { WorkflowDocument } from '../workflows/schemas/workflow.schema';
 import { ProjectDocument } from '../projects/schemas/project.schema';
 import { Actor } from '../common/actor';
@@ -9,7 +9,7 @@ import { MemosService } from '../memos/memos.service';
 import { EdgesService } from '../edges/edges.service';
 import { AuditService } from '../audit/audit.service';
 import { WorkflowsService } from '../workflows/workflows.service';
-import { CanvasViewService } from '../blocks/canvas-view.service';
+import { CanvasViewService } from '../nodes/canvas-view.service';
 import { PutCanvasDto } from './dto/put-canvas.dto';
 
 /**
@@ -23,7 +23,7 @@ import { PutCanvasDto } from './dto/put-canvas.dto';
 @Injectable()
 export class CanvasService {
   constructor(
-    @InjectModel(Block.name) private readonly blockModel: Model<BlockDocument>,
+    @InjectModel(WorkflowNode.name) private readonly nodeModel: Model<WorkflowNodeDocument>,
     private readonly memos: MemosService,
     private readonly edges: EdgesService,
     private readonly audit: AuditService,
@@ -41,22 +41,22 @@ export class CanvasService {
     this.workflows.assertCanvasLockHeldBy(workflow, actor);
 
     // ★ phaseId 검증은 이 workflow의 phase 목록 기준이다. 단 "지금 목록에 없는 phaseId"를
-    //   무조건 거절하면 안 된다 — phase를 지우면 그걸 가리키던 블록은 일부러 그대로 남겨
-    //   두는 설계라(유실 표시), 그 블록이 포함된 캔버스는 영영 저장할 수 없게 된다.
+    //   무조건 거절하면 안 된다 — phase를 지우면 그걸 가리키던 노드는 일부러 그대로 남겨
+    //   두는 설계라(유실 표시), 그 노드가 포함된 캔버스는 영영 저장할 수 없게 된다.
     //   그래서 "이미 저장돼 있던 값 그대로면" 통과시키고, 새로 지정하는 phaseId만 따진다.
     const validPhaseIds = new Set((workflow.phases ?? []).map((p) => p.id));
 
     this.assertValidLayouts(dto);
 
-    const stored = await this.blockModel.find({ workflowId: workflow._id }, { phaseId: 1 }).exec();
-    const storedPhaseId = new Map(stored.map((b) => [b._id.toString(), b.phaseId]));
+    const stored = await this.nodeModel.find({ workflowId: workflow._id }, { phaseId: 1 }).exec();
+    const storedPhaseId = new Map(stored.map((n) => [n._id.toString(), n.phaseId]));
 
-    for (const b of dto.blocks) {
-      if (validPhaseIds.has(b.phaseId)) continue;
-      if (storedPhaseId.get(b.id) === b.phaseId) continue; // 유실된 채로 그대로 둔 블록
-      throw new BadRequestException(`Unknown phase: ${b.phaseId}`);
+    for (const n of dto.nodes) {
+      if (validPhaseIds.has(n.phaseId)) continue;
+      if (storedPhaseId.get(n.id) === n.phaseId) continue; // 유실된 채로 그대로 둔 노드
+      throw new BadRequestException(`Unknown phase: ${n.phaseId}`);
     }
-    // 메모는 블록과 달리 유실을 표시할 이유가 없다 — 사라진 phase에 붙어 있던 메모는
+    // 메모는 노드와 달리 유실을 표시할 이유가 없다 — 사라진 phase에 붙어 있던 메모는
     // FE가 저장 직전에 남아 있는 첫 phase로 옮겨 보낸다.
     for (const m of dto.memos) {
       if (!validPhaseIds.has(m.phaseId)) {
@@ -65,11 +65,11 @@ export class CanvasService {
     }
 
     await Promise.all(
-      dto.blocks.map((b) =>
-        this.blockModel
+      dto.nodes.map((n) =>
+        this.nodeModel
           .updateOne(
-            { _id: b.id, workflowId: workflow._id },
-            { $set: { layout: b.layout, phaseId: b.phaseId } },
+            { _id: n.id, workflowId: workflow._id },
+            { $set: { layout: n.layout, phaseId: n.phaseId } },
           )
           .exec(),
       ),
@@ -97,13 +97,13 @@ export class CanvasService {
     }
 
     await this.audit.log(actor, 'CANVAS_SAVE', 'workflow', workflow._id, {
-      blocks: dto.blocks.length,
+      nodes: dto.nodes.length,
       edges: dto.edges.length,
       memos: dto.memos.length,
     });
 
     return {
-      blocks: await this.canvasView.assemble(workflow, project, actor),
+      nodes: await this.canvasView.assemble(workflow, project, actor),
       memos: await this.memos.listForWorkflow(workflow._id.toString()),
       edges: await this.edges.listForWorkflow(workflow._id.toString()),
     };
@@ -123,8 +123,8 @@ export class CanvasService {
     // x(phase 레인 좌측 경계)는 여전히 0 이상이어야 한다.
     const isValid = (l: { x: number; y: number; w: number; h: number }) =>
       l && l.x >= 0 && Number.isFinite(l.y) && l.w > 0 && l.h > 0;
-    for (const b of dto.blocks) {
-      if (!isValid(b.layout)) throw new BadRequestException(`Invalid coordinates: ${b.id}`);
+    for (const n of dto.nodes) {
+      if (!isValid(n.layout)) throw new BadRequestException(`Invalid coordinates: ${n.id}`);
     }
     for (const m of dto.memos) {
       if (!isValid(m.layout)) throw new BadRequestException('Memo coordinates are invalid.');

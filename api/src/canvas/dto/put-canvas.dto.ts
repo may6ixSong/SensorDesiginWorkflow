@@ -1,9 +1,9 @@
 import { Type } from 'class-transformer';
 import { IsArray, IsBoolean, IsIn, IsObject, IsOptional, IsString, ValidateNested } from 'class-validator';
-import { LayoutDto } from '../../blocks/dto/block-crud.dto';
+import { LayoutDto } from '../../nodes/dto/node-crud.dto';
 import { MEMO_COLORS } from '../../memos/schemas/memo.schema';
 
-export class CanvasBlockDto {
+export class CanvasNodeDto {
   @IsString()
   id: string;
 
@@ -64,8 +64,8 @@ export class CanvasEdgeDto {
 export class PutCanvasDto {
   @IsArray()
   @ValidateNested({ each: true })
-  @Type(() => CanvasBlockDto)
-  blocks: CanvasBlockDto[];
+  @Type(() => CanvasNodeDto)
+  nodes: CanvasNodeDto[];
 
   @IsArray()
   @ValidateNested({ each: true })

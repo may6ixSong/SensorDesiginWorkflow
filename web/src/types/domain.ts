@@ -24,7 +24,7 @@ export type NetworkKind = 'OA' | 'HPC' | null;
 
 /**
  * 권한 한 벌 — **부서 다중 + 개별 사용자 다중**(설계서 01장 §3.3).
- * workflow의 editAccess/viewAccess, block.recipients 전부 이 모양을 쓴다.
+ * workflow의 editAccess/viewAccess, node.recipients 전부 이 모양을 쓴다.
  */
 export interface AccessGrant {
   departments: string[];
@@ -56,8 +56,8 @@ export type Milestone = ScheduleSpan;
 
 /**
  * workflow 하나만의 일정. 생성 시 마일스톤을 복사해 시작하지만 그 뒤로는 완전히 독립이라
- * 칸 수·이름·날짜가 전부 다를 수 있고 서로 겹쳐도 된다. 블록(BlockDto.phaseId)이 가리키는
- * 대상이며, 지워지면 그 블록은 "일정 유실" 상태로 캔버스에 남는다.
+ * 칸 수·이름·날짜가 전부 다를 수 있고 서로 겹쳐도 된다. 노드(NodeDto.phaseId)가 가리키는
+ * 대상이며, 지워지면 그 노드는 "일정 유실" 상태로 캔버스에 남는다.
  */
 export type WorkflowPhase = ScheduleSpan;
 
@@ -222,18 +222,18 @@ export interface CommentDto {
 }
 
 /* ------------------------------------------------------------------ *
- * Block (캔버스 위의 자리)
+ * Node (캔버스 위의 자리)
  * ------------------------------------------------------------------ */
 
 /**
- * publish 3상태(설계서 03장 §2.2). 블록에는 **버전 숫자를 쓰지 않고** 이 배지만 그린다.
+ * publish 3상태(설계서 03장 §2.2). 노드에는 **버전 숫자를 쓰지 않고** 이 배지만 그린다.
  *   unpublished    — published 버전이 하나도 없다
  *   published      — 있고, 마지막 release 이후 major 변화가 없다
  *   newlyPublished — 있고, 마지막 release 이후 major가 올라갔다(= 다음 release 대상)
  */
 export type PublishState = 'unpublished' | 'published' | 'newlyPublished';
 
-export interface BlockDto {
+export interface NodeDto {
   id: string;
   workflowId: string;
   phaseId: string;
@@ -245,7 +245,7 @@ export interface BlockDto {
   /** 열람 권한이 없으면 masked 형태로 온다. 미매핑이면 null. */
   artifact: ArtifactDto | MaskedArtifactDto | null;
   publishState: PublishState;
-  /** artifact가 매핑된 block에서만 값이 있다 — A/B/C 전부 공통이다(설계서 04장 §3.2). */
+  /** artifact가 매핑된 node에서만 값이 있다 — A/B/C 전부 공통이다(설계서 04장 §3.2). */
   recipients: AccessGrant | null;
   series: string | null;
   seriesIdx: number;
@@ -319,7 +319,7 @@ export interface ReleasedVersionDto {
 }
 
 export interface ReleaseItemSourceDto {
-  blockId: string;
+  nodeId: string;
   artifactId: string | null;
   artifactName: string;
   /** null이면 그 source가 아직 한 번도 publish되지 않았다 — "아직 전달되지 않음". */
@@ -327,7 +327,7 @@ export interface ReleaseItemSourceDto {
 }
 
 export interface ReleaseItemDto {
-  blockId: string;
+  nodeId: string;
   artifactId: string;
   artifactName: string;
   tier: Tier;
@@ -383,7 +383,7 @@ export interface ReleaseDto {
 
 /** release 다이얼로그가 쓰는 미리보기 한 줄. 실행과 같은 로직으로 계산된다. */
 export interface ReleasePreviewItemDto {
-  blockId: string;
+  nodeId: string;
   artifactId: string;
   artifactName: string;
   tier: Tier;
@@ -400,7 +400,7 @@ export interface ReleasePreviewItemDto {
    * 나머지는 직전 release의 선택을 그대로 이어받으므로 다시 묻지 않는다(설계서 05장 §4.2).
    */
   sources: {
-    blockId: string;
+    nodeId: string;
     artifactId: string;
     artifactName: string;
     candidates: ReleasedVersionDto[];
@@ -459,10 +459,10 @@ export interface MyReleaseRowDto {
   published: boolean;
 }
 
-/** 내 부서가 주는 산출물 한 자리. 행의 정체성은 artifact가 아니라 block이다. */
+/** 내 부서가 주는 산출물 한 자리. 행의 정체성은 artifact가 아니라 node이다. */
 export interface MyArtifactRowDto {
-  blockId: string;
-  blockName: string;
+  nodeId: string;
+  nodeName: string;
   workflowId: string;
   workflowName: string;
   workflowDepartment: string;
@@ -513,7 +513,7 @@ export interface VersionEventDto {
   projectId: string;
   projectCode: string;
   projectName: string;
-  placements: { workflowId: string; workflowName: string; department: string; blockId: string }[];
+  placements: { workflowId: string; workflowName: string; department: string; nodeId: string }[];
 }
 
 export interface CalendarDto {

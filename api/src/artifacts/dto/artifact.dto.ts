@@ -105,7 +105,7 @@ export function toArtifactDto(artifact: ArtifactDocument, level: AccessLevel): A
 
 /**
  * 열람 권한이 전혀 없는 산출물을 목록에 실을 때 쓰는 최소 표현.
- * 캔버스는 블록의 **존재**를 그려야 하지만, 버전 라벨·링크·경로는 응답에서 빠져야 한다.
+ * 캔버스는 노드의 **존재**를 그려야 하지만, 버전 라벨·링크·경로는 응답에서 빠져야 한다.
  */
 export interface MaskedArtifactDto {
   id: string;

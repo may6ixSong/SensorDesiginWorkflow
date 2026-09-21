@@ -5,7 +5,7 @@ import { Actor } from '../common/actor';
 import { Release, ReleaseDocument } from '../releases/schemas/release.schema';
 import { Artifact, ArtifactDocument, ArtifactVersion } from '../artifacts/schemas/artifact.schema';
 import { ProjectDocument } from '../projects/schemas/project.schema';
-import { MyScope, MyScopeService, ScopedBlock } from './my-scope.service';
+import { MyScope, MyScopeService, ScopedNode } from './my-scope.service';
 import {
   CalendarDto,
   MyArtifactRowDto,
@@ -27,8 +27,8 @@ type Scoped<T> = T | null;
  * My Assignment (설계서 09장) — 과제 경계를 넘어 "내 일"만 모아 보여주는 화면의 뒤편.
  *
  * ★ 이 서비스는 **외부 서비스를 한 번도 호출하지 않는다.** 목록·달력에 필요한 판정이
- *   전부 SIREN이 직접 들고 있는 값(project 로스터, workflow.department, block.intent,
- *   block.recipients, release의 파생 필드)으로 끝나기 때문이다. 산출물별 라이브 권한
+ *   전부 SIREN이 직접 들고 있는 값(project 로스터, workflow.department, node.intent,
+ *   node.recipients, release의 파생 필드)으로 끝나기 때문이다. 산출물별 라이브 권한
  *   판정(게이트 2)은 행을 눌러 release 상세를 열 때 그 한 건에 대해서만 돈다.
  *
  * ★ Admin은 어느 엔드포인트에서도 필터가 없다 — 전부 읽는다(사용자 요청).
@@ -114,7 +114,7 @@ export class AssignmentsService {
    * ---------------------------------------------------------------- */
 
   /**
-   * 내 부서 workflow의 own block 중 artifact가 매핑된 것 전부(모든 과제·모든 workflow).
+   * 내 부서 workflow의 own node 중 artifact가 매핑된 것 전부(모든 과제·모든 workflow).
    * **최근 1년 안에 움직인 것만** 가져오고, 최근 순으로 준다.
    *
    * "움직였다"는 artifact 문서의 `updatedAt`과 마지막 버전 사건 중 더 최근 쪽이다 —
@@ -143,8 +143,8 @@ export class AssignmentsService {
     const workflowById = new Map(scope.myWorkflows.map((w) => [w.workflowId, w]));
 
     const rows: MyArtifactRowDto[] = [];
-    for (const block of scope.myOwnBlocks) {
-      const artifact = byId.get(block.artifactId);
+    for (const node of scope.myOwnNodes) {
+      const artifact = byId.get(node.artifactId);
       if (!artifact) continue;
 
       // DB 필터는 배열 멀티키라 과매치된다(다른 원소가 범위 양끝을 나눠 만족해도 문서가
@@ -152,23 +152,23 @@ export class AssignmentsService {
       const updatedAt = this.lastActivityAt(artifact);
       if (updatedAt.getTime() < cutoff.getTime()) continue;
 
-      const workflow = workflowById.get(block.workflowId);
-      const project = projectById.get(block.projectId);
+      const workflow = workflowById.get(node.workflowId);
+      const project = projectById.get(node.projectId);
       const versions = artifact.versions ?? [];
       const latest = this.latestVersion(versions);
 
       rows.push({
-        blockId: block.blockId,
-        blockName: block.name,
-        workflowId: block.workflowId,
+        nodeId: node.nodeId,
+        nodeName: node.name,
+        workflowId: node.workflowId,
         workflowName: workflow?.name ?? '',
         workflowDepartment: workflow?.department ?? '',
-        projectId: block.projectId,
+        projectId: node.projectId,
         projectCode: project?.code ?? '',
         projectName: project?.name ?? '',
-        phaseId: block.phaseId,
+        phaseId: node.phaseId,
 
-        artifactId: block.artifactId,
+        artifactId: node.artifactId,
         artifactName: artifact.name,
         tier: artifact.tier,
         network: artifact.network ?? null,
@@ -188,8 +188,8 @@ export class AssignmentsService {
         versionCount: versions.length,
         publishedVersionCount: versions.filter((v) => v.isPublished).length,
 
-        recipientDepartments: block.recipientDepartments,
-        recipientUserCount: block.recipientUsers.length,
+        recipientDepartments: node.recipientDepartments,
+        recipientUserCount: node.recipientUsers.length,
 
         updatedAt: updatedAt.toISOString(),
       });
@@ -247,22 +247,22 @@ export class AssignmentsService {
 
     const projectById = this.projectIndex(scope);
     const workflowById = new Map(scope.myWorkflows.map((w) => [w.workflowId, w]));
-    const placementsByArtifact = new Map<string, ScopedBlock[]>();
-    for (const b of scope.myOwnBlocks) {
-      const list = placementsByArtifact.get(b.artifactId) ?? [];
-      list.push(b);
-      placementsByArtifact.set(b.artifactId, list);
+    const placementsByArtifact = new Map<string, ScopedNode[]>();
+    for (const n of scope.myOwnNodes) {
+      const list = placementsByArtifact.get(n.artifactId) ?? [];
+      list.push(n);
+      placementsByArtifact.set(n.artifactId, list);
     }
 
     const events: VersionEventDto[] = [];
     for (const artifact of artifacts) {
       const artifactId = artifact._id.toString();
       const project = projectById.get(artifact.projectId.toString());
-      const placements = (placementsByArtifact.get(artifactId) ?? []).map((b) => ({
-        workflowId: b.workflowId,
-        workflowName: workflowById.get(b.workflowId)?.name ?? '',
-        department: workflowById.get(b.workflowId)?.department ?? '',
-        blockId: b.blockId,
+      const placements = (placementsByArtifact.get(artifactId) ?? []).map((n) => ({
+        workflowId: n.workflowId,
+        workflowName: workflowById.get(n.workflowId)?.name ?? '',
+        department: workflowById.get(n.workflowId)?.department ?? '',
+        nodeId: n.nodeId,
       }));
 
       for (const v of artifact.versions ?? []) {

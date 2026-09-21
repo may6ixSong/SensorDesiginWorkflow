@@ -41,7 +41,7 @@ export class LayoutDto {
   h: number;
 }
 
-export class CreateBlockDto {
+export class CreateNodeDto {
   @IsString()
   @MinLength(1)
   @MaxLength(160)
@@ -55,8 +55,8 @@ export class CreateBlockDto {
   layout: LayoutDto;
 
   /**
-   * 이 block이 내가 **주는(own)** 산출물인지 **받는(received)** 산출물인지(설계서 03장
-   * §5.2, 04장 §6). 생성 후에는 바꾸지 않는다 — 방향을 바꾸고 싶으면 block을 새로 만든다.
+   * 이 node가 내가 **주는(own)** 산출물인지 **받는(received)** 산출물인지(설계서 03장
+   * §5.2, 04장 §6). 생성 후에는 바꾸지 않는다 — 방향을 바꾸고 싶으면 node를 새로 만든다.
    */
   @IsOptional()
   @IsIn(['own', 'received'])
@@ -74,7 +74,7 @@ export class CreateBlockDto {
   newArtifact?: NewArtifactSourceDto;
 }
 
-export class UpdateBlockDto {
+export class UpdateNodeDto {
   @IsOptional()
   @IsString()
   @MinLength(1)
@@ -93,5 +93,5 @@ export class UpdateBlockDto {
   newArtifact?: NewArtifactSourceDto;
 }
 
-/** block의 recipient 교체 — A/B/C 전부 공통이다(설계서 04장 §3.2). */
+/** node의 recipient 교체 — A/B/C 전부 공통이다(설계서 04장 §3.2). */
 export class ReplaceRecipientsDto extends AccessGrantDto {}
