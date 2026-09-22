@@ -31,8 +31,6 @@ interface Props {
   onHl: boolean;
   dimLink: boolean;
   hasHl: boolean;
-  /** 수신 부서 필터에서 제외됐다 — 숨기지 않고 흐리게만 한다(flow가 끊겨 보이면 안 된다). */
-  filteredOut?: boolean;
   onOpen: (id: string) => void;
   onPinClick: (id: string, e: React.MouseEvent) => void;
   onGripDown: (id: string, e: React.PointerEvent) => void;
@@ -54,7 +52,7 @@ interface Props {
  *   산출물의 내용이지 캔버스 구조가 아니다(설계서 03장 §1).
  */
 export function NodeCard({
-  d, phase, orphan = false, edit, canEdit, isSel, onHl, dimLink, hasHl, filteredOut = false,
+  d, phase, orphan = false, edit, canEdit, isSel, onHl, dimLink, hasHl,
   onOpen, onPinClick, onGripDown, linkActive, registerRef,
   onPointerDown, onPointerMove, onPointerUp, onClick, deptLabel,
 }: Props) {
@@ -148,7 +146,7 @@ export function NodeCard({
           border: `${emph ? 2 : 1.5}px ${orphan || received ? 'dashed' : 'solid'} ${edgeColor}`,
           boxShadow: emph ? `0 0 0 4px ${T.selectRing}, ${T.shMd}` : T.shSm,
           overflow: 'hidden',
-          opacity: unrelated || filteredOut ? 0.32 : 1,
+          opacity: unrelated ? 0.32 : 1,
           transition: edit
             ? 'opacity .15s'
             : 'box-shadow .18s, transform .18s, border-color .16s, opacity .18s',
