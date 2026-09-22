@@ -21,6 +21,7 @@ export function toReleaseDto(release: ReleaseDocument, visibleArtifactIds: Set<s
     releasedBy: release.releasedBy,
     note: release.note,
     workflowAt: release.workflowAt,
+    targetDepartments: [...(release.targetDepartments ?? [])],
     recipientDepartments: [...(release.recipientDepartments ?? [])],
     items: (release.items ?? []).map((item) => {
       const visible = visibleArtifactIds.has(item.artifactId);
