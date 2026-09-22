@@ -20,7 +20,15 @@ export const queryKeys = {
 
   /** Release — workflow별 목록, 미리보기, 부서별 필터 뷰, 산출물별 타임라인. */
   releases: (workflowId: string) => ['workflows', workflowId, 'releases'] as const,
-  releasePreview: (workflowId: string) => ['workflows', workflowId, 'release', 'preview'] as const,
+  /**
+   * 그 workflow의 preview 캐시 **전 변종**을 가리키는 prefix — 부서 조합별로 키가 갈라지므로
+   * (`releasePreview`) "전부 무효화"에는 이 prefix가 필요하다. 세그먼트 문자열을 여기 한 곳에만
+   * 두어, 나중에 이름이 바뀌어도 호출부가 조용히 어긋나지 않게 한다.
+   */
+  releasePreviewAll: (workflowId: string) =>
+    ['workflows', workflowId, 'release', 'preview'] as const,
+  releasePreview: (workflowId: string, departments: string[] = []) =>
+    [...queryKeys.releasePreviewAll(workflowId), [...departments].sort().join(',')] as const,
   releasesByDepartment: (projectId: string, department: string) =>
     ['projects', projectId, 'releases', 'department', department] as const,
   releasesByArtifact: (artifactId: string) => ['artifacts', artifactId, 'releases'] as const,
