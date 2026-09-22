@@ -28,12 +28,6 @@ interface Props {
   workflow: WorkflowDto;
   phases: WorkflowPhase[];
   canEdit: boolean;
-  /**
-   * 수신 부서 필터 — 선택된 부서가 recipient에 없는 노드를 흐리게 한다.
-   * **숨기지 않는다**: flow 구조가 끊겨 보이면 안 되기 때문이다(설계서 03장 §6.1).
-   * 비어 있으면 전체를 그대로 보여준다.
-   */
-  recipientFilter?: string[];
   /** 저장 완료(성공/실패 무관) 후 호출할 콜백을 받는다 — 편집 종료를 저장 이후로 미뤄 쿼리 재활성화 레이스를 막는다. */
   onSaveLayout: (onSettled: () => void) => void;
   /**
@@ -53,19 +47,10 @@ type Blk = CanvasNode | CanvasMemo;
  * flow 하이라이트가 모두 여기서 완결된다 (설계서 3.7~3.9, 7.1, 부록 A.7).
  */
 export function Canvas({
-  workflow, phases, canEdit, recipientFilter, onSaveLayout, onCancelEdit,
+  workflow, phases, canEdit, onSaveLayout, onCancelEdit,
 }: Props) {
   const { t } = useTranslation();
   const { label: deptLabel } = useDepartmentLabel(workflow.projectId);
-  /**
-   * 수신 부서 필터 — 걸린 노드는 흐려질 뿐 사라지지 않는다. 필터가 비어 있으면 아무것도
-   * 흐리게 하지 않는다(설계서 03장 §6.1).
-   */
-  const isFilteredOut = useMemo(() => {
-    const wanted = recipientFilter ?? [];
-    if (!wanted.length) return () => false;
-    return (n: CanvasNode) => !n.recipientDepartments.some((d) => wanted.includes(d));
-  }, [recipientFilter]);
   /** 노드 아이콘/LIVE 배지에 쓸 서비스별 tier(Hub 설계서 §5.1) — Hub 레지스트리 캐시를 그대로 쓴다. */
   const vpRef = useRef<HTMLDivElement>(null);
   const cvRef = useRef<HTMLDivElement>(null);
@@ -684,7 +669,6 @@ export function Canvas({
               d={d}
               phase={phases.find((p) => p.id === d.phase)}
               orphan={isOrphanPhase(phases, d.phase)}
-              filteredOut={isFilteredOut(d)}
               edit={edit}
               canEdit={canEdit}
               isSel={sel === d.id}
