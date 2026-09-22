@@ -12,6 +12,7 @@ import { toast } from '@/store/toastStore';
 import { Ey } from '@/components/common/Panel';
 import { SirenButton } from '@/components/common/SirenButton';
 import { Icon } from '@/components/common/Icon';
+import { useDepartmentLabel } from '@/hooks/useDepartmentLabel';
 import { ArtifactVersionContents } from './ArtifactVersionContents';
 import { ArtifactVersionTree } from './ArtifactVersionTree';
 import { AddVersionDialog } from './AddVersionDialog';
@@ -48,6 +49,8 @@ export function CalypsoInlinePanel({ artifactId, projectId, nodeId, releases, on
   const [picked, setPicked] = useState<CalypsoVersionView | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [publishing, setPublishing] = useState<CalypsoVersionView | null>(null);
+  /** artifact의 `department`는 부서 id다 — 표지에 찍을 이름은 project 캐시에서 찾는다(02장 §9.3). */
+  const { label: deptLabel } = useDepartmentLabel(projectId);
 
   const { data: a, isLoading, isError } = useQuery({
     queryKey: queryKeys.calypsoArtifact(artifactId),
@@ -113,7 +116,12 @@ export function CalypsoInlinePanel({ artifactId, projectId, nodeId, releases, on
     // page와 같은 자리 배치를 슬라이드 폭에 맞게 옮겨온다(사용자 요청).
     <Box sx={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
       <Box sx={{ flex: 2, minWidth: 0, borderRadius: '12px', overflow: 'hidden' }}>
-        <ArtifactVersionContents a={a} version={shown} onDownload={handleDownload} />
+        <ArtifactVersionContents
+          a={a}
+          version={shown}
+          departmentLabel={deptLabel(a.department)}
+          onDownload={handleDownload}
+        />
       </Box>
 
       <Box sx={{ flex: 1, minWidth: 0 }}>
