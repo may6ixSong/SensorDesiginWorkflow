@@ -40,6 +40,16 @@ function ArtifactList({ project }: { project: ProjectDetailDto }) {
     [project.members, user?.KnoxID],
   );
 
+  /**
+   * 부서 id → 이름. project를 이미 손에 들고 있으니 `useDepartmentLabel` 훅을 부를 필요 없이
+   * 여기서 바로 만든다(02장 §9.3) — 어차피 같은 캐시를 읽는다.
+   */
+  const deptNames = useMemo(
+    () => new Map(project.departments.map((d) => [d.id, d.name])),
+    [project.departments],
+  );
+  const deptLabel = (id: string) => deptNames.get(id) ?? id;
+
   const { data = [], isLoading, isError } = useQuery({
     queryKey: queryKeys.calypsoArtifacts(project._id),
     queryFn: () => listCalypsoArtifacts({ projectId: project._id }),
@@ -103,7 +113,12 @@ function ArtifactList({ project }: { project: ProjectDetailDto }) {
       ) : (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
           {data.map((a) => (
-            <ArtifactRow key={a.id} artifact={a} onOpen={() => navigate(`/projects/${project._id}/artifacts/${a.id}`)} />
+            <ArtifactRow
+              key={a.id}
+              artifact={a}
+              departmentLabel={deptLabel(a.department)}
+              onOpen={() => navigate(`/projects/${project._id}/artifacts/${a.id}`)}
+            />
           ))}
         </Box>
       )}
@@ -135,7 +150,14 @@ function iconForCalypsoArtifact(a: CalypsoArtifact): IconName {
   return 'pending';
 }
 
-function ArtifactRow({ artifact: a, onOpen }: { artifact: CalypsoArtifact; onOpen: () => void }) {
+function ArtifactRow({
+  artifact: a, departmentLabel, onOpen,
+}: {
+  artifact: CalypsoArtifact;
+  /** `a.department`는 부서 id라 그대로 못 쓴다 — 호출부가 이름으로 풀어 내려 준다(02장 §9.3). */
+  departmentLabel: string;
+  onOpen: () => void;
+}) {
   const { resolveUser } = useDirectory();
   const by = resolveUser(a.createdBy);
   const v = a.latestVersion;
@@ -169,7 +191,7 @@ function ArtifactRow({ artifact: a, onOpen }: { artifact: CalypsoArtifact; onOpe
         )}
       </Box>
 
-      <Badge color={T.dm} bg={T.sf2} borderColor={T.ln}>{a.department}</Badge>
+      <Badge color={T.dm} bg={T.sf2} borderColor={T.ln}>{departmentLabel}</Badge>
 
       <Box sx={{ display: 'flex', alignItems: 'center', gap: '6px', flex: '0 0 130px' }}>
         <UserAvatar user={by} size={20} />
@@ -199,7 +221,20 @@ function RegisterDialog({
    * picker를 보여준다 — 자동 배정할 값이 없기 때문이다.
    */
   const needsPicker = isAdmin || myDepartments.length !== 1;
-  const fallbackDept = project.departments[0] ?? myDepartments[0] ?? '';
+  /**
+   * 고르는 값은 부서 **id**이고 화면에 보이는 것은 이름이다(02장 §9.3). `project.departments`가
+   * 아직 비어 있는(부서를 하나도 등록하지 않은) 과제라면 내 소속 id를 그대로 후보로 쓰되,
+   * 그때는 이름을 찾을 곳이 없으므로 id를 그대로 보여 준다 — 없는 이름을 지어내지 않는다.
+   */
+  const deptNameById = useMemo(
+    () => new Map(project.departments.map((d) => [d.id, d.name])),
+    [project.departments],
+  );
+  const deptLabel = (id: string) => deptNameById.get(id) ?? id;
+  const candidateDeptIds = project.departments.length
+    ? project.departments.map((d) => d.id)
+    : myDepartments;
+  const fallbackDept = candidateDeptIds[0] ?? '';
   const autoDept = !needsPicker ? myDepartments[0] : '';
 
   const [name, setName] = useState('');
@@ -271,14 +306,13 @@ function RegisterDialog({
           <SelectInput
             value={department || fallbackDept}
             onChange={setDepartment}
-            options={(project.departments.length ? project.departments : myDepartments)
-              .map((d) => ({ value: d, label: d }))}
+            options={candidateDeptIds.map((id) => ({ value: id, label: deptLabel(id) }))}
           />
         </Field>
       ) : (
         <Field label="Department">
           <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '3px 0' }}>
-            <Badge color={T.pr} bg={T.prSoft} borderColor={T.prLine}>{autoDept}</Badge>
+            <Badge color={T.pr} bg={T.prSoft} borderColor={T.prLine}>{deptLabel(autoDept)}</Badge>
             <Box sx={{ fontSize: 11, color: T.dm2 }}>assigned from your project membership</Box>
           </Box>
         </Field>
