@@ -106,6 +106,12 @@
     "delete": "Delete",
     "cancel": "Cancel"
   },
+  "list": {
+    "allDepartments": "All",
+    "noRecipientDepartment": "No department receives anything from this workflow yet. Set recipients on a node first.",
+    "noRecipientDepartmentPast": "This release didn't target any specific department when it was published.",
+    "nothingToReleaseInScope": "Nothing to release for this department"
+  },
   "canvas": {
     "editing": "Editing",
     "save": "Save",
@@ -161,12 +167,20 @@
     "notDelivered": "Not delivered yet",
     "changed": "Changed",
     "history": "Release history",
-    "carriedOver": "Carried over from the last release"
+    "carriedOver": "Carried over from the last release",
+    "noRecipientExcluded": "{{count}} node(s) have no recipient department and will not be delivered.",
+    "overlapTab": "overlap",
+    "nothingToRelease": "Nothing to release",
+    "nothingForTarget": "No artifact goes to this department. Close this dialog and pick another department, or set recipients on a node first."
   },
   "project": {
     "codeImmutable": "Project code and revision cannot be changed after creation.",
     "noAccess": "You do not have access to this project.",
     "noWorkflowAccess": "You do not have access to this workflow."
+  },
+  "node": {
+    "recipients": "Recipients — which departments receive this artifact",
+    "recipientsEmptyHint": "With no department, this artifact is never delivered by a release."
   },
   "recipientMatrix": {
     "tooltip": "Recipient departments by artifact",
