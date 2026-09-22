@@ -1,17 +1,18 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Box } from '@mui/material';
 import { Card, Ey } from '@/components/common/Panel';
 import { SirenButton } from '@/components/common/SirenButton';
 import { Icon } from '@/components/common/Icon';
 import { UserAvatar } from '@/components/common/Avatar';
 import { NetworkTag } from '@/components/artifact/ArtifactChips';
-import { FEEDBACK_STATUS_META, ReleaseFeedbackSection, StatusDot } from '@/components/release/ReleaseFeedbackThread';
+import { ReleaseFeedbackSection } from '@/components/release/ReleaseFeedbackThread';
 import { useDirectory } from '@/app/providers/DirectoryProvider';
 import { useComments } from '@/api/hooks/useComments';
-import { useAllReleaseFeedback } from '@/api/hooks/useAssignments';
 import { fmtAt } from '@/lib/canvasModel';
 import { useDepartmentLabel } from '@/hooks/useDepartmentLabel';
-import { NodeDto, NetworkKind, ReleaseDto, ReleaseFeedbackStatus, ReleasePreviewItemDto, WorkflowDto } from '@/types/domain';
+import { DepartmentChips } from './DepartmentChips';
+import { DepartmentDto, NodeDto, NetworkKind, ReleaseDto, ReleasePreviewItemDto, WorkflowDto } from '@/types/domain';
 import { CURSOR_POINTER, FONT_MONO, R, T, TNUM } from '@/theme/tokens';
 
 type OpenTab = 'overview' | 'recipients' | 'comments';
@@ -39,7 +40,11 @@ interface Props {
   canShowCurrent: boolean;
   previewItems: ReleasePreviewItemDto[];
   previewChangedCount: number;
-  recipientFilter: string[];
+  /** 수신 부서 필터 후보 — 그 과제에 등록된 부서. chip 탭이 여기서 그려진다(Task 6). */
+  departmentOptions: DepartmentDto[];
+  onOpenRelease: () => void;
+  /** 활성 부서 chip을 페이지에 알린다 — release 다이얼로그의 타겟 기본값이 된다(스펙 §6.4). */
+  onActiveDeptChange: (dept: string | null) => void;
   canEdit: boolean;
   workflowId: string;
   onSelectRelease: (id: string) => void;
@@ -64,10 +69,18 @@ interface Props {
  */
 export function ArtifactListView({
   workflow, nodes, sortedReleases, selected, showCurrent, canShowCurrent,
-  previewItems, previewChangedCount, recipientFilter, canEdit, workflowId,
+  previewItems, previewChangedCount, departmentOptions, onOpenRelease, onActiveDeptChange, canEdit, workflowId,
   onSelectRelease, onSelectCurrent, onOpenArtifact, onAddArtifact,
 }: Props) {
   const { resolveUser } = useDirectory();
+  const { t } = useTranslation();
+  /** 활성 부서 chip. null = All. 예전의 다중 선택 recipientFilter를 대체한다(스펙 §6.2). */
+  const [activeDept, setActiveDept] = useState<string | null>(null);
+  /** chip 클릭으로 사용자가 직접 고른 값 — 즉시 페이지에도 알린다(release 타겟의 기본값). */
+  const changeActiveDept = (next: string | null) => {
+    setActiveDept(next);
+    onActiveDeptChange(next);
+  };
   const { label: deptLabel } = useDepartmentLabel(workflow.projectId);
   const nodeById = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
   const phaseNameById = useMemo(
@@ -121,11 +134,49 @@ export function ArtifactListView({
     }));
   }, [showCurrent, previewItems, nodes, nodeById, phaseNameById, selected]);
 
+  /**
+   * chip 후보 — Current는 "이 workflow의 node에 recipient로 한 번이라도 등장한 부서",
+   * 과거 release는 "그 release가 실제로 전달한 부서"다(스펙 §6.2·§6.3). 표시 순서는
+   * 과제 부서 순서를 따른다.
+   */
+  const chipDepartments = useMemo(() => {
+    const present = new Set<string>();
+    if (showCurrent) {
+      rows.forEach((r) => r.recipientDepartments.forEach((d) => present.add(d)));
+    } else {
+      (selected?.recipientDepartments ?? []).forEach((d) => present.add(d));
+    }
+    const ordered = departmentOptions.filter((d) => present.has(d.id)).map((d) => d.id);
+    // 과제 부서 목록에서 지워진 id도 이력에는 남을 수 있다 — 뒤에 붙여 잃지 않는다.
+    const extra = [...present].filter((d) => !ordered.includes(d));
+    return [...ordered, ...extra];
+  }, [showCurrent, rows, selected, departmentOptions]);
+
+  /**
+   * 활성 chip을 유효한 값으로 유지하고, 그 값을 페이지에도 알린다(release 타겟의 기본값).
+   *
+   * ★ 이미 고른 chip이 여전히 후보에 있으면 **건드리지 않는다** — recipient 구성이 바뀔 때마다
+   *   사용자의 선택을 All로 되돌리면 "recipient를 고치고 부서별로 확인한다"는 주 사용 흐름이
+   *   깨진다. Current는 null(All)이 유효하고, 과거 release는 All 탭이 없으므로(스펙 §6.3)
+   *   null로 남을 수 없어 첫 후보로 떨어진다.
+   * ★ 부모 통지는 setState updater **밖에서** 한다 — updater 안에서 side effect를 부르면
+   *   StrictMode에서 두 번 실행된다.
+   */
+  useEffect(() => {
+    const next =
+      activeDept !== null && chipDepartments.includes(activeDept)
+        ? activeDept
+        : showCurrent
+          ? null
+          : (chipDepartments[0] ?? null);
+    if (next !== activeDept) setActiveDept(next);
+    onActiveDeptChange(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showCurrent, selected?.id, chipDepartments.join(',')]);
+
   const filtered = useMemo(
-    () => rows.filter(
-      (r) => !recipientFilter.length || r.recipientDepartments.some((d) => recipientFilter.includes(d)),
-    ),
-    [rows, recipientFilter],
+    () => (activeDept ? rows.filter((r) => r.recipientDepartments.includes(activeDept)) : rows),
+    [rows, activeDept],
   );
 
   const ownRows = useMemo(
@@ -216,15 +267,46 @@ export function ArtifactListView({
 
       {/* 우측 — 선택된 release(또는 Current)의 artifact 표 */}
       <Box sx={{ flex: 1, minWidth: 0, overflowY: 'auto' }}>
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: '12px' }}>
-          {/* Current를 볼 때만 노출된다(사용자 확정, 설계서 05장 §7.1) — 과거 release는
-              그 시점의 스냅샷이라 여기서 새 node를 만드는 게 의미가 없다. */}
-          {canEdit && showCurrent && (
-            <SirenButton variant="primary" onClick={onAddArtifact}>
+        <DepartmentChips
+          departments={chipDepartments}
+          value={activeDept}
+          onChange={changeActiveDept}
+          deptLabel={deptLabel}
+          includeAll={showCurrent}
+        />
+
+        {showCurrent && chipDepartments.length === 0 && (
+          <Box sx={{ fontSize: 12, color: T.dm2, mb: '12px' }}>{t('list.noRecipientDepartment')}</Box>
+        )}
+
+        {/* 과거 release인데 chip 후보가 없는 경우 — recipientDepartments가 비어 있던
+            레거시 release다. 이 화면엔 All 탭이 없으므로(스펙 §6.3) chip도 설명도 없이
+            표만 그리면 "부서 필터 없는 전체 보기"로 조용히 되돌아가 버린다 — 대신 이유를
+            보여주고 표는 그리지 않는다(아래 ArtifactGroup 렌더링 조건 참고). */}
+        {!showCurrent && selected && chipDepartments.length === 0 && (
+          <Box sx={{ fontSize: 12, color: T.dm2, mb: '12px' }}>{t('list.noRecipientDepartmentPast')}</Box>
+        )}
+
+        {/* Current일 때만 — 과거 release는 그 시점의 스냅샷이라 여기서 release를 내거나
+            새 node를 만드는 게 의미가 없다(설계서 05장 §7.1, 스펙 §6.3). */}
+        {canEdit && showCurrent && (
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: '12px' }}>
+            <SirenButton
+              variant="primary"
+              onClick={onOpenRelease}
+              disabled={filtered.length === 0}
+              title={filtered.length === 0 ? t('list.nothingToReleaseInScope') : undefined}
+            >
+              <Icon name="send" /> {t('release.title')}
+            </SirenButton>
+            {/* 이 행에서 solid(primary)로 강조되는 건 Release뿐이다(사용자 요청) — release는
+                되돌릴 수 없는 동작이고(설계서 05장 §4.5), node 추가는 그냥 일상적인 편집이라
+                굳이 같은 무게로 강조할 이유가 없다. */}
+            <SirenButton variant="default" onClick={onAddArtifact}>
               <Icon name="plus" /> Add New Node
             </SirenButton>
-          )}
-        </Box>
+          </Box>
+        )}
 
         {!showCurrent && selected && (
           <>
@@ -250,23 +332,30 @@ export function ArtifactListView({
               </Box>
             )}
 
-            {/* 부서별 status/comment 대시보드(설계서 05장 §7.1.1) — Comments 컬럼과 같은
-                기준으로 workflow Edit Access에게만 보인다. 캔버스/list view가 공유하는
-                recipientFilter가 비어 있으면(전체 부서) 요약을, 부서로 좁혔으면 그 부서(들)의
-                스레드 전체를 보여준다. */}
-            {canEdit && (
-              <ReleaseFeedbackDashboard
-                releaseId={selected.id}
-                projectId={workflow.projectId}
-                recipientDepartments={selected.recipientDepartments}
-                recipientFilter={recipientFilter}
-                deptLabel={deptLabel}
-              />
+            {/* 그 부서가 남긴 status/comment 스레드(설계서 05장 §7.1.1, 스펙 §6.3) —
+                chip마다 하나다. Comments 컬럼과 같은 기준으로 workflow Edit Access에게만
+                보인다. 여기서 답글도 달 수 있다(release를 낸 쪽에서 다는 답글). */}
+            {canEdit && activeDept && (
+              <Box
+                sx={{
+                  border: `1px solid ${T.ln}`, borderRadius: `${R.sm}px`,
+                  padding: '12px 14px', background: T.sf2, mb: '18px',
+                }}
+              >
+                <ReleaseFeedbackSection
+                  releaseId={selected.id}
+                  department={activeDept}
+                  projectId={workflow.projectId}
+                />
+              </Box>
             )}
           </>
         )}
 
-        {(showCurrent || selected) && (
+        {/* 과거 release인데 chip 후보가 없으면(위 noRecipientDepartmentPast 메시지) 표를
+            그리지 않는다 — activeDept가 null로 남아 filtered가 필터 없이 전부를 보여주는
+            상태라, 그대로 그리면 "All 없는 화면에 조용히 전체 보기"가 되어버린다. */}
+        {(showCurrent || (selected && chipDepartments.length > 0)) && (
           <>
             <ArtifactGroup title="Deliverable" rows={ownRows} workflowId={workflowId} canEdit={canEdit} onOpen={onOpenArtifact} deptLabel={deptLabel} />
             <Box sx={{ height: '18px' }} />
@@ -274,100 +363,6 @@ export function ArtifactListView({
           </>
         )}
       </Box>
-    </Box>
-  );
-}
-
-/**
- * 부서별 release status/comment 대시보드(설계서 05장 §7.1.1) — 09장 §4의 assumption
- * A4를 완성한다: "workflow(낸 쪽)이 여러 부서의 상태를 한눈에 모아보는 화면"이 이제
- * workflow의 list view 안, 과거 release를 열었을 때 산출물 표 위에 얹힌다.
- *
- * 필터 없음(전체 부서) → 부서마다 요약 카드 하나(최신 status + 댓글 수)만, 한 번에
- * 부르는 `GET .../feedback/all`로. 부서 1개 이상으로 좁혔을 때 → 그 부서(들)의 스레드
- * 전체(답글·작성 폼 포함)를 `ReleaseFeedbackSection`으로 — My Assignment와 같은
- * 컴포넌트를 재사용하므로 여기서 다는 답글도 완전히 동작한다.
- */
-function ReleaseFeedbackDashboard({
-  releaseId, projectId, recipientDepartments, recipientFilter, deptLabel,
-}: {
-  releaseId: string;
-  projectId: string;
-  recipientDepartments: string[];
-  recipientFilter: string[];
-  deptLabel: (deptId: string) => string;
-}) {
-  if (!recipientDepartments.length) return null;
-
-  if (recipientFilter.length > 0) {
-    const filtered = recipientDepartments.filter((d) => recipientFilter.includes(d));
-    if (!filtered.length) return null;
-    return (
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: '18px', mb: '18px' }}>
-        {filtered.map((dept) => (
-          <Box key={dept} sx={{ border: `1px solid ${T.ln}`, borderRadius: `${R.sm}px`, padding: '12px 14px', background: T.sf2 }}>
-            <ReleaseFeedbackSection releaseId={releaseId} department={dept} projectId={projectId} />
-          </Box>
-        ))}
-      </Box>
-    );
-  }
-
-  return (
-    <ReleaseFeedbackSummary
-      releaseId={releaseId}
-      recipientDepartments={recipientDepartments}
-      deptLabel={deptLabel}
-    />
-  );
-}
-
-/** "전체 부서" 요약 — 부서마다 최신 top-level status + 댓글 수만 카드로. */
-function ReleaseFeedbackSummary({
-  releaseId, recipientDepartments, deptLabel,
-}: {
-  releaseId: string;
-  recipientDepartments: string[];
-  deptLabel: (deptId: string) => string;
-}) {
-  const { data, isLoading } = useAllReleaseFeedback(releaseId, true);
-
-  return (
-    <Box sx={{ mb: '18px' }}>
-      <Ey sx={{ mb: '9px' }}>Department status &amp; comments — all recipients</Ey>
-      {isLoading ? (
-        <Box sx={{ fontSize: 11.5, color: T.dm2 }}>Loading…</Box>
-      ) : (
-        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '10px' }}>
-          {recipientDepartments.map((dept) => {
-            const entries = data?.[dept] ?? [];
-            const topLevel = entries.filter((e) => !e.parentId);
-            const latestStatus: ReleaseFeedbackStatus = topLevel.length
-              ? (topLevel[topLevel.length - 1].status ?? 'accepted')
-              : 'accepted';
-            const meta = FEEDBACK_STATUS_META[latestStatus];
-            return (
-              <Box
-                key={dept}
-                sx={{
-                  border: `1px solid ${meta.line}`, background: meta.bg, borderRadius: `${R.sm}px`,
-                  padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '5px',
-                }}
-              >
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-                  <StatusDot status={latestStatus} selected={false} />
-                  <Box sx={{ fontSize: 12.5, fontWeight: 700 }}>{deptLabel(dept)}</Box>
-                </Box>
-                <Box sx={{ fontSize: 11, color: T.dm2 }}>
-                  {entries.length === 0
-                    ? 'No comments yet'
-                    : `${entries.length} comment${entries.length > 1 ? 's' : ''} · ${meta.label}`}
-                </Box>
-              </Box>
-            );
-          })}
-        </Box>
-      )}
     </Box>
   );
 }
