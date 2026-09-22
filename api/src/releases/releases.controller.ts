@@ -37,11 +37,25 @@ export class ReleasesController {
     @InjectModel(Workflow.name) private readonly workflowModel: Model<WorkflowDocument>,
   ) {}
 
-  /** 지금 release하면 무엇이 나갈지. 실행과 같은 로직으로 계산한다. */
+  /**
+   * 지금 release하면 무엇이 나갈지. 실행과 **같은 로직**으로 계산한다(설계서 05장 §8).
+   *
+   * `departments`는 콤마로 구분한 부서 id 목록이다. **생략하면 All** — 그 workflow가
+   * 전달하는 전 부서를 겨냥한 것으로 본다. 필터링을 서버에서 하는 이유는 규칙이 FE에
+   * 다시 구현되면 미리보기와 결과가 어긋나기 때문이다(스펙 §5.1).
+   */
   @Get('workflows/:workflowId/release/preview')
   @WorkflowAccess('edit')
-  async preview(@CurrentWorkflow() workflow: WorkflowDocument, @CurrentActor() me: Actor) {
-    return this.releases.preview(workflow, me);
+  async preview(
+    @CurrentWorkflow() workflow: WorkflowDocument,
+    @CurrentActor() me: Actor,
+    @Query('departments') departments?: string,
+  ) {
+    const target = (departments ?? '')
+      .split(',')
+      .map((d) => d.trim())
+      .filter(Boolean);
+    return this.releases.preview(workflow, me, target);
   }
 
   /** 실행. 권한은 Edit Access 전원이다(설계서 05장 §4.4). */
