@@ -39,11 +39,15 @@ export class CanvasViewService {
       nodes.map((n) => n.artifactId).filter(Boolean) as any[],
     );
 
-    // publish 배지의 기준점 — 마지막 release가 그 산출물을 어떤 major로 실어 보냈는가.
-    const lastRelease = await this.releases.previous(workflow._id);
+    // publish 배지의 기준점 — 그 산출물이 담겼던 **가장 최근 release**가 어떤 major로
+    // 실어 보냈는가. 부서 타겟팅 이후로는 "가장 최근 release 한 건"이 아니라 산출물별로
+    // 따로 찾아야 한다(ReleasesService.baselineFor 참고) — 최신 release가 다른 부서를
+    // 겨냥했다면 이 산출물을 담지 않았을 수 있어서다.
+    const baseline = await this.releases.baselineFor(workflow._id);
     const lastMajorByArtifact = new Map<string, string | null>(
-      (lastRelease?.items ?? []).map((i) => [i.artifactId, i.published?.majorKey ?? null]),
+      [...baseline].map(([artifactId, item]) => [artifactId, item.published?.majorKey ?? null]),
     );
+    const hasAnyRelease = await this.releases.hasAnyRelease(workflow._id);
 
     // Recipients/Comments 탭 노출 여부의 기준(설계서 01장 §3.8 확장) — workflow 전체에 대해
     // 한 번만 판정하면 된다. node마다 다르지 않다.
@@ -63,7 +67,7 @@ export class CanvasViewService {
           node,
           artifact,
           level,
-          this.publishState(artifact, lastMajorByArtifact, lastRelease !== null),
+          this.publishState(artifact, lastMajorByArtifact, hasAnyRelease),
           canManageNodes,
         );
       }),
@@ -130,16 +134,17 @@ export class CanvasViewService {
     const level = artifact
       ? await this.artifactAccess.levelFor(actor, artifact, project)
       : null;
-    const lastRelease = await this.releases.previous(workflow._id);
+    const baseline = await this.releases.baselineFor(workflow._id);
     const lastMajorByArtifact = new Map<string, string | null>(
-      (lastRelease?.items ?? []).map((i) => [i.artifactId, i.published?.majorKey ?? null]),
+      [...baseline].map(([artifactId, item]) => [artifactId, item.published?.majorKey ?? null]),
     );
+    const hasAnyRelease = await this.releases.hasAnyRelease(workflow._id);
     const canManageNodes = workflowLevel(actor, workflow, project) === 'edit';
     return toNodeDto(
       node,
       artifact,
       level,
-      this.publishState(artifact, lastMajorByArtifact, lastRelease !== null),
+      this.publishState(artifact, lastMajorByArtifact, hasAnyRelease),
       canManageNodes,
     );
   }
