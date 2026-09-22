@@ -18,6 +18,7 @@ import {
   downloadCalypsoVersion, getCalypsoArtifact, releaseCalypsoArtifact,
   removeCalypsoEditor, removeCalypsoViewGrant, setCalypsoNetwork, setCalypsoRestrictView,
 } from '@/api/calypsoClient';
+import { useDepartmentLabel } from '@/hooks/useDepartmentLabel';
 import { toast } from '@/store/toastStore';
 import { T } from '@/theme/tokens';
 
@@ -31,6 +32,11 @@ export function ArtifactDetailPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [publishing, setPublishing] = useState<CalypsoVersionView | null>(null);
   const [tab, setTab] = useState<DetailTab>('versions');
+  /**
+   * Calypso artifact의 `department`는 SIREN `Project.departments[].id`다(02장 §9.3) — 이름은
+   * 이 과제 캐시에서 찾아 쓴다. 추가 네트워크 호출은 없다(이미 project를 본 화면의 캐시 재사용).
+   */
+  const { label: deptLabel } = useDepartmentLabel(projectId);
 
   const { data: a, isLoading, isError, error } = useQuery({
     queryKey: queryKeys.calypsoArtifact(id),
@@ -156,14 +162,19 @@ export function ArtifactDetailPage() {
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: '10px', mt: '4px' }}>
             <Box sx={{ fontSize: 18, fontWeight: 700, letterSpacing: '-.01em' }}>{a.name}</Box>
-            <Badge color={T.dm} bg={T.sf2} borderColor={T.ln}>{a.department}</Badge>
+            <Badge color={T.dm} bg={T.sf2} borderColor={T.ln}>{deptLabel(a.department)}</Badge>
             {a.myAccess === 'view' && <Badge color={T.dm} bg={T.sf2} borderColor={T.ln}>View only</Badge>}
           </Box>
         </Box>
 
         <Box sx={{ flex: 1, minHeight: 0, display: 'flex' }}>
           <Box sx={{ flex: 3, minWidth: 0, display: 'flex', borderRight: `1px solid ${T.ln}` }}>
-            <ArtifactVersionContents a={a} version={shown} onDownload={handleDownload} />
+            <ArtifactVersionContents
+              a={a}
+              version={shown}
+              departmentLabel={deptLabel(a.department)}
+              onDownload={handleDownload}
+            />
           </Box>
           <Box sx={{ flex: 1, minWidth: 320, background: T.sf2, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <NetworkField
