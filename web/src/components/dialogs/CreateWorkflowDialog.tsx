@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Box } from '@mui/material';
-import { Milestone } from '@/types/domain';
+import { DepartmentDto, Milestone } from '@/types/domain';
 import { ModalShell } from '@/components/common/ModalShell';
 import { SirenButton } from '@/components/common/SirenButton';
 import { Ey, Field, SelectInput, TextInput } from '@/components/common/Panel';
@@ -10,10 +10,12 @@ import { FONT_MONO, T } from '@/theme/tokens';
 
 interface Props {
   /**
-   * 고를 수 있는 부서 — "내가 이 과제에서 속한 부서"다(Admin이면 과제 전체 부서).
+   * 고를 수 있는 부서의 **id** — "내가 이 과제에서 속한 부서"다(Admin이면 과제 전체 부서).
    * 호출부가 lib/access.ts의 myDepartments()로 계산해 넘긴다.
    */
   myDepartments: string[];
+  /** 그 과제에 등록된 부서 전체 — 위 id를 사람이 읽는 이름으로 바꾸는 데만 쓴다(02장 §9.3). */
+  departmentOptions: DepartmentDto[];
   /** 새 workflow가 물려받을 과제 공통 일정 — 무엇이 복사되는지 미리 보여 준다. */
   milestones: Milestone[];
   onClose: () => void;
@@ -37,7 +39,7 @@ interface Props {
  *   (Admin은 과제 전체 부서를 갖는 것으로 계산되므로 이 경우에 걸리지 않는다).
  */
 export function CreateWorkflowDialog({
-  myDepartments, milestones, onClose, onCreate, saving, error,
+  myDepartments, departmentOptions, milestones, onClose, onCreate, saving, error,
 }: Props) {
   const [name, setName] = useState('');
   const [department, setDepartment] = useState(myDepartments[0] ?? '');
@@ -91,7 +93,10 @@ export function CreateWorkflowDialog({
               value={department}
               onChange={setDepartment}
               disabled={myDepartments.length === 1}
-              options={myDepartments.map((d) => ({ value: d, label: d }))}
+              options={myDepartments.map((id) => ({
+                value: id,
+                label: departmentOptions.find((d) => d.id === id)?.name ?? id,
+              }))}
             />
           </Field>
           <Field label="Description">
