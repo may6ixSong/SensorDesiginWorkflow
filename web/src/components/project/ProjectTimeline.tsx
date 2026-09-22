@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Box } from '@mui/material';
 import { Link } from 'react-router-dom';
-import { NodeDto, Milestone, ScheduleSpan, WorkflowDto } from '@/types/domain';
+import { DepartmentDto, NodeDto, Milestone, ScheduleSpan, WorkflowDto } from '@/types/domain';
 import { useNodes } from '@/api/hooks/useNodes';
 import {
   DAY_MS, DateRange, dayMs, monthTicks, rangeOf, ratioIn, shortDate, sortSchedule, spanDays,
@@ -75,9 +75,14 @@ function xOf(g: Geometry, iso: string) { return ratioIn(g.range, dayMs(iso)) * g
  * 화면에서 잘려 사라지면 안 되기 때문이다.
  */
 export function ProjectTimeline({
-  projectId, milestones, workflows, mineOnly = false,
+  projectId, milestones, workflows, departments, mineOnly = false,
 }: {
   projectId: string; milestones: Milestone[]; workflows: WorkflowDto[];
+  /**
+   * 그 과제에 등록된 부서 — 그룹 머리글에 쓸 **이름**을 찾는 데만 쓴다. `workflow.department`는
+   * 부서 id이므로(02장 §9.3) 이걸 없이 그리면 머리글에 ObjectId가 그대로 노출된다.
+   */
+  departments: DepartmentDto[];
   /** My Workflow 필터(설계서 01장 §3.7) — 내가 **권한을 가진**(edit 또는 view) workflow만 남긴다. */
   mineOnly?: boolean;
 }) {
@@ -102,8 +107,15 @@ export function ProjectTimeline({
     return { range, trackW: Math.max(MIN_TRACK_W, Math.round(days * PX_PER_DAY)) };
   }, [milestones, workflows]);
 
-  /** 도메인 단위로 묶어서 보여 준다 — 3D 뷰와 같은 그룹 기준. */
+  /**
+   * 도메인(=부서) 단위로 묶어서 보여 준다 — 3D 뷰와 같은 그룹 기준.
+   *
+   * ★ 묶는 키는 부서 **id**이고 머리글에 찍는 `label`은 그 id의 **이름**이다(02장 §9.3).
+   *   정렬도 id가 아니라 label로 한다 — id로 정렬하면 사람이 보기에 무작위 순서가 된다.
+   *   이름을 찾지 못하면(지워진 부서) id를 그대로 보여준다. 지어내지 않는다.
+   */
   const groups = useMemo(() => {
+    const nameById = new Map(departments.map((d) => [d.id, d.name]));
     const m = new Map<string, WorkflowDto[]>();
     shown.forEach((w) => {
       const key = domainOf(w);
@@ -112,9 +124,15 @@ export function ProjectTimeline({
       m.set(key, arr);
     });
     return [...m.entries()]
-      .sort((a, b) => (a[0] === UNASSIGNED_DOMAIN ? 1 : b[0] === UNASSIGNED_DOMAIN ? -1 : a[0].localeCompare(b[0])))
-      .map(([key, items]) => ({ key, workflows: [...items].sort((a, b) => a.name.localeCompare(b.name)) }));
-  }, [shown]);
+      .map(([key, items]) => ({
+        key,
+        label: key === UNASSIGNED_DOMAIN ? 'UNASSIGNED' : nameById.get(key) ?? key,
+        workflows: [...items].sort((a, b) => a.name.localeCompare(b.name)),
+      }))
+      .sort((a, b) => (a.key === UNASSIGNED_DOMAIN ? 1
+        : b.key === UNASSIGNED_DOMAIN ? -1
+          : a.label.localeCompare(b.label)));
+  }, [shown, departments]);
 
   if (!geo) {
     return (
@@ -225,7 +243,7 @@ export function ProjectTimeline({
                       fontFamily: FONT_MONO, fontSize: 10, letterSpacing: '.12em', color: T.dm,
                     }}
                   >
-                    {g.key === UNASSIGNED_DOMAIN ? 'UNASSIGNED' : g.key.toUpperCase()}
+                    {g.label.toUpperCase()}
                   </Box>
                   <Box sx={{ flex: `0 0 ${geo.trackW}px` }} />
                 </Box>
