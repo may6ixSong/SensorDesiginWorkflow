@@ -72,6 +72,16 @@ export class CreateNodeDto {
   @ValidateNested()
   @Type(() => NewArtifactSourceDto)
   newArtifact?: NewArtifactSourceDto;
+
+  /**
+   * 생성 시점의 recipient(스펙 §4.3). list view에서 특정 부서 chip이 활성일 때 그 부서가
+   * 기본으로 채워져 온다 — 다만 **실제로 저장되는 값은 사용자가 Add를 누른 시점의 선택**
+   * 그대로다(스펙 §6.5).
+   */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => AccessGrantDto)
+  recipients?: AccessGrantDto;
 }
 
 export class UpdateNodeDto {
