@@ -28,6 +28,9 @@ export const canViewWorkflow = (
  *
  * Admin은 그 과제의 전체 부서를 가진 것으로 본다 — workflow 생성/부서 변경 dropdown이
  * 자연스럽게 전체를 보여주게 된다.
+ *
+ * ★ 반환값은 부서 **id** 배열이다(02장 §9.3) — `Project.departments`가 `{id, name}`으로
+ *   바뀐 뒤에도 권한 판정은 id 동등비교로 하고, 이름은 표시 직전에만 조회한다.
  */
 export function myDepartments(
   project: Pick<ProjectDetailDto, 'members' | 'departments'> | null | undefined,
@@ -35,7 +38,7 @@ export function myDepartments(
   isAdmin?: boolean,
 ): string[] {
   if (!project) return [];
-  if (isAdmin) return [...(project.departments ?? [])];
+  if (isAdmin) return (project.departments ?? []).map((d) => d.id);
   return [...(project.members?.find((m) => m.knoxId === myKnoxId)?.departments ?? [])];
 }
 
