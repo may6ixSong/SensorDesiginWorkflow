@@ -11,6 +11,7 @@ import { normalizeGrant } from '../common/access';
 import { WorkflowDocument } from '../workflows/schemas/workflow.schema';
 import { ProjectDocument } from '../projects/schemas/project.schema';
 import { NewArtifactSourceDto } from './dto/node-crud.dto';
+import { shouldResetRecipients } from './node-policy';
 
 const EMPTY_RECIPIENTS = () => ({ departments: [], users: [] });
 
@@ -42,6 +43,23 @@ export class NodesService {
       throw new BadRequestException(
         'This artifact is already mapped to another node in this workflow.',
       );
+    }
+  }
+
+  /**
+   * 부서는 항상 그 과제에 등록된 id여야 한다(설계서 02장 §9) — recipients가 이제 release
+   * 대상을 결정하므로, 매칭되지 않는 department id는 "그 artifact가 누구에게도 조용히
+   * 전달되지 않는" 사고로 이어진다(사용자 결정). create()와 replaceRecipients() 양쪽이
+   * 같은 검증을 쓴다 — 한쪽만 검증하면 나머지 경로로 여전히 새어나간다.
+   *
+   * ★ 검증 대상은 **normalizeGrant를 통과한 뒤의 값**이어야 한다 — 앞뒤 공백만 섞인
+   *   유효 id를 raw 문자열 그대로 비교해 "Unknown department"로 잘못 거부하면 안 된다.
+   */
+  private assertKnownDepartments(project: ProjectDocument, departments: string[]): void {
+    const known = new Set(project.departments.map((d) => d.id));
+    const unknown = departments.filter((d) => !known.has(d));
+    if (unknown.length > 0) {
+      throw new BadRequestException(`Unknown department: ${unknown.join(', ')}`);
     }
   }
 
@@ -107,11 +125,19 @@ export class NodesService {
       intent?: 'own' | 'received';
       artifactId?: string | null;
       newArtifact?: NewArtifactSourceDto;
+      recipients?: { departments?: string[]; users?: string[] };
     },
     actor: Actor,
   ): Promise<WorkflowNodeDocument> {
     if (!(workflow.phases ?? []).some((p) => p.id === input.phaseId)) {
       throw new BadRequestException(`Unknown phase: ${input.phaseId}`);
+    }
+
+    // normalizeGrant로 다듬은(trim/dedupe) 뒤의 값을 검증한다 — 저장되는 값과 검증하는
+    // 값이 같아야 한다.
+    const normalizedRecipients = input.recipients ? normalizeGrant(input.recipients) : null;
+    if (normalizedRecipients) {
+      this.assertKnownDepartments(project, normalizedRecipients.departments);
     }
 
     const intent = input.intent ?? 'own';
@@ -130,7 +156,7 @@ export class NodesService {
       name: input.name.trim(),
       layout: input.layout,
       intent,
-      recipients: EMPTY_RECIPIENTS(),
+      recipients: normalizedRecipients ?? EMPTY_RECIPIENTS(),
       series: null,
       seriesIdx: 1,
       seriesTotal: 1,
@@ -168,10 +194,13 @@ export class NodesService {
       node.artifactId = nextArtifactId;
 
       const after = node.artifactId?.toString() ?? null;
-      if (before !== after) {
-        // 다른 산출물로 바뀌면 recipient도 초기화한다 — 이전 값이 새 산출물에도 유효한
+      if (shouldResetRecipients(before, after)) {
+        // 다른 산출물로 **바뀌면** recipient도 초기화한다 — 이전 값이 새 산출물에도 유효한
         // 구성이라는 보장이 없다(사용자 결정: 조용히 남기면 잘못된 부서에 알림이 갈 수 있다).
+        // `null → X`(=처음 매핑)를 초기화 대상에서 빼는 이유는 shouldResetRecipients 참고.
         node.recipients = EMPTY_RECIPIENTS();
+      }
+      if (before !== after) {
         // 무엇이 누구에게 전달되는지가 통째로 달라지는 사건이라 반드시 남긴다.
         await this.audit.log(actor, 'BLOCK_ARTIFACT_REMAP', 'block', node._id, {
           workflowId: node.workflowId.toString(),
@@ -201,6 +230,7 @@ export class NodesService {
    *   recipient에 **속하는 것**과 recipient를 **편집하는 것**은 별개다(설계서 01장 §4.2).
    */
   async replaceRecipients(
+    project: ProjectDocument,
     nodeId: string,
     input: { departments?: string[]; users?: string[] },
     actor: Actor,
@@ -209,7 +239,9 @@ export class NodesService {
     if (!node.artifactId) {
       throw new BadRequestException('This node has no artifact mapped yet.');
     }
-    node.recipients = normalizeGrant(input);
+    const normalized = normalizeGrant(input);
+    this.assertKnownDepartments(project, normalized.departments);
+    node.recipients = normalized;
     await node.save();
     await this.audit.log(actor, 'BLOCK_RECIPIENTS_REPLACE', 'block', node._id, {
       recipients: node.recipients,
