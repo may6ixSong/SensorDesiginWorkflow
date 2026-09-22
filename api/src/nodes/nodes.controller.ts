@@ -148,7 +148,7 @@ export class NodesController {
     @CurrentProject() project: ProjectDocument,
     @CurrentActor() me: Actor,
   ) {
-    const node = await this.nodes.replaceRecipients(nodeId, dto, me);
+    const node = await this.nodes.replaceRecipients(project, nodeId, dto, me);
     return this.canvasView.assembleOne(node, workflow, project, me);
   }
 }
