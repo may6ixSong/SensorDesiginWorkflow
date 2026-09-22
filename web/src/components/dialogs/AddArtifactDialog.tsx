@@ -21,12 +21,21 @@ interface Props {
   phases: WorkflowPhase[];
   myDepartments: string[];
   departmentOptions: DepartmentDto[];
+  /**
+   * 열릴 때 기본으로 체크될 recipient 부서 — list view에서 특정 부서 chip이 활성이면 그
+   * 부서다. All이면 빈 배열이라 아무것도 체크되지 않는다(스펙 §6.5).
+   *
+   * ★ 이건 **UI 기본값일 뿐**이다. 실제로 저장되는 값은 사용자가 Add를 누른 시점의 선택
+   *   그대로다 — 기본값을 지우고 다른 부서를 고를 수 있다.
+   */
+  defaultRecipientDepartments: string[];
   onClose: () => void;
   onCreate: (p: {
     name: string;
     phaseId: string;
     intent: ArtifactIntent;
     newArtifact?: NewArtifactSourceInput;
+    recipients: { departments: string[]; users: string[] };
   }) => void;
   submitting?: boolean;
 }
@@ -42,7 +51,7 @@ interface Props {
  */
 export function AddArtifactDialog({
   workflowName, workflowId, projectId, phases, myDepartments, departmentOptions,
-  onClose, onCreate, submitting,
+  defaultRecipientDepartments, onClose, onCreate, submitting,
 }: Props) {
   const { t } = useTranslation();
   const [intent, setIntent] = useState<ArtifactIntent>('own');
@@ -56,6 +65,9 @@ export function AddArtifactDialog({
   const [mapNow, setMapNow] = useState(true);
   const [src, setSrc] = useState<ArtifactSourceState>(emptySourceState());
   const [err, setErr] = useState<string | null>(null);
+  /** 기본값으로 시작하되 사용자가 자유롭게 바꾼다. users는 이 화면에서 다루지 않는다 —
+   *  생성 후 node 상세의 Recipients 탭에서 지정한다(스펙 §6.5). */
+  const [recipientDepts, setRecipientDepts] = useState<string[]>(defaultRecipientDepartments);
 
   const changeIntent = (next: ArtifactIntent) => {
     setIntent(next);
@@ -67,7 +79,7 @@ export function AddArtifactDialog({
       // 매핑을 나중으로 미루는 경우엔 이름이 유일한 단서라 반드시 있어야 한다.
       if (!name.trim()) { setErr('Name is required when you are not mapping an artifact yet.'); return; }
       setErr(null);
-      onCreate({ name: name.trim(), phaseId, intent });
+      onCreate({ name: name.trim(), phaseId, intent, recipients: { departments: recipientDepts, users: [] } });
       return;
     }
     if (!src.source) { setErr('Pick where this artifact comes from.'); return; }
@@ -76,7 +88,7 @@ export function AddArtifactDialog({
     const newArtifact = resolveNewArtifact(src, finalName);
     if (!newArtifact) { setErr('Finish picking the artifact for that source.'); return; }
     setErr(null);
-    onCreate({ name: finalName, phaseId, intent, newArtifact });
+    onCreate({ name: finalName, phaseId, intent, newArtifact, recipients: { departments: recipientDepts, users: [] } });
   };
 
   return (
@@ -176,6 +188,44 @@ export function AddArtifactDialog({
             </Box>
           ))}
         </Box>
+      </Field>
+
+      <Field label={t('node.recipients')}>
+        {departmentOptions.length === 0 ? (
+          <Box sx={{ fontSize: 11.5, color: T.dm2 }}>This project has no departments registered yet.</Box>
+        ) : (
+          <>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+              {departmentOptions.map((d) => {
+                const on = recipientDepts.includes(d.id);
+                return (
+                  <Box
+                    key={d.id}
+                    component="button"
+                    type="button"
+                    onClick={() =>
+                      setRecipientDepts((prev) =>
+                        prev.includes(d.id) ? prev.filter((x) => x !== d.id) : [...prev, d.id],
+                      )
+                    }
+                    sx={{
+                      fontSize: 11.5, fontWeight: 600, padding: '5px 10px', borderRadius: `${R.pill}px`,
+                      cursor: CURSOR_POINTER, transition: '.14s', fontFamily: 'inherit',
+                      background: on ? T.prSoft : T.sf,
+                      color: on ? T.pr : T.dm,
+                      border: `1px solid ${on ? T.pr : T.ln2}`,
+                    }}
+                  >
+                    {on ? '✓ ' : ''}{d.name}
+                  </Box>
+                );
+              })}
+            </Box>
+            {recipientDepts.length === 0 && (
+              <Box sx={{ fontSize: 11, color: T.warn, mt: '6px' }}>{t('node.recipientsEmptyHint')}</Box>
+            )}
+          </>
+        )}
       </Field>
 
       {mapNow ? (
