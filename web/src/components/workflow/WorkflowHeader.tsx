@@ -1,9 +1,9 @@
-import { useState } from 'react';
-import { Box, Chip, Menu, MenuItem, Stack, Tooltip, Typography } from '@mui/material';
+import { Box, Chip, Stack, Tooltip, Typography } from '@mui/material';
 import { useTranslation } from 'react-i18next';
-import { DepartmentDto, WorkflowDto } from '@/types/domain';
+import { WorkflowDto } from '@/types/domain';
 import { SirenButton } from '@/components/common/SirenButton';
 import { Icon } from '@/components/common/Icon';
+import { useDepartmentLabel } from '@/hooks/useDepartmentLabel';
 import { ViewMode } from '@/lib/viewMode';
 import { R, T } from '@/theme/tokens';
 
@@ -11,20 +11,15 @@ interface WorkflowHeaderProps {
   workflow: WorkflowDto;
   /** 이 workflow에서 일정을 잃은 산출물 수 — 0보다 크면 헤더에 경고 chip이 붙는다. */
   orphanCount: number;
-  /** Edit 권한 — 있어야 설정(연필)·Release 버튼이 보인다. */
+  /** Edit 권한 — 있어야 설정(연필) 버튼이 보인다. */
   canEdit: boolean;
-  /** 수신 부서 필터 후보 — 그 과제에 등록된 부서. 필터 값은 부서 **id**다. */
-  departmentOptions: DepartmentDto[];
-  recipientFilter: string[];
-  onChangeRecipientFilter: (next: string[]) => void;
   /** Workflow settings(Details/Schedule/Permissions 탭) 열기. */
   onOpenSettings: () => void;
-  onOpenRelease?: () => void;
-  /** canvas/list 전환 — 부서 필터 버튼 왼쪽에 세그먼트 버튼 2개로 그린다(사용자 요청). */
+  /** canvas/list 전환 — 매트릭스 아이콘 버튼 왼쪽에 세그먼트 버튼 2개로 그린다(사용자 요청). */
   viewMode: ViewMode;
   onChangeViewMode: (mode: ViewMode) => void;
   /**
-   * "Artifact별 전달 부서" 매트릭스 열기 — 부서 필터 버튼 바로 왼쪽의 table 아이콘
+   * "Artifact별 전달 부서" 매트릭스 열기 — canvas/list 전환 바로 오른쪽의 table 아이콘
    * 버튼(사용자 요청). canEdit이 아니면 이 버튼 자체를 그리지 않는다 — 그 다이얼로그는
    * edit 권한자 전용이다.
    */
@@ -34,7 +29,7 @@ interface WorkflowHeaderProps {
 const ICON_BUTTON_SIZE = 19.5;
 
 /**
- * workflow명 · 소속 부서 · 수신 부서 필터 · view 전환 · 설정 · Release.
+ * workflow명 · 소속 부서 · view 전환 · 설정.
  *
  * ★ canvas view와 list view가 공유하는 유일한 헤더다(사용자 요청) — 예전에는 Release
  *   history 페이지가 "Back to canvas" 버튼과 자기만의 막대를 따로 그렸지만, 이제 이
@@ -43,21 +38,16 @@ const ICON_BUTTON_SIZE = 19.5;
  * ★ 캔버스 편집 중에는 여기(app bar 아래)의 액션이 전부 잠긴다 — 그 처리는 Canvas가
  *   편집 상태를 알고 있으므로 상위에서 내려주는 게 아니라, 편집 중 이 헤더 자체를
  *   비활성 컨테이너로 감싸는 방식으로 한다(설계서 03장 §4.3).
+ * ★ 부서 필터와 Release 버튼은 이 헤더에서 **제거됐다**(스펙 §6.1) — 부서 스코프는
+ *   list view의 chip 탭이 갖고, release도 거기서만 낸다. canvas view는 그 두 컨트롤이
+ *   빠진 것 외에는 달라지지 않는다.
  */
 export function WorkflowHeader({
-  workflow, orphanCount, canEdit, departmentOptions, recipientFilter,
-  onChangeRecipientFilter, onOpenSettings, onOpenRelease, viewMode, onChangeViewMode,
+  workflow, orphanCount, canEdit, onOpenSettings, viewMode, onChangeViewMode,
   onOpenRecipientMatrix,
 }: WorkflowHeaderProps) {
   const { t } = useTranslation();
-  const [filterAnchor, setFilterAnchor] = useState<HTMLElement | null>(null);
-
-  const toggle = (dep: string) =>
-    onChangeRecipientFilter(
-      recipientFilter.includes(dep)
-        ? recipientFilter.filter((d) => d !== dep)
-        : [...recipientFilter, dep],
-    );
+  const { label: deptLabel } = useDepartmentLabel(workflow.projectId);
 
   return (
     <Stack
@@ -82,7 +72,7 @@ export function WorkflowHeader({
                 padding: '1px 7px', borderRadius: `${R.pill}px`, flexShrink: 0,
               }}
             >
-              {departmentOptions.find((d) => d.id === workflow.department)?.name ?? workflow.department}
+              {deptLabel(workflow.department)}
             </Box>
           </Stack>
           <Typography variant="caption" color="text.secondary" noWrap>
@@ -115,7 +105,7 @@ export function WorkflowHeader({
         />
       )}
 
-      {/* canvas/list 전환 — 부서 필터 버튼 바로 왼쪽. 선택된 쪽만 활성화된 것처럼 보인다. */}
+      {/* canvas/list 전환 — 매트릭스 아이콘 버튼 왼쪽. 선택된 쪽만 활성화된 것처럼 보인다. */}
       <Stack direction="row" sx={{ border: `1px solid ${T.ln2}`, borderRadius: `${R.sm}px`, overflow: 'hidden' }}>
         <SirenButton
           variant={viewMode === 'canvas' ? 'on' : 'ghost'}
@@ -133,7 +123,7 @@ export function WorkflowHeader({
         </SirenButton>
       </Stack>
 
-      {/* Artifact별 전달 부서 매트릭스 — 부서 필터 버튼 바로 왼쪽. edit 권한자 전용. */}
+      {/* Artifact별 전달 부서 매트릭스 — canvas/list 전환 바로 오른쪽. edit 권한자 전용. */}
       {canEdit && onOpenRecipientMatrix && (
         <Tooltip title={t('recipientMatrix.tooltip')}>
           <SirenButton
@@ -145,52 +135,6 @@ export function WorkflowHeader({
             <Icon name="excel" size={ICON_BUTTON_SIZE} />
           </SirenButton>
         </Tooltip>
-      )}
-
-      {/* 수신 부서 필터 — 고른 부서가 받는 산출물만 남기고 나머지는 흐려진다. */}
-      {departmentOptions.length > 0 && (
-        <>
-          <SirenButton
-            variant={recipientFilter.length ? 'primary' : 'ghost'}
-            onClick={(e) => setFilterAnchor(e.currentTarget as HTMLElement)}
-          >
-            <Icon name="list" />
-            {recipientFilter.length
-              ? `${t('canvas.recipientFilter')} · ${recipientFilter.length}`
-              : t('canvas.allDepartments')}
-          </SirenButton>
-          <Menu
-            anchorEl={filterAnchor}
-            open={Boolean(filterAnchor)}
-            onClose={() => setFilterAnchor(null)}
-            anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-            transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-          >
-            <MenuItem
-              onClick={() => { onChangeRecipientFilter([]); setFilterAnchor(null); }}
-              sx={{ fontSize: 13, fontWeight: recipientFilter.length ? 400 : 700 }}
-            >
-              {t('canvas.allDepartments')}
-            </MenuItem>
-            {departmentOptions.map((dep) => {
-              const on = recipientFilter.includes(dep.id);
-              return (
-                <MenuItem key={dep.id} onClick={() => toggle(dep.id)} sx={{ fontSize: 13, gap: '8px' }}>
-                  <Box sx={{ width: 14, display: 'inline-flex', color: on ? T.pr : 'transparent' }}>
-                    <Icon name="check" />
-                  </Box>
-                  {dep.name}
-                </MenuItem>
-              );
-            })}
-          </Menu>
-        </>
-      )}
-
-      {canEdit && onOpenRelease && (
-        <SirenButton variant="primary" onClick={onOpenRelease}>
-          <Icon name="send" /> {t('release.title')}
-        </SirenButton>
       )}
     </Stack>
   );
