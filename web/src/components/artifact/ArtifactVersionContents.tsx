@@ -20,6 +20,12 @@ function fmtAt(iso: string): string {
 interface Props {
   a: CalypsoArtifact;
   version: CalypsoVersionView | null;
+  /**
+   * 표지 머리글에 찍히는 부서 이름 — `a.department`는 부서 **id**라 그대로 쓸 수 없다(02장
+   * §9.3). 이름 조회는 SIREN project 캐시가 필요한 일이라 이 컴포넌트가 직접 하지 않고
+   * 호출부(ArtifactDetailPage)가 풀어서 내려 준다.
+   */
+  departmentLabel: string;
   onDownload: (v: CalypsoVersionView) => void;
 }
 
@@ -28,7 +34,7 @@ interface Props {
  * 이제 여기 없다 — Dialog(AddVersionDialog/PublishVersionDialog)로 옮겨서 version
  * history 위쪽 버튼과 트리 각 행에서 각각 띄운다(사용자 요청).
  */
-export function ArtifactVersionContents({ a, version: v, onDownload }: Props) {
+export function ArtifactVersionContents({ a, version: v, departmentLabel, onDownload }: Props) {
   const { resolveUser } = useDirectory();
   const accent = v?.isReleased ? T.pr : T.warn;
   // "WORKING"은 지금 보이는 버전이 실제 latest일 때만 — 사용자가 버전 트리에서 과거의
@@ -58,7 +64,7 @@ export function ArtifactVersionContents({ a, version: v, onDownload }: Props) {
             <Box sx={{ height: 4, background: accent, flex: '0 0 auto' }} />
             <Box sx={{ padding: '24px 28px 26px' }}>
               <Box sx={{ fontFamily: FONT_MONO, fontSize: 10, letterSpacing: '.18em', textTransform: 'uppercase', color: T.dm2 }}>
-                {a.department}
+                {departmentLabel}
               </Box>
               <Box sx={{ fontFamily: FONT_DISPLAY, fontSize: 24, fontWeight: 800, letterSpacing: '-.02em', lineHeight: 1.25, mt: '8px' }}>
                 {a.name}
