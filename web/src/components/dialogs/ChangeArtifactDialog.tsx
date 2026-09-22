@@ -7,7 +7,6 @@ import { Ey, Field, TextInput } from '@/components/common/Panel';
 import { Icon } from '@/components/common/Icon';
 import { ArtifactSourcePicker, ArtifactSourceState, emptySourceState, resolveNewArtifact } from '@/components/artifact/ArtifactSourcePicker';
 import { NewArtifactSourceInput } from '@/api/hooks/useNodes';
-import { DepartmentDto } from '@/types/domain';
 import { R, T } from '@/theme/tokens';
 
 interface Props {
