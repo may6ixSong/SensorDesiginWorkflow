@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Box, Chip, Menu, MenuItem, Stack, Tooltip, Typography } from '@mui/material';
 import { useTranslation } from 'react-i18next';
-import { WorkflowDto } from '@/types/domain';
+import { DepartmentDto, WorkflowDto } from '@/types/domain';
 import { SirenButton } from '@/components/common/SirenButton';
 import { Icon } from '@/components/common/Icon';
 import { ViewMode } from '@/lib/viewMode';
@@ -13,8 +13,8 @@ interface WorkflowHeaderProps {
   orphanCount: number;
   /** Edit 권한 — 있어야 설정(연필)·Release 버튼이 보인다. */
   canEdit: boolean;
-  /** 수신 부서 필터 후보 — 그 과제에 등록된 부서. */
-  departmentOptions: string[];
+  /** 수신 부서 필터 후보 — 그 과제에 등록된 부서. 필터 값은 부서 **id**다. */
+  departmentOptions: DepartmentDto[];
   recipientFilter: string[];
   onChangeRecipientFilter: (next: string[]) => void;
   /** Workflow settings(Details/Schedule/Permissions 탭) 열기. */
@@ -82,7 +82,7 @@ export function WorkflowHeader({
                 padding: '1px 7px', borderRadius: `${R.pill}px`, flexShrink: 0,
               }}
             >
-              {workflow.department}
+              {departmentOptions.find((d) => d.id === workflow.department)?.name ?? workflow.department}
             </Box>
           </Stack>
           <Typography variant="caption" color="text.secondary" noWrap>
@@ -173,13 +173,13 @@ export function WorkflowHeader({
               {t('canvas.allDepartments')}
             </MenuItem>
             {departmentOptions.map((dep) => {
-              const on = recipientFilter.includes(dep);
+              const on = recipientFilter.includes(dep.id);
               return (
-                <MenuItem key={dep} onClick={() => toggle(dep)} sx={{ fontSize: 13, gap: '8px' }}>
+                <MenuItem key={dep.id} onClick={() => toggle(dep.id)} sx={{ fontSize: 13, gap: '8px' }}>
                   <Box sx={{ width: 14, display: 'inline-flex', color: on ? T.pr : 'transparent' }}>
                     <Icon name="check" />
                   </Box>
-                  {dep}
+                  {dep.name}
                 </MenuItem>
               );
             })}
