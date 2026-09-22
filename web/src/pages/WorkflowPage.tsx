@@ -342,7 +342,10 @@ export function WorkflowPage() {
                     onSuccess: (updated) => {
                       toast(
                         updated.department !== workflow.department
-                          ? `Moved to ${updated.department}`
+                          ? `Moved to ${
+                            project?.departments.find((d) => d.id === updated.department)?.name
+                              ?? updated.department
+                          }`
                           : 'Saved',
                       );
                     },
