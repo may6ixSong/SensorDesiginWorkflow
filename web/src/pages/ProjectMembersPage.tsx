@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Box } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import { Navigate } from 'react-router-dom';
-import { ProjectMemberDto } from '@/types/domain';
+import { DepartmentDto, ProjectMemberDto } from '@/types/domain';
 import {
   useAddProjectMember, useAddProjectManager, useRemoveProjectMember, useRemoveProjectManager,
 } from '@/api/hooks/useProjects';
@@ -55,12 +55,12 @@ export function ProjectMembersPage() {
               <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(300px,1fr))', gap: '14px' }}>
                 {project.departments.map((dept) => (
                   <DepartmentMemberCard
-                    key={dept}
+                    key={dept.id}
                     projectId={project._id}
-                    deptName={dept}
-                    members={project.members.filter((m) => m.departments.includes(dept))}
+                    dept={dept}
+                    members={project.members.filter((m) => m.departments.includes(dept.id))}
                     takenKnoxIds={new Set(
-                      project.members.filter((m) => m.departments.includes(dept)).map((m) => m.knoxId),
+                      project.members.filter((m) => m.departments.includes(dept.id)).map((m) => m.knoxId),
                     )}
                     canManage={canManageManagers}
                   />
@@ -84,7 +84,7 @@ export function ProjectMembersPage() {
 function DepartmentsButton({
   projectId, departments, members, own,
 }: {
-  projectId: string; departments: string[]; members: ProjectMemberDto[]; own: boolean;
+  projectId: string; departments: DepartmentDto[]; members: ProjectMemberDto[]; own: boolean;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -210,10 +210,11 @@ function ProjectManagersCard({
  * 한다.
  */
 function DepartmentMemberCard({
-  projectId, deptName, members, takenKnoxIds, canManage,
+  projectId, dept, members, takenKnoxIds, canManage,
 }: {
   projectId: string;
-  deptName: string;
+  /** 이 카드가 나타내는 부서 — 저장/조회는 `dept.id`로, 화면 표기는 `dept.name`으로 한다. */
+  dept: DepartmentDto;
   members: ProjectMemberDto[];
   takenKnoxIds: Set<string>;
   canManage: boolean;
@@ -228,7 +229,7 @@ function DepartmentMemberCard({
   return (
     <Card>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', mb: '9px' }}>
-        <Ey sx={{ flex: 1 }}>{deptName}</Ey>
+        <Ey sx={{ flex: 1 }}>{dept.name}</Ey>
         {canManage && (
           <SirenButton variant="ghost" onClick={() => setSearchOpen(true)} aria-label={t('members.addMember')}>
             <Icon name="plus" />
@@ -264,13 +265,13 @@ function DepartmentMemberCard({
 
       {searchOpen && (
         <UserSearchDialog
-          title={`${t('members.addMember')} — ${deptName}`}
+          title={`${t('members.addMember')} — ${dept.name}`}
           excludeKnoxIds={takenKnoxIds}
-          fixedDepartment={deptName}
+          fixedDepartment={dept.id}
           onClose={() => setSearchOpen(false)}
           onConfirm={(knoxId, department) => {
             addMember.mutate(
-              { knoxId, department: department ?? deptName },
+              { knoxId, department: department ?? dept.id },
               {
                 onSuccess: () => { setSearchOpen(false); toast('Member added'); },
                 onError: (e: any) => toast(e?.response?.data?.message ?? 'Failed to add'),
@@ -283,13 +284,13 @@ function DepartmentMemberCard({
       {target && (
         <ConfirmDialog
           title={t('members.confirmDeleteMemberTitle')}
-          message={t('members.confirmDeleteMemberMessage', { name: resolveUser(target).name, knoxId: target, dept: deptName })}
+          message={t('members.confirmDeleteMemberMessage', { name: resolveUser(target).name, knoxId: target, dept: dept.name })}
           warning={t('members.confirmDeleteMemberWarning')}
           confirmLabel={t('members.remove')}
           cancelLabel={t('members.cancel')}
           busy={removeMember.isPending}
           onCancel={() => setTarget(null)}
-          onConfirm={() => removeMember.mutate({ knoxId: target, department: deptName }, {
+          onConfirm={() => removeMember.mutate({ knoxId: target, department: dept.id }, {
             onSuccess: () => { setTarget(null); toast('Member removed'); },
           })}
         />
