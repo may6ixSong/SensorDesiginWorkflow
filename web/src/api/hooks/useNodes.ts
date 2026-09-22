@@ -98,6 +98,7 @@ export function useCreateNode(workflowId: string) {
       intent?: ArtifactIntent;
       artifactId?: string | null;
       newArtifact?: NewArtifactSourceInput;
+      recipients?: { departments: string[]; users: string[] };
     }) => {
       const res = await apiClient.post<NodeDto>(`/workflows/${workflowId}/nodes`, input);
       return res.data;
