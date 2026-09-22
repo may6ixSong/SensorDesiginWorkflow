@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Box } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
-import { Milestone, ProjectMemberDto, WorkflowDto } from '@/types/domain';
+import { DepartmentDto, Milestone, ProjectMemberDto, WorkflowDto } from '@/types/domain';
 import { ProjectPageShell } from '@/components/project/ProjectPageShell';
 import { ProjectTimeline } from '@/components/project/ProjectTimeline';
 import { EditMilestonesDialog } from '@/components/dialogs/EditMilestonesDialog';
@@ -48,7 +48,7 @@ function MilestonesSection({
   projectId: string; milestones: Milestone[]; managers: string[];
   members: ProjectMemberDto[];
   /** 이 과제가 인정하는 부서 — Admin이 workflow를 만들 때의 후보가 된다. */
-  departments: string[];
+  departments: DepartmentDto[];
   workflows: WorkflowDto[];
 }) {
   const { user, isAdmin } = useAuth();
@@ -102,12 +102,14 @@ function MilestonesSection({
         projectId={projectId}
         milestones={milestones}
         workflows={workflows}
+        departments={departments}
         mineOnly={mineOnly}
       />
 
       {createOpen && (
         <CreateWorkflowDialog
           myDepartments={myDepts}
+          departmentOptions={departments}
           milestones={milestones}
           saving={createWorkflow.isPending}
           error={createErr}
