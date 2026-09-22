@@ -11,14 +11,20 @@
  *
  * React/DOM을 전혀 모르는 순수 함수만 모아 뒀다.
  */
-import { NodeDto, WorkflowDto } from '@/types/domain';
+import { DepartmentDto, NodeDto, WorkflowDto } from '@/types/domain';
 
 export const UNASSIGNED_DOMAIN = 'UNASSIGNED';
 
-/** IP가 속한 도메인 — BE에 domain 필드가 아직 없는 데이터도 깨지지 않게 폴백을 둔다. */
+/**
+ * IP가 속한 도메인 — 값은 `Project.departments[].id`다(02장 §9.3).
+ *
+ * ★ 예전에는 부서 **이름**을 대문자로 올려 키로 썼다(같은 이름의 대소문자 차이를 한 도메인으로
+ *   묶기 위해). id로 바뀐 뒤에는 그 정규화가 필요 없을 뿐 아니라 **해서는 안 된다** — id는
+ *   대소문자를 구분하는 불투명한 값이라 올려버리면 `departments[]`의 어떤 항목과도 매칭되지
+ *   않는다. 사람에게 보이는 이름은 `buildDomainModel`이 `label`에 따로 채운다.
+ */
 export function domainOf(workflow: WorkflowDto): string {
-  const raw = (workflow.department ?? '').trim();
-  return raw ? raw.toUpperCase() : UNASSIGNED_DOMAIN;
+  return (workflow.department ?? '').trim() || UNASSIGNED_DOMAIN;
 }
 
 export interface StatusCounts {
@@ -110,20 +116,21 @@ function assignColors(keys: string[]): Map<string, string> {
  * workflow 목록 + IP별 산출물(own)로 도메인 모델을 만든다.
  * @param nodesByWorkflow workflowId → 그 workflow의 캔버스 노드. 다른 workflow의 것은
  *   이미 한 번 세므로 넣지 않는다(항로 중복 방지).
- * @param knownDomains 과제에 등록된 부서 목록(Project.departments). IP가 하나도 배정되지
- *   않은 부서도 빈 섹션으로 보여 주기 위한 것 — 이걸 넘기지 않으면 IP가 실제로 가진
- *   부서만 나온다. 대소문자는 domainOf()와 같은 기준으로 올려 맞춘다.
+ * @param knownDepartments 과제에 등록된 부서 목록(Project.departments, `{id, name}`). IP가
+ *   하나도 배정되지 않은 부서도 빈 섹션으로 보여 주기 위한 것 — 이걸 넘기지 않으면 IP가
+ *   실제로 가진 부서만 나온다. **그룹 키는 id, 사람이 읽는 `label`은 여기서 찾은 이름**이라
+ *   부서명을 바꾸면 이 화면의 섹션 제목도 같이 따라온다(02장 §9.3).
  */
 export function buildDomainModel(
   workflows: WorkflowDto[],
   nodesByWorkflow: Map<string, NodeDto[]>,
-  knownDomains: string[] = [],
+  knownDepartments: DepartmentDto[] = [],
 ): DomainWorkflowModel {
+  const nameById = new Map(knownDepartments.map((d) => [d.id, d.name]));
   const grouped = new Map<string, WorkflowDto[]>();
   // 등록된 도메인을 먼저 빈 그룹으로 깔아 둔다 — IP가 없어도 섹션 자리는 만든다.
-  knownDomains.forEach((d) => {
-    const key = d.trim().toUpperCase();
-    if (key && !grouped.has(key)) grouped.set(key, []);
+  knownDepartments.forEach((d) => {
+    if (d.id && !grouped.has(d.id)) grouped.set(d.id, []);
   });
   workflows.forEach((workflow) => {
     const key = domainOf(workflow);
@@ -146,7 +153,14 @@ export function buildDomainModel(
       (acc, workflow) => addCounts(acc, countStatuses(nodesByWorkflow.get(workflow.id) ?? [])),
       emptyCounts(),
     );
-    return { key, label: key, color: colorOf.get(key) ?? DOMAIN_PALETTE[0], workflows: members, counts };
+    return {
+      key,
+      // 지워진 부서를 가리키는 workflow가 남아 있으면 id를 그대로 보여 준다 — 지어내지 않는다.
+      label: key === UNASSIGNED_DOMAIN ? UNASSIGNED_DOMAIN : nameById.get(key) ?? key,
+      color: colorOf.get(key) ?? DOMAIN_PALETTE[0],
+      workflows: members,
+      counts,
+    };
   });
 
   return {
