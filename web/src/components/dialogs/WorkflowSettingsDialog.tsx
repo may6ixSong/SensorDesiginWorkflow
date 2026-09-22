@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { Box } from '@mui/material';
 import { useTranslation } from 'react-i18next';
-import { AccessGrant, Milestone, WorkflowDto } from '@/types/domain';
+import { AccessGrant, DepartmentDto, Milestone, WorkflowDto } from '@/types/domain';
 import { ModalShell } from '@/components/common/ModalShell';
 import { SirenButton } from '@/components/common/SirenButton';
 import { Ey, Field, SelectInput, TextInput } from '@/components/common/Panel';
@@ -32,10 +32,10 @@ interface Props {
   saving?: boolean;
   saveError?: string | null;
 
-  /** 부서 후보 — 내가 이 과제에서 속한 부서(Admin이면 과제 전체). */
+  /** 부서 후보 — 내가 이 과제에서 속한 부서의 **id** 목록(Admin이면 과제 전체). */
   myDepartments: string[];
-  /** 권한 편집용 부서 후보 — 그 과제에 등록된 부서 전체. */
-  departmentOptions: string[];
+  /** 권한 편집용 부서 후보 — 그 과제에 등록된 부서 전체(`{id, name}`, 02장 §9.3). */
+  departmentOptions: DepartmentDto[];
 
   onSavePhases: (phases: ScheduleDraft[]) => void;
   savingPhases?: boolean;
@@ -98,6 +98,7 @@ export function WorkflowSettingsDialog({
           <DetailsTab
             workflow={workflow}
             myDepartments={myDepartments}
+            departmentOptions={departmentOptions}
             onSave={onSave}
             saving={saving}
             error={saveError}
@@ -137,10 +138,11 @@ export function WorkflowSettingsDialog({
  *   editAccess 교체를 동반해 사실상 권한 이양이기 때문이다(설계서 01장 §3.5).
  */
 function DetailsTab({
-  workflow, myDepartments, onSave, saving, error,
+  workflow, myDepartments, departmentOptions, onSave, saving, error,
 }: {
   workflow: WorkflowDto;
   myDepartments: string[];
+  departmentOptions: DepartmentDto[];
   onSave: Props['onSave'];
   saving?: boolean;
   error?: string | null;
@@ -158,15 +160,27 @@ function DetailsTab({
    * 지금 배정된 부서가 내 부서 목록에 없을 수 있다(다른 사람이 만들었거나, 내가 부서를
    * 옮겼거나). 그 값을 셀렉트에서 지워버리면 화면이 거짓말을 하게 되므로, 선택된 채로
    * 비활성 항목으로 목록 맨 위에 끼워 보여준다(설계서 01장 §3.5).
+   *
+   * ★ `value`는 부서 **id**이고 사람에게 보이는 `label`은 `departmentOptions`에서 찾은
+   *   이름이다(02장 §9.3) — 이름을 바꿔도 이 select가 들고 있는 값은 그대로다.
    */
+  const nameById = useMemo(
+    () => new Map(departmentOptions.map((d) => [d.id, d.name])),
+    [departmentOptions],
+  );
+  const deptLabel = (id: string) => nameById.get(id) ?? id;
+
   const options = useMemo(() => {
     const current = (workflow.department ?? '').trim();
-    const mine = myDepartments.map((d) => ({ value: d, label: d }));
+    const mine = myDepartments.map((id) => ({ value: id, label: nameById.get(id) ?? id }));
     if (current && !myDepartments.includes(current)) {
-      return [{ value: current, label: current, disabled: true }, ...mine];
+      return [
+        { value: current, label: nameById.get(current) ?? current, disabled: true },
+        ...mine,
+      ];
     }
     return mine;
-  }, [workflow.department, myDepartments]);
+  }, [workflow.department, myDepartments, nameById]);
 
   const submit = () => {
     if (!name.trim()) { setNameErr(true); return; }
@@ -223,7 +237,7 @@ function DetailsTab({
               <Box sx={{ mt: '1px', flexShrink: 0 }}><Icon name="warn" /></Box>
               <Box>
                 <Box sx={{ fontWeight: 700, mb: '2px' }}>
-                  {workflow.department} → {department}
+                  {deptLabel(workflow.department)} → {deptLabel(department)}
                 </Box>
                 {t('workflow.departmentChangeWarning')}
               </Box>
@@ -244,7 +258,7 @@ function PermissionsTab({
 }: {
   workflow: WorkflowDto;
   own: boolean;
-  departmentOptions: string[];
+  departmentOptions: DepartmentDto[];
   onSaveAccess: Props['onSaveAccess'];
   saving?: boolean;
 }) {
