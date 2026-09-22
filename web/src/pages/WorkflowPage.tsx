@@ -99,14 +99,17 @@ export function WorkflowPage() {
 
   const [saveErr, setSaveErr] = useState<string | null>(null);
   const [phasesErr, setPhasesErr] = useState<string | null>(null);
-  /** 수신 부서 필터 — canvas에서는 흐리게, list에서는 숨긴다(사용자 요청, 공통 컨트롤이지만
-   * 화면마다 적용 방식은 다르다). */
-  const [recipientFilter, setRecipientFilter] = useState<string[]>([]);
   const [releaseOpen, setReleaseOpen] = useState(false);
   const [recipientMatrixOpen, setRecipientMatrixOpen] = useState(false);
+  /** list view에서 지금 활성인 부서 chip(null = All) — release 타겟의 기본값이다. */
+  const [activeListDept, setActiveListDept] = useState<string | null>(null);
+  /** release 다이얼로그가 실제로 겨냥하는 부서. 다이얼로그를 열 때 활성 chip으로 고정되고,
+   *  다이얼로그 안에서는 바꿀 수 없다(사용자 요청) — spillover 부서는 서버가 계산해 탭으로만
+   *  더해진다(스펙 §2.2, §5.1). */
+  const [releaseTarget, setReleaseTarget] = useState<string[]>([]);
 
-  /** Release 다이얼로그 전용 — 열려 있을 때만 라이브로 조회한다(설계서 05장 §4.4). */
-  const releasePreview = useReleasePreview(workflowId, releaseOpen);
+  /** Release 다이얼로그 전용 — 열려 있을 때만, 고른 타겟으로 조회한다(설계서 05장 §4.4). */
+  const releasePreview = useReleasePreview(workflowId, releaseOpen, releaseTarget);
 
   const myDepartments = useMemo(
     () => myDeptsOf(project, me?.KnoxID, isAdmin),
@@ -165,14 +168,16 @@ export function WorkflowPage() {
    * 실어 보낸다(사용자 요청) — list view는 편집 세션/저장 개념이 없어 즉시 확정돼야 한다.
    * canvas view에서 편집 세션 중에 추가한 경우엔 취소 시 삭제할 수 있도록 계속 추적한다.
    */
-  const handleCreateArtifact = ({ name, phaseId, intent, newArtifact }: {
-    name: string; phaseId: string; intent: ArtifactIntent; newArtifact?: NewArtifactSourceInput;
+  const handleCreateArtifact = ({ name, phaseId, intent, newArtifact, recipients }: {
+    name: string; phaseId: string; intent: ArtifactIntent;
+    newArtifact?: NewArtifactSourceInput;
+    recipients: { departments: string[]; users: string[] };
   }) => {
     if (!workflow) return;
     const seed = { x: 0, y: 0, phase: phaseId };
     placeInLane(seed, phaseList, workflow.phaseWidths ?? {}, (nodes ?? []).map(toCanvasNode));
     createNode.mutate(
-      { name, phaseId, intent, newArtifact, layout: { x: seed.x, y: seed.y, w: NW, h: NH } },
+      { name, phaseId, intent, newArtifact, recipients, layout: { x: seed.x, y: seed.y, w: NW, h: NH } },
       {
         onSuccess: (created) => {
           if (mode === 'canvas') {
@@ -184,7 +189,10 @@ export function WorkflowPage() {
           }
           // list view의 "Current"는 매핑된 항목을 release preview에서 읽는다 — 방금 만든
           // node가 artifact까지 매핑됐다면 그 계산도 새로 해야 한다.
-          qc.invalidateQueries({ queryKey: queryKeys.releasePreview(workflowId ?? '') });
+          // 부서별로 갈라진 preview 캐시 **전 변종**을 무효화한다 — 4요소 prefix라 그 workflow의
+          // 모든 departments 조합에 걸린다. 부서 chip을 고른 상태에서 node를 추가했을 때 그 부서의
+          // 목록이 stale로 남지 않게 하려면 이 형태여야 한다.
+          qc.invalidateQueries({ queryKey: queryKeys.releasePreviewAll(workflowId ?? '') });
           st.getState().setAddDlg(false);
           toast('Artifact added');
         },
@@ -227,14 +235,10 @@ export function WorkflowPage() {
             workflow={workflow}
             orphanCount={orphanCount}
             canEdit={canEdit}
-            departmentOptions={project?.departments ?? []}
-            recipientFilter={recipientFilter}
-            onChangeRecipientFilter={setRecipientFilter}
             onOpenSettings={() => {
               setSaveErr(null); setPhasesErr(null);
               st.getState().setWorkflowSettingsTab('details');
             }}
-            onOpenRelease={() => setReleaseOpen(true)}
             viewMode={pendingCookieRedirect ? 'list' : mode}
             onChangeViewMode={switchView}
             onOpenRecipientMatrix={canEdit ? () => setRecipientMatrixOpen(true) : undefined}
@@ -247,7 +251,6 @@ export function WorkflowPage() {
               workflow={workflow}
               phaseList={phaseList}
               canEdit={canEdit}
-              recipientFilter={recipientFilter}
               nodes={nodes ?? []}
               deleteNode={deleteNode}
             />
@@ -261,7 +264,17 @@ export function WorkflowPage() {
               canShowCurrent={canShowCurrent}
               previewItems={preview.data?.items ?? []}
               previewChangedCount={preview.data?.changedCount ?? 0}
-              recipientFilter={recipientFilter}
+              departmentOptions={project?.departments ?? []}
+              onOpenRelease={() => {
+                // 활성 chip이 특정 부서면 그 부서를, All이면 빈 배열(=전 부서)을 타겟으로
+                // 시작한다. 이 타겟은 고정이다 — 다이얼로그 안에서 더 넣거나 뺄 수 없다
+                // (사용자 요청). 그 부서의 산출물 중 다른 부서와 recipient가 겹치는 게
+                // 있으면 그 부서가 spillover 탭으로 추가되어 겹치는 산출물만 함께 나간다 —
+                // 탭에 나올 부서와 그 안의 항목 모두 서버가 계산한다(스펙 §2.2, §5.1).
+                setReleaseTarget(activeListDept ? [activeListDept] : []);
+                setReleaseOpen(true);
+              }}
+              onActiveDeptChange={setActiveListDept}
               canEdit={canEdit}
               workflowId={workflowId ?? ''}
               onSelectRelease={(rid) => navigate(`/details/${projectId}/${workflowId}/releases/${rid}`)}
@@ -391,6 +404,10 @@ export function WorkflowPage() {
               phases={phaseList}
               myDepartments={myDepartments}
               departmentOptions={project?.departments ?? []}
+              // ★ canvas에는 활성 부서 개념이 없다 — list view에서 고른 chip이
+              //   `activeListDept`에 남아 있어도(세 라우트가 같은 WorkflowPage 엘리먼트를
+              //   렌더해 remount가 없다) canvas의 Add node는 빈 상태로 열려야 한다(스펙 §6.5).
+              defaultRecipientDepartments={mode === 'list' && activeListDept ? [activeListDept] : []}
               onClose={() => st.getState().setAddDlg(false)}
               submitting={createNode.isPending}
               onCreate={handleCreateArtifact}
@@ -414,10 +431,11 @@ export function WorkflowPage() {
               preview={releasePreview.data ?? null}
               loading={releasePreview.isLoading}
               saving={createRelease.isPending}
+              target={releaseTarget}
               onClose={() => setReleaseOpen(false)}
-              onRelease={({ note, sources }) =>
+              onRelease={(p) =>
                 createRelease.mutate(
-                  { note, sources },
+                  p,
                   {
                     onSuccess: (created) => {
                       setReleaseOpen(false);
@@ -442,12 +460,11 @@ export function WorkflowPage() {
  * canvasStore를 그 workflow로 hydrate할 이유가 없어 별도 컴포넌트로 뺐다.
  */
 function CanvasBody({
-  workflow, phaseList, canEdit, recipientFilter, nodes: nodeDtos, deleteNode,
+  workflow, phaseList, canEdit, nodes: nodeDtos, deleteNode,
 }: {
   workflow: WorkflowDto;
   phaseList: WorkflowPhase[];
   canEdit: boolean;
-  recipientFilter: string[];
   nodes: NodeDto[];
   deleteNode: ReturnType<typeof useDeleteNode>;
 }) {
@@ -531,7 +548,6 @@ function CanvasBody({
         workflow={workflow}
         phases={phaseList}
         canEdit={canEdit}
-        recipientFilter={recipientFilter}
         onSaveLayout={saveLayout}
         onCancelEdit={handleCancelEdit}
       />
