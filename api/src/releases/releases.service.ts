@@ -12,6 +12,12 @@ import { EdgesService } from '../edges/edges.service';
 import { NotificationService } from '../notifications/notification.service';
 import { AuditService } from '../audit/audit.service';
 import { Actor } from '../common/actor';
+import {
+  baselineByArtifact,
+  resolveTargetDepartments,
+  selectReleasableNodes,
+  spilloverDepartments,
+} from './release-policy';
 
 /** preview 응답의 한 줄. release 실행 결과와 같은 로직으로 만들어진다. */
 export interface ReleasePreviewItem {
@@ -49,6 +55,12 @@ export interface ReleasePreview {
   nextSeq: number;
   items: ReleasePreviewItem[];
   changedCount: number;
+  /** 해석된 타겟 부서 — 요청이 All이었으면 실제로 받게 되는 부서 전체(스펙 §4.1). */
+  targetDepartments: string[];
+  /** 다이얼로그 탭 구성 — 타겟 ∪ spillover. `isTarget:false`가 spillover다(스펙 §6.4). */
+  departments: { id: string; itemCount: number; isTarget: boolean }[];
+  /** artifact는 매핑됐지만 recipient 부서가 없어 전달되지 않는 node 수(스펙 §2.1). */
+  excludedNoRecipient: number;
 }
 
 /**
@@ -88,15 +100,33 @@ export class ReleasesService {
   }
 
   /**
-   * 직전 release — 변경 감지와 source 이어받기의 기준점이다.
+   * 변경 감지와 source 이어받기의 기준점 — **산출물별로** "그걸 담았던 직전 release의
+   * item"이다(스펙 §3). 직전 release 한 건만 보던 옛 방식과 달리, 중간 release에 그
+   * 산출물이 빠져 있어도 올바른 기준점이 잡힌다.
    *
-   * `.limit(1)`을 쓰지 않는다 — 인메모리 드라이버(in-memory-driver.ts)가 그 체이닝을
-   * 지원하지 않아 두 모드의 동작이 갈린다. 정렬된 결과의 첫 항목을 쓰면 양쪽 모두에서
-   * 같게 동작한다. release 수는 workflow당 많아야 수십 건이라 비용도 문제되지 않는다.
+   * ★ `CanvasViewService`(nodes/canvas-view.service.ts)의 publish 배지 계산도 이 메서드를
+   *   쓴다 — 부서 타겟팅 이후로는 "가장 최근 release 한 건"만 보면 안 된다. 타겟이 B인
+   *   release는 recipient가 A뿐인 산출물 X를 담지 않으므로, X가 두 release 전(A 타겟)에
+   *   나갔더라도 최신 release 한 건짜리 기준으로는 "한 번도 안 나감"으로 오판된다. 부서
+   *   타겟팅 하에서는 이게 예외가 아니라 일상적인 경우라 산출물별 기준점이 맞다.
+   *
+   * `.limit(1)`을 쓰지 않는다 — 인메모리 드라이버가 그 체이닝을 지원하지 않아 두 모드의
+   * 동작이 갈린다. release 수는 workflow당 많아야 수십 건이라 전량 조회로도 충분하다.
    */
-  async previous(workflowId: string | Types.ObjectId): Promise<ReleaseDocument | null> {
-    const all = await this.model.find({ workflowId }).sort({ seq: -1 }).exec();
-    return all[0] ?? null;
+  async baselineFor(workflowId: string | Types.ObjectId): Promise<Map<string, ReleaseItem>> {
+    const newestFirst = await this.model.find({ workflowId }).sort({ seq: -1 }).exec();
+    return baselineByArtifact(newestFirst);
+  }
+
+  /**
+   * 이 workflow가 release를 한 번이라도 낸 적이 있는가. `CanvasViewService`가 publish
+   * 배지를 "신규"와 "그 major는 이미 나갔던 적 있음"으로 가르는 데 쓴다 — `baselineFor()`의
+   * 결과가 비어 있는 것과는 별개 질문이다(그 map이 비어 있는 건 "이 workflow가 release를
+   * 한 번도 안 냈다"뿐 아니라 "release는 냈지만 이 산출물이 그중 어디에도 없었다"에서도
+   * 나올 수 있다) — 그래서 명시적으로 따로 묻는다.
+   */
+  async hasAnyRelease(workflowId: string | Types.ObjectId): Promise<boolean> {
+    return (await this.model.countDocuments({ workflowId })) > 0;
   }
 
   /** 부서별 필터 뷰 — "우리 부서가 받은 것"(설계서 05장 §7.2). workflow 경계를 넘어 모은다. */
@@ -124,41 +154,64 @@ export class ReleasesService {
    * 평소 캔버스 렌더링은 외부 서비스를 한 번도 호출하지 않는다. 라이브 조회는 여기와
    * 산출물 상세 slide를 열 때뿐이다(설계서 05장 §8).
    */
-  async preview(workflow: WorkflowDocument, _actor: Actor): Promise<ReleasePreview> {
-    const items = await this.buildItems(workflow);
+  async preview(
+    workflow: WorkflowDocument,
+    _actor: Actor,
+    target: string[] = [],
+  ): Promise<ReleasePreview> {
+    const { items, excludedNoRecipient } = await this.buildItems(workflow, target);
+    const targetDepartments = resolveTargetDepartments(items, target);
+    const spillover = spilloverDepartments(items, target);
+
+    const countFor = (dept: string) =>
+      items.filter((i) => i.recipients.departments.includes(dept)).length;
+
     return {
       workflowId: workflow._id.toString(),
       nextSeq: (workflow.releaseSeq ?? 0) + 1,
       items,
       changedCount: items.filter((i) => i.changed).length,
+      targetDepartments,
+      departments: [
+        ...targetDepartments.map((id) => ({ id, itemCount: countFor(id), isTarget: true })),
+        ...spillover.map((id) => ({ id, itemCount: countFor(id), isTarget: false })),
+      ],
+      excludedNoRecipient,
     };
   }
 
-  private async buildItems(workflow: WorkflowDocument): Promise<ReleasePreviewItem[]> {
-    const nodes = await this.nodes.releasableForWorkflow(workflow._id);
-    const artifactMap = await this.artifacts.findMany(nodes.map((n) => n.artifactId!));
-    const prev = await this.previous(workflow._id);
-    const prevByArtifact = new Map((prev?.items ?? []).map((i) => [i.artifactId, i]));
+  private async buildItems(
+    workflow: WorkflowDocument,
+    target: string[],
+  ): Promise<{ items: ReleasePreviewItem[]; excludedNoRecipient: number }> {
+    const candidates = await this.nodes.releasableForWorkflow(workflow._id);
+    // ★ 포함 항목 선택은 policy 함수 하나만 쓴다 — preview와 create가 어긋나지 않게(§8).
+    const { selected, excludedNoRecipient } = selectReleasableNodes(candidates, target);
+
+    // ★ artifact는 **후보 전체**로 한 번만 읽는다 — 선택되지 않은 node도 flow상 upstream으로
+    //   잡힐 수 있어 source 후보 계산에 필요하다. 선택된 것만 따로 또 읽지 않는다.
+    const artifactMap = await this.artifacts.findMany(candidates.map((n) => n.artifactId!));
+    const baseline = await this.baselineFor(workflow._id);
     const upstream = await this.edges.upstreamMap(workflow._id);
     const phaseName = new Map((workflow.phases ?? []).map((p) => [p.id, p.name]));
-    const nodeById = new Map(nodes.map((n) => [n._id.toString(), n]));
+    const nodeById = new Map(candidates.map((n) => [n._id.toString(), n]));
 
-    // 각 artifact의 "지금 최신 published"를 한 번씩만 해석한다 — SIREN 캐시에서 읽는다
-    // (설계서 05장 §8, 07장 §3·§4). 라이브 조회는 더 이상 하지 않는다.
+    // 버전 해석은 실제로 나갈 항목에만 필요하다.
     const resolved = new Map<string, { version: ReleasedVersion | null; lookupFailed: boolean }>();
-    for (const a of artifactMap.values()) {
-      resolved.set(a._id.toString(), this.resolveLatestPublished(a));
+    for (const node of selected) {
+      const a = artifactMap.get(node.artifactId!.toString());
+      if (a) resolved.set(a._id.toString(), this.resolveLatestPublished(a));
     }
 
     const items: ReleasePreviewItem[] = [];
 
-    for (const node of nodes) {
+    for (const node of selected) {
       const artifact = artifactMap.get(node.artifactId!.toString());
       if (!artifact) continue;
 
       const artifactId = artifact._id.toString();
       const current = resolved.get(artifactId) ?? { version: null, lookupFailed: false };
-      const previousItem = prevByArtifact.get(artifactId);
+      const previousItem = baseline.get(artifactId);
       const firstTime = !previousItem;
 
       // 변경 감지는 major 단위로만 한다 — minor는 비교하지 않는다(설계서 05장 §3).
@@ -167,8 +220,8 @@ export class ReleasesService {
 
       const sources = changed
         ? this.buildSourceCandidates(node, upstream, nodeById, artifactMap)
-        : // 바뀌지 않은 산출물은 직전 release의 선택을 그대로 이어받는다 — 사용자가 매번
-          // 똑같은 선택을 반복하지 않게 한다(설계서 05장 §4.2).
+        : // 바뀌지 않은 산출물은 **그걸 담았던 직전 release**의 선택을 그대로 이어받는다
+          // (스펙 §3) — 사용자가 매번 똑같은 선택을 반복하지 않게 한다.
           (previousItem?.sources ?? []).map((s) => ({
             nodeId: s.nodeId,
             artifactId: s.artifactId ?? '',
@@ -195,7 +248,7 @@ export class ReleasesService {
       });
     }
 
-    return items;
+    return { items, excludedNoRecipient };
   }
 
   /**
@@ -290,21 +343,32 @@ export class ReleasesService {
    */
   async create(
     workflow: WorkflowDocument,
-    input: { note: string; sources?: Record<string, Record<string, string | null>> },
+    input: { note: string; sources?: Record<string, Record<string, string | null>>; targetDepartments?: string[] },
     actor: Actor,
   ): Promise<ReleaseDocument> {
     const note = (input.note ?? '').trim();
     if (!note) throw new BadRequestException('A release note is required.');
 
-    const previewItems = await this.buildItems(workflow);
+    const project = await this.projectModel.findById(workflow.projectId).exec();
+    const knownDepartments = new Set((project?.departments ?? []).map((d) => d.id));
+    const target = [...new Set(input.targetDepartments ?? [])];
+    const unknown = target.filter((d) => !knownDepartments.has(d));
+    if (unknown.length > 0) {
+      throw new BadRequestException(`Unknown department: ${unknown.join(', ')}`);
+    }
+
+    const { items: previewItems } = await this.buildItems(workflow, target);
     if (previewItems.length === 0) {
-      throw new BadRequestException('There is nothing to release — no node has an artifact mapped.');
+      throw new BadRequestException(
+        target.length > 0
+          ? 'There is nothing to release for the selected departments.'
+          : 'There is nothing to release — no node has an artifact mapped with a recipient department.',
+      );
     }
 
     // workflowAt.departmentLabel — 그 순간의 부서 이름을 얼려 둔다(02장 §9.4). id
     // 자체(workflow.department)는 살아있는 한 항상 Project.departments에서 다시 찾아
     // 최신 이름을 보여주고, 이 label은 그 부서가 나중에 지워졌을 때만 쓰이는 대체값이다.
-    const project = await this.projectModel.findById(workflow.projectId).exec();
     const departmentLabel =
       project?.departments.find((d) => d.id === workflow.department)?.name ?? workflow.department;
 
@@ -366,6 +430,7 @@ export class ReleasesService {
         note,
         workflowAt: { name: workflow.name, department: workflow.department, departmentLabel },
         items,
+        targetDepartments: resolveTargetDepartments(items, target),
         recipientDepartments: [...departments],
         recipientUsers: [...users],
         isMock: false,
