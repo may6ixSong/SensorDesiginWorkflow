@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Box, Tooltip } from '@mui/material';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
-import { NodeDto, WorkflowPhase } from '@/types/domain';
+import { DepartmentDto, NodeDto, WorkflowPhase } from '@/types/domain';
 import { useReplaceNodeRecipients } from '@/api/hooks/useNodes';
 import { sortSchedule } from '@/lib/schedule';
 import { ModalShell } from '@/components/common/ModalShell';
@@ -26,14 +26,15 @@ interface Props {
   workflowId: string;
   nodes: NodeDto[];
   phases: WorkflowPhase[];
-  /** 그 과제에 등록된 부서(Project.departments) — 열이 된다. */
-  departmentOptions: string[];
+  /** 그 과제에 등록된 부서(Project.departments) — 열이 된다. 값은 id, 열 머리글은 이름. */
+  departmentOptions: DepartmentDto[];
   onClose: () => void;
 }
 
 interface PendingToggle {
   node: NodeDto;
-  dept: string;
+  /** 토글 대상 부서 — 저장은 `id`로, confirm 문구는 `name`으로 쓴다(02장 §9.3). */
+  dept: DepartmentDto;
   adding: boolean;
 }
 
@@ -109,9 +110,9 @@ export function RecipientMatrixDialog({ workflowId, nodes, phases, departmentOpt
   const isPhaseBoundary = (rowIdx: number) =>
     rowIdx === rows.length - 1 || rows[rowIdx + 1].phaseId !== rows[rowIdx].phaseId;
 
-  const handleCellClick = (node: NodeDto, dept: string) => {
+  const handleCellClick = (node: NodeDto, dept: DepartmentDto) => {
     if (!node.artifactId || replaceRecipients.isPending) return;
-    const has = node.recipients?.departments.includes(dept) ?? false;
+    const has = node.recipients?.departments.includes(dept.id) ?? false;
     setPending({ node, dept, adding: !has });
   };
 
@@ -119,7 +120,7 @@ export function RecipientMatrixDialog({ workflowId, nodes, phases, departmentOpt
     if (!pending) return;
     const { node, dept, adding } = pending;
     const currentDepts = node.recipients?.departments ?? [];
-    const nextDepts = adding ? [...currentDepts, dept] : currentDepts.filter((d) => d !== dept);
+    const nextDepts = adding ? [...currentDepts, dept.id] : currentDepts.filter((d) => d !== dept.id);
     replaceRecipients.mutate(
       { nodeId: node.id, departments: nextDepts, users: node.recipients?.users ?? [] },
       {
@@ -205,7 +206,7 @@ export function RecipientMatrixDialog({ workflowId, nodes, phases, departmentOpt
                     {departmentOptions.map((dept) => (
                       <Box
                         component="th"
-                        key={dept}
+                        key={dept.id}
                         sx={{
                           position: 'sticky', top: 0, zIndex: 2,
                           width: COL_W, minWidth: COL_W, height: HEADER_ROW_H,
@@ -214,9 +215,9 @@ export function RecipientMatrixDialog({ workflowId, nodes, phases, departmentOpt
                           padding: '6px 8px', textAlign: 'center', verticalAlign: 'middle',
                         }}
                       >
-                        <Tooltip title={dept}>
+                        <Tooltip title={dept.name}>
                           <Box sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {dept}
+                            {dept.name}
                           </Box>
                         </Tooltip>
                       </Box>
@@ -281,10 +282,10 @@ export function RecipientMatrixDialog({ workflowId, nodes, phases, departmentOpt
                           )}
                         </Box>
                         {departmentOptions.map((dept) => {
-                          const active = mapped && (b.recipients?.departments.includes(dept) ?? false);
+                          const active = mapped && (b.recipients?.departments.includes(dept.id) ?? false);
                           return (
                             <MatrixCell
-                              key={`${b.id}-${dept}`}
+                              key={`${b.id}-${dept.id}`}
                               mapped={mapped}
                               active={active}
                               bottomBorder={bottomBorder}
@@ -329,7 +330,7 @@ export function RecipientMatrixDialog({ workflowId, nodes, phases, departmentOpt
         <ConfirmDialog
           title={t(pending.adding ? 'recipientMatrix.addTitle' : 'recipientMatrix.removeTitle')}
           message={t(pending.adding ? 'recipientMatrix.addMessage' : 'recipientMatrix.removeMessage', {
-            dept: pending.dept,
+            dept: pending.dept.name,
             artifact: pending.node.name,
           })}
           confirmLabel={t(pending.adding ? 'recipientMatrix.add' : 'recipientMatrix.remove')}
