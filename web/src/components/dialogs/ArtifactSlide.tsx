@@ -3,8 +3,8 @@ import { Box } from '@mui/material';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
-  AccessGrant, ArtifactHtmlView, ArtifactVersionDto, NodeDto, ProjectDetailDto, ReleaseDto, WorkflowPhase,
-  isMaskedArtifact,
+  AccessGrant, ArtifactHtmlView, ArtifactVersionDto, DepartmentDto, NodeDto, ProjectDetailDto, ReleaseDto,
+  WorkflowPhase, isMaskedArtifact,
 } from '@/types/domain';
 import { SlidePanel } from '@/components/common/SlidePanel';
 import { SirenButton, Badge } from '@/components/common/SirenButton';
@@ -689,7 +689,7 @@ function RecipientsTab({
 }: {
   node: NodeDto;
   canEdit: boolean;
-  departmentOptions: string[];
+  departmentOptions: DepartmentDto[];
   onSaveRecipients: Props['onSaveRecipients'];
   saving?: boolean;
 }) {
