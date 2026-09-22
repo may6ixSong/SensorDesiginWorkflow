@@ -213,9 +213,11 @@ export function ArtifactSourcePicker({
     [typeEntries, term],
   );
   const calypsoList = useMemo(
+    // 검색은 사람이 입력한 말로 하므로 부서는 id가 아니라 **이름**으로 대조한다(02장 §9.3) —
+    // id로 두면 부서명을 쳐도 아무것도 걸리지 않는다.
     () => (calypsoArtifacts ?? [])
-      .filter((a) => !term || `${a.name} ${a.department}`.toLowerCase().includes(term)),
-    [calypsoArtifacts, term],
+      .filter((a) => !term || `${a.name} ${deptLabel(a.department)}`.toLowerCase().includes(term)),
+    [calypsoArtifacts, term, deptLabel],
   );
 
   // 이미 live/hpc 산출물을 골라 둔 상태로 열렸으면(산출물 변경 등) 그 서비스에 속한
