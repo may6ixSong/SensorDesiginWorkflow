@@ -71,17 +71,58 @@ export function useUpdateProject(projectId: string) {
 }
 
 /**
- * 이 과제의 부서 목록 교체 — 목록 전체를 보낸다(workflow-domains와 같은 방식). 산출물
- * "Received from" 화면의 후보 목록이라 workflow-domains와 달리 사용 중이어도 자유롭게
- * 지울 수 있다(BE가 막지 않는다).
+ * 부서 관리 — 추가 / 이름 변경 / 삭제를 **항목 단위**로 부른다(02장 §9.3).
+ *
+ * ★ 예전의 "목록 전체를 배열로 교체"(`PATCH :id/departments`) 방식은 폐지했다. 부서가
+ *   `{id, name}`이 되면서 id는 한 번 발급되면 절대 바뀌지 않아야 하는데, 배열 통째 교체는
+ *   어느 항목이 어느 항목의 후신인지 서버가 알 수 없어 id를 새로 발급해 버리기 때문이다 —
+ *   그러면 그 부서를 참조하던 workflow/node/artifact 권한이 전부 끊긴다.
+ * ★ 세 훅 모두 응답으로 갱신된 project 전체를 받아 캐시에 그대로 덮는다. 그래서 이름을
+ *   바꾸면 그 캐시를 읽는 모든 화면(`useDepartmentLabel`)의 라벨이 **추가 요청 없이** 즉시
+ *   따라온다.
  */
-export function useUpdateProjectDepartments(projectId: string) {
+export function useAddDepartment(projectId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (departments: string[]) => {
-      const res = await apiClient.patch<ApiEnvelope<ProjectDetailDto>>(
+    mutationFn: async (name: string) => {
+      const res = await apiClient.post<ApiEnvelope<ProjectDetailDto>>(
         `/projects/${projectId}/departments`,
-        { departments },
+        { name },
+      );
+      return res.data.data;
+    },
+    onSuccess: (project) => {
+      qc.setQueryData(queryKeys.project(projectId), project);
+      qc.invalidateQueries({ queryKey: queryKeys.projects });
+    },
+  });
+}
+
+/** 부서명 변경 — id는 그대로 두고 표시 이름만 바꾼다(사용자 요청의 핵심 동작). */
+export function useRenameDepartment(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ deptId, name }: { deptId: string; name: string }) => {
+      const res = await apiClient.patch<ApiEnvelope<ProjectDetailDto>>(
+        `/projects/${projectId}/departments/${deptId}`,
+        { name },
+      );
+      return res.data.data;
+    },
+    onSuccess: (project) => {
+      qc.setQueryData(queryKeys.project(projectId), project);
+      qc.invalidateQueries({ queryKey: queryKeys.projects });
+    },
+  });
+}
+
+/** 부서 삭제 — 그 부서에 멤버가 남아 있으면 BE가 막는다. */
+export function useRemoveDepartment(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (deptId: string) => {
+      const res = await apiClient.delete<ApiEnvelope<ProjectDetailDto>>(
+        `/projects/${projectId}/departments/${deptId}`,
       );
       return res.data.data;
     },
