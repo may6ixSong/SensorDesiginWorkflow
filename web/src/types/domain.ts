@@ -382,6 +382,8 @@ export interface ReleaseDto {
   releasedBy: string;
   note: string;
   workflowAt: { name: string; department: string };
+  /** 이 release가 겨냥한 부서. `recipientDepartments`와 다르면 그 차이가 spillover다. */
+  targetDepartments: string[];
   recipientDepartments: string[];
   items: ReleaseItemDto[];
   /** 지금 이 사람이 이 과제에서 속한 부서 전체(Admin은 그 과제의 전 부서). "받은 것"
@@ -417,11 +419,24 @@ export interface ReleasePreviewItemDto {
   }[];
 }
 
+/** release 다이얼로그의 부서 탭 하나. `isTarget: false`면 recipient가 겹쳐 파생된 부서다. */
+export interface ReleasePreviewDepartmentDto {
+  id: string;
+  itemCount: number;
+  isTarget: boolean;
+}
+
 export interface ReleasePreviewDto {
   workflowId: string;
   nextSeq: number;
   items: ReleasePreviewItemDto[];
   changedCount: number;
+  /** 해석된 타겟 부서 — 요청이 All이었으면 실제로 받게 되는 부서 전체. */
+  targetDepartments: string[];
+  /** 탭 구성 — 타겟 ∪ spillover. */
+  departments: ReleasePreviewDepartmentDto[];
+  /** artifact는 매핑됐지만 recipient 부서가 없어 전달되지 않는 node 수. */
+  excludedNoRecipient: number;
 }
 
 /* ------------------------------------------------------------------ *
