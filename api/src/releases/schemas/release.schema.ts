@@ -153,6 +153,18 @@ export class Release {
   items: ReleaseItem[];
 
   /**
+   * 이 release가 **겨냥한** 부서(`Project.departments[].id`) — 스펙 §4.1.
+   *
+   * ★ 항상 `targetDepartments ⊆ recipientDepartments` 다. 타겟에 넣었지만 받을 산출물이
+   *   없던 부서는 떨어진다.
+   * ★ All로 냈으면 실제로 받은 부서 전체가 되어 `recipientDepartments`와 같아진다.
+   * ★ `targetDepartments=[A]`, `recipientDepartments=[A,B]` 는 "A를 겨냥했고, recipient가
+   *   겹치는 산출물 때문에 B로 번졌다"는 뜻이다(스펙 §2.2).
+   */
+  @Prop({ type: [String], default: [], index: true })
+  targetDepartments: string[];
+
+  /**
    * 조회 최적화용 파생 필드 — items 안의 모든 수신 부서/사용자를 평탄화해 담는다.
    * 부서별 필터 뷰(설계서 05장 §7.2)가 이 필드로 인덱스 조회한다.
    */
@@ -182,3 +194,4 @@ ReleaseSchema.index({ recipientUsers: 1, releasedAt: -1 });
 ReleaseSchema.index({ releasedBy: 1, releasedAt: -1 });
 ReleaseSchema.index({ 'workflowAt.department': 1, releasedAt: -1 });
 ReleaseSchema.index({ releasedAt: -1 });
+ReleaseSchema.index({ targetDepartments: 1, releasedAt: -1 });
