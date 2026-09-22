@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQueries } from '@tanstack/react-query';
 import { apiClient, ApiEnvelope } from '@/api/client';
 import { queryKeys } from '@/api/queryKeys';
-import { NodeDto, EdgeDto, Milestone, WorkflowDto } from '@/types/domain';
+import { DepartmentDto, NodeDto, EdgeDto, Milestone, WorkflowDto } from '@/types/domain';
 import { Icon } from '@/components/common/Icon';
 import { CURSOR_POINTER, FONT_MONO, T } from '@/theme/tokens';
 import { buildDomainModel, withAlpha, lighten, darken, DomainWorkflowModel, UNASSIGNED_DOMAIN } from '@/lib/domainWorkflow';
@@ -88,7 +88,7 @@ interface Props {
   milestones: Milestone[];
   workflows: WorkflowDto[];
   /** 과제에 등록된 부서 목록(Project.departments) — 도메인 모델을 만들 때 빈 부서도 알아보기 위해 쓴다. */
-  departments: string[];
+  departments: DepartmentDto[];
 }
 
 export function DesignWorkflowDialog(props: Props) {
@@ -190,7 +190,8 @@ function WorkflowStage({
     return m;
   }, [byWorkflow]);
 
-  const domainSig = departments.join('|');
+  // 부서 목록이 실제로 바뀌었는지(추가/삭제/**이름 변경**) 한 줄로 요약해 모델 재계산 트리거로 쓴다.
+  const domainSig = departments.map((d) => `${d.id}:${d.name}`).join('|');
   const model: DomainWorkflowModel = useMemo(
     () => buildDomainModel(workflows, byWorkflow, departments),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -965,7 +966,7 @@ function DomainNav({
         {zones.map((z) => {
           const pct = z.total ? Math.round((z.released / z.total) * 100) : 0;
           const on = active === z.key;
-          const label = z.key === UNASSIGNED_DOMAIN ? 'Unassigned' : z.key;
+          const label = z.key === UNASSIGNED_DOMAIN ? 'Unassigned' : z.label;
           const orphans = z.rows.reduce((n, r) => n + r.orphans, 0);
           return (
             <Box
