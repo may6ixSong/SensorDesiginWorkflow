@@ -27,7 +27,7 @@ import { Artifact, ArtifactDocument } from '../artifacts/schemas/artifact.schema
 import { CALYPSO_SERVICE_KEY, CalypsoClientService } from './calypso-client.service';
 import { HubSyncService } from './hub-sync.service';
 import {
-  CalypsoAddVersionDto, CalypsoGrantDto, CalypsoReleaseDto, CreateCalypsoArtifactDto,
+  CalypsoAddTableVersionDto, CalypsoAddVersionDto, CalypsoGrantDto, CalypsoReleaseDto, CreateCalypsoArtifactDto,
   SetCalypsoNetworkDto, SetCalypsoRestrictViewDto,
 } from './dto/calypso-proxy.dto';
 
@@ -192,6 +192,44 @@ export class CalypsoProxyController {
     const body = this.relay(result);
     await this.syncCache(id, me.knoxId, isAdmin);
     return body;
+  }
+
+  /**
+   * 표(table) 콘텐츠 새 버전(설계서 11장) — 행 JSON을 그대로 넘기고, 검증·요약은 Calypso가
+   * template으로 한다. 저장 뒤 SIREN 캐시를 갱신하는 건 파일 업로드와 같다.
+   */
+  @Post(':id/table-versions')
+  async addTableVersion(
+    @Param('id') id: string,
+    @Query('projectId') projectId: string,
+    @Body() dto: CalypsoAddTableVersionDto,
+    @CurrentActor() me: Actor,
+  ) {
+    const { departments, isAdmin } = await this.resolveContext(projectId, me);
+    const result = await this.calypso.forward(
+      'POST', `/artifacts/${encodeURIComponent(id)}/table-versions`,
+      { versionNote: dto.versionNote, description: dto.description, rows: dto.rows },
+      me.knoxId, departments, isAdmin,
+    );
+    const body = this.relay(result);
+    await this.syncCache(id, me.knoxId, isAdmin);
+    return body;
+  }
+
+  /** 한 버전의 표 데이터 + 그때의 template 정의. */
+  @Get(':id/tables/:versionRef')
+  async table(
+    @Param('id') id: string,
+    @Param('versionRef') versionRef: string,
+    @Query('projectId') projectId: string,
+    @CurrentActor() me: Actor,
+  ) {
+    const { departments, isAdmin } = await this.resolveContext(projectId, me);
+    const result = await this.calypso.forward(
+      'GET', `/artifacts/${encodeURIComponent(id)}/tables/${encodeURIComponent(versionRef)}`,
+      undefined, me.knoxId, departments, isAdmin,
+    );
+    return this.relay(result);
   }
 
   /** 파일이 하나면 그대로, 여러 개면 zip으로 묶여서 온다 — Calypso가 그 판정을 한다(§3.9). */

@@ -62,6 +62,9 @@ export class AutoRunSourceController {
   async contents(@Param('id') id: string, @Param('versionRef') versionRef: string, @Req() req: any) {
     const { artifact, version } = await this.authorize(req, id, versionRef);
     const files = version.files ?? [];
+    // 표(table) 콘텐츠면 행 데이터를 JSON 그대로 싣는다 — HPC로는 파일이 아니라 JSON만 보낼 수
+    // 있다(SIREN 설계서 11장 §6). columns는 key/label만(그때의 template 정의 기준).
+    const table = version.table ? await this.artifacts.tableOf(version) : null;
     return {
       artifactId: artifact._id.toString(),
       name: artifact.name,
@@ -75,6 +78,18 @@ export class AutoRunSourceController {
       paths: (version.paths ?? []).map((p) => ({ path: p.path, label: p.label ?? '' })),
       // 같은 토큰으로 받는다 — 파일이 없으면 null.
       downloadPath: files.length ? 'download' : null,
+      contentKind: artifact.contentKind ?? 'file',
+      table: table
+        ? {
+            templateKey: table.template.key,
+            templateVersion: table.template.version,
+            columns: table.template.columns.map((c) => ({ key: c.key, label: c.label, type: c.type })),
+            rowCount: table.rows.length,
+            errorCount: version.table?.errorCount ?? 0,
+            warningCount: version.table?.warningCount ?? 0,
+            rows: table.rows,
+          }
+        : null,
       createdBy: version.createdBy,
       createdAt: version.createdAt instanceof Date ? version.createdAt.toISOString() : String(version.createdAt),
     };

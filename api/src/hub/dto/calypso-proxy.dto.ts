@@ -1,5 +1,5 @@
 import {
-  IsBoolean, IsIn, IsOptional, IsString, MaxLength, MinLength, ValidateIf,
+  ArrayMaxSize, IsArray, IsBoolean, IsIn, IsOptional, IsString, MaxLength, MinLength, ValidateIf,
 } from 'class-validator';
 
 /**
@@ -36,6 +36,58 @@ export class CreateCalypsoArtifactDto {
   @IsOptional()
   @IsBoolean()
   restrictView?: boolean;
+
+  /** 주면 표(table) 콘텐츠 artifact로 만든다(설계서 11장). */
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  templateKey?: string;
+}
+
+/** POST /calypso-artifacts/:id/table-versions 몸체 — Calypso가 template으로 검증한다. */
+export class CalypsoAddTableVersionDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(200)
+  versionNote: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsArray()
+  @ArrayMaxSize(20000)
+  rows: Record<string, unknown>[];
+}
+
+/** POST/PUT /calypso-templates 몸체 — 세부 규칙 검사는 Calypso(templateProblems)가 한다. */
+export class CalypsoTemplateDto {
+  @IsString()
+  @MinLength(2)
+  @MaxLength(63)
+  key: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(120)
+  name: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  description?: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(31)
+  sheetName: string;
+
+  @IsArray()
+  columns: Record<string, unknown>[];
+
+  @IsOptional()
+  @IsBoolean()
+  archived?: boolean;
 }
 
 /** PATCH /calypso-artifacts/:id/restrict-view 몸체. */

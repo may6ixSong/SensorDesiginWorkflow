@@ -45,6 +45,30 @@ export class ArtifactPath {
 export const ArtifactPathSchema = SchemaFactory.createForClass(ArtifactPath);
 
 /**
+ * 표(table) 콘텐츠 버전의 요약(SIREN 설계서 11장 §3) — 행 데이터 자체는 `artifactTables`
+ * 컬렉션에 versionRef로 따로 있다. 목록·트리는 이 요약만으로 그린다.
+ */
+@Schema({ _id: false, timestamps: false })
+export class ArtifactTableSummary {
+  @Prop({ required: true })
+  templateKey: string;
+
+  @Prop({ required: true })
+  templateVersion: number;
+
+  @Prop({ required: true, default: 0 })
+  rowCount: number;
+
+  /** 저장 시점의 검증 결과 — errorCount > 0이면 publish할 수 없다. */
+  @Prop({ required: true, default: 0 })
+  errorCount: number;
+
+  @Prop({ required: true, default: 0 })
+  warningCount: number;
+}
+export const ArtifactTableSummarySchema = SchemaFactory.createForClass(ArtifactTableSummary);
+
+/**
  * Calypso가 소유하는 버전. **여기가 실물(또는 참조)의 집이다** - SIREN은 이 값을
  * 참조로만 관측한다(Hub 설계서 §1.2).
  *
@@ -84,6 +108,10 @@ export class ArtifactVersion {
   /** network==='HPC'인 artifact에서만 쓴다 — 여러 개 가능(사용자 요청). */
   @Prop({ type: [ArtifactPathSchema], default: [] })
   paths: ArtifactPath[];
+
+  /** 표(table) 콘텐츠 artifact의 버전이면 그 요약, 아니면 null(SIREN 설계서 11장). */
+  @Prop({ type: ArtifactTableSummarySchema, default: null })
+  table: ArtifactTableSummary | null;
 
   /**
    * 짧은 한 줄 메모 — 이 버전에서 뭐가 바뀌었는지, 필수(사용자 요청: 버전을 올리거나
@@ -174,6 +202,17 @@ export class Artifact {
    */
   @Prop({ type: String, enum: ['OA', 'HPC', null], default: null })
   network: CalypsoNetwork;
+
+  /**
+   * 콘텐츠 종류(SIREN 설계서 11장) — 'file'이면 지금까지처럼 파일/링크/경로, 'table'이면
+   * template으로 정해진 표 데이터를 버전으로 쌓는다. 만들 때 정하고 바꾸지 않는다.
+   */
+  @Prop({ type: String, enum: ['file', 'table'], default: 'file' })
+  contentKind: 'file' | 'table';
+
+  /** contentKind === 'table'일 때 어느 template인가. 새 버전은 항상 그 template의 최신 정의로 검증한다. */
+  @Prop({ type: String, default: null })
+  templateKey: string | null;
 
   @Prop({ type: [ArtifactVersionSchema], default: [] })
   versions: ArtifactVersion[];

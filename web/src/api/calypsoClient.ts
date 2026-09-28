@@ -1,4 +1,5 @@
 import { apiClient, ApiEnvelope } from './client';
+import { TableRow, TableTemplateDef } from '@/lib/tableValidation';
 
 /**
  * File Artifacts(Calypso, Tier B) — SIREN BE의 프록시를 통해서만 호출한다(설계서 07장 §2).
@@ -37,12 +38,22 @@ export interface CalypsoVersionView {
   links: CalypsoLink[];
   /** network==='HPC'인 artifact에서만 쓴다 — 여러 개 가능(사용자 요청). */
   paths: CalypsoPathEntry[];
+  /** 표(table) 콘텐츠 버전이면 요약(설계서 11장) — 행 데이터는 getCalypsoTable로 따로 받는다. */
+  table?: CalypsoTableSummary | null;
   /** 짧은 한 줄 메모 — 필수, 서식 없는 텍스트. */
   versionNote: string;
   /** 서식 있는(HTML) 긴 설명 — 선택. 렌더링 전 반드시 sanitize한다. */
   description: string;
   createdBy: string;
   createdAt: string;
+}
+
+export interface CalypsoTableSummary {
+  templateKey: string;
+  templateVersion: number;
+  rowCount: number;
+  errorCount: number;
+  warningCount: number;
 }
 
 export interface CalypsoGrant {
@@ -66,6 +77,9 @@ export interface CalypsoArtifact {
   /** 'OA' | 'HPC' — 언제든 edit 권한자가 바꿀 수 있다(사용자 요청, `setCalypsoNetwork`).
    * 기존 버전들의 콘텐츠는 그대로 남는다. null은 마이그레이션 전의 예전 문서에만 남는다. */
   network: 'OA' | 'HPC' | null;
+  /** 'file' = 파일/링크/경로, 'table' = template으로 관리하는 표 데이터(설계서 11장). 없으면 file. */
+  contentKind?: 'file' | 'table';
+  templateKey?: string | null;
   createdBy: string;
   /** 'edit'이면 업로드/릴리스/권한관리 가능, 'view'면 released 버전만 열람. */
   myAccess: 'edit' | 'view';
@@ -96,6 +110,8 @@ export async function getCalypsoArtifact(id: string, projectId: string): Promise
 
 export async function createCalypsoArtifact(input: {
   projectId: string; department: string; name: string; description?: string; network: 'OA' | 'HPC';
+  /** 주면 표(table) 콘텐츠 artifact로 만든다(설계서 11장). */
+  templateKey?: string;
 }): Promise<CalypsoArtifact> {
   const { data } = await apiClient.post<ApiEnvelope<CalypsoArtifact>>('/calypso-artifacts', input);
   return data.data;
@@ -223,6 +239,60 @@ export async function setCalypsoRestrictView(id: string, projectId: string, rest
 export async function setCalypsoNetwork(id: string, projectId: string, network: 'OA' | 'HPC'): Promise<CalypsoArtifact> {
   const { data } = await apiClient.patch<ApiEnvelope<CalypsoArtifact>>(
     `/calypso-artifacts/${id}/network`, { network }, { params: { projectId } },
+  );
+  return data.data;
+}
+
+/* ── 표(table) 콘텐츠와 template (설계서 11장) ── */
+
+export interface CalypsoTemplateSummary extends TableTemplateDef {
+  archived: boolean;
+  updatedBy: string;
+  updatedAt: string | null;
+  revisionCount: number;
+}
+
+export async function listCalypsoTemplates(includeArchived = false): Promise<CalypsoTemplateSummary[]> {
+  const { data } = await apiClient.get<ApiEnvelope<CalypsoTemplateSummary[]>>('/calypso-templates', {
+    params: includeArchived ? { includeArchived: 'true' } : {},
+  });
+  return data.data;
+}
+
+/** version을 주면 그때의 정의(옛 표 버전을 그릴 때), 없으면 최신. */
+export async function getCalypsoTemplate(key: string, version?: number): Promise<TableTemplateDef> {
+  const { data } = await apiClient.get<ApiEnvelope<TableTemplateDef>>(`/calypso-templates/${encodeURIComponent(key)}`, {
+    params: version ? { version } : {},
+  });
+  return data.data;
+}
+
+export type CalypsoTemplateInput = Omit<TableTemplateDef, 'version'> & { archived?: boolean };
+
+export async function createCalypsoTemplate(input: CalypsoTemplateInput): Promise<CalypsoTemplateSummary> {
+  const { data } = await apiClient.post<ApiEnvelope<CalypsoTemplateSummary>>('/calypso-templates', input);
+  return data.data;
+}
+
+export async function updateCalypsoTemplate(key: string, input: CalypsoTemplateInput): Promise<CalypsoTemplateSummary> {
+  const { data } = await apiClient.put<ApiEnvelope<CalypsoTemplateSummary>>(`/calypso-templates/${encodeURIComponent(key)}`, input);
+  return data.data;
+}
+
+export async function getCalypsoTable(
+  id: string, projectId: string, versionRef: string,
+): Promise<{ template: TableTemplateDef; rows: TableRow[]; versionRef: string }> {
+  const { data } = await apiClient.get<ApiEnvelope<{ template: TableTemplateDef; rows: TableRow[]; versionRef: string }>>(
+    `/calypso-artifacts/${id}/tables/${encodeURIComponent(versionRef)}`, { params: { projectId } },
+  );
+  return data.data;
+}
+
+export async function addCalypsoTableVersion(
+  id: string, projectId: string, rows: TableRow[], versionNote: string, description?: string,
+): Promise<CalypsoArtifact> {
+  const { data } = await apiClient.post<ApiEnvelope<CalypsoArtifact>>(
+    `/calypso-artifacts/${id}/table-versions`, { rows, versionNote, description }, { params: { projectId } },
   );
   return data.data;
 }
