@@ -11,6 +11,7 @@ import { AuditService } from '../audit/audit.service';
 import { WorkflowsService } from '../workflows/workflows.service';
 import { CanvasViewService } from '../nodes/canvas-view.service';
 import { PutCanvasDto } from './dto/put-canvas.dto';
+import { AutoRunService } from '../auto-run/auto-run.service';
 
 /**
  * 캔버스(레이아웃/연결) 일괄 PUT.
@@ -29,6 +30,7 @@ export class CanvasService {
     private readonly audit: AuditService,
     private readonly workflows: WorkflowsService,
     private readonly canvasView: CanvasViewService,
+    private readonly autoRun: AutoRunService,
   ) {}
 
   async apply(
@@ -63,6 +65,13 @@ export class CanvasService {
         throw new BadRequestException(`Unknown phase: ${m.phaseId}`);
       }
     }
+
+    // Auto Run이 켜진 node를 순환 위에 올리는 flow는 저장하지 않는다(설계서 10장 §3.2) —
+    // 아무것도 쓰기 전에 거부해야 부분 저장이 남지 않는다.
+    await this.autoRun.assertFlowKeepsAutoRunAcyclic(
+      workflow._id,
+      dto.edges.map((e) => ({ fromId: e.fromId, toId: e.toId, bidirectional: e.bidirectional === true })),
+    );
 
     await Promise.all(
       dto.nodes.map((n) =>

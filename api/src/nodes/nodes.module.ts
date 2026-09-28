@@ -9,6 +9,7 @@ import { AuditModule } from '../audit/audit.module';
 import { ArtifactsModule } from '../artifacts/artifacts.module';
 import { EdgesModule } from '../edges/edges.module';
 import { ReleasesModule } from '../releases/releases.module';
+import { AutoRunModule } from '../auto-run/auto-run.module';
 
 const Models = registerModels([{ name: WorkflowNode.name, schema: WorkflowNodeSchema }]);
 
@@ -19,6 +20,8 @@ const Models = registerModels([{ name: WorkflowNode.name, schema: WorkflowNodeSc
     AuditModule,
     ArtifactsModule,
     EdgesModule,
+    // 캔버스 카드의 Auto Run 표시(등록 여부·실행 중)를 조립한다(설계서 10장 §8.1).
+    AutoRunModule,
     // 캔버스의 publish 배지가 "마지막 release 대비 major가 올라갔는가"를 물어봐야 하고,
     // release는 다시 노드 목록을 필요로 한다 — 둘이 서로를 참조하므로 forwardRef다.
     forwardRef(() => ReleasesModule),

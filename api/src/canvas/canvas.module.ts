@@ -5,11 +5,12 @@ import { EdgesModule } from '../edges/edges.module';
 import { AuditModule } from '../audit/audit.module';
 import { WorkflowsModule } from '../workflows/workflows.module';
 import { NodesModule } from '../nodes/nodes.module';
+import { AutoRunModule } from '../auto-run/auto-run.module';
 import { CanvasService } from './canvas.service';
 import { CanvasController } from './canvas.controller';
 
 @Module({
-  imports: [CommonAccessModule, MemosModule, EdgesModule, AuditModule, WorkflowsModule, NodesModule],
+  imports: [CommonAccessModule, MemosModule, EdgesModule, AuditModule, WorkflowsModule, NodesModule, AutoRunModule],
   providers: [CanvasService],
   controllers: [CanvasController],
 })

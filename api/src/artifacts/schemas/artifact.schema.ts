@@ -113,6 +113,15 @@ export class ArtifactVersion {
   @Prop({ type: Date, default: null })
   publishedAt: Date | null;
 
+  /**
+   * 이 published 버전으로 Auto Run 발화 조건을 이미 평가했는가(설계서 10장 §4.1). push
+   * 이벤트로 처음 published를 본 순간 한 번만 평가하고 여기 찍는다 — 같은 버전의 재전송이나,
+   * Calypso 프록시 pull이 push보다 먼저 캐시를 채운 경우에도 정확히 한 번만 평가된다. pull
+   * 경로(매핑 시·야간 재동기화)는 이 값을 건드리지 않으며 평가도 하지 않는다(사용자 결정 A6).
+   */
+  @Prop({ type: Date, default: null })
+  autoRunEvaluatedAt: Date | null;
+
   @Prop({ default: () => new Date() })
   createdAt: Date;
 }

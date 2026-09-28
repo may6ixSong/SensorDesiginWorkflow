@@ -2,6 +2,7 @@ import { WorkflowNodeDocument } from '../schemas/node.schema';
 import { ArtifactDocument } from '../../artifacts/schemas/artifact.schema';
 import { AccessLevel } from '../../common/access';
 import { ArtifactDto, MaskedArtifactDto, toArtifactDto, toMaskedArtifactDto } from '../../artifacts/dto/artifact.dto';
+import type { AutoRunNodeSummary } from '../../auto-run/auto-run.service';
 
 /**
  * 캔버스 노드 하나의 공개 모양.
@@ -35,6 +36,11 @@ export interface NodeDto {
   series: string | null;
   seriesIdx: number;
   seriesTotal: number;
+  /**
+   * Auto Run 표시(설계서 10장 §8.1) — 캔버스가 등록 표식과 "실행 중" 애니메이션을 그린다.
+   * 무엇이 어떤 버전으로 돌았는지 같은 상세는 Auto Run 탭(Edit Access 전용)에서만 본다.
+   */
+  autoRun: AutoRunNodeSummary;
 }
 
 /**
@@ -62,6 +68,7 @@ export function toNodeDto(
   publishState: PublishState,
   /** 이 workflow에 대한 Edit Access가 있는가 — Recipients 노출 여부의 유일한 기준이다. */
   canManageNodes: boolean,
+  autoRun: AutoRunNodeSummary = { enabled: false, activeStatus: null },
 ): NodeDto {
   return {
     id: node._id.toString(),
@@ -89,5 +96,6 @@ export function toNodeDto(
     series: node.series?.toString() ?? null,
     seriesIdx: node.seriesIdx,
     seriesTotal: node.seriesTotal,
+    autoRun,
   };
 }

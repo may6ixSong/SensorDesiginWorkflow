@@ -112,6 +112,7 @@ export class HubService {
       key: artifactTypeKey,
       name: dto.artifactName.trim(),
       description: dto.description?.trim() || '',
+      supportsAutoRun: dto.supportsAutoRun === true,
     };
 
     const existing = await this.model.findOne({ baseUrl }).exec();
@@ -169,6 +170,7 @@ export class HubService {
         if (!type) continue;
         type.name = entry.name.trim();
         type.description = entry.description?.trim() || '';
+        if (entry.supportsAutoRun !== undefined) type.supportsAutoRun = entry.supportsAutoRun;
       }
       svc.markModified('artifactTypes');
     }

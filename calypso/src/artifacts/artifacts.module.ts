@@ -14,5 +14,7 @@ import { SirenCommonModule } from '../siren-common/siren-common.module';
   ],
   providers: [ArtifactsService],
   controllers: [ArtifactsController],
+  // Auto Run source 접근(auto-run/)이 같은 조회 경로를 쓴다.
+  exports: [ArtifactsService],
 })
 export class ArtifactsModule {}

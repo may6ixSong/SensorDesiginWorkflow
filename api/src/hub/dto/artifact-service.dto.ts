@@ -48,6 +48,11 @@ export class RegisterArtifactTypeDto {
   @IsString()
   @MaxLength(400000)
   icon?: string;
+
+  /** 이 종류가 Auto Run을 지원하는가(설계서 10장 §2). 안 보내면 false — 등록 후에도 카드에서 바꿀 수 있다. */
+  @IsOptional()
+  @IsBoolean()
+  supportsAutoRun?: boolean;
 }
 
 /** artifactTypes 항목 하나의 name/description만 고칠 때 쓴다 — key로 기존 항목을 찾아 맞춘다(새로 추가/삭제는 안 됨). */
@@ -65,6 +70,11 @@ export class UpdateArtifactTypeEntryDto {
   @IsString()
   @MaxLength(240)
   description?: string;
+
+  /** Auto Run 지원 여부(설계서 10장 §2) — 안 보내면 기존 값을 그대로 둔다. */
+  @IsOptional()
+  @IsBoolean()
+  supportsAutoRun?: boolean;
 }
 
 /**
@@ -122,6 +132,7 @@ export function toArtifactServiceDto(s: ArtifactServiceDocument) {
       key: t.key,
       name: t.name,
       description: t.description ?? '',
+      supportsAutoRun: t.supportsAutoRun === true,
     })),
   };
 }

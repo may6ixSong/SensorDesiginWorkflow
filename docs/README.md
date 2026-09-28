@@ -24,6 +24,7 @@ CIS(CMOS Image Sensor) 설계 산출물을 workflow 캔버스 위에서 흐름�
 | [07-hub-operations.md](07-hub-operations.md) | 허브 운영 — Service Manage(OA/HPC 등록·토큰), FE→BE 단일 경로, version 이벤트 수신·동기화 |
 | [08-service-integration.md](08-service-integration.md) | **새 서비스 연동 API 레퍼런스** — SIREN↔서비스 양방향 호출과 DTO를 한 파일에. 새 OA/HPC Service를 연동할 땐 이것부터 |
 | [09-my-assignment.md](09-my-assignment.md) | **My Assignment** — 과제를 가로질러 내 release·산출물·달력을 모아 보는 화면. scope 판정과 조회 범위 |
+| [10-auto-run.md](10-auto-run.md) | **Auto Run** — node에 trigger를 걸어, source가 새로 publish되면 그 node의 artifact 서비스에 자동 생성 요청을 보낸다. 등록 조건·발화 조건·순환 방지·실행 기록·Calypso source 토큰 |
 | [prompts/a-tier-recipient-integration.md](prompts/a-tier-recipient-integration.md) | A Tier 연동 서비스에 전달할 **정책** 변경 요청 프롬프트 |
 | [prompts/rpm-access-endpoint.md](prompts/rpm-access-endpoint.md) | 위 요청 ①을 **구현 수준**으로 구체화한 것 — RPM 등 A Tier 서비스 세션에 그대로 전달 |
 | [prompts/db-migration-v3.md](prompts/db-migration-v3.md) | 실제 MongoDB의 데이터를 v3 스키마 모양으로 바꾸는 **실행 전용** 프롬프트 |
@@ -207,6 +208,24 @@ CIS(CMOS Image Sensor) 설계 산출물을 workflow 캔버스 위에서 흐름�
 | 구현 | `framer-motion` + `theme/motion.ts` 토큰 단일화 + `prefers-reduced-motion` 대응 |
 | i18n | 시스템 언어가 영어면 모든 안내·경고 문구가 영어로 표기된다 |
 
+### 3.8 Auto Run (10장)
+
+| 항목 | 결정 |
+|---|---|
+| trigger 단위 | **node**. 주는(own)·매핑된 node만. source는 flow 직전 1홉(release와 같은 규칙) |
+| 지원 서비스 | Service Manage에서 **artifact 종류 단위**로 `Supports Auto Run`을 켠 서비스만. Calypso는 미지원(개발용 probe 예외) |
+| 등록 권한 | workflow **Edit Access** |
+| 자동 발화 조건 | source 1개 이상 · 전부 published · 전부 대상 artifact의 최신 버전(published 무관)보다 **뒤에** publish됨 |
+| 평가 시점 | push 이벤트로 published 버전을 **처음** 본 순간 한 번. pull(매핑·Calypso 프록시·야간 재동기화)은 평가하지 않는다 |
+| 지금 실행 | 등록 조건만 보고 시각 비교 없이 즉시 발송. source가 전부 published여야 한다 |
+| 순환 | 순환 위 node는 등록 불가, 등록된 node를 순환으로 만드는 캔버스 저장은 거부. workflow 간 순환은 막지 않는다(주석만) |
+| 전송 | `POST {baseUrl}/auto-run/triggers`, Bearer = Service Manage 토큰, in-process 큐, 3회 재시도, 60분 시간 초과 |
+| runAs | 시스템 계정 `sdp.op`. 사용자 승인 뒤 발행이면 승인자로 — 서비스 판단 |
+| 결과 처리 | 버전 발행/temporary 여부는 **서비스가 정한다**. SIREN은 상태 콜백만 받는다. release는 항상 사람 |
+| Calypso source | run별 읽기 전용 토큰(버전 하나, 24시간). 서비스 이벤트 토큰은 공유하지 않는다 |
+| 알림 | workflow owner에게만, 성공/실패만 |
+| 감사 로그 | 남기지 않는다 |
+
 ---
 
 ## 4. 미결 · TODO
@@ -223,6 +242,8 @@ CIS(CMOS Image Sensor) 설계 산출물을 workflow 캔버스 위에서 흐름�
 | ~~T14~~ | ~~File Artifacts(Calypso) 받는 쪽 placeholder의 편집권~~ | **재확인 후 확정.** 받는 쪽이 매핑용으로 새로 등록한 artifact도 등록자가 그대로 편집 가능하다 — Calypso `computeAccess()`의 기존 규칙("등록자·Admin은 항상 edit")을 그대로 둔다(사용자 결정). 편집을 막는 별도 로직은 만들지 않기로 확정했다 |
 | ~~T15~~ | ~~File Artifacts(Calypso) 다중 파일 다운로드/업로드 UI~~ | **완료.** 업로드는 `<input multiple>`로 여러 파일을 한 번에 보내고, 다운로드는 `GET .../download/:versionRef` 하나로 통일 — Calypso가 파일이 하나면 그대로, 여러 개면 zip(`archiver`)으로 묶어서 내려준다. FE는 파일 개수를 몰라도 된다 |
 | ~~T16~~ | ~~File Artifacts(Calypso) OA-link/HPC-path 등록 UI~~ | **완료, 단 다이얼로그가 아니라 contents 화면에.** "새 Artifact 추가"는 이름만 받는 빈 artifact를 만들고, 그 artifact에 버전이 하나도 없을 때 `ArtifactVersionContents.tsx`(SIREN 슬라이드의 `CalypsoInlinePanel`과 Calypso 독립 페이지 `ArtifactDetailPage`가 공유하는 화면)가 File/Link(OA)/Path(HPC) 중 하나를 고르게 한다. 그 첫 버전 추가가 `Artifact.network`를 그 자리에서 확정하고, 이후로는 바뀌지 않는다(`calypso/src/artifacts/artifacts.service.ts#lockNetworkOnFirstVersion`) |
+| T17 | Auto Run workflow 간 순환 차단 | workflow를 넘나드는 순환(WF1 X→Y, WF2 Y→X)은 지금 막지 않는다(사용자 판단: 생기지 않는 구성). 필요해지면 payload에 depth를 싣고 `triggerRunId`로 이어받아 5 hop에서 끊는다 — 10장 §3.2 |
+| T18 | Auto Run 알림 메일 | 지금은 `NotificationService.notifyAutoRun` 로그 stub — T3 메일 어댑터와 함께 붙인다 |
 | T5 | Owner 이양 | 현재 불가. 요청이 오면 열 수 있도록 코드에 TODO 주석 유지 |
 | T6 | OA Service/HPC Service 연동 서비스의 slide 차단 규칙 반영 | SIREN 쪽은 완료(그 서비스의 access 응답 하나로 판정, A/C 공통). 남은 것은 **각 서비스 쪽 `access` 구현**이다 — `prompts/rpm-access-endpoint.md` 를 그 서비스 세션에 전달 (HPC Service는 이제 A와 같은 라이브 게이트 대상이라, HPC 쪽에도 같은 요청이 추가로 필요하다) |
 | T8 | 실 DB 마이그레이션 | 인메모리 모드는 시드가 새 스키마로 다시 만들어져 해당 없음. 실 DB 환경에서만 `prompts/db-migration-v3.md` 를 desktop 세션에 전달. **코드 변경 없이 데이터만 바꾸는 작업**이다 |

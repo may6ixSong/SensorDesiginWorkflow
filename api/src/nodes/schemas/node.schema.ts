@@ -100,6 +100,21 @@ export class WorkflowNode {
   @Prop({ required: true, trim: true })
   createdBy: string;
 
+  /**
+   * Auto Run 등록 여부(설계서 10장). 켜져 있으면 flow 직전 1홉 source가 전부 새로 publish될
+   * 때 SIREN이 이 node의 artifact 서비스에 trigger를 보낸다. 등록 조건(own·매핑됨·지원 서비스·
+   * 순환 없음·source 1개 이상)은 AutoRunService.eligibility()가 판정한다 — 서브다큐먼트가
+   * 아니라 최상위 필드로 두는 건 인메모리 드라이버가 최상위 기본값만 채우기 때문이다.
+   */
+  @Prop({ default: false })
+  autoRunEnabled: boolean;
+
+  @Prop({ type: String, default: null })
+  autoRunUpdatedBy: string | null;
+
+  @Prop({ type: Date, default: null })
+  autoRunUpdatedAt: Date | null;
+
   @Prop({ default: false, index: true })
   isMock: boolean;
 

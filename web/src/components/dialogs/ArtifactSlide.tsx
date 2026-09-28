@@ -26,12 +26,13 @@ import { releaseBadgeMap } from '@/lib/releaseBadge';
 import { toast } from '@/store/toastStore';
 import { CURSOR_POINTER, FONT_MONO, R, T, TNUM } from '@/theme/tokens';
 import { NetworkChip } from '@/components/artifact/ArtifactChips';
+import { AutoRunTab } from '@/components/artifact/AutoRunTab';
 
 /** Overview에서 html preview를 함께 그릴 때 왼쪽(B) 칸의 실제 폭 — 900px 패널 - 좌우 여백
  * - 두 칸 사이 gap을 뺀 2/3. CalypsoInlinePanel의 왼쪽 칸과 같은 폭으로 맞춘다. */
 const HTML_VIEW_MAX_WIDTH = 560;
 
-type Tab = 'overview' | 'recipients' | 'comments';
+type Tab = 'overview' | 'recipients' | 'comments' | 'autorun';
 
 /** Published/Working 배지가 기본 Badge 크기(8px)로는 너무 작다는 지적(사용자) — 여기서만 키운다. */
 const STATUS_BADGE_SX = { fontSize: 10.5, padding: '2px 7px', fontWeight: 700 };
@@ -329,6 +330,12 @@ export function ArtifactSlide({
             ? [
                 { key: 'recipients' as Tab, label: t('artifact.recipients') },
                 { key: 'comments' as Tab, label: 'Comments', badge: comments.data?.length || undefined },
+                // Auto Run(설계서 10장 §8.2) — Recipients/Comments와 같은 Edit Access 게이트다.
+                {
+                  key: 'autorun' as Tab,
+                  label: 'Auto Run',
+                  badge: node.autoRun?.activeStatus ? '●' : node.autoRun?.enabled ? 'On' : undefined,
+                },
               ]
             : []),
         ]}
@@ -370,6 +377,8 @@ export function ArtifactSlide({
         )}
 
         {tab === 'comments' && <CommentsTab node={node} versions={effectiveVersions} />}
+
+        {tab === 'autorun' && <AutoRunTab node={node} />}
       </TabPanel>
     </SlidePanel>
   );

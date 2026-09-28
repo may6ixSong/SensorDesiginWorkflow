@@ -114,13 +114,24 @@ export class ArtifactsService {
    */
   async findOrCreateExternal(
     projectId: Types.ObjectId,
-    input: { tier: 'A' | 'B' | 'C'; name: string; serviceKey: string; externalArtifactId: string },
+    input: {
+      tier: 'A' | 'B' | 'C';
+      name: string;
+      serviceKey: string;
+      externalArtifactId: string;
+      artifactTypeKey?: string | null;
+    },
     actor: Actor,
   ): Promise<ArtifactDocument> {
     const existing = await this.model
       .findOne({ projectId, serviceKey: input.serviceKey, externalArtifactId: input.externalArtifactId })
       .exec();
-    if (existing) return existing;
+    if (existing) {
+      // 예전에 종류 없이 만들어진 artifact면 지금 고른 종류로 채운다 — Auto Run 지원 판정이
+      // 종류 단위다(설계서 10장 §2). 이미 값이 있으면 건드리지 않는다(호출부가 저장한다).
+      if (!existing.artifactTypeKey && input.artifactTypeKey) existing.artifactTypeKey = input.artifactTypeKey;
+      return existing;
+    }
     try {
       return await this.create(
         projectId,
@@ -132,6 +143,7 @@ export class ArtifactsService {
           network: input.tier === 'C' ? 'HPC' : input.tier === 'B' ? null : 'OA',
           serviceKey: input.serviceKey,
           externalArtifactId: input.externalArtifactId,
+          artifactTypeKey: input.artifactTypeKey ?? null,
         },
         actor,
       );

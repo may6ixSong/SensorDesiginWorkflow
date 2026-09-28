@@ -18,6 +18,8 @@ export type ArtifactSourceKind = 'live' | 'file' | 'hpc';
 export interface ArtifactSourceState {
   source: ArtifactSourceKind | null;
   serviceKey: string;
+  /** 고른 후보가 속한 artifact 종류(Service Manage의 artifactTypeKey) — Auto Run 지원 판정에 쓴다(설계서 10장 §2). */
+  artifactTypeKey: string;
   liveArtifactId: string;
   calypsoArtifactId: string;
 }
@@ -25,6 +27,7 @@ export interface ArtifactSourceState {
 export const emptySourceState = (): ArtifactSourceState => ({
   source: null,
   serviceKey: '',
+  artifactTypeKey: '',
   liveArtifactId: '',
   calypsoArtifactId: '',
 });
@@ -246,8 +249,11 @@ export function ArtifactSourcePicker({
   const fallbackDept = departmentOptions[0]?.id ?? myDepartments[0] ?? '';
   const effectiveDept = needsDeptPicker ? (newDept || fallbackDept) : myDepartments[0];
 
-  const pickLive = (serviceKey: string, source: 'live' | 'hpc', id: string, name: string) => {
-    onChange({ ...emptySourceState(), source, serviceKey, liveArtifactId: id });
+  const pickLive = (serviceKey: string, source: 'live' | 'hpc', typeKey: string, id: string, name: string) => {
+    // 종류가 등록 안 된 레거시 서비스는 typeKey 자리에 serviceKey를 넣어 뒀다(typeEntries) —
+    // 그건 실제 artifactTypeKey가 아니므로 보내지 않는다.
+    const artifactTypeKey = typeKey === serviceKey ? '' : typeKey;
+    onChange({ ...emptySourceState(), source, serviceKey, artifactTypeKey, liveArtifactId: id });
     onSelectName?.(name);
   };
 
@@ -369,7 +375,7 @@ export function ArtifactSourcePicker({
                 expanded={expandedKeys.has(key)}
                 onToggle={() => toggleExpanded(key)}
                 selectedId={state.source === e.source && state.serviceKey === e.serviceKey ? state.liveArtifactId : ''}
-                onPick={(id, name) => pickLive(e.serviceKey, e.source, id, name)}
+                onPick={(id, name) => pickLive(e.serviceKey, e.source, e.typeKey, id, name)}
               />
             );
           })
@@ -412,9 +418,15 @@ export function ArtifactSourcePicker({
 export function resolveNewArtifact(
   state: ArtifactSourceState,
   name: string,
-): { source: 'live' | 'file' | 'hpc'; name: string; serviceKey?: string; externalArtifactId?: string } | null {
+): { source: 'live' | 'file' | 'hpc'; name: string; serviceKey?: string; artifactTypeKey?: string; externalArtifactId?: string } | null {
   if ((state.source === 'live' || state.source === 'hpc') && state.serviceKey && state.liveArtifactId) {
-    return { source: state.source, name, serviceKey: state.serviceKey, externalArtifactId: state.liveArtifactId };
+    return {
+      source: state.source,
+      name,
+      serviceKey: state.serviceKey,
+      ...(state.artifactTypeKey ? { artifactTypeKey: state.artifactTypeKey } : {}),
+      externalArtifactId: state.liveArtifactId,
+    };
   }
   if (state.source === 'file' && state.calypsoArtifactId) {
     return { source: 'file', name, externalArtifactId: state.calypsoArtifactId };

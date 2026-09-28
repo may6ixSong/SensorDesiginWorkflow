@@ -1,4 +1,4 @@
-import { IsBoolean, IsISO8601, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsBoolean, IsIn, IsISO8601, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 
 /**
  * SIREN이 모든 산출물 서비스 — OA Service/File Artifacts/HPC Service — 로부터 동일하게
@@ -64,4 +64,42 @@ export class VersionPublishedEventDto {
   @IsOptional()
   @IsString()
   note: string | null;
+
+  /**
+   * 이 버전이 Auto Run trigger의 결과로 만들어졌으면 그 trigger의 id(설계서 10장 §6.4) —
+   * SIREN이 그 실행 기록에 결과 버전으로 남긴다. 사람이 만든 버전이면 보내지 않는다.
+   */
+  @IsOptional()
+  @IsString()
+  triggerRunId?: string | null;
+}
+
+/**
+ * Auto Run trigger를 받은 서비스가 진행 상태를 알리는 콜백(설계서 08장 §2.3).
+ * version 이벤트와 같이 `forbidNonWhitelisted:true`로 엄격하게 검증한다.
+ */
+export class AutoRunStatusEventDto {
+  @IsString()
+  @MinLength(1)
+  triggerRunId: string;
+
+  @IsIn(['running', 'succeeded', 'failed'])
+  status: 'running' | 'succeeded' | 'failed';
+
+  /** 실패 사유·진행 설명 등 사람이 읽을 한 줄. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  message?: string | null;
+
+  /** 이 실행으로 만든 버전이 있으면 그 라벨(temporary로 두고 발행하지 않았으면 비운다). */
+  @IsOptional()
+  @IsString()
+  versionLabel?: string | null;
+
+  /** 그 서비스 쪽 작업 id(선택). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  externalJobId?: string | null;
 }

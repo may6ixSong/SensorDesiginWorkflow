@@ -12,6 +12,8 @@ export interface NewArtifactSourceInput {
   source: 'live' | 'file' | 'hpc';
   name: string;
   serviceKey?: string;
+  /** 고른 후보의 artifact 종류(Service Manage artifactTypeKey) — Auto Run 지원 판정에 쓴다. */
+  artifactTypeKey?: string;
   externalArtifactId?: string;
 }
 
@@ -31,8 +33,22 @@ export function useNodes(workflowId: string | undefined, enabled = true) {
       const res = await apiClient.get<NodeDto[]>(`/workflows/${workflowId}/nodes`);
       return res.data;
     },
+    // Auto Run 표시를 따라간다(설계서 10장 §8.1) — 자동 발화는 서버에서(다른 서비스의 publish
+    // 이벤트로) 일어나므로 사용자가 아무것도 안 눌러도 시작될 수 있다. 그래서 Auto Run이 켜진
+    // node가 하나라도 있으면 느리게, 실행 중이면 빠르게 다시 묻는다. 없으면 폴링하지 않는다.
+    refetchInterval: (query) => {
+      const list = query.state.data ?? [];
+      if (list.some((n) => n.autoRun?.activeStatus)) return AUTO_RUN_POLL_MS;
+      if (list.some((n) => n.autoRun?.enabled)) return AUTO_RUN_IDLE_POLL_MS;
+      return false;
+    },
   });
 }
+
+/** 진행 중인 Auto Run을 따라가는 폴링 간격. */
+export const AUTO_RUN_POLL_MS = 4000;
+/** Auto Run이 켜져만 있을 때(다음 자동 발화를 기다리는 중) 폴링 간격. */
+export const AUTO_RUN_IDLE_POLL_MS = 10_000;
 
 /**
  * A Tier(Calypso 제외 Hub 등록 서비스)의 라이브 버전 조회 — v3 재설계 전에 있던

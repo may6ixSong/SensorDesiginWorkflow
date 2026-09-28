@@ -52,6 +52,40 @@ export default () => ({
    * Calypso 쪽도 검증을 건너뛴다 — 운영 배포 시 반드시 설정할 것.
    */
   calypsoApiToken: process.env.CALYPSO_API_TOKEN || '',
+  /**
+   * Auto Run(설계서 10장) 설정 묶음.
+   */
+  autoRun: {
+    /** 전역 kill switch — false면 자동 발화·Run now·dispatch가 전부 멈춘다(설정 화면도 그렇게 표시). */
+    enabled: (process.env.AUTO_RUN_ENABLED ?? 'true') !== 'false',
+    /** trigger payload의 runAs — 서비스가 자동 생성 버전을 이 계정으로 발행한다(사용자 결정 C9). */
+    systemAccount: process.env.AUTO_RUN_SYSTEM_ACCOUNT || 'sdp.op',
+    /** dispatch 이후 이 시간 안에 succeeded/failed 콜백이 없으면 실패로 닫는다(사용자: 길어야 1시간). */
+    timeoutMinutes: Number(process.env.AUTO_RUN_TIMEOUT_MINUTES) > 0 ? Number(process.env.AUTO_RUN_TIMEOUT_MINUTES) : 60,
+    /**
+     * 그 서비스가 status 콜백·version 이벤트를 보낼 SIREN api 주소 — payload의 `callback`에
+     * 그대로 실린다. 서비스 쪽(HPC망 등)에서 닿는 주소여야 한다.
+     */
+    publicApiUrl: (process.env.SIREN_PUBLIC_API_URL || 'http://localhost:3000/api/v1').replace(/\/+$/, ''),
+    /**
+     * 서비스가 Calypso source를 직접 받아갈 때 쓰는 Calypso api 주소 — CALYPSO_API는 SIREN BE
+     * 기준 주소라 서비스 쪽에서 안 닿을 수 있어 따로 둔다. 비어 있으면 CALYPSO_API를 쓴다.
+     */
+    calypsoExternalApiUrl: (process.env.CALYPSO_EXTERNAL_API_URL || process.env.CALYPSO_API || 'http://localhost:3010/api/v1').replace(/\/+$/, ''),
+    /**
+     * Calypso source 읽기 전용 토큰(run마다 발급)의 서명 비밀. Calypso의 AUTO_RUN_SOURCE_TOKEN_SECRET과
+     * 같은 값이어야 한다. 비어 있으면 CALYPSO_API_TOKEN(SIREN↔Calypso 공유 비밀)을 쓴다.
+     */
+    sourceTokenSecret: process.env.AUTO_RUN_SOURCE_TOKEN_SECRET || process.env.CALYPSO_API_TOKEN || 'siren-dev-auto-run',
+    sourceTokenTtlHours: Number(process.env.AUTO_RUN_SOURCE_TOKEN_TTL_HOURS) > 0 ? Number(process.env.AUTO_RUN_SOURCE_TOKEN_TTL_HOURS) : 24,
+    /**
+     * ★ 개발/검증 전용 — true면 Calypso(File Artifacts) 산출물 node에도 Auto Run을 등록할 수
+     *   있고, trigger는 Calypso의 probe 수신기(calypso `POST /auto-run/triggers`)로 간다. 실제
+     *   생성은 하지 않고 "수신한 payload가 올바른가"만 확인해 콜백한다. 운영에서는 끈다 —
+     *   Calypso는 Auto Run을 지원하지 않는다(사용자 결정 C5).
+     */
+    calypsoProbe: (process.env.AUTO_RUN_CALYPSO_PROBE ?? 'false') === 'true',
+  },
   /** S3 호환 오브젝트 스토리지 (SFM_API files.service.ts와 동일한 키 구성). */
   storage: {
     uri: process.env.S3_URI ?? '',
