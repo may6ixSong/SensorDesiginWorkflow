@@ -7,7 +7,7 @@ export type IconName =
   | 'up' | 'dn' | 'send' | 'shield' | 'users' | 'trash' | 'note' | 'copy'
   | 'pan' | 'grid' | 'undo' | 'expand' | 'fit' | 'hist' | 'link' | 'search' | 'list'
   | 'sun' | 'moon' | 'globe' | 'book' | 'info' | 'warn' | 'flag' | 'bell' | 'calendar' | 'inbox'
-  | 'artifact' | 'unlinked' | 'pdf' | 'pending';
+  | 'artifact' | 'unlinked' | 'pdf' | 'pending' | 'bolt' | 'play';
 
 const P: Record<IconName, { d: string; s: number }> = {
   word: { s: 14, d: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/>' },
@@ -64,6 +64,9 @@ const P: Record<IconName, { d: string; s: number }> = {
   // network도 안 정해지고 파일도 아직 없는 artifact 목록 행용 — 시계 모양으로 "아직
   // 아무 콘텐츠도 없음/대기 중"을 나타낸다(사용자 요청).
   pending: { s: 14, d: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>' },
+  // Auto Run(설계서 10장) — 등록된 node 표식과 Auto Run 탭.
+  bolt: { s: 14, d: '<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>' },
+  play: { s: 13, d: '<path d="M7 4v16l13-8z"/>' },
 };
 
 export function Icon({ name, size }: { name: IconName; size?: number }) {

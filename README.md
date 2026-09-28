@@ -29,6 +29,7 @@ CIS(CMOS Image Sensor) 개발의 설계 산출물을 workflow 단위 캔버스 �
 | [docs/07-hub-operations.md](docs/07-hub-operations.md) | Service Manage · 토큰 발급 · version 이벤트 설계 배경 |
 | [docs/08-service-integration.md](docs/08-service-integration.md) | **새 서비스 연동 API 레퍼런스 — DTO 포함, 이것부터 본다** |
 | [docs/09-my-assignment.md](docs/09-my-assignment.md) | My Assignment — 과제를 가로지르는 내 release·산출물·달력 |
+| [docs/10-auto-run.md](docs/10-auto-run.md) | Auto Run — node trigger로 source publish 시 그 node의 artifact 서비스에 자동 생성 요청 |
 | [docs/observer-contract-v1.yaml](docs/observer-contract-v1.yaml) | 08장의 OpenAPI 원본(참고용 — 갱신이 늦을 수 있다) |
 | [docs/prompts/](docs/prompts/) | 연동 서비스·작업 지시용 프롬프트 |
 

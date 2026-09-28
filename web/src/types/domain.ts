@@ -258,6 +258,68 @@ export interface NodeDto {
   series: string | null;
   seriesIdx: number;
   seriesTotal: number;
+  /** Auto Run 표시(설계서 10장 §8.1) — 등록 여부와 지금 실행 중인 run의 상태. */
+  autoRun?: AutoRunNodeSummary;
+}
+
+/* ── Auto Run (설계서 10장) ── */
+
+export type AutoRunStatus = 'queued' | 'dispatched' | 'running' | 'succeeded' | 'failed';
+
+export interface AutoRunNodeSummary {
+  enabled: boolean;
+  /** 진행 중인 run이 있으면 그 상태(queued/dispatched/running), 없으면 null. */
+  activeStatus: AutoRunStatus | null;
+}
+
+export interface AutoRunSourceDto {
+  nodeId: string;
+  nodeName: string;
+  artifactId: string;
+  artifactName: string;
+  tier: string;
+  network: string | null;
+  serviceKey: string | null;
+  externalArtifactId: string | null;
+  versionLabel: string;
+  versionRef: string | null;
+  publishedAt: string | null;
+}
+
+export interface AutoRunRunDto {
+  id: string;
+  trigger: 'auto' | 'manual';
+  requestedBy: string | null;
+  status: AutoRunStatus;
+  message: string | null;
+  externalJobId: string | null;
+  resultVersionLabel: string | null;
+  causeArtifactId: string | null;
+  causeVersionLabel: string | null;
+  sources: AutoRunSourceDto[];
+  attempts: number;
+  queuedAt: string;
+  dispatchedAt: string | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+}
+
+export interface AutoRunStateDto {
+  serverEnabled: boolean;
+  enabled: boolean;
+  updatedBy: string | null;
+  updatedAt: string | null;
+  eligibility: { eligible: boolean; reasons: string[] };
+  target: { serviceName: string; typeName: string | null; isCalypsoProbe: boolean } | null;
+  sources: {
+    nodeId: string;
+    nodeName: string;
+    artifactName: string;
+    versionLabel: string | null;
+    publishedAt: string | null;
+  }[];
+  targetLatestAt: string | null;
+  runs: AutoRunRunDto[];
 }
 
 export interface MemoDto {

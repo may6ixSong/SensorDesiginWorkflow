@@ -10,6 +10,7 @@ import { ReleasesService } from '../releases/releases.service';
 import { Actor } from '../common/actor';
 import { workflowLevel } from '../common/access';
 import { NodeDto, publishStateOf, toNodeDto } from './dto/node.dto';
+import { AutoRunService } from '../auto-run/auto-run.service';
 
 /**
  * 캔버스 응답을 조립한다 — 노드 + 각 산출물의 권한 판정 + publish 배지 상태.
@@ -27,6 +28,7 @@ export class CanvasViewService {
     private readonly artifacts: ArtifactsService,
     private readonly artifactAccess: ArtifactAccessService,
     private readonly releases: ReleasesService,
+    private readonly autoRun: AutoRunService,
   ) {}
 
   async assemble(
@@ -52,6 +54,8 @@ export class CanvasViewService {
     // Recipients/Comments 탭 노출 여부의 기준(설계서 01장 §3.8 확장) — workflow 전체에 대해
     // 한 번만 판정하면 된다. node마다 다르지 않다.
     const canManageNodes = workflowLevel(actor, workflow, project) === 'edit';
+    // 실행 중인 Auto Run — workflow 전체를 한 번에 읽는다(node마다 따로 묻지 않는다).
+    const activeRuns = await this.autoRun.summarizeForWorkflow(workflow._id);
 
     return Promise.all(
       nodes.map(async (node) => {
@@ -69,6 +73,7 @@ export class CanvasViewService {
           level,
           this.publishState(artifact, lastMajorByArtifact, hasAnyRelease),
           canManageNodes,
+          { enabled: node.autoRunEnabled === true, activeStatus: activeRuns.get(node._id.toString()) ?? null },
         );
       }),
     );
@@ -140,12 +145,14 @@ export class CanvasViewService {
     );
     const hasAnyRelease = await this.releases.hasAnyRelease(workflow._id);
     const canManageNodes = workflowLevel(actor, workflow, project) === 'edit';
+    const activeRuns = await this.autoRun.summarizeForWorkflow(workflow._id);
     return toNodeDto(
       node,
       artifact,
       level,
       this.publishState(artifact, lastMajorByArtifact, hasAnyRelease),
       canManageNodes,
+      { enabled: node.autoRunEnabled === true, activeStatus: activeRuns.get(node._id.toString()) ?? null },
     );
   }
 }

@@ -17,6 +17,7 @@ import { HubEventsController } from './hub-events.controller';
 import { CalypsoProxyController } from './calypso-proxy.controller';
 import { HubTokenGuard } from './guards/hub-token.guard';
 import { MockObserverController } from './mock/mock-observer.controller';
+import { AutoRunModule } from '../auto-run/auto-run.module';
 
 /**
  * ★ 개발 전용 ★ — MOCKUP_ENABLED=true 일 때만 가짜 A Tier 서비스 엔드포인트를 등록한다.
@@ -45,6 +46,8 @@ const mockControllers = process.env.MOCKUP_ENABLED === 'true' ? [MockObserverCon
       { name: Artifact.name, schema: ArtifactSchema },
     ]),
     AuditModule,
+    // version 이벤트 수신 시 Auto Run 발화를 평가하고, status 콜백을 기록한다(설계서 10장).
+    AutoRunModule,
   ],
   providers: [
     HubService,

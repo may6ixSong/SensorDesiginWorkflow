@@ -6,7 +6,8 @@ import { validate } from 'class-validator';
 import { Artifact, ArtifactDocument } from '../artifacts/schemas/artifact.schema';
 import { HubSyncService } from './hub-sync.service';
 import { HubEventSender, HubTokenGuard } from './guards/hub-token.guard';
-import { VersionPublishedEventDto } from './dto/version-event.dto';
+import { AutoRunStatusEventDto, VersionPublishedEventDto } from './dto/version-event.dto';
+import { AutoRunService } from '../auto-run/auto-run.service';
 
 /**
  * 각 산출물 서비스가 SIREN에 version 발행을 알리는 인바운드 경로(설계서 07장 §4).
@@ -21,6 +22,7 @@ export class HubEventsController {
   constructor(
     @InjectModel(Artifact.name) private readonly artifacts: Model<ArtifactDocument>,
     private readonly hubSync: HubSyncService,
+    private readonly autoRun: AutoRunService,
   ) {}
 
   /**
@@ -84,7 +86,49 @@ export class HubEventsController {
       note: dto.note ?? null,
       observedAt: new Date(dto.updatedAt),
     });
+
+    // 종류 없이 매핑된 artifact(예전 데이터·종류를 모르는 후보)는 이벤트가 알려준 종류로
+    // 채운다 — Auto Run 지원 판정이 종류 단위다(설계서 10장 §2).
+    if (!artifact.artifactTypeKey && sender.artifactTypeKeys.includes(dto.artifactTypeKey)) {
+      artifact.artifactTypeKey = dto.artifactTypeKey;
+    }
+
+    // Auto Run 발화 평가(설계서 10장 §4.1) — published 버전을 push로 **처음** 본 순간에만
+    // 한 번 평가한다. pull 경로(매핑 시·Calypso 프록시·야간 재동기화)는 평가하지 않지만,
+    // pull이 먼저 캐시를 채웠어도 이 표시가 비어 있으니 push가 도착하면 그때 평가된다.
+    const entry = (artifact.versions ?? []).find((v) => v.versionLabel === dto.versionLabel);
+    const evaluateAutoRun = !!entry && entry.isPublished && !entry.autoRunEvaluatedAt;
+    if (evaluateAutoRun && entry) {
+      entry.autoRunEvaluatedAt = new Date();
+      artifact.markModified('versions');
+    }
     await artifact.save();
+
+    if (dto.triggerRunId) {
+      await this.autoRun.linkResultVersion(sender.serviceKey, dto.triggerRunId, dto.versionLabel);
+    }
+    if (evaluateAutoRun) {
+      // 응답을 기다리게 하지 않는다 — 발신 서비스의 publish 동작과 무관한 SIREN 내부 일이다.
+      void this.autoRun.onSourcePublished(artifact._id, dto.versionLabel);
+    }
     return { recorded: true };
+  }
+
+  /**
+   * Auto Run trigger를 받은 서비스의 진행 상태 콜백(설계서 08장 §2.3, 10장 §6.3).
+   * 같은 Bearer token으로 인증하고, 그 run을 받은 서비스만 갱신할 수 있다. 엄격 검증 규칙은
+   * version 이벤트와 같다(정의 안 된 필드가 섞이면 400).
+   */
+  @Post('auto-run-status')
+  async autoRunStatus(
+    @Req() req: { body: unknown; hubEventSender_: HubEventSender },
+  ): Promise<{ recorded: boolean }> {
+    const dto = plainToInstance(AutoRunStatusEventDto, req.body);
+    const errors = await validate(dto, { whitelist: true, forbidNonWhitelisted: true });
+    if (errors.length > 0) {
+      const messages = errors.flatMap((e) => Object.values(e.constraints ?? {}));
+      throw new BadRequestException(messages.length > 0 ? messages : 'Validation failed.');
+    }
+    return this.autoRun.recordStatus(req.hubEventSender_.serviceKey, dto);
   }
 }

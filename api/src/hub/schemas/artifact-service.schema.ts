@@ -38,6 +38,14 @@ export class ArtifactType {
 
   @Prop({ default: '', trim: true })
   description: string;
+
+  /**
+   * 이 종류가 Auto Run(설계서 10장)을 지원하는가 — Admin이 Service Manage에서 켠다. 이 값이
+   * true인 종류의 산출물을 가리키는 node에만 Auto Run을 등록할 수 있다. 켠다는 건 그 서비스가
+   * `POST {baseUrl}/auto-run/triggers`를 이미 구현했다는 약속이다(08장 §1.6).
+   */
+  @Prop({ default: false })
+  supportsAutoRun: boolean;
 }
 export const ArtifactTypeSchema = SchemaFactory.createForClass(ArtifactType);
 

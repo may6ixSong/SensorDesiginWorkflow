@@ -40,9 +40,35 @@ export interface NotificationSender {
   send(payload: ReleaseNotification): Promise<void>;
 }
 
+/**
+ * Auto Run 결과 알림 한 통(설계서 10장 §7) — workflow owner 한 명에게만, 성공/실패일 때만 간다
+ * (사용자 결정 F3·Q9). 시작·진행 중은 알리지 않는다 — 캔버스의 실행 표시로 충분하다.
+ */
+export interface AutoRunNotification {
+  runId: string;
+  workflowId: string;
+  workflowName: string;
+  nodeName: string;
+  artifactName: string;
+  trigger: 'auto' | 'manual';
+  status: 'succeeded' | 'failed';
+  message: string | null;
+  resultVersionLabel: string | null;
+  recipientKnoxId: string;
+}
+
 @Injectable()
 export class NotificationService implements NotificationSender {
   private readonly logger = new Logger(NotificationService.name);
+
+  /** TODO(T3): 메일 어댑터가 붙으면 release 알림과 같은 경로로 보낸다. 지금은 로그만 남긴다. */
+  async notifyAutoRun(payload: AutoRunNotification): Promise<void> {
+    this.logger.log(
+      `[notify:auto-run] ${payload.recipientKnoxId} ← ${payload.workflowName} / ${payload.nodeName} ` +
+        `${payload.status}${payload.resultVersionLabel ? ` (${payload.resultVersionLabel})` : ''}` +
+        `${payload.message ? ` — ${payload.message}` : ''}`,
+    );
+  }
 
   async send(payload: ReleaseNotification): Promise<void> {
     // TODO(T3): 메일 어댑터 연결 지점.

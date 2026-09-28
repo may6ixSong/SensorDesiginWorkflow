@@ -67,6 +67,22 @@ export default () => ({
    * CALYPSO_EVENT_TOKEN을 실제 발급받은 값으로 덮어써야 한다.
    */
   calypsoEventToken: process.env.CALYPSO_EVENT_TOKEN || 'mock-token-calypso',
+  /**
+   * SIREN Auto Run(SIREN 설계서 10장 §6.2) — trigger를 받은 서비스가 Calypso source를 받아갈 때
+   * 싣는 run별 읽기 전용 토큰의 서명 비밀. SIREN의 AUTO_RUN_SOURCE_TOKEN_SECRET과 같은 값이어야
+   * 한다. 비어 있으면 SIREN_CALLER_TOKEN(SIREN 쪽 CALYPSO_API_TOKEN과 같은 값)을 쓴다 — 양쪽
+   * 기본값이 같은 규칙이라 env를 따로 안 맞춰도 맞물린다.
+   */
+  autoRunSourceTokenSecret: process.env.AUTO_RUN_SOURCE_TOKEN_SECRET || process.env.SIREN_CALLER_TOKEN || 'siren-dev-auto-run',
+  /**
+   * ★ 개발/검증 전용 — true면 `POST /auto-run/triggers` probe 수신기가 동작한다(auto-run/
+   *   auto-run-probe.controller.ts). Calypso는 Auto Run을 지원하지 않는다 — 운영에서는 끈다.
+   */
+  autoRunProbeEnabled: (process.env.AUTO_RUN_PROBE_ENABLED ?? 'false') === 'true',
+  /** probe가 running 콜백 뒤 succeeded/failed를 보내기까지 기다리는 시간 — 화면의 실행 중 표시 확인용. */
+  autoRunProbeDelayMs: Number(process.env.AUTO_RUN_PROBE_DELAY_MS) >= 0 && process.env.AUTO_RUN_PROBE_DELAY_MS
+    ? Number(process.env.AUTO_RUN_PROBE_DELAY_MS)
+    : 5000,
   /** S3 호환 오브젝트 스토리지 (SFM_API files.service.ts와 동일한 키 구성). */
   storage: {
     uri: process.env.S3_URI ?? '',

@@ -9,7 +9,7 @@
  * ★ 노드에는 **버전 라벨을 쓰지 않는다.** 버전은 상세 slide에서만 보이고, 캔버스는
  *   publish 3상태 배지만 그린다(설계서 03장 §2).
  */
-import { NodeDto, EdgeDto, MemoDto, PublishState, Tier, WorkflowPhase, isMaskedArtifact } from '@/types/domain';
+import { AutoRunStatus, NodeDto, EdgeDto, MemoDto, PublishState, Tier, WorkflowPhase, isMaskedArtifact } from '@/types/domain';
 import { DAY_MS, dayMs } from './schedule';
 import {
   DEFAULT_PW, GAP, LANE_PAD, MH, MW, NH, NW, ROW_H, TOP_PAD, WALL_FORCE, snp,
@@ -54,6 +54,11 @@ export interface CanvasNode {
   series: string | null;
   seriesIdx: number;
   seriesTotal: number;
+
+  /** Auto Run 등록 여부 — 카드에 번개 표식을 그린다(설계서 10장 §8.1). */
+  autoRunEnabled: boolean;
+  /** 진행 중인 Auto Run이 있으면 그 상태 — 카드가 "실행 중" 애니메이션을 그린다. */
+  autoRunActive: AutoRunStatus | null;
 
   /* 좌표 */
   x: number;
@@ -119,6 +124,8 @@ export function toCanvasNode(b: NodeDto): CanvasNode {
     series: b.series,
     seriesIdx: b.seriesIdx,
     seriesTotal: b.seriesTotal,
+    autoRunEnabled: b.autoRun?.enabled === true,
+    autoRunActive: b.autoRun?.activeStatus ?? null,
     x: b.layout.x,
     y: b.layout.y,
     w: b.layout.w || NW,

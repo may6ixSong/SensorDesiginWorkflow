@@ -3,6 +3,8 @@ export interface HubArtifactType {
   key: string;
   name: string;
   description: string;
+  /** 이 종류가 Auto Run(설계서 10장)을 지원하는가 — Admin이 Service Manage에서 켠다. */
+  supportsAutoRun?: boolean;
 }
 
 /**

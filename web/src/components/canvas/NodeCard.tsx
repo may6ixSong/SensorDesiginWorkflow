@@ -1,9 +1,22 @@
 import { Box } from '@mui/material';
+import { keyframes } from '@emotion/react';
 import { CanvasNode, stOf } from '@/lib/canvasModel';
+import { usePrefersReducedMotion } from '@/theme/useReducedMotion';
 import { WorkflowPhase } from '@/types/domain';
 import { Icon, IconName } from '@/components/common/Icon';
 import { NetworkTag } from '@/components/artifact/ArtifactChips';
 import { CURSOR_POINTER, R, T, TNUM } from '@/theme/tokens';
+
+/** Auto Run 실행 중 — 카드 둘레가 숨 쉬듯 번지고(pulse), 아래 띠가 흐른다(flow). */
+const autoRunPulse = keyframes`
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--s-pr) 45%, transparent); }
+  70% { box-shadow: 0 0 0 12px color-mix(in srgb, var(--s-pr) 0%, transparent); }
+  100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--s-pr) 0%, transparent); }
+`;
+const autoRunFlow = keyframes`
+  from { background-position: 0 0; }
+  to { background-position: 40px 0; }
+`;
 
 /**
  * tier별 노드 아이콘 — A는 그 서비스가 들고 있는 "살아 있는" 산출물이라 패키지,
@@ -58,6 +71,10 @@ export function NodeCard({
 }: Props) {
   const st = stOf(d);
   const compact = d.h < 150;
+  const reduceMotion = usePrefersReducedMotion();
+  // Auto Run(설계서 10장 §8.1) — 등록돼 있으면 번개 표식, trigger가 나가서 끝나기 전까지는
+  // 카드 전체에 "돌아가는 중" 표시. 어떤 버전으로 돌았는지 같은 상세는 Auto Run 탭에서만 본다.
+  const autoRunning = !!d.autoRunActive;
 
   // 클릭으로 flow 하이라이트가 켜져 있는데 이 노드가 그 흐름에 안 걸려 있으면 흐리게 —
   // 연결된 것들이 상대적으로 더 눈에 띄게 한다.
@@ -147,6 +164,13 @@ export function NodeCard({
           boxShadow: emph ? `0 0 0 4px ${T.selectRing}, ${T.shMd}` : T.shSm,
           overflow: 'hidden',
           opacity: unrelated ? 0.32 : 1,
+          ...(autoRunning && !emph && {
+            borderColor: T.pr,
+            borderStyle: 'solid',
+            ...(reduceMotion
+              ? { boxShadow: `0 0 0 4px ${T.prSoft}, ${T.shSm}` }
+              : { animation: `${autoRunPulse} 1.8s ease-out infinite` }),
+          }),
           transition: edit
             ? 'opacity .15s'
             : 'box-shadow .18s, transform .18s, border-color .16s, opacity .18s',
@@ -175,6 +199,31 @@ export function NodeCard({
             <NetworkTag network={d.net} />
 
             <Box sx={{ flex: 1 }} />
+
+            {autoRunning ? (
+              <Box
+                title="Auto Run in progress"
+                sx={{
+                  display: 'inline-flex', alignItems: 'center', gap: '5px', flexShrink: 0,
+                  fontSize: 13, fontWeight: 700, color: T.prTx, background: T.pr,
+                  padding: '3px 9px 3px 7px', borderRadius: '999px',
+                }}
+              >
+                <Icon name="bolt" size={13} />
+                {d.autoRunActive === 'queued' ? 'Queued' : 'Running'}
+              </Box>
+            ) : d.autoRunEnabled ? (
+              <Box
+                title="Auto Run is on"
+                sx={{
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                  width: 24, height: 24, borderRadius: '50%',
+                  color: T.pr, background: T.prSoft, border: `1px solid ${T.prLine}`,
+                }}
+              >
+                <Icon name="bolt" size={13} />
+              </Box>
+            ) : null}
 
             {/* 같은 산출물이 여러 phase에 걸쳐 놓인 경우의 회차(2/3 …). 확대 안 해도
                 보이게 2배로 키웠다(사용자 요청: 10 -> 20). */}
@@ -261,6 +310,18 @@ export function NodeCard({
             <Box sx={{ flex: 1 }} />
           </Box>
         </Box>
+
+        {/* Auto Run 실행 중 — 카드 아래 가장자리를 흐르는 띠 */}
+        {autoRunning && (
+          <Box
+            sx={{
+              position: 'absolute', left: 0, right: 0, bottom: 0, height: 4,
+              backgroundImage: `repeating-linear-gradient(90deg, ${T.pr} 0 20px, ${T.prSoft} 20px 40px)`,
+              backgroundSize: '40px 4px',
+              ...(!reduceMotion && { animation: `${autoRunFlow} .8s linear infinite` }),
+            }}
+          />
+        )}
 
         {/* 편집 모드 — 드래그 그립과 flow 연결 핀 */}
         {edit && canEdit && (

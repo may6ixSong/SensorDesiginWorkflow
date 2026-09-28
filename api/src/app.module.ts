@@ -17,6 +17,7 @@ import { StorageModule } from './storage/storage.module';
 import { AuditModule } from './audit/audit.module';
 import { HubModule } from './hub/hub.module';
 import { AssignmentsModule } from './assignments/assignments.module';
+import { AutoRunModule } from './auto-run/auto-run.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { AssignmentsModule } from './assignments/assignments.module';
     AuditModule,
     HubModule,
     AssignmentsModule,
+    AutoRunModule,
   ],
 })
 export class AppModule {}

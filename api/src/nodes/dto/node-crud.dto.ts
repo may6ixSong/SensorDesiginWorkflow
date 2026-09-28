@@ -21,6 +21,15 @@ export class NewArtifactSourceDto {
   @IsString()
   serviceKey?: string;
 
+  /**
+   * source: 'live' | 'hpc'일 때만 — 고른 후보가 속한 artifact 종류(Service Manage의
+   * artifactTypeKey). Auto Run 지원 여부가 종류 단위라 이 값이 있어야 판정할 수 있다
+   * (설계서 10장 §2). 없으면 첫 version 이벤트가 채운다.
+   */
+  @IsOptional()
+  @IsString()
+  artifactTypeKey?: string;
+
   /** source: 'live' | 'file' | 'hpc'일 때만 — 그 서비스 안에서의 산출물 id. */
   @IsOptional()
   @IsString()

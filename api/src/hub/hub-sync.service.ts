@@ -79,6 +79,9 @@ export class HubSyncService {
       // html-view는 캐시하지 않는다 — 열람 시점에 라이브로 확인한다(07장 §4.1).
       hasHtmlView: false,
       publishedAt: input.isPublished ? input.observedAt : null,
+      // Auto Run 평가 표시는 push 이벤트 경로만 찍는다 — 갱신할 때 반드시 물려받아야
+      // pull이 덮어써도 같은 버전으로 다시 발화하지 않는다(설계서 10장 §4.1).
+      autoRunEvaluatedAt: idx >= 0 ? (versions[idx].autoRunEvaluatedAt ?? null) : null,
       createdAt: idx >= 0 ? versions[idx].createdAt : new Date(),
     } as ArtifactVersion;
 

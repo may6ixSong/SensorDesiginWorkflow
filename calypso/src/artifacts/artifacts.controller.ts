@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -18,7 +17,6 @@ import {
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { ConfigService } from '@nestjs/config';
-import type { ZipArchive } from 'archiver';
 import { CurrentActor } from '../common/current-actor.decorator';
 import { Actor } from '../common/actor';
 import { SirenCallerGuard } from '../common/siren-caller.guard';
@@ -39,6 +37,7 @@ import {
 } from './dto/artifact-crud.dto';
 import { CONTRACT_VERSION, toArtifactSummary, toVersionRecord } from './observer.dto';
 import { HubEventSenderService } from '../siren-common/hub-event-sender.service';
+import { streamVersionFiles } from './version-files';
 
 function toGrantInput(dto: GrantDto): { type: 'user'; knoxId: string } | { type: 'department'; department: string } {
   if (dto.type === 'user') return { type: 'user', knoxId: dto.knoxId as string };
@@ -222,36 +221,7 @@ export class ArtifactsController {
     if (access !== 'edit' && !version.isReleased) {
       throw new ForbiddenException('Only released versions are available at your access level.');
     }
-    const files = version.files ?? [];
-    if (!files.length) throw new BadRequestException('This version has no stored file.');
-
-    if (files.length === 1) {
-      const body = await this.storage.download(files[0].storageKey);
-      if (!body) throw new NotFoundException('The stored file could not be found.');
-      return new StreamableFile(body, {
-        type: 'application/octet-stream',
-        disposition: `attachment; filename="${encodeURIComponent(files[0].fileName)}"`,
-      });
-    }
-
-    const buffers = await Promise.all(files.map((f) => this.storage.download(f.storageKey)));
-    // archiver@8은 ESM 전용이라 컴파일된 CJS 코드에서 정적 import(=require)로 못 읽는다.
-    // 그냥 `await import('archiver')`를 쓰면 tsconfig의 module:commonjs 때문에 TypeScript가
-    // 다시 require()로 downlevel 컴파일해버려 같은 에러가 난다 — new Function으로 만든
-    // import() 호출은 TS가 문자열 안 코드를 못 건드리므로 런타임에 진짜 ESM dynamic
-    // import로 남는다(archiver 같은 ESM-only 패키지를 CJS에서 쓸 때 널리 쓰는 우회법).
-    const importArchiver = new Function('return import("archiver")') as () => Promise<typeof import('archiver')>;
-    const { ZipArchive } = await importArchiver();
-    const archive = new ZipArchive({ zlib: { level: 9 } });
-    files.forEach((f, i) => {
-      const buf = buffers[i];
-      if (buf) archive.append(buf, { name: f.fileName });
-    });
-    void archive.finalize();
-    return new StreamableFile(archive, {
-      type: 'application/zip',
-      disposition: `attachment; filename="${encodeURIComponent(a.name)}-${version.major}.${version.minor}.zip"`,
-    });
+    return streamVersionFiles(this.storage, a, version);
   }
 
   // ── SIREN이 호출하는 Observer 계약 ────────────────────────────────

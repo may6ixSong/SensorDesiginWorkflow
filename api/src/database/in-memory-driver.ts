@@ -244,6 +244,17 @@ function attachInstanceMethods(doc: AnyDoc, store: Map<string, AnyDoc>): AnyDoc 
     configurable: true,
     writable: true,
   });
+  // 실제 Mongoose 문서는 중첩 배열을 직접 고친 뒤 markModified()로 변경을 알린다. 인메모리
+  // 문서는 참조를 그대로 들고 있어 알릴 게 없다 — 호출만 받아 준다(없으면 TypeError로 500이
+  // 났다: Service Manage에서 artifact 종류를 고칠 때).
+  Object.defineProperty(doc, 'markModified', {
+    value: function markModified() {
+      return undefined;
+    },
+    enumerable: false,
+    configurable: true,
+    writable: true,
+  });
   Object.defineProperty(doc, 'toObject', {
     value: function toObject(this: AnyDoc) {
       return { ...this };

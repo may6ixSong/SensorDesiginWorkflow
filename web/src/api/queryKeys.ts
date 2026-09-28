@@ -16,6 +16,8 @@ export const queryKeys = {
     ['workflows', workflowId, 'nodes', nodeId, 'html-view', versionLabel] as const,
   memos: (workflowId: string) => ['workflows', workflowId, 'memos'] as const,
   comments: (workflowId: string, nodeId: string) => ['workflows', workflowId, 'nodes', nodeId, 'comments'] as const,
+  /** node 하나의 Auto Run 설정·실행 이력(설계서 10장 §8.2). */
+  autoRun: (workflowId: string, nodeId: string) => ['workflows', workflowId, 'nodes', nodeId, 'auto-run'] as const,
   edges: (workflowId: string) => ['workflows', workflowId, 'edges'] as const,
 
   /** Release — workflow별 목록, 미리보기, 부서별 필터 뷰, 산출물별 타임라인. */

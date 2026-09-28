@@ -17,6 +17,7 @@ hubSyncCheckpoints  야간 전체 재동기화 커서(07장 §6) — **폐기 �
                     만들었다가 그 설계가 바뀌어 한 번 폐기 대상이었는데, 지금의 야간 재동기화
                     용도로 그대로 재사용한다
 auditLogs       감사 로그
+autoRuns        ★신규★ Auto Run 실행 기록 — trigger 한 번 = 문서 하나, _id가 triggerRunId(10장 §5)
 ```
 
 **폐기되는 컬렉션**: `hldReleases`, `hpcPathMocks`(§4.1), `projectServiceLinks`(04장 §6.3).
@@ -219,6 +220,11 @@ WorkflowNode {
   // 폐기했다.)
   recipients: { departments: string[], users: string[] }  // departments는 id(§9)
 
+  // ★신규★ Auto Run 등록(10장 §3). 최상위 필드 — 인메모리 드라이버가 최상위 기본값만 채운다.
+  autoRunEnabled: boolean       // 기본 false. 다른 artifact로 재매핑하면 false로 돌아간다
+  autoRunUpdatedBy: string | null
+  autoRunUpdatedAt: Date | null
+
   createdBy: string
   isMock: boolean
 }
@@ -414,6 +420,20 @@ Project 계층(01장 §2.2)은 그대로 지켜진다. **Admin은 어느 라우�
 
 `POST /releases` 는 **멱등하지 않다.** 중복 클릭을 막기 위해 FE는 요청 중 버튼을 잠그고,
 BE는 `releaseSeq` 를 원자적으로 증가시켜 순번 충돌을 막는다.
+
+### 7.6 Auto Run ★신규★ (10장)
+
+| Method | Path | 권한 | 비고 |
+|---|---|---|---|
+| `GET` | `/workflows/:wid/nodes/:nid/auto-run` | workflow Edit | 등록 여부·등록 조건(이유)·source 현황·최근 실행 20건 |
+| `PUT` | `/workflows/:wid/nodes/:nid/auto-run` | workflow Edit | `{ enabled }`. 켤 때 조건이 안 맞으면 400(이유 포함) |
+| `POST` | `/workflows/:wid/nodes/:nid/auto-run/runs` | workflow Edit | 지금 실행. source가 전부 published여야 한다 |
+| `POST` | `/hub/events/auto-run-status` | 서비스 Bearer | 서비스의 진행 상태 콜백(08장 §2.3) |
+
+`GET /workflows/:wid/nodes`의 각 node에 `autoRun: { enabled, activeStatus }`가 추가됐다(캔버스 표식).
+`artifactServices.artifactTypes[]`에 `supportsAutoRun: boolean`, `artifacts.versions[]`에
+`autoRunEvaluatedAt: Date | null`(10장 §4.1)이 추가됐다. node 매핑 시 `newArtifact.artifactTypeKey`를
+받아 `artifacts.artifactTypeKey`에 저장한다.
 
 ---
 

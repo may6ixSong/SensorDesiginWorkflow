@@ -151,7 +151,13 @@ export class ArtifactSourceService {
     project: ProjectDocument,
     actor: Actor,
     intent: CandidateIntent,
-    input: { source: 'live' | 'file' | 'hpc'; serviceKey?: string; externalArtifactId: string; name: string },
+    input: {
+      source: 'live' | 'file' | 'hpc';
+      serviceKey?: string;
+      artifactTypeKey?: string;
+      externalArtifactId: string;
+      name: string;
+    },
   ): Promise<ArtifactDocument> {
     const serviceKey = input.source === 'file' ? CALYPSO_SERVICE_KEY : input.serviceKey;
     if (input.source !== 'file' && !serviceKey) throw new BadRequestException('serviceKey is required.');
@@ -183,7 +189,14 @@ export class ArtifactSourceService {
 
     const artifact = await this.artifacts.findOrCreateExternal(
       project._id as Types.ObjectId,
-      { tier, name: input.name, serviceKey: serviceKey as string, externalArtifactId: input.externalArtifactId },
+      {
+        tier,
+        name: input.name,
+        serviceKey: serviceKey as string,
+        externalArtifactId: input.externalArtifactId,
+        // Calypso(file)에는 종류 개념이 없다 — live/hpc만 싣는다.
+        artifactTypeKey: input.source === 'file' ? null : (input.artifactTypeKey || null),
+      },
       actor,
     );
     await this.hubSync.pullFullHistory(artifact, actor.knoxId, actor.isAdmin);

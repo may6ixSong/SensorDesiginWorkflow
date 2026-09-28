@@ -187,6 +187,10 @@ export class VersionPublishedEventDto {
 `whitelist: true` + `forbidNonWhitelisted: true`로 걸어서, 정의 안 된 필드가 섞여 와도
 400으로 거부한다.
 
+★ Auto Run(10장)이 생기면서 선택 필드 `triggerRunId`가 추가됐다 — Auto Run trigger의 결과로 만든
+버전이면 그 id를 싣는다. 같은 컨트롤러에 상태 콜백 `POST /hub/events/auto-run-status`도 있다
+(08장 §2.3).
+
 ★ 필드 설계에서 뺀 것들과 그 이유:
 - **`versionRef`(불변 참조)** — 안 둔다. 한번 찍힌 `versionLabel`은 그 artifact 안에서 절대
   재사용되지 않는다는 전제라, `versionLabel` 자체가 불변 참조를 겸한다.

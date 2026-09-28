@@ -81,6 +81,7 @@ export class NodesService {
       return this.sources.resolveLiveOrFile(project, actor, intent, {
         source: na.source,
         serviceKey: na.serviceKey,
+        artifactTypeKey: na.artifactTypeKey,
         externalArtifactId: na.externalArtifactId,
         name: na.name,
       });
@@ -199,6 +200,13 @@ export class NodesService {
         // 구성이라는 보장이 없다(사용자 결정: 조용히 남기면 잘못된 부서에 알림이 갈 수 있다).
         // `null → X`(=처음 매핑)를 초기화 대상에서 빼는 이유는 shouldResetRecipients 참고.
         node.recipients = EMPTY_RECIPIENTS();
+      }
+      if (before !== after && node.autoRunEnabled) {
+        // 다른 산출물로 바뀌면 Auto Run도 끈다(설계서 10장 §3.3) — 새 산출물의 서비스가
+        // Auto Run을 지원한다는 보장이 없고, 다시 켤 때 등록 조건을 새로 확인해야 한다.
+        node.autoRunEnabled = false;
+        node.autoRunUpdatedBy = actor.knoxId;
+        node.autoRunUpdatedAt = new Date();
       }
       if (before !== after) {
         // 무엇이 누구에게 전달되는지가 통째로 달라지는 사건이라 반드시 남긴다.

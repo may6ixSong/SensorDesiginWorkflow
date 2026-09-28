@@ -181,6 +181,19 @@ function TokenRow({ label, value, mask = false }: { label: string; value: string
 function ServiceCard({ service: s }: { service: HubService }) {
   const qc = useQueryClient();
   const [editOpen, setEditOpen] = useState(false);
+  // 종류별 Auto Run 지원 스위치(설계서 10장 §2) — 켠다는 건 그 서비스가 `POST {baseUrl}/auto-run/triggers`를
+  // 이미 구현했다는 뜻이다. 끄면 그 종류를 가리키는 node의 Auto Run은 다음 평가부터 발화하지 않는다.
+  const autoRunToggle = useMutation({
+    mutationFn: (t: HubService['artifactTypes'][number]) =>
+      apiClient.patch(`/hub/services/${s.key}`, {
+        artifactTypes: [{ key: t.key, name: t.name, description: t.description, supportsAutoRun: !t.supportsAutoRun }],
+      }),
+    onSuccess: (_res, t) => {
+      qc.invalidateQueries({ queryKey: ['hub'] });
+      toast(t.supportsAutoRun ? `Auto Run turned off for ${t.name}` : `Auto Run turned on for ${t.name}`);
+    },
+    onError: (e: any) => toast(e?.response?.data?.message ?? 'Failed to save'),
+  });
   const toggle = useMutation({
     mutationFn: () => apiClient.patch(`/hub/services/${s.key}`, { enabled: !s.enabled }),
     onSuccess: () => {
@@ -264,6 +277,25 @@ function ServiceCard({ service: s }: { service: HubService }) {
                 }}
               >
                 {t.key}
+              </Box>
+              <Box
+                component="button"
+                type="button"
+                title={t.supportsAutoRun
+                  ? 'Auto Run is supported — click to turn it off'
+                  : 'Turn on only after this service implements POST /auto-run/triggers'}
+                disabled={autoRunToggle.isPending}
+                onClick={() => autoRunToggle.mutate(t)}
+                sx={{
+                  flex: '0 0 auto', display: 'inline-flex', alignItems: 'center', gap: '3px',
+                  fontSize: 10, fontWeight: 700, fontFamily: 'inherit', padding: '2px 7px', borderRadius: '999px',
+                  cursor: 'pointer',
+                  color: t.supportsAutoRun ? T.pr : T.dm2,
+                  background: t.supportsAutoRun ? T.prSoft : 'transparent',
+                  border: `1px solid ${t.supportsAutoRun ? T.prLine : T.ln2}`,
+                }}
+              >
+                <Icon name="bolt" size={10} /> Auto Run {t.supportsAutoRun ? 'on' : 'off'}
               </Box>
               <SirenButton
                 variant="ghost"
@@ -457,6 +489,7 @@ function RegisterDialog({ tier, title, onClose }: { tier: RegisterTier; title: s
   const [artifactName, setArtifactName] = useState('');
   const [description, setDescription] = useState('');
   const [baseUrl, setBaseUrl] = useState('');
+  const [supportsAutoRun, setSupportsAutoRun] = useState(false);
   const [nameErr, setNameErr] = useState(false);
   const [artifactNameErr, setArtifactNameErr] = useState(false);
   const [baseUrlErr, setBaseUrlErr] = useState(false);
@@ -472,6 +505,7 @@ function RegisterDialog({ tier, title, onClose }: { tier: RegisterTier; title: s
         description: description.trim() || undefined,
         baseUrl: baseUrl.trim(),
         icon: icon || undefined,
+        supportsAutoRun,
       });
       return data.data as RegisterResult;
     },
@@ -578,6 +612,25 @@ function RegisterDialog({ tier, title, onClose }: { tier: RegisterTier; title: s
           placeholder="https://…"
         />
       </Field>
+      <Box
+        component="label"
+        sx={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: 12, lineHeight: 1.55, mb: '12px', cursor: 'pointer' }}
+      >
+        <Box
+          component="input"
+          type="checkbox"
+          checked={supportsAutoRun}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSupportsAutoRun(e.target.checked)}
+          sx={{ mt: '3px' }}
+        />
+        <Box>
+          <Box sx={{ fontWeight: 600 }}>Supports Auto Run</Box>
+          <Box sx={{ color: T.dm2, fontSize: 11 }}>
+            Only if this service implements <Box component="span" sx={{ fontFamily: FONT_MONO }}>POST /auto-run/triggers</Box>.
+            Workflow nodes on this artifact can then register Auto Run. You can change this later on the card.
+          </Box>
+        </Box>
+      </Box>
       <Box sx={{ fontSize: 11, color: T.dm2, lineHeight: 1.6 }}>
         If this baseURL is already registered, the existing Service name and token are kept — this just
         adds a new artifact under it.
