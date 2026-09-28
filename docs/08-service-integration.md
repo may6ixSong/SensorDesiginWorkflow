@@ -375,14 +375,36 @@ interface AutoRunStatusEvent {
   message?: string | null;        // 실패 사유·진행 설명 — SIREN 화면과 owner 알림에 그대로 나간다(2000자)
   versionLabel?: string | null;   // 이 실행으로 만든 버전(있으면)
   externalJobId?: string | null;  // 이 서비스 쪽 작업 id(선택, 200자)
+
+  // ── status가 'failed'일 때만 ──
+  failureKind?: 'source' | 'service' | null;  // source 데이터 문제인지, 서비스 자체 문제인지.
+                                               // sourceErrors를 주면 생략해도 'source'로 본다
+  sourceErrors?: {                             // 문제가 된 source들(최대 200)
+    sirenArtifactId?: string | null;           // ← trigger의 sources[].sirenArtifactId
+    externalArtifactId?: string | null;        // ← sources[].externalArtifactId
+    nodeId?: string | null;                    // ← sources[].nodeId   (셋 중 하나 이상)
+    versionLabel?: string | null;              // 생략하면 trigger에 실어 보낸 버전으로 본다
+    message: string;                           // 무엇이 문제였는지(2000자) — 알림에 그대로 나간다
+  }[] | null;
 }
+```
+
+**source 때문에 돌지 못했을 때**(예: Port List의 Bits가 정수가 아님)는 `failed` + `sourceErrors`로
+어느 source의 무엇이 문제인지 짚어 준다. SIREN은 그 source를 실행 기록에 표시하고, workflow owner와
+**그 source 버전을 발행한 사람**에게 실패 알림을 보낸다.
+
+```json
+{ "triggerRunId": "…", "status": "failed", "message": "Port list validation failed",
+  "sourceErrors": [{ "externalArtifactId": "6aba…dea", "message": "Row 12: Bits value is not a valid integer" }] }
 ```
 
 응답: `{ "recorded": boolean }`.
 - §2.1과 같이 **정의 안 된 필드가 섞이면 400**.
 - 그 run을 받은 서비스의 토큰이 아니면 403.
 - 이미 끝난(succeeded/failed) run이나 모르는 id면 `{recorded:false}` — 재시도할 필요 없다.
-- `succeeded`/`failed`는 workflow owner에게 알림이 나간다. `running`은 캔버스 표시만 바꾼다.
+- `succeeded`/`failed`는 workflow owner에게 알림이 나간다. `failed` + `sourceErrors`면 문제가 된
+  source 버전의 발행자에게도 나간다. `running`은 캔버스 표시만 바꾼다.
+- `failureKind`/`sourceErrors`를 `failed`가 아닌 상태와 같이 보내면 400.
 
 ### 2.4 Calypso source 받기 — 그 서비스 → Calypso
 

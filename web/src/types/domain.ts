@@ -286,12 +286,26 @@ export interface AutoRunSourceDto {
   publishedAt: string | null;
 }
 
+/** 서비스가 실패를 알리며 짚은 source 하나(설계서 10장 §6.5). */
+export interface AutoRunSourceErrorDto {
+  nodeId: string | null;
+  nodeName: string | null;
+  artifactId: string | null;
+  artifactName: string | null;
+  externalArtifactId: string | null;
+  versionLabel: string | null;
+  message: string;
+}
+
 export interface AutoRunRunDto {
   id: string;
   trigger: 'auto' | 'manual';
   requestedBy: string | null;
   status: AutoRunStatus;
   message: string | null;
+  /** 'source' = source artifact 데이터 문제로 실패, 'service' = 서비스 자체 문제. */
+  failureKind: 'source' | 'service' | null;
+  sourceErrors: AutoRunSourceErrorDto[];
   externalJobId: string | null;
   resultVersionLabel: string | null;
   causeArtifactId: string | null;

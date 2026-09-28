@@ -126,7 +126,10 @@ export class HubEventsController {
     const dto = plainToInstance(AutoRunStatusEventDto, req.body);
     const errors = await validate(dto, { whitelist: true, forbidNonWhitelisted: true });
     if (errors.length > 0) {
-      const messages = errors.flatMap((e) => Object.values(e.constraints ?? {}));
+      // sourceErrors[] 안쪽 오류는 children에 있다 — 끝까지 펼쳐서 보여준다.
+      const flatten = (list: typeof errors): string[] =>
+        list.flatMap((e) => [...Object.values(e.constraints ?? {}), ...flatten(e.children ?? [])]);
+      const messages = flatten(errors);
       throw new BadRequestException(messages.length > 0 ? messages : 'Validation failed.');
     }
     return this.autoRun.recordStatus(req.hubEventSender_.serviceKey, dto);

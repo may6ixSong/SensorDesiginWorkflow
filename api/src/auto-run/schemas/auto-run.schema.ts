@@ -55,6 +55,37 @@ export class AutoRunSource {
 }
 export const AutoRunSourceSchema = SchemaFactory.createForClass(AutoRunSource);
 
+/**
+ * 서비스가 실패를 알리면서 "이 source 때문"이라고 짚은 항목(설계서 10장 §6.5). run.sources와
+ * 맞춰 이름을 채워 두고, 못 맞추면 서비스가 준 식별자만 남긴다.
+ */
+@Schema({ _id: false })
+export class AutoRunSourceError {
+  @Prop({ type: String, default: null })
+  nodeId: string | null;
+
+  @Prop({ type: String, default: null })
+  nodeName: string | null;
+
+  @Prop({ type: String, default: null })
+  artifactId: string | null;
+
+  @Prop({ type: String, default: null })
+  artifactName: string | null;
+
+  @Prop({ type: String, default: null })
+  externalArtifactId: string | null;
+
+  @Prop({ type: String, default: null })
+  versionLabel: string | null;
+
+  @Prop({ required: true })
+  message: string;
+}
+export const AutoRunSourceErrorSchema = SchemaFactory.createForClass(AutoRunSourceError);
+
+export type AutoRunFailureKind = 'source' | 'service';
+
 export type AutoRunDocument = AutoRun & Document;
 
 /**
@@ -104,6 +135,16 @@ export class AutoRun {
   /** 실패 사유 또는 그 서비스가 준 메시지. */
   @Prop({ type: String, default: null })
   message: string | null;
+
+  /**
+   * 실패 원인 구분(설계서 10장 §6.5) — 'source'면 source artifact의 데이터 문제로 돌지 못했다는
+   * 뜻이고 sourceErrors에 어느 source인지 남는다. 'service'는 서비스 자체 문제. 성공이면 null.
+   */
+  @Prop({ type: String, enum: ['source', 'service', null], default: null })
+  failureKind: AutoRunFailureKind | null;
+
+  @Prop({ type: [AutoRunSourceErrorSchema], default: [] })
+  sourceErrors: AutoRunSourceError[];
 
   /** 그 서비스가 알려준 자기 쪽 작업 id(선택). */
   @Prop({ type: String, default: null })

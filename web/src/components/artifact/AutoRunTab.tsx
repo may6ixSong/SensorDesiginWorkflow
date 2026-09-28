@@ -241,19 +241,53 @@ function RunCard({ run: r }: { run: AutoRunRunDto }) {
       </Box>
 
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: '5px', mt: '7px' }}>
-        {r.sources.map((src) => (
-          <Box
-            key={src.nodeId}
-            title={src.versionRef ?? undefined}
-            sx={{
-              fontSize: 11, padding: '2px 7px', borderRadius: `${R.xs}px`,
-              background: T.sf2, border: `1px solid ${T.ln}`, color: T.dm,
-            }}
-          >
-            {src.nodeName} <Box component="span" sx={{ fontFamily: FONT_MONO, ...TNUM }}>{src.versionLabel}</Box>
-          </Box>
-        ))}
+        {r.sources.map((src) => {
+          const bad = r.sourceErrors.some((e) => e.nodeId === src.nodeId || e.artifactId === src.artifactId);
+          return (
+            <Box
+              key={src.nodeId}
+              title={src.versionRef ?? undefined}
+              sx={{
+                fontSize: 11, padding: '2px 7px', borderRadius: `${R.xs}px`,
+                background: bad ? T.dangerSoft : T.sf2,
+                border: `1px solid ${bad ? T.dangerLine : T.ln}`,
+                color: bad ? T.danger : T.dm,
+              }}
+            >
+              {bad && <Box component="span" sx={{ mr: '3px' }}>✕</Box>}
+              {src.nodeName} <Box component="span" sx={{ fontFamily: FONT_MONO, ...TNUM }}>{src.versionLabel}</Box>
+            </Box>
+          );
+        })}
       </Box>
+
+      {r.status === 'failed' && r.failureKind && (
+        <Box sx={{ fontSize: 11, fontWeight: 700, color: T.danger, mt: '8px' }}>
+          {r.failureKind === 'source' ? 'Failed because of source data' : 'Failed inside the service'}
+        </Box>
+      )}
+      {r.sourceErrors.length > 0 && (
+        <Box
+          sx={{
+            mt: '6px', padding: '8px 10px', borderRadius: `${R.sm}px`,
+            background: T.dangerSoft, border: `1px solid ${T.dangerLine}`,
+            display: 'flex', flexDirection: 'column', gap: '5px',
+          }}
+        >
+          {r.sourceErrors.map((e, i) => (
+            <Box key={`${e.nodeId ?? e.externalArtifactId ?? ''}-${i}`} sx={{ fontSize: 12, lineHeight: 1.5, color: T.danger }}>
+              <Box component="span" sx={{ fontWeight: 700 }}>
+                {e.nodeName ?? e.artifactName ?? e.externalArtifactId ?? 'Unknown source'}
+                {e.versionLabel ? ` ${e.versionLabel}` : ''}
+              </Box>
+              {' — '}{e.message}
+            </Box>
+          ))}
+          <Box sx={{ fontSize: 11, color: T.dm2 }}>
+            The workflow owner and whoever published these source versions were notified.
+          </Box>
+        </Box>
+      )}
 
       {r.message && (
         <Box

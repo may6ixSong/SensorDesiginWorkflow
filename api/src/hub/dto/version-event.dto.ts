@@ -1,4 +1,7 @@
-import { IsBoolean, IsIn, IsISO8601, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  ArrayMaxSize, IsArray, IsBoolean, IsIn, IsISO8601, IsOptional, IsString, MaxLength, MinLength, ValidateNested,
+} from 'class-validator';
 
 /**
  * SIREN이 모든 산출물 서비스 — OA Service/File Artifacts/HPC Service — 로부터 동일하게
@@ -74,6 +77,34 @@ export class VersionPublishedEventDto {
   triggerRunId?: string | null;
 }
 
+/** 실패 콜백에서 "이 source 때문"을 짚는 항목 — 식별자는 셋 중 하나 이상(설계서 08장 §2.3). */
+export class AutoRunSourceErrorDto {
+  /** trigger payload `sources[].sirenArtifactId` */
+  @IsOptional()
+  @IsString()
+  sirenArtifactId?: string | null;
+
+  /** trigger payload `sources[].externalArtifactId` */
+  @IsOptional()
+  @IsString()
+  externalArtifactId?: string | null;
+
+  /** trigger payload `sources[].nodeId` */
+  @IsOptional()
+  @IsString()
+  nodeId?: string | null;
+
+  @IsOptional()
+  @IsString()
+  versionLabel?: string | null;
+
+  /** 그 source의 무엇이 문제였는지 — 알림에 그대로 나간다. */
+  @IsString()
+  @MinLength(1)
+  @MaxLength(2000)
+  message: string;
+}
+
 /**
  * Auto Run trigger를 받은 서비스가 진행 상태를 알리는 콜백(설계서 08장 §2.3).
  * version 이벤트와 같이 `forbidNonWhitelisted:true`로 엄격하게 검증한다.
@@ -102,4 +133,20 @@ export class AutoRunStatusEventDto {
   @IsString()
   @MaxLength(200)
   externalJobId?: string | null;
+
+  /**
+   * status가 failed일 때만 — 실패 원인 구분. sourceErrors를 주면 생략해도 'source'로 본다.
+   * 'source' = source artifact의 데이터 때문에 돌지 못함, 'service' = 서비스 자체 문제.
+   */
+  @IsOptional()
+  @IsIn(['source', 'service'])
+  failureKind?: 'source' | 'service' | null;
+
+  /** status가 failed일 때만 — 문제가 된 source들(설계서 10장 §6.5). */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(200)
+  @ValidateNested({ each: true })
+  @Type(() => AutoRunSourceErrorDto)
+  sourceErrors?: AutoRunSourceErrorDto[] | null;
 }

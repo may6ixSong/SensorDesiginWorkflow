@@ -10,7 +10,9 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { AutoRun, AutoRunDocument, AutoRunSource, AutoRunStatus, ACTIVE_AUTO_RUN_STATUSES } from './schemas/auto-run.schema';
+import {
+  AutoRun, AutoRunDocument, AutoRunFailureKind, AutoRunSource, AutoRunSourceError, AutoRunStatus, ACTIVE_AUTO_RUN_STATUSES,
+} from './schemas/auto-run.schema';
 import { WorkflowNode, WorkflowNodeDocument } from '../nodes/schemas/node.schema';
 import { Workflow, WorkflowDocument } from '../workflows/schemas/workflow.schema';
 import { Project, ProjectDocument } from '../projects/schemas/project.schema';
@@ -59,6 +61,8 @@ export interface AutoRunRunDto {
   requestedBy: string | null;
   status: AutoRunStatus;
   message: string | null;
+  failureKind: AutoRunFailureKind | null;
+  sourceErrors: AutoRunSourceError[];
   externalJobId: string | null;
   resultVersionLabel: string | null;
   causeArtifactId: string | null;
@@ -103,6 +107,14 @@ export interface AutoRunStatusInput {
   message?: string | null;
   versionLabel?: string | null;
   externalJobId?: string | null;
+  failureKind?: AutoRunFailureKind | null;
+  sourceErrors?: {
+    sirenArtifactId?: string | null;
+    externalArtifactId?: string | null;
+    nodeId?: string | null;
+    versionLabel?: string | null;
+    message: string;
+  }[] | null;
 }
 
 function toRunDto(r: AutoRunDocument): AutoRunRunDto {
@@ -112,6 +124,8 @@ function toRunDto(r: AutoRunDocument): AutoRunRunDto {
     requestedBy: r.requestedBy ?? null,
     status: r.status,
     message: r.message ?? null,
+    failureKind: r.failureKind ?? null,
+    sourceErrors: (r.sourceErrors ?? []).map((e) => ({ ...e })),
     externalJobId: r.externalJobId ?? null,
     resultVersionLabel: r.resultVersionLabel ?? null,
     causeArtifactId: r.causeArtifactId ?? null,
@@ -700,6 +714,9 @@ export class AutoRunService implements OnModuleInit, OnModuleDestroy {
       throw new ForbiddenException('This run was not sent to your service.');
     }
     if (isTerminal(run.status)) return { recorded: false };
+    if (input.status !== 'failed' && (input.failureKind || input.sourceErrors?.length)) {
+      throw new BadRequestException('failureKind and sourceErrors are only allowed with status "failed".');
+    }
 
     const now = new Date();
     if (input.externalJobId) run.externalJobId = input.externalJobId;
@@ -717,9 +734,36 @@ export class AutoRunService implements OnModuleInit, OnModuleDestroy {
     run.status = input.status;
     run.startedAt = run.startedAt ?? now;
     run.finishedAt = now;
+    if (input.status === 'failed') {
+      run.sourceErrors = this.matchSourceErrors(run, input.sourceErrors ?? []);
+      run.failureKind = input.failureKind ?? (run.sourceErrors.length ? 'source' : null);
+    }
     await run.save();
     await this.notifyOwner(run);
     return { recorded: true };
+  }
+
+  /**
+   * 서비스가 짚은 source를 이 run이 실제로 보낸 source(run.sources)와 맞춘다 — sirenArtifactId →
+   * externalArtifactId → nodeId 순서로 찾는다. 못 맞춘 항목도 버리지 않고 서비스가 준 값 그대로
+   * 남긴다(무엇 때문에 실패했는지는 그래도 보여야 한다).
+   */
+  private matchSourceErrors(run: AutoRunDocument, input: NonNullable<AutoRunStatusInput['sourceErrors']>): AutoRunSourceError[] {
+    return input.map((e) => {
+      const src = run.sources.find((s) =>
+        (!!e.sirenArtifactId && s.artifactId === e.sirenArtifactId)
+        || (!!e.externalArtifactId && s.externalArtifactId === e.externalArtifactId)
+        || (!!e.nodeId && s.nodeId === e.nodeId));
+      return {
+        nodeId: src?.nodeId ?? e.nodeId ?? null,
+        nodeName: src?.nodeName ?? null,
+        artifactId: src?.artifactId ?? e.sirenArtifactId ?? null,
+        artifactName: src?.artifactName ?? null,
+        externalArtifactId: src?.externalArtifactId ?? e.externalArtifactId ?? null,
+        versionLabel: e.versionLabel ?? src?.versionLabel ?? null,
+        message: e.message,
+      };
+    });
   }
 
   /**
@@ -755,6 +799,11 @@ export class AutoRunService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  /**
+   * 결과 알림(설계서 10장 §7) — workflow owner에게는 성공/실패 모두. source 때문에 실패했으면
+   * **문제가 된 source 버전을 발행한 사람(giver)**에게도 실패 알림을 보낸다 — 고칠 사람이 바로
+   * 알아야 하기 때문이다. 같은 사람이 여러 자격으로 걸리면 한 통만 보낸다(owner 우선).
+   */
   private async notifyOwner(run: AutoRunDocument): Promise<void> {
     if (run.status !== 'succeeded' && run.status !== 'failed') return;
     try {
@@ -763,8 +812,14 @@ export class AutoRunService implements OnModuleInit, OnModuleDestroy {
         this.nodes.findById(run.nodeId).exec(),
         this.artifacts.findById(run.artifactId).exec(),
       ]);
-      if (!workflow?.ownerKnoxId) return;
-      await this.notifications.notifyAutoRun({
+      if (!workflow) return;
+      const sourceErrors = (run.sourceErrors ?? []).map((e) => ({
+        nodeName: e.nodeName ?? null,
+        artifactName: e.artifactName ?? e.externalArtifactId ?? null,
+        versionLabel: e.versionLabel ?? null,
+        message: e.message,
+      }));
+      const base = {
         runId: run._id.toString(),
         workflowId: workflow._id.toString(),
         workflowName: workflow.name,
@@ -774,11 +829,41 @@ export class AutoRunService implements OnModuleInit, OnModuleDestroy {
         status: run.status,
         message: run.message ?? null,
         resultVersionLabel: run.resultVersionLabel ?? null,
-        recipientKnoxId: workflow.ownerKnoxId,
-      });
+        failureKind: run.failureKind ?? null,
+        sourceErrors,
+      };
+
+      const sent = new Set<string>();
+      if (workflow.ownerKnoxId) {
+        sent.add(workflow.ownerKnoxId);
+        await this.notifications.notifyAutoRun({ ...base, recipientKnoxId: workflow.ownerKnoxId, recipientRole: 'owner' });
+      }
+      if (run.status === 'failed' && run.sourceErrors?.length) {
+        const givers = await this.sourceGivers(run);
+        for (const knoxId of givers) {
+          if (sent.has(knoxId)) continue;
+          sent.add(knoxId);
+          await this.notifications.notifyAutoRun({ ...base, recipientKnoxId: knoxId, recipientRole: 'source-giver' });
+        }
+      }
     } catch (e) {
-      this.logger.warn(`auto-run owner notification failed for run ${run._id.toString()} — ${(e as Error).message}`);
+      this.logger.warn(`auto-run notification failed for run ${run._id.toString()} — ${(e as Error).message}`);
     }
+  }
+
+  /** 문제가 된 source 버전들의 giver(그 버전을 발행한 사람) — SIREN 버전 캐시에서 찾는다. */
+  private async sourceGivers(run: AutoRunDocument): Promise<string[]> {
+    const ids = [...new Set((run.sourceErrors ?? []).map((e) => e.artifactId).filter((x): x is string => !!x))];
+    if (!ids.length) return [];
+    const docs = await this.artifacts.find({ _id: { $in: ids } }).exec();
+    const out: string[] = [];
+    for (const e of run.sourceErrors ?? []) {
+      const a = docs.find((d) => d._id.toString() === e.artifactId);
+      const label = e.versionLabel ?? run.sources.find((s) => s.artifactId === e.artifactId)?.versionLabel;
+      const giver = a?.versions?.find((v) => v.versionLabel === label)?.giverKnoxId;
+      if (giver && !out.includes(giver)) out.push(giver);
+    }
+    return out;
   }
 
   // ── 다른 모듈이 쓰는 검증 ─────────────────────────────────────────────

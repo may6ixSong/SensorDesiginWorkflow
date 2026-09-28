@@ -54,7 +54,12 @@ export interface AutoRunNotification {
   status: 'succeeded' | 'failed';
   message: string | null;
   resultVersionLabel: string | null;
+  /** 실패 원인 — 'source'면 sourceErrors에 어느 source가 왜 문제였는지 있다(설계서 10장 §6.5). */
+  failureKind: 'source' | 'service' | null;
+  sourceErrors: { nodeName: string | null; artifactName: string | null; versionLabel: string | null; message: string }[];
   recipientKnoxId: string;
+  /** owner = workflow owner, source-giver = 문제가 된 source 버전을 발행한 사람. */
+  recipientRole: 'owner' | 'source-giver';
 }
 
 @Injectable()
@@ -63,10 +68,15 @@ export class NotificationService implements NotificationSender {
 
   /** TODO(T3): 메일 어댑터가 붙으면 release 알림과 같은 경로로 보낸다. 지금은 로그만 남긴다. */
   async notifyAutoRun(payload: AutoRunNotification): Promise<void> {
+    const sources = payload.sourceErrors
+      .map((e) => `${e.nodeName ?? e.artifactName ?? '?'}${e.versionLabel ? `@${e.versionLabel}` : ''}: ${e.message}`)
+      .join('; ');
     this.logger.log(
-      `[notify:auto-run] ${payload.recipientKnoxId} ← ${payload.workflowName} / ${payload.nodeName} ` +
-        `${payload.status}${payload.resultVersionLabel ? ` (${payload.resultVersionLabel})` : ''}` +
-        `${payload.message ? ` — ${payload.message}` : ''}`,
+      `[notify:auto-run:${payload.recipientRole}] ${payload.recipientKnoxId} ← ${payload.workflowName} / ${payload.nodeName} ` +
+        `${payload.status}${payload.failureKind ? ` (${payload.failureKind} error)` : ''}` +
+        `${payload.resultVersionLabel ? ` (${payload.resultVersionLabel})` : ''}` +
+        `${payload.message ? ` — ${payload.message}` : ''}` +
+        `${sources ? ` — sources: ${sources}` : ''}`,
     );
   }
 
