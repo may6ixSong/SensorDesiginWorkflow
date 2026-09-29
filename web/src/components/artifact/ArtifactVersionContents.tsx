@@ -27,6 +27,8 @@ interface Props {
    */
   departmentLabel: string;
   onDownload: (v: CalypsoVersionView) => void;
+  /** true면 파일 목록·다운로드를 그리지 않는다 — workflow slide의 sheet artifact(설계서 11장 §4). */
+  hideFiles?: boolean;
 }
 
 /**
@@ -34,7 +36,7 @@ interface Props {
  * 이제 여기 없다 — Dialog(AddVersionDialog/PublishVersionDialog)로 옮겨서 version
  * history 위쪽 버튼과 트리 각 행에서 각각 띄운다(사용자 요청).
  */
-export function ArtifactVersionContents({ a, version: v, departmentLabel, onDownload }: Props) {
+export function ArtifactVersionContents({ a, version: v, departmentLabel, onDownload, hideFiles = false }: Props) {
   const { resolveUser } = useDirectory();
   const accent = v?.isReleased ? T.pr : T.warn;
   // "WORKING"은 지금 보이는 버전이 실제 latest일 때만 — 사용자가 버전 트리에서 과거의
@@ -119,12 +121,14 @@ export function ArtifactVersionContents({ a, version: v, departmentLabel, onDown
                 />
               )}
 
+              {/* 보여줄 파일·링크·경로가 하나도 없으면(예: slide의 sheet) 구분선째 그리지 않는다. */}
+              {((!hideFiles && (v.files ?? []).length > 0) || (v.links ?? []).length > 0 || (v.paths ?? []).length > 0) && (
               <Box sx={{ mt: '20px', paddingTop: '16px', borderTop: `1px solid ${T.ln}` }}>
                 {/* v.files는 서버 DTO(toVersionView)가 항상 배열을 보장하지만, 스키마 확장
                     이전(fileName/storageKey 단수 필드) 시절 문서나 raw driver로 직접 넣은
                     문서처럼 그 보장을 안 거친 데이터가 섞이면 undefined로 올 수 있다 —
                     화면이 통째로 죽지 않게 방어한다. */}
-                {(v.files ?? []).length > 0 && (
+                {!hideFiles && (v.files ?? []).length > 0 && (
                   <>
                     <Box sx={{ fontFamily: FONT_MONO, fontSize: 10, letterSpacing: '.15em', textTransform: 'uppercase', color: T.dm2, mb: '9px' }}>
                       {v.files.length > 1 ? `Files (${v.files.length})` : 'File'}
@@ -206,6 +210,7 @@ export function ArtifactVersionContents({ a, version: v, departmentLabel, onDown
                   </>
                 )}
               </Box>
+              )}
             </Box>
           </Box>
         ) : (

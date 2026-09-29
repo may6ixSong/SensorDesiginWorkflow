@@ -251,7 +251,7 @@ export function ArtifactSlide({
       footer={own && onDelete && (
         <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
           <SirenButton variant="ghost" onClick={onDelete} sx={{ color: T.danger, borderColor: T.dangerLine }}>
-            <Icon name="trash" /> Remove from canvas
+            <Icon name="trash" /> Remove Node
           </SirenButton>
         </Box>
       )}

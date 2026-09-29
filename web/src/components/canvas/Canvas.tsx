@@ -394,21 +394,8 @@ export function Canvas({
       return;
     }
 
-    // 이동 없이 클릭한 경우 (편집 모드)
-    if (s.link && s.link !== id) {
-      const target = st.getState().nodes.find((n) => n.id === id);
-      if (target) {
-        if (!s.edges.some((x) => x.from === s.link && x.to === id)) {
-          s.setEdges([
-            ...s.edges,
-            { id: `tmp-${Date.now()}`, from: s.link!, to: id, auto: false, bi: false },
-          ]);
-        }
-        s.setLink(null);
-        toast('Linked');
-        return;
-      }
-    }
+    // 이동 없이 클릭한 경우 (편집 모드) — out 포트로 연결을 시작해 둔 상태면 이 노드로 잇는다.
+    if (s.link && s.link !== id && connectTo(id)) return;
     if (st.getState().memos.some((m) => m.id === id)) {
       s.setNoteDlg(id);
       return;
@@ -498,11 +485,55 @@ export function Canvas({
     window.addEventListener('pointerup', up);
   };
 
-  /* ── pin 클릭 → 연결 시작/취소 ── */
-  const onPinClick = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
+  /**
+   * 연결 중인 source(s.link)에서 target 노드로 flow를 하나 만든다. 노드가 아니면(메모 등) false.
+   * 이미 같은 방향 flow가 있으면 새로 만들지 않고 연결 모드만 끝낸다.
+   */
+  const connectTo = (targetId: string): boolean => {
     const s = st.getState();
-    s.setLink(s.link === id ? null : id);
+    const from = s.link;
+    if (!from || from === targetId) return false;
+    if (!s.nodes.some((n) => n.id === targetId)) return false;
+    if (!s.edges.some((x) => x.from === from && x.to === targetId)) {
+      s.setEdges([
+        ...s.edges,
+        { id: `tmp-${Date.now()}`, from, to: targetId, auto: false, bi: false },
+      ]);
+    }
+    s.setLink(null);
+    toast('Linked');
+    return true;
+  };
+
+  /**
+   * out 포트(노드 오른쪽 가운데) — 두 가지로 쓴다(사용자 요청: 노드끼리 flow 연결 복구).
+   *  - 끌어서 다른 노드 위에 놓으면 그 노드로 바로 잇는다.
+   *  - 그냥 누르면 연결 모드가 켜지고(선이 포인터를 따라온다) 이어서 target 노드를 누르면 잇는다.
+   *    같은 포트를 다시 누르면 취소.
+   */
+  const onPortDown = (id: string, e: React.PointerEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const s = st.getState();
+    if (s.link === id) {
+      s.setLink(null);
+      return;
+    }
+    s.setLink(id);
+    s.setLinkPos(cvPt(e));
+    const sx = e.clientX;
+    const sy = e.clientY;
+    const move = (ev: PointerEvent) => st.getState().setLinkPos(cvPt(ev));
+    const up = (ev: PointerEvent) => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      if (Math.hypot(ev.clientX - sx, ev.clientY - sy) < 4) return; // 클릭 — 연결 모드 유지
+      const el = document.elementFromPoint(ev.clientX, ev.clientY)?.closest('[data-bid]');
+      const target = el?.getAttribute('data-bid');
+      if (!target || !connectTo(target)) st.getState().setLink(null);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
   };
 
   /* ── 툴박스 액션 ── */
@@ -677,7 +708,8 @@ export function Canvas({
               dimLink={!!link && link !== d.id}
               linkActive={link === d.id}
               onOpen={(id: string) => st.getState().openDeliverable(id)}
-              onPinClick={onPinClick}
+              onPortDown={onPortDown}
+              linkTarget={!!link && link !== d.id}
               onGripDown={onGripDown}
               registerRef={registerRef}
               onPointerDown={onBlockPointerDown(d.id)}

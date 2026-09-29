@@ -3,7 +3,6 @@ import { Box } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   CalypsoVersionView, addCalypsoVersion, downloadCalypsoVersion, getCalypsoArtifact, releaseCalypsoArtifact,
-  setCalypsoNetwork,
 } from '@/api/calypsoClient';
 import { queryKeys } from '@/api/queryKeys';
 import { ReleaseDto } from '@/types/domain';
@@ -17,7 +16,6 @@ import { ArtifactVersionContents } from './ArtifactVersionContents';
 import { ArtifactVersionTree } from './ArtifactVersionTree';
 import { AddVersionDialog } from './AddVersionDialog';
 import { PublishVersionDialog } from './PublishVersionDialog';
-import { NetworkField } from './NetworkField';
 import { T } from '@/theme/tokens';
 
 interface Props {
@@ -78,11 +76,6 @@ export function CalypsoInlinePanel({ artifactId, projectId, nodeId, releases, on
     onSuccess: () => { invalidate(); toast('Published'); setPublishing(null); },
     onError: (e: any) => toast(e?.response?.data?.message ?? 'Publish failed'),
   });
-  const network = useMutation({
-    mutationFn: (network: 'OA' | 'HPC') => setCalypsoNetwork(artifactId, projectId, network),
-    onSuccess: () => { invalidate(); toast('Network changed'); },
-    onError: (e: any) => toast(e?.response?.data?.message ?? 'Could not change network'),
-  });
   const handleDownload = async (v: CalypsoVersionView) => {
     try {
       const { blob, filename } = await downloadCalypsoVersion(artifactId, projectId, v.versionRef);
@@ -122,11 +115,13 @@ export function CalypsoInlinePanel({ artifactId, projectId, nodeId, releases, on
           version={shown}
           departmentLabel={deptLabel(a.department)}
           onDownload={handleDownload}
+          // sheet는 파일을 내려받지 않는다 — 필요하면 Artifact 화면에서 Excel로 내보낸다(사용자 요청).
+          hideFiles={a.contentKind === 'sheet'}
         />
       </Box>
 
       <Box sx={{ flex: 1, minWidth: 0 }}>
-        <NetworkField a={a} canEdit={canEdit} changing={network.isPending} onChange={(kind) => network.mutate(kind)} />
+        {/* network는 여기서 보이지도 바꾸지도 않는다 — Artifact 화면에서 직접 한다(사용자 요청). */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', mb: '10px' }}>
           <Ey sx={{ flex: 1, mb: 0 }}>Version history</Ey>
           {/* sheet는 Artifact 화면에서 Save·Publish한다 — 여기서는 published 버전만 카드로 본다(설계서 11장 §4). */}

@@ -45,7 +45,10 @@ interface Props {
   dimLink: boolean;
   hasHl: boolean;
   onOpen: (id: string) => void;
-  onPinClick: (id: string, e: React.MouseEvent) => void;
+  /** out 포트(오른쪽 가운데)를 눌렀을 때 — 끌어서 놓거나, 누른 뒤 target 노드를 눌러 flow를 잇는다. */
+  onPortDown: (id: string, e: React.PointerEvent) => void;
+  /** 다른 노드에서 연결을 시작한 상태 — 이 노드의 in 포트를 강조해 "여기로 이을 수 있다"를 보여준다. */
+  linkTarget?: boolean;
   onGripDown: (id: string, e: React.PointerEvent) => void;
   linkActive: boolean;
   registerRef: (id: string, el: HTMLDivElement | null) => void;
@@ -66,7 +69,7 @@ interface Props {
  */
 export function NodeCard({
   d, phase, orphan = false, edit, canEdit, isSel, onHl, dimLink, hasHl,
-  onOpen, onPinClick, onGripDown, linkActive, registerRef,
+  onOpen, onPortDown, onGripDown, linkActive, linkTarget = false, registerRef,
   onPointerDown, onPointerMove, onPointerUp, onClick, deptLabel,
 }: Props) {
   const st = stOf(d);
@@ -146,6 +149,42 @@ export function NodeCard({
         >
           <Icon name="eye" size={17} /> Details
         </Box>
+      )}
+
+      {/* 편집 모드 — flow 연결 포트. 카드의 overflow에 잘리지 않게 바깥 래퍼에 둔다.
+          in(왼쪽 가운데)은 들어오는 자리 표시이고, 누르면 노드 클릭과 같다(연결 중이면 여기로 잇는다).
+          out(오른쪽 가운데)은 연결을 시작한다 — 끌어서 놓거나, 누른 뒤 target 노드를 누른다. */}
+      {edit && canEdit && (
+        <>
+          <Box
+            aria-hidden
+            sx={{
+              position: 'absolute', left: -7, top: '50%', transform: 'translateY(-50%)', zIndex: 6,
+              width: 14, height: 14, borderRadius: '50%', boxSizing: 'border-box',
+              background: linkTarget ? T.pr : T.sf,
+              border: `2px solid ${linkTarget ? T.pr : T.ln2}`,
+              boxShadow: linkTarget ? `0 0 0 4px ${T.prSoft}` : 'none',
+              transition: 'background .15s, border-color .15s, box-shadow .15s',
+            }}
+          />
+          <Box
+            component="button"
+            type="button"
+            title="Connect flow"
+            aria-label={`Connect a flow from ${d.name}`}
+            onPointerDown={(e) => onPortDown(d.id, e)}
+            onClick={(e) => e.stopPropagation()}
+            sx={{
+              position: 'absolute', right: -8, top: '50%', transform: 'translateY(-50%)', zIndex: 6,
+              width: 16, height: 16, padding: 0, borderRadius: '50%', boxSizing: 'border-box',
+              background: linkActive ? T.pr : T.sf,
+              border: `2px solid ${linkActive ? T.pr : T.dm2}`,
+              cursor: 'crosshair', fontFamily: 'inherit',
+              transition: 'background .15s, border-color .15s, transform .15s',
+              '&:hover': { borderColor: T.pr, background: linkActive ? T.pr : T.prSoft, transform: 'translateY(-50%) scale(1.15)' },
+            }}
+          />
+        </>
       )}
 
       {/* 카드 — border/background/overflow는 여기서만. 바깥 래퍼와 분리해야 Details
@@ -337,22 +376,6 @@ export function NodeCard({
               }}
             >
               <Icon name="expand" />
-            </Box>
-            <Box
-              component="button"
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={(e) => { e.stopPropagation(); onPinClick(d.id, e); }}
-              title="Connect flow"
-              sx={{
-                position: 'absolute', right: 6, top: 6, width: 18, height: 18, padding: 0,
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                borderRadius: '50%', border: `1px solid ${linkActive ? T.pr : T.ln2}`,
-                background: linkActive ? T.pr : T.sf, color: linkActive ? T.prTx : T.dm,
-                cursor: CURSOR_POINTER, fontFamily: 'inherit',
-                '&:hover': { borderColor: T.pr, color: linkActive ? T.prTx : T.pr },
-              }}
-            >
-              <Icon name="send" />
             </Box>
           </>
         )}
