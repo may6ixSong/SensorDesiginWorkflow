@@ -209,19 +209,6 @@ function ProjectCard({ project, view }: { project: ProjectDto; view: View }) {
           >
             {project.code}
           </Box>
-          {project.revision && (
-            <Box
-              component="span"
-              title="Revision"
-              sx={{
-                fontFamily: FONT_MONO, fontSize: 9, letterSpacing: '.1em', padding: '2px 7px',
-                borderRadius: '6px', background: 'transparent', color: T.dm2,
-                border: `1px dashed ${T.ln2}`,
-              }}
-            >
-              {project.revision}
-            </Box>
-          )}
           <Box
             component="span"
             sx={{
@@ -232,8 +219,23 @@ function ProjectCard({ project, view }: { project: ProjectDto; view: View }) {
             {project.status}
           </Box>
         </Box>
-        <Box sx={{ fontSize: row ? 15 : 17, fontWeight: 700, letterSpacing: '-.015em', lineHeight: 1.3 }}>
-          {project.name}
+        <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+          <Box sx={{ fontSize: row ? 15 : 17, fontWeight: 700, letterSpacing: '-.015em', lineHeight: 1.3 }}>
+            {project.name}
+          </Box>
+          {project.revision && (
+            <Box
+              component="span"
+              title="Revision"
+              sx={{
+                fontFamily: FONT_MONO, fontSize: 11.5, fontWeight: 700, letterSpacing: '.06em',
+                padding: '3px 10px', borderRadius: '999px', lineHeight: 1.3,
+                background: T.pr, color: '#fff', border: `1px solid ${T.pr}`,
+              }}
+            >
+              {project.revision}
+            </Box>
+          )}
         </Box>
         <Box sx={{ fontSize: 11.5, color: T.dm, mt: '4px' }}>
           {workflows?.length ?? 0} workflows

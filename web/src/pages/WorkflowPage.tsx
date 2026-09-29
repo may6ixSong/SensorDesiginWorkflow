@@ -491,6 +491,10 @@ function CanvasBody({
   useEffect(() => {
     return () => {
       if (useCanvasStore.getState().edit) useCanvasStore.getState().cancelEdit();
+      // 페이지를 벗어나면 node 선택/highlight와 zoom·pan을 버린다 — 다시 들어오면 항상 초기
+      // 상태다(canvas/list view, slide 등 화면 모드만 쿠키로 기억). loadedWorkflowId를 비워
+      // 다음 hydrate가 viewport·선택을 초기화하게 한다.
+      useCanvasStore.setState({ sel: null, hlSet: null, loadedWorkflowId: null });
     };
   }, [workflowId]);
 
