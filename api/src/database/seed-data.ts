@@ -389,7 +389,7 @@ export async function seedDatabase(models: SeedModels): Promise<void> {
    *   항상 실패하고, 그러면 A Tier 산출물이 아무에게도 안 보여 UI를 만들 수 없기 때문이다.
    *   이렇게 해두면 ObserverClientService의 실제 fetch 경로가 그대로 실행된다 — 권한
    *   로직을 우회하지 않는다. */
-  const MOCK_OBSERVER = `http://localhost:${process.env.PORT ?? 3000}/api/v1/__mock-observer`;
+  const MOCK_OBSERVER = `http://localhost:${process.env.PORT ?? 3001}/api/v1/__mock-observer`;
   await ArtifactServiceModel.deleteMany({ isMock: true });
   await ArtifactServiceModel.insertMany([
     { key: 'simhub', name: 'SimHub', contractVersion: '1.0', defaultTier: 'A', transport: 'http',

@@ -255,7 +255,7 @@ probe(`calypso POST /auto-run/triggers`)는 실제 서비스가 할 일을 흉�
 | `AUTO_RUN_ENABLED` | `true` | 전역 kill switch |
 | `AUTO_RUN_SYSTEM_ACCOUNT` | `sdp.op` | payload `runAs` |
 | `AUTO_RUN_TIMEOUT_MINUTES` | `60` | 끝 콜백 대기 시간 |
-| `SIREN_PUBLIC_API_URL` | `http://localhost:3000/api/v1` | payload `callback`의 주소 — 서비스 쪽에서 닿아야 한다 |
+| `SIREN_PUBLIC_API_URL` | `http://localhost:3001/api/v1` | payload `callback`의 주소 — 서비스 쪽에서 닿아야 한다 |
 | `CALYPSO_EXTERNAL_API_URL` | `CALYPSO_API` | 서비스가 Calypso source를 받아갈 주소 |
 | `AUTO_RUN_SOURCE_TOKEN_SECRET` | `CALYPSO_API_TOKEN` | Calypso source 토큰 서명 비밀(Calypso와 같은 값) |
 | `AUTO_RUN_SOURCE_TOKEN_TTL_HOURS` | `24` | Calypso source 토큰 만료 |

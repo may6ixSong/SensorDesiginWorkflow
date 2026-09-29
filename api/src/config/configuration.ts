@@ -18,7 +18,7 @@ function resolveMongodbUri(): string {
  * 그대로 통과시킨다. main.ts가 타입을 보고 listen 호출을 나눈다.
  */
 function resolvePort(): string | number {
-  const raw = process.env.PORT?.trim() || '3000';
+  const raw = process.env.PORT?.trim() || '3001';
   const parsed = Number(raw);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : raw;
 }
@@ -66,7 +66,7 @@ export default () => ({
      * 그 서비스가 status 콜백·version 이벤트를 보낼 SIREN api 주소 — payload의 `callback`에
      * 그대로 실린다. 서비스 쪽(HPC망 등)에서 닿는 주소여야 한다.
      */
-    publicApiUrl: (process.env.SIREN_PUBLIC_API_URL || 'http://localhost:3000/api/v1').replace(/\/+$/, ''),
+    publicApiUrl: (process.env.SIREN_PUBLIC_API_URL || 'http://localhost:3001/api/v1').replace(/\/+$/, ''),
     /**
      * 서비스가 Calypso source를 직접 받아갈 때 쓰는 Calypso api 주소 — CALYPSO_API는 SIREN BE
      * 기준 주소라 서비스 쪽에서 안 닿을 수 있어 따로 둔다. 비어 있으면 CALYPSO_API를 쓴다.

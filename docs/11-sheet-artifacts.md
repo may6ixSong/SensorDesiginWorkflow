@@ -102,7 +102,9 @@ SpreadJS 라이선스는 SIREN 도메인이 아니라 **SDP_SPA 도메인**(`htt
 있다. 그래서 편집기는 SDP_SPA의 `/sheet-host` 페이지를 iframe으로 띄우고, **postMessage로만** 주고받는다.
 
 - SIREN 설정: `web/.env.*`의 `SHEET_HOST_URL`. 운영은 `https://sdp.samsungds.net:44302/sheet-host`,
-  로컬은 이 저장소의 `sheet-host/` 개발 서버(`http://localhost:5175/`, SpreadJS 평가판 — 워터마크가 뜬다).
+  로컬은 SDP_SPA 개발 서버의 `http://localhost:3000/sheet-host`(그래서 SIREN api의 dev 포트는 3001이다).
+  SDP_SPA 없이 돌리려면 이 저장소의 `sheet-host/` 개발 서버(`http://localhost:5175/`, SpreadJS 평가판 —
+  워터마크가 뜬다)로 바꾼다.
 - `sheet-host/src/sheetHost/`가 **참고 구현**이다. SDP_SPA에 옮기는 방법은
   `prompts/sdp-spa-sheet-host.md`.
 - iframe에는 `sandbox`를 주지 않는다(붙여넣기·가져오기가 막힌다). 로그인·쿠키를 쓰지 않는다.
