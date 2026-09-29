@@ -93,11 +93,17 @@ export function ModalShell({
 const MotionPaperTransition = forwardRef<
   HTMLDivElement,
   // MUI의 TransitionProps는 여기서 쓰지 않는 필드가 많아 필요한 것만 좁혀 받는다.
-  { in?: boolean; children?: ReactNode; onExited?: (node?: HTMLElement) => void; motionTransition?: object }
->(function MotionPaperTransition({ in: inProp, children, onExited, motionTransition }, ref) {
+  // tabIndex는 버리면 안 된다 — MUI 포커스 트랩이 이 노드에 포커스를 두는데, 없으면
+  // "The modal content node does not accept focus" 경고를 띄운다.
+  {
+    in?: boolean; children?: ReactNode; onExited?: (node?: HTMLElement) => void; motionTransition?: object;
+    tabIndex?: number;
+  }
+>(function MotionPaperTransition({ in: inProp, children, onExited, motionTransition, tabIndex = -1 }, ref) {
   return (
     <motion.div
       ref={ref}
+      tabIndex={tabIndex}
       variants={dialogVariants}
       initial="hidden"
       animate={inProp ? 'visible' : 'exit'}
