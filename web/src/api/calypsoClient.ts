@@ -94,7 +94,7 @@ export interface SheetLatestInfo {
   label: string;
   /** 한 번이라도 저장했는가 — 아니면 시작 시트는 template(또는 빈 시트)이다. */
   saved: boolean;
-  /** 마지막 publish 이후 저장한 내용이 있는가 — Publish 버튼을 여는 조건이다. */
+  /** 마지막 publish 이후 저장한 내용이 있는가 — 참고용(화면은 쓰지 않는다). */
   hasUnpublishedChanges: boolean;
   updatedBy: string;
   updatedAt: string;

@@ -178,7 +178,8 @@ export function ArtifactDetailPage() {
     if (sheetDirty) setPendingPick(v);
     else setPicked(v);
   };
-  const canPublishSheet = !!a.sheetLatest?.hasUnpublishedChanges && !sheetDirty;
+  // 저장한 적이 있고 화면에 저장 안 한 변경이 없으면 publish할 수 있다 — 이전 버전과 같은지는 따지지 않는다.
+  const canPublishSheet = !!a.sheetLatest?.saved && !sheetDirty;
 
   return (
     <AppShell>

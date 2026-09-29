@@ -62,8 +62,8 @@ sheet에는 버전 업로드가 없다. 대신 **latest**(작업본) 하나와 *
 | 누가 보나 | edit 권한자만(Calypso 화면). SIREN workflow·release는 모른다 | 기존 규칙 그대로(view는 released만) |
 
 - **Publish**: latest 내용으로 새 published 버전(major +1 · minor 0)을 만들고, 이때만 SIREN에 버전 이벤트가
-  간다. latest는 그대로 남아 계속 고칠 수 있다. 저장한 적이 없거나 마지막 publish 이후 저장한 내용이 없으면
-  막는다(같은 내용 재발행 방지). 저장 안 한 변경이 화면에 있으면 먼저 Save해야 한다.
+  간다. latest는 그대로 남아 계속 고칠 수 있다. 이전 published 버전과 같은지는 비교하지 않는다(사용자 결정) —
+  한 번도 저장하지 않았거나, 저장 안 한 변경이 화면에 있을 때만 막는다(먼저 Save).
 - 예전에 저장마다 minor 버전이 생기던 sheet는, latest가 아직 없으면 최신 미발행 버전(없으면 최신 published)을
   latest의 시작점으로 쓴다. 첫 Save부터 새 방식이 된다. 그 옛 minor 버전은 화면 트리에 보이지 않는다.
 

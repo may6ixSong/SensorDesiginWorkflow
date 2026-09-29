@@ -37,9 +37,8 @@ export function sheetLatestRow(a: CalypsoArtifact): CalypsoVersionView | null {
     files: [],
     links: [],
     paths: [],
-    versionNote: !l.saved
-      ? 'Not saved yet'
-      : l.hasUnpublishedChanges ? 'Saved — not published yet' : 'Same as the last published version',
+    // 이전 published 버전과 비교해 보여주지 않는다(사용자 결정) — 첫 저장 전인지만 알린다.
+    versionNote: l.saved ? '' : 'Not saved yet',
     description: '',
     createdBy: l.updatedBy,
     createdAt: l.updatedAt,

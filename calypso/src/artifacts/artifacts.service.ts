@@ -436,14 +436,11 @@ export class ArtifactsService {
 
   /**
    * sheet Publish — 지금 latest 내용으로 새 released 버전(major +1 · minor 0)을 만든다. latest는 그대로
-   * 남고 계속 고칠 수 있다. 마지막 저장 이후 이미 publish했으면(같은 내용) 막는다.
+   * 남고 계속 고칠 수 있다. 이전 published 버전과 같은지는 비교하지 않는다(사용자 결정) — 저장한 적만 있으면 된다.
    */
   private async publishSheet(a: ArtifactDocument, versionNote: string, description: string | undefined, actor: Actor) {
     const draft = draftOf(a);
     if (!(draft.files ?? []).length) throw new BadRequestException('Save the sheet before publishing.');
-    if (draft.publishedVersionRef) {
-      throw new BadRequestException('Nothing changed since the last publish — save your changes first.');
-    }
     const major = (a.versions[0]?.major ?? 0) + 1;
     const versionRef = this.buildVersionRef(a, major, 0);
     a.versions.unshift({
