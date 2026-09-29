@@ -77,6 +77,11 @@ export interface CalypsoArtifact {
   viewGrants: CalypsoGrant[];
   /** false(기본) — project member 누구나 view 가능. true면 viewGrants로만 제한. */
   restrictView: boolean;
+  /** 'sheet'면 엑셀처럼 편집하는 표(설계서 11장) — 버전은 sheet 편집기로만 만든다. */
+  contentKind: 'file' | 'sheet';
+  /** sheet를 만들 때 불러온 template과 그 개정본. 없으면 빈 시트에서 시작했다. */
+  templateKey: string | null;
+  templateRevision: number | null;
 }
 
 export async function listCalypsoArtifacts(query: {
@@ -96,6 +101,7 @@ export async function getCalypsoArtifact(id: string, projectId: string): Promise
 
 export async function createCalypsoArtifact(input: {
   projectId: string; department: string; name: string; description?: string; network: 'OA' | 'HPC';
+  contentKind?: 'file' | 'sheet'; templateKey?: string;
 }): Promise<CalypsoArtifact> {
   const { data } = await apiClient.post<ApiEnvelope<CalypsoArtifact>>('/calypso-artifacts', input);
   return data.data;
@@ -223,6 +229,140 @@ export async function setCalypsoRestrictView(id: string, projectId: string, rest
 export async function setCalypsoNetwork(id: string, projectId: string, network: 'OA' | 'HPC'): Promise<CalypsoArtifact> {
   const { data } = await apiClient.patch<ApiEnvelope<CalypsoArtifact>>(
     `/calypso-artifacts/${id}/network`, { network }, { params: { projectId } },
+  );
+  return data.data;
+}
+
+// ── Sheet (설계서 11장) ────────────────────────────────────────────────
+
+/** 시트 병합 범위 — 0부터 센다. */
+export interface SheetMerge {
+  row: number;
+  col: number;
+  rowCount: number;
+  colCount: number;
+}
+
+/** 소비자(HPC 등)가 받는 셀 값 격자 — 화면에 보이는 문자열 그대로. */
+export interface SheetGrid {
+  format: 'siren-sheet-grid';
+  version: 1;
+  sheets: { name: string; rows: string[][]; merges: SheetMerge[] }[];
+}
+
+/** SpreadJS 문서 JSON — 내용은 SpreadJS 형식이라 SIREN은 들여다보지 않는다. */
+export type SheetDocument = Record<string, unknown>;
+
+/** 기본 template의 중립 명세 — 편집기(sheet-host)가 워크북으로 만든다. */
+export type SheetSeed = Record<string, unknown>;
+
+export interface SheetStart {
+  source: 'version' | 'template' | 'empty';
+  versionLabel: string | null;
+  templateKey: string | null;
+  templateRevision: number | null;
+  document: SheetDocument | null;
+  seed: SheetSeed | null;
+}
+
+export interface SheetVersionContent {
+  versionRef: string;
+  versionLabel: string;
+  isReleased: boolean;
+  document: SheetDocument;
+  grid: SheetGrid;
+}
+
+/** 다음 편집의 시작 시트 — 최신 버전, 없으면 template, 그것도 없으면 빈 시트. edit 권한자만. */
+export async function getCalypsoSheetStart(id: string, projectId: string): Promise<SheetStart> {
+  const { data } = await apiClient.get<ApiEnvelope<SheetStart>>(`/calypso-artifacts/${id}/sheet`, { params: { projectId } });
+  return data.data;
+}
+
+export async function getCalypsoSheetVersion(id: string, projectId: string, versionRef: string): Promise<SheetVersionContent> {
+  const { data } = await apiClient.get<ApiEnvelope<SheetVersionContent>>(
+    `/calypso-artifacts/${id}/sheet/${encodeURIComponent(versionRef)}`, { params: { projectId } },
+  );
+  return data.data;
+}
+
+/** 파일 이름에 못 쓰는 글자를 걸러낸다 — 버전 파일 이름은 artifact 이름에서 온다. */
+export function sheetFileBase(name: string): string {
+  return name.replace(/[\\/:*?"<>|]+/g, '_').trim() || 'sheet';
+}
+
+/**
+ * sheet 새 버전 — 편집기가 돌려준 문서 JSON·격자(·엑셀)를 보통 버전 업로드와 같은 경로로
+ * 올린다. Calypso가 .ssjson/.grid.json 한 개씩 있는지만 본다(내용 검사 없음).
+ */
+export async function addCalypsoSheetVersion(
+  a: Pick<CalypsoArtifact, 'id' | 'name'>,
+  projectId: string,
+  content: { document: SheetDocument; grid: SheetGrid; xlsx: Blob | null },
+  versionNote: string,
+  description?: string,
+): Promise<CalypsoArtifact> {
+  const base = sheetFileBase(a.name);
+  const files: File[] = [
+    new File([JSON.stringify(content.document)], `${base}.ssjson`, { type: 'application/json' }),
+    new File([JSON.stringify(content.grid)], `${base}.grid.json`, { type: 'application/json' }),
+  ];
+  if (content.xlsx) {
+    files.push(new File([content.xlsx], `${base}.xlsx`, {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    }));
+  }
+  return addCalypsoVersion(a.id, projectId, { files }, versionNote, description);
+}
+
+export interface SheetTemplate {
+  key: string;
+  name: string;
+  description: string;
+  archived: boolean;
+  currentRevision: number;
+  revisions: { revision: number; kind: 'document' | 'seed'; note: string; createdBy: string; createdAt: string }[];
+  updatedBy: string;
+  updatedAt: string | null;
+}
+
+export async function listSheetTemplates(includeArchived = false): Promise<SheetTemplate[]> {
+  const { data } = await apiClient.get<ApiEnvelope<SheetTemplate[]>>('/calypso-sheet-templates', {
+    params: includeArchived ? { includeArchived: 'true' } : {},
+  });
+  return data.data;
+}
+
+export async function getSheetTemplateStart(key: string, revision?: number): Promise<{
+  key: string; name: string; revision: number; document: SheetDocument | null; seed: SheetSeed | null;
+}> {
+  const { data } = await apiClient.get(`/calypso-sheet-templates/${encodeURIComponent(key)}/start`, {
+    params: revision ? { revision: String(revision) } : {},
+  });
+  return data.data;
+}
+
+export async function createSheetTemplate(input: {
+  key: string; name: string; description?: string; fromKey?: string;
+}): Promise<SheetTemplate> {
+  const { data } = await apiClient.post<ApiEnvelope<SheetTemplate>>('/calypso-sheet-templates', input);
+  return data.data;
+}
+
+export async function updateSheetTemplate(key: string, input: {
+  name?: string; description?: string; archived?: boolean;
+}): Promise<SheetTemplate> {
+  const { data } = await apiClient.patch<ApiEnvelope<SheetTemplate>>(`/calypso-sheet-templates/${encodeURIComponent(key)}`, input);
+  return data.data;
+}
+
+/** Admin이 편집기로 저장한 시트를 새 개정본으로 — 이미 만든 artifact에는 영향이 없다. */
+export async function addSheetTemplateRevision(key: string, document: SheetDocument, note: string): Promise<SheetTemplate> {
+  const form = new FormData();
+  form.append('document', new File([JSON.stringify(document)], 'template.ssjson', { type: 'application/json' }));
+  if (note) form.append('note', note);
+  const { data } = await apiClient.post<ApiEnvelope<SheetTemplate>>(
+    `/calypso-sheet-templates/${encodeURIComponent(key)}/revisions`, form,
   );
   return data.data;
 }

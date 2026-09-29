@@ -301,6 +301,8 @@ export class CalypsoClientService {
       description?: string;
       network?: 'OA' | 'HPC';
       restrictView?: boolean;
+      contentKind?: 'file' | 'sheet';
+      templateKey?: string;
     },
     knoxId: string,
     departments: string[],
@@ -320,6 +322,42 @@ export class CalypsoClientService {
       return { status: res.status, body };
     } catch (e) {
       this.logger.warn(`Calypso createArtifact error — ${(e as Error).message}`);
+      return null;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  /**
+   * 모양이 단순한 나머지 호출(sheet 편집 시작점·sheet 버전·sheet template)을 한 곳에서 보낸다.
+   * body가 FormData면 multipart로, 그 외 값이면 JSON으로 보낸다. 응답 상태·본문은 그대로
+   * 돌려준다 — 판정은 Calypso가 하고 SIREN은 relay만 한다(calypso-proxy.controller.ts).
+   */
+  async forward(
+    method: 'GET' | 'POST' | 'PATCH',
+    path: string,
+    body: unknown,
+    knoxId: string,
+    departments: string[],
+    isAdmin: boolean,
+  ): Promise<{ status: number; body: any } | null> {
+    if (!this.baseUrl) return null;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), TRANSFER_TIMEOUT_MS);
+    try {
+      const isForm = body instanceof FormData;
+      const headers: Record<string, string> = this.actorHeaders(knoxId, departments, isAdmin);
+      if (body !== undefined && !isForm) headers['Content-Type'] = 'application/json';
+      const res = await fetch(`${this.baseUrl}${path}`, {
+        method,
+        signal: controller.signal,
+        headers,
+        body: body === undefined ? undefined : isForm ? (body as FormData) : JSON.stringify(body),
+      });
+      const resBody = await res.json().catch(() => null);
+      return { status: res.status, body: resBody };
+    } catch (e) {
+      this.logger.warn(`Calypso ${method} ${path} error — ${(e as Error).message}`);
       return null;
     } finally {
       clearTimeout(timer);

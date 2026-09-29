@@ -16,7 +16,7 @@ function depthOf(pathname: string): number {
   const seg = pathname.split('/').filter(Boolean);
   if (seg.length === 0) return 0;                      // 대문
   if (seg[0] === 'guide' || seg[0] === 'no-access') return 1;
-  if (seg[0] === 'service-manage') return 1;
+  if (seg[0] === 'service-manage' || seg[0] === 'sheet-templates') return 1;
   // /projects/:id(2) → /projects/:id/artifacts(3) → /projects/:id/artifacts/:artifactId(4).
   // ★ 예전에는 `seg.length >= 3 ? 3`이어서 목록과 상세가 **같은 깊이(3)** 로 잡혔다 —
   //   그래서 목록→상세가 방향 없는 형제 전환(direction 0)이 되어 슬라이드도 안 나오고,

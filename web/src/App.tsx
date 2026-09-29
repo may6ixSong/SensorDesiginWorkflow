@@ -5,6 +5,7 @@ import { useAuth } from '@/app/providers/AuthProvider';
 import { DetailsRedirect } from '@/pages/DetailsRedirect';
 import { HomePage } from '@/pages/HomePage';
 import { ServiceManagePage } from '@/pages/ServiceManagePage';
+import { SheetTemplatesPage } from '@/pages/SheetTemplatesPage';
 import { ProjectListPage } from '@/pages/ProjectListPage';
 import { MyAssignmentPage } from '@/pages/MyAssignmentPage';
 import { ProjectInfoPage } from '@/pages/ProjectInfoPage';
@@ -59,6 +60,7 @@ export default function App() {
         <Route path="/details/:projectId/:workflowId/releases" element={<WorkflowPage />} />
         <Route path="/details/:projectId/:workflowId/releases/:releaseId" element={<WorkflowPage />} />
         <Route path="/service-manage" element={<ServiceManagePage />} />
+        <Route path="/sheet-templates" element={<SheetTemplatesPage />} />
         <Route path="/guide" element={<GuidePage />} />
         <Route path="/no-access" element={<NoAccessPage />} />
       </Routes>

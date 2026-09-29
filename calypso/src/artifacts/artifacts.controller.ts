@@ -165,6 +165,9 @@ export class ArtifactsController {
       throw new ForbiddenException('You do not have edit access to this artifact.');
     }
 
+    // sheet artifact면 문서/격자 파일의 모양부터 본다 — 스토리지에 쓰기 전에(설계서 11장 §4).
+    this.artifacts.assertSheetUpload(a, files ?? []);
+
     const nextLabel = this.artifacts.nextVersionLabel(a);
     const uploaded = await Promise.all(
       (files ?? []).map(async (file) => {
@@ -222,6 +225,46 @@ export class ArtifactsController {
       throw new ForbiddenException('Only released versions are available at your access level.');
     }
     return streamVersionFiles(this.storage, a, version);
+  }
+
+  /**
+   * sheet 편집기(sheet-host)의 다음 편집 시작 시트 — 최신 버전 문서, 없으면 만들 때 고정한
+   * template 개정본, 그것도 없으면 빈 시트(SIREN 설계서 11장 §4). 새 버전을 만들 수 있는
+   * edit 권한자만 부른다.
+   */
+  @Get(':id/sheet')
+  async sheetStart(@Param('id') id: string, @CurrentActor() me: Actor) {
+    const a = await this.artifacts.findVisibleOrThrow(id, me);
+    if (this.artifacts.computeAccess(a, me) !== 'edit') {
+      throw new ForbiddenException('You do not have edit access to this artifact.');
+    }
+    return { data: await this.artifacts.sheetStart(a) };
+  }
+
+  /** 한 sheet 버전의 문서 JSON + 격자. 권한은 다운로드와 같다(view는 released만). */
+  @Get(':id/sheet/:versionRef')
+  async sheetVersion(
+    @Param('id') id: string,
+    @Param('versionRef') versionRef: string,
+    @CurrentActor() me: Actor,
+  ) {
+    const a = await this.artifacts.findVisibleOrThrow(id, me);
+    const access = this.artifacts.computeAccess(a, me);
+    const version = a.versions.find((v) => v.versionRef === decodeURIComponent(versionRef));
+    if (!version) throw new NotFoundException('Version not found.');
+    if (access !== 'edit' && !version.isReleased) {
+      throw new ForbiddenException('Only released versions are available at your access level.');
+    }
+    const { document, grid } = await this.artifacts.readSheet(a, version);
+    return {
+      data: {
+        versionRef: version.versionRef,
+        versionLabel: `${version.major}.${version.minor}`,
+        isReleased: version.isReleased === true,
+        document,
+        grid,
+      },
+    };
   }
 
   // ── SIREN이 호출하는 Observer 계약 ────────────────────────────────

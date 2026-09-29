@@ -1,0 +1,23 @@
+{
+  "name": "siren-sheet-host-dev",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Local stand-in for SDP_SPA /sheet-host — the SpreadJS iframe SIREN embeds (docs/11-sheet-artifacts.md).",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@mescius/spread-sheets": "17.1.10",
+    "@mescius/spread-sheets-io": "17.1.10",
+    "@mescius/spread-sheets-react": "17.1.10",
+    "react": "18.2.0",
+    "react-dom": "18.2.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.1",
+    "vite": "^5.4.5"
+  }
+}

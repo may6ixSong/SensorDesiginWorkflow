@@ -5,6 +5,7 @@ import {
   CalypsoVersionView, addCalypsoVersion, downloadCalypsoVersion, getCalypsoArtifact, releaseCalypsoArtifact,
   setCalypsoNetwork,
 } from '@/api/calypsoClient';
+import { useCalypsoSheetDialogs } from '@/components/sheet/CalypsoSheetDialogs';
 import { queryKeys } from '@/api/queryKeys';
 import { ReleaseDto } from '@/types/domain';
 import { releaseBadgeMap } from '@/lib/releaseBadge';
@@ -65,6 +66,8 @@ export function CalypsoInlinePanel({ artifactId, projectId, nodeId, releases, on
     qc.invalidateQueries({ queryKey: queryKeys.calypsoArtifacts(projectId) });
   };
 
+  const sheet = useCalypsoSheetDialogs(a, projectId, invalidate);
+
   const upload = useMutation({
     mutationFn: ({ input, versionNote, description }: {
       input: { files?: File[]; viewUrl?: string; hpcPath?: string }; versionNote: string; description: string;
@@ -121,6 +124,7 @@ export function CalypsoInlinePanel({ artifactId, projectId, nodeId, releases, on
           version={shown}
           departmentLabel={deptLabel(a.department)}
           onDownload={handleDownload}
+          onOpenSheet={a.contentKind === 'sheet' ? sheet.openView : undefined}
         />
       </Box>
 
@@ -129,8 +133,10 @@ export function CalypsoInlinePanel({ artifactId, projectId, nodeId, releases, on
         <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', mb: '10px' }}>
           <Ey sx={{ flex: 1, mb: 0 }}>Version history</Ey>
           {canEdit && (
-            <SirenButton onClick={() => setAddOpen(true)}>
-              <Icon name="plus" size={12} /> Add a new version
+            <SirenButton onClick={() => (a.contentKind === 'sheet' ? sheet.openEdit() : setAddOpen(true))}>
+              {a.contentKind === 'sheet'
+                ? <><Icon name="edit" size={12} /> Edit sheet</>
+                : <><Icon name="plus" size={12} /> Add a new version</>}
             </SirenButton>
           )}
         </Box>
@@ -153,6 +159,7 @@ export function CalypsoInlinePanel({ artifactId, projectId, nodeId, releases, on
           onClose={() => setAddOpen(false)}
         />
       )}
+      {sheet.dialogs}
       {publishing && (
         <PublishVersionDialog
           a={a}

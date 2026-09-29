@@ -12,6 +12,7 @@ import { PublishVersionDialog } from '@/components/artifact/PublishVersionDialog
 import { NetworkField } from '@/components/artifact/NetworkField';
 import { Badge, SirenButton } from '@/components/common/SirenButton';
 import { Icon } from '@/components/common/Icon';
+import { useCalypsoSheetDialogs } from '@/components/sheet/CalypsoSheetDialogs';
 import { queryKeys } from '@/api/queryKeys';
 import {
   CalypsoGrantInput, CalypsoVersionView, addCalypsoEditor, addCalypsoVersion, addCalypsoViewGrant,
@@ -58,6 +59,8 @@ export function ArtifactDetailPage() {
     qc.invalidateQueries({ queryKey: queryKeys.calypsoArtifact(id) });
     if (projectId) qc.invalidateQueries({ queryKey: queryKeys.calypsoArtifacts(projectId) });
   };
+
+  const sheet = useCalypsoSheetDialogs(a, projectId, invalidate);
 
   const upload = useMutation({
     mutationFn: ({ input, versionNote, description }: {
@@ -163,6 +166,7 @@ export function ArtifactDetailPage() {
           <Box sx={{ display: 'flex', alignItems: 'center', gap: '10px', mt: '4px' }}>
             <Box sx={{ fontSize: 18, fontWeight: 700, letterSpacing: '-.01em' }}>{a.name}</Box>
             <Badge color={T.dm} bg={T.sf2} borderColor={T.ln}>{deptLabel(a.department)}</Badge>
+            {a.contentKind === 'sheet' && <Badge color={T.pr} bg={T.prSoft} borderColor={T.prLine}>Sheet</Badge>}
             {a.myAccess === 'view' && <Badge color={T.dm} bg={T.sf2} borderColor={T.ln}>View only</Badge>}
           </Box>
         </Box>
@@ -174,6 +178,7 @@ export function ArtifactDetailPage() {
               version={shown}
               departmentLabel={deptLabel(a.department)}
               onDownload={handleDownload}
+              onOpenSheet={a.contentKind === 'sheet' ? sheet.openView : undefined}
             />
           </Box>
           <Box sx={{ flex: 1, minWidth: 320, background: T.sf2, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -199,8 +204,10 @@ export function ArtifactDetailPage() {
                 <Box>
                   {a.myAccess === 'edit' && (
                     <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: '10px' }}>
-                      <SirenButton onClick={() => setAddOpen(true)}>
-                        <Icon name="plus" size={12} /> Add a new version
+                      <SirenButton onClick={() => (a.contentKind === 'sheet' ? sheet.openEdit() : setAddOpen(true))}>
+                        {a.contentKind === 'sheet'
+                          ? <><Icon name="edit" size={12} /> Edit sheet</>
+                          : <><Icon name="plus" size={12} /> Add a new version</>}
                       </SirenButton>
                     </Box>
                   )}
@@ -237,6 +244,7 @@ export function ArtifactDetailPage() {
           onClose={() => setAddOpen(false)}
         />
       )}
+      {sheet.dialogs}
       {publishing && (
         <PublishVersionDialog
           a={a}

@@ -7,6 +7,7 @@ import { isUsingRealDb } from './database/model-registration';
 import { ArtifactsModule } from './artifacts/artifacts.module';
 import { SirenCommonModule } from './siren-common/siren-common.module';
 import { AutoRunModule } from './auto-run/auto-run.module';
+import { SheetsModule } from './sheets/sheets.module';
 
 /**
  * Calypso - SIREN Hub의 파일형 산출물 등록 창구.
@@ -30,6 +31,7 @@ import { AutoRunModule } from './auto-run/auto-run.module';
     ArtifactsModule,
     SirenCommonModule,
     AutoRunModule,
+    SheetsModule,
   ],
 })
 export class AppModule {}

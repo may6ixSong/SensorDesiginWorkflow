@@ -36,6 +36,17 @@ export class CreateCalypsoArtifactDto {
   @IsOptional()
   @IsBoolean()
   restrictView?: boolean;
+
+  /** 생략하면 'file'. 'sheet'면 엑셀처럼 편집하는 표(설계서 11장). */
+  @IsOptional()
+  @IsIn(['file', 'sheet'])
+  contentKind?: 'file' | 'sheet';
+
+  /** sheet일 때만 — 첫 편집의 시작 시트로 쓸 Calypso sheet template key. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(63)
+  templateKey?: string;
 }
 
 /** PATCH /calypso-artifacts/:id/restrict-view 몸체. */
@@ -106,4 +117,50 @@ export class CalypsoGrantDto {
   @IsString()
   @MinLength(1)
   department?: string;
+}
+
+/** POST /calypso-sheet-templates 몸체 — calypso/src/sheets/sheet-templates.dto.ts와 같은 모양. */
+export class CreateCalypsoSheetTemplateDto {
+  @IsString()
+  @MinLength(2)
+  @MaxLength(63)
+  key: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(120)
+  name: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  description?: string;
+
+  @IsOptional()
+  @IsString()
+  fromKey?: string;
+}
+
+export class UpdateCalypsoSheetTemplateDto {
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(120)
+  name?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  description?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  archived?: boolean;
+}
+
+export class AddCalypsoSheetTemplateRevisionDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  note?: string;
 }

@@ -194,6 +194,38 @@ export class CalypsoProxyController {
     return body;
   }
 
+  /**
+   * sheet 편집기의 다음 편집 시작 시트(설계서 11장 §4) — 최신 버전 문서, 없으면 template,
+   * 그것도 없으면 빈 시트. edit 권한 판정은 Calypso가 한다.
+   */
+  @Get(':id/sheet')
+  async sheetStart(
+    @Param('id') id: string,
+    @Query('projectId') projectId: string,
+    @CurrentActor() me: Actor,
+  ) {
+    const { departments, isAdmin } = await this.resolveContext(projectId, me);
+    return this.relay(await this.calypso.forward(
+      'GET', `/artifacts/${encodeURIComponent(id)}/sheet`, undefined, me.knoxId, departments, isAdmin,
+    ));
+  }
+
+  /** 한 sheet 버전의 문서 JSON + 격자 — 권한은 다운로드와 같다. */
+  @Get(':id/sheet/:versionRef')
+  async sheetVersion(
+    @Param('id') id: string,
+    @Param('versionRef') versionRef: string,
+    @Query('projectId') projectId: string,
+    @CurrentActor() me: Actor,
+  ) {
+    const { departments, isAdmin } = await this.resolveContext(projectId, me);
+    return this.relay(await this.calypso.forward(
+      'GET',
+      `/artifacts/${encodeURIComponent(id)}/sheet/${encodeURIComponent(versionRef)}`,
+      undefined, me.knoxId, departments, isAdmin,
+    ));
+  }
+
   /** 파일이 하나면 그대로, 여러 개면 zip으로 묶여서 온다 — Calypso가 그 판정을 한다(§3.9). */
   @Get(':id/download/:versionRef')
   async download(
