@@ -334,7 +334,7 @@ function EditServiceDialog({ service: s, onClose }: { service: HubService; onClo
   const [baseUrl, setBaseUrl] = useState(s.baseUrl ?? '');
   const [icon, setIcon] = useState(s.icon);
   const [nameErr, setNameErr] = useState(false);
-  const [types, setTypes] = useState(s.artifactTypes.map((t) => ({ key: t.key, name: t.name, description: t.description })));
+  const [types, setTypes] = useState(s.artifactTypes.map((t) => ({ key: t.key, name: t.name, description: t.description, previewHtml: t.previewHtml ?? '' })));
   const [typeErrKeys, setTypeErrKeys] = useState<string[]>([]);
 
   const mutation = useMutation({
@@ -344,7 +344,7 @@ function EditServiceDialog({ service: s, onClose }: { service: HubService; onClo
         description: description.trim(),
         baseUrl: baseUrl.trim(),
         icon,
-        artifactTypes: types.map((t) => ({ key: t.key, name: t.name.trim(), description: t.description.trim() })),
+        artifactTypes: types.map((t) => ({ key: t.key, name: t.name.trim(), description: t.description.trim(), previewHtml: t.previewHtml })),
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['hub'] });
@@ -414,6 +414,12 @@ function EditServiceDialog({ service: s, onClose }: { service: HubService; onClo
                   placeholder="e.g. Readout Pattern"
                 />
                 <Box sx={{ fontFamily: FONT_MONO, fontSize: 10, color: T.dm2 }}>{t.key}</Box>
+                <TextArea
+                  value={t.previewHtml}
+                  onChange={(v) => setTypes((prev) => prev.map((p, j) => (j === i ? { ...p, previewHtml: v } : p)))}
+                  rows={4}
+                  placeholder="Preview HTML — optional. Leave empty to show a default card."
+                />
               </Box>
             ))}
           </Box>
@@ -490,6 +496,7 @@ function RegisterDialog({ tier, title, onClose }: { tier: RegisterTier; title: s
   const [description, setDescription] = useState('');
   const [baseUrl, setBaseUrl] = useState('');
   const [supportsAutoRun, setSupportsAutoRun] = useState(false);
+  const [previewHtml, setPreviewHtml] = useState('');
   const [nameErr, setNameErr] = useState(false);
   const [artifactNameErr, setArtifactNameErr] = useState(false);
   const [baseUrlErr, setBaseUrlErr] = useState(false);
@@ -506,6 +513,7 @@ function RegisterDialog({ tier, title, onClose }: { tier: RegisterTier; title: s
         baseUrl: baseUrl.trim(),
         icon: icon || undefined,
         supportsAutoRun,
+        previewHtml: previewHtml.trim() || undefined,
       });
       return data.data as RegisterResult;
     },
@@ -603,6 +611,14 @@ function RegisterDialog({ tier, title, onClose }: { tier: RegisterTier; title: s
       </Field>
       <Field label="Description — optional">
         <TextArea value={description} onChange={setDescription} rows={2} />
+      </Field>
+      <Field label="Preview HTML — optional, shows what this kind of artifact looks like when picking a source">
+        <TextArea
+          value={previewHtml}
+          onChange={setPreviewHtml}
+          rows={5}
+          placeholder="<div>…</div> — scripts and external requests are stripped. Leave empty to show a default card."
+        />
       </Field>
       <Field label="BaseURL — that service's API base address">
         <TextInput

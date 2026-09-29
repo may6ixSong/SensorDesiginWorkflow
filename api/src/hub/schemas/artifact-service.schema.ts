@@ -46,6 +46,15 @@ export class ArtifactType {
    */
   @Prop({ default: false })
   supportsAutoRun: boolean;
+
+  /**
+   * 이 종류가 어떤 모양의 산출물인지 보여주는 정적 preview html(선택) — artifact 선택 화면의
+   * 오른쪽 칸에 쓴다. 인스턴스 하나의 내용이 아니라 **종류의 대표 화면**이다. 비어 있으면
+   * 화면이 서비스 아이콘/이름/설명으로 만든 기본 카드를 대신 보여준다. 외부에서 온 값이라
+   * 렌더 직전에 web에서 반드시 sanitize한다(DOMPurify).
+   */
+  @Prop({ default: '' })
+  previewHtml: string;
 }
 export const ArtifactTypeSchema = SchemaFactory.createForClass(ArtifactType);
 

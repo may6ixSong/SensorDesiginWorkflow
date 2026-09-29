@@ -2,9 +2,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Box, CircularProgress } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useArtifactCandidates, useArtifactServices } from '@/api/hooks/useHub';
+import { ArtifactPreviewPane, PickerFocus } from './ArtifactPreviewPane';
 import { CalypsoArtifact, createCalypsoArtifact, listCalypsoArtifacts } from '@/api/calypsoClient';
 import { queryKeys } from '@/api/queryKeys';
-import { ArtifactIntent, DepartmentDto } from '@/types/domain';
+import { ArtifactCandidateDto, ArtifactIntent, DepartmentDto } from '@/types/domain';
 import { useDepartmentLabel } from '@/hooks/useDepartmentLabel';
 import { Field, SelectInput, TextInput } from '@/components/common/Panel';
 import { SirenButton } from '@/components/common/SirenButton';
@@ -45,6 +46,9 @@ interface Props {
   onChange: (next: ArtifactSourceState) => void;
   /** 후보를 고르면 이름 필드가 비어 있을 때만 자동으로 채워 준다. */
   onSelectName?: (name: string) => void;
+  /** 후보 조회 기준이 되는 project code/revision — 서버가 이 값으로 걸러 주므로 화면에 밝혀 둔다. */
+  projectCode?: string;
+  projectRevision?: string;
 }
 
 const rowSx = (sel: boolean, pickable: boolean) => ({
@@ -75,10 +79,11 @@ const NETWORK_OPTIONS: readonly ['OA', 'HPC'] = ['OA', 'HPC'];
  * 방식은 사용자가 명시적으로 반려했다.
  */
 function ArtifactTypeRow({
-  workflowId, source, intent, serviceKey, typeName, expanded, onToggle, selectedId, onPick,
+  workflowId, source, intent, serviceKey, typeName, expanded, onToggle, selectedId, onPick, focusedId,
 }: {
   workflowId: string; source: 'live' | 'hpc'; intent: ArtifactIntent; serviceKey: string; typeName: string;
-  expanded: boolean; onToggle: () => void; selectedId: string; onPick: (id: string, name: string) => void;
+  expanded: boolean; onToggle: () => void; selectedId: string; onPick: (c: ArtifactCandidateDto) => void;
+  focusedId: string;
 }) {
   const { data: result, isLoading } = useArtifactCandidates(workflowId, source, intent, serviceKey, expanded);
   return (
@@ -116,8 +121,8 @@ function ArtifactTypeRow({
               return (
                 <Box
                   key={c.externalArtifactId}
-                  onClick={() => { if (c.pickable) onPick(c.externalArtifactId, c.name); }}
-                  sx={rowSx(sel, c.pickable)}
+                  onClick={() => onPick(c)}
+                  sx={{ ...rowSx(sel, c.pickable), ...(!sel && focusedId === c.externalArtifactId ? { borderColor: T.ln3 } : {}) }}
                 >
                   <Box sx={radioSx(sel)} />
                   <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -172,7 +177,7 @@ const typeRowKey = (e: ArtifactTypeEntry) => `${e.serviceKey}::${e.typeKey}`;
  */
 export function ArtifactSourcePicker({
   workflowId, projectId, intent, myDepartments, departmentOptions,
-  state, onChange, onSelectName,
+  state, onChange, onSelectName, projectCode, projectRevision,
 }: Props) {
   const qc = useQueryClient();
   // Calypso artifact의 department 표시는 전사 고정 6종이 아니라 이 artifact가 속한
@@ -190,6 +195,7 @@ export function ArtifactSourcePicker({
   const effectiveNewNetwork: 'OA' | 'HPC' = newNetworkLocked ? 'OA' : newNetwork;
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(() => new Set());
   const didInitialExpand = useRef(false);
+  const [focus, setFocus] = useState<PickerFocus | null>(null);
 
   const { data: allServices, isLoading: loadingServices } = useArtifactServices();
   const { data: calypsoArtifacts, isLoading: loadingCalypso } = useQuery({
@@ -244,6 +250,11 @@ export function ArtifactSourcePicker({
     }
   }, [typeEntries, state.source, state.serviceKey]);
 
+  const focusType = (e: ArtifactTypeEntry) => {
+    const service = services.find((x) => x.key === e.serviceKey);
+    if (service) setFocus({ kind: 'type', service, typeKey: e.typeKey, typeName: e.typeName, source: e.source });
+  };
+
   const toggleExpanded = (key: string) => {
     setExpandedKeys((prev) => {
       const next = new Set(prev);
@@ -256,7 +267,14 @@ export function ArtifactSourcePicker({
   const fallbackDept = departmentOptions[0]?.id ?? myDepartments[0] ?? '';
   const effectiveDept = needsDeptPicker ? (newDept || fallbackDept) : myDepartments[0];
 
-  const pickLive = (serviceKey: string, source: 'live' | 'hpc', typeKey: string, id: string, name: string) => {
+  const pickLive = (e: ArtifactTypeEntry, c: ArtifactCandidateDto) => {
+    const { serviceKey, source, typeKey } = e;
+    const id = c.externalArtifactId;
+    const name = c.name;
+    const service = services.find((x) => x.key === serviceKey);
+    // 미리보기는 pickable 여부와 상관없이 항상 보여 준다 — 왜 못 고르는지도 오른쪽에 나온다.
+    if (service) setFocus({ kind: 'live', service, typeKey, typeName: e.typeName, source, candidate: c });
+    if (!c.pickable) return;
     // 종류가 등록 안 된 레거시 서비스는 typeKey 자리에 serviceKey를 넣어 뒀다(typeEntries) —
     // 그건 실제 artifactTypeKey가 아니므로 보내지 않는다.
     const artifactTypeKey = typeKey === serviceKey ? '' : typeKey;
@@ -265,6 +283,7 @@ export function ArtifactSourcePicker({
   };
 
   const pickCalypso = (a: CalypsoArtifact) => {
+    setFocus({ kind: 'file', artifact: a, deptLabel: deptLabel(a.department) });
     onChange({ ...emptySourceState(), source: 'file', calypsoArtifactId: a.id });
     onSelectName?.(a.name);
     setCreating(false);
@@ -297,8 +316,24 @@ export function ArtifactSourcePicker({
 
   return (
     <Field label="Artifact Source">
+      {projectCode && (
+        <Box sx={{ fontSize: 11, color: T.dm2, mb: '8px', lineHeight: 1.6 }}>
+          Showing artifacts registered for project{' '}
+          <Box component="span" sx={{ fontFamily: FONT_MONO, color: T.dm, fontWeight: 600 }}>
+            {projectCode}{projectRevision ? ` · ${projectRevision}` : ''}
+          </Box>
+          . Services with several projects are filtered by this code and revision.
+        </Box>
+      )}
+      <Box
+        sx={{
+          display: 'grid', gridTemplateColumns: 'minmax(0, 320px) minmax(0, 1fr)', gap: '14px', alignItems: 'start',
+          '@media (max-width: 760px)': { gridTemplateColumns: 'minmax(0, 1fr)' },
+        }}
+      >
+      <Box sx={{ minWidth: 0 }}>
       <TextInput value={query} onChange={setQuery} placeholder="Search services or file artifacts" />
-      <Box sx={{ mt: '8px', maxHeight: 320, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+      <Box sx={{ mt: '8px', maxHeight: 460, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px' }}>
         {/* Tier B가 이제 File 전용이 아니게 되면서(OA-link/HPC-path도 등록 가능) 맨 위로
             올려 뒀다(사용자 요청) — 목록 맨 아래에 묻혀 있으면 그 사실이 눈에 안 띈다. */}
         {creating ? (
@@ -387,9 +422,10 @@ export function ArtifactSourcePicker({
                 serviceKey={e.serviceKey}
                 typeName={e.typeName}
                 expanded={expandedKeys.has(key)}
-                onToggle={() => toggleExpanded(key)}
+                onToggle={() => { toggleExpanded(key); focusType(e); }}
                 selectedId={state.source === e.source && state.serviceKey === e.serviceKey ? state.liveArtifactId : ''}
-                onPick={(id, name) => pickLive(e.serviceKey, e.source, e.typeKey, id, name)}
+                onPick={(c) => pickLive(e, c)}
+                focusedId={focus?.kind === 'live' && focus.service.key === e.serviceKey && focus.typeKey === e.typeKey ? focus.candidate.externalArtifactId : ''}
               />
             );
           })
@@ -399,7 +435,7 @@ export function ArtifactSourcePicker({
           const sel = state.source === 'file' && state.calypsoArtifactId === a.id;
           const pickable = intent !== 'own' || a.myAccess === 'edit';
           return (
-            <Box key={a.id} onClick={() => { if (pickable) pickCalypso(a); }} sx={rowSx(sel, pickable)}>
+            <Box key={a.id} onClick={() => { if (pickable) pickCalypso(a); else setFocus({ kind: 'file', artifact: a, deptLabel: deptLabel(a.department) }); }} sx={rowSx(sel, pickable)}>
               <Box sx={radioSx(sel)} />
               <Box sx={{ flex: 1, minWidth: 0 }}>
                 <Box sx={{ fontSize: 12.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -423,6 +459,17 @@ export function ArtifactSourcePicker({
             No match for that search.
           </Box>
         )}
+      </Box>
+      </Box>
+      <Box
+        sx={{
+          minWidth: 0, maxHeight: 460, overflowY: 'auto', position: 'sticky', top: 0,
+          borderLeft: `1px solid ${T.ln}`, paddingLeft: '14px',
+          '@media (max-width: 760px)': { borderLeft: 'none', paddingLeft: 0, borderTop: `1px solid ${T.ln}`, paddingTop: '12px' },
+        }}
+      >
+        <ArtifactPreviewPane focus={focus} />
+      </Box>
       </Box>
     </Field>
   );

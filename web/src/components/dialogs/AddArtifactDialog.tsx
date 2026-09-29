@@ -50,7 +50,7 @@ interface Props {
  *   artifact를 바꿀 때(ChangeArtifactDialog) 둘 다에서 재사용한다.
  */
 export function AddArtifactDialog({
-  workflowName, workflowId, projectId, phases, myDepartments, departmentOptions,
+  workflowName, workflowId, projectId, projectCode, projectRevision, phases, myDepartments, departmentOptions,
   defaultRecipientDepartments, onClose, onCreate, submitting,
 }: Props) {
   const { t } = useTranslation();
@@ -82,7 +82,7 @@ export function AddArtifactDialog({
     <ModalShell
       open
       onClose={onClose}
-      width={520}
+      width={900}
       header={
         <>
           <Ey>{workflowName}</Ey>
@@ -202,6 +202,8 @@ export function AddArtifactDialog({
         state={src}
         onChange={setSrc}
         onSelectName={(n) => { if (!name.trim()) setName(n); }}
+        projectCode={projectCode}
+        projectRevision={projectRevision}
       />
 
       {err && <Box sx={{ fontSize: 12, color: T.danger, mb: '10px' }}>{err}</Box>}

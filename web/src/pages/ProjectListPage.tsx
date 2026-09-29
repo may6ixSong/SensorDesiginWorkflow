@@ -88,9 +88,9 @@ export function ProjectListPage() {
                   onClick={() => setFilter(f)}
                   sx={{
                     fontSize: 12, padding: '6px 12px', borderRadius: '999px', cursor: CURSOR_POINTER,
-                    border: `1px solid ${filter === f ? T.prLine : T.ln2}`,
-                    background: filter === f ? T.prSoft : T.sf,
-                    color: filter === f ? T.pr : T.dm,
+                    border: `1px solid ${filter === f ? T.ln3 : T.ln2}`,
+                    background: filter === f ? T.sf3 : T.sf,
+                    color: filter === f ? T.tx : T.dm,
                     fontWeight: filter === f ? 600 : 500,
                     '&:hover': { borderColor: T.ln3 },
                   }}
@@ -123,7 +123,7 @@ export function ProjectListPage() {
           {list.length === 0 ? (
             <Box
               sx={{
-                border: `1px dashed ${T.ln2}`, borderRadius: '14px', background: T.sf,
+                border: `1px dashed ${T.ln2}`, borderRadius: '12px', background: T.sf,
                 padding: '58px 20px', textAlign: 'center',
               }}
             >
@@ -134,7 +134,7 @@ export function ProjectListPage() {
             <Box
               sx={
                 view === 'grid'
-                  ? { display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(340px,1fr))', gap: '16px' }
+                  ? { display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(320px,1fr))', gap: '14px' }
                   : { display: 'flex', flexDirection: 'column', gap: '10px' }
               }
             >
@@ -143,13 +143,13 @@ export function ProjectListPage() {
               ))}
               <Box
                 sx={{
-                  border: `1px dashed ${T.ln2}`, borderRadius: '14px', cursor: CURSOR_POINTER,
+                  border: `1px dashed ${T.ln2}`, borderRadius: '12px', cursor: CURSOR_POINTER,
                   display: 'flex', flexDirection: view === 'grid' ? 'column' : 'row',
                   alignItems: 'center', justifyContent: 'center',
-                  minHeight: view === 'grid' ? 190 : 62,
+                  minHeight: view === 'grid' ? 150 : 56,
                   color: T.dm2, fontSize: 12.5, gap: '7px',
                   transition: 'border-color .16s, color .16s, background .16s',
-                  '&:hover': { borderColor: T.prLine, color: T.pr, background: T.prSoft },
+                  '&:hover': { borderColor: T.ln3, color: T.tx, background: T.sf2 },
                 }}
               >
                 <Icon name="plus" size={18} />
@@ -179,48 +179,26 @@ function ProjectCard({ project, view }: { project: ProjectDto; view: View }) {
   }, [workflows, resolveUser]);
 
   const row = view === 'list';
+  const active = project.status === 'ACTIVE';
 
   return (
     <Box
       onClick={() => navigate(`/projects/${project._id}`)}
       sx={{
-        position: 'relative', cursor: CURSOR_POINTER, background: T.sf,
-        border: `1px solid ${T.ln}`, borderRadius: '14px', overflow: 'hidden',
-        boxShadow: T.shXs, transition: 'transform .18s cubic-bezier(.2,.8,.3,1), box-shadow .18s, border-color .18s',
-        padding: row ? '14px 18px' : '18px 18px 16px',
-        display: row ? 'flex' : 'block',
-        alignItems: row ? 'center' : undefined,
-        gap: row ? '18px' : undefined,
-        '&:hover': { transform: 'translateY(-3px)', boxShadow: T.shLg, borderColor: T.ln2 },
-        '&::before': {
-          content: '""', position: 'absolute', left: 0, top: 0, bottom: 0, width: 2,
-          background: T.pr, opacity: 0.7,
-        },
+        cursor: CURSOR_POINTER, background: T.sf,
+        border: `1px solid ${T.ln}`, borderRadius: '12px',
+        transition: 'border-color .16s, box-shadow .16s',
+        padding: row ? '14px 18px' : '18px',
+        display: row ? 'flex' : 'flex',
+        flexDirection: row ? 'row' : 'column',
+        alignItems: row ? 'center' : 'stretch',
+        gap: row ? '24px' : '16px',
+        '&:hover': { borderColor: T.ln3, boxShadow: T.shSm },
       }}
     >
-      <Box sx={{ flex: row ? '0 0 260px' : undefined }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: '7px', mb: '8px' }}>
-          <Box
-            component="span"
-            sx={{
-              fontFamily: FONT_MONO, fontSize: 9.5, letterSpacing: '.1em', padding: '2px 7px',
-              borderRadius: '6px', background: T.sf3, color: T.dm, border: `1px solid ${T.ln}`,
-            }}
-          >
-            {project.code}
-          </Box>
-          <Box
-            component="span"
-            sx={{
-              fontFamily: FONT_MONO, fontSize: 9, letterSpacing: '.1em', padding: '2px 7px',
-              borderRadius: '999px', background: T.prSoft, color: T.pr, border: `1px solid ${T.prLine}`,
-            }}
-          >
-            {project.status}
-          </Box>
-        </Box>
+      <Box sx={{ flex: row ? '0 0 300px' : undefined, minWidth: 0 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-          <Box sx={{ fontSize: row ? 15 : 17, fontWeight: 700, letterSpacing: '-.015em', lineHeight: 1.3 }}>
+          <Box sx={{ fontSize: row ? 15 : 17, fontWeight: 700, letterSpacing: '-.015em', lineHeight: 1.3, overflowWrap: 'anywhere' }}>
             {project.name}
           </Box>
           {project.revision && (
@@ -228,53 +206,51 @@ function ProjectCard({ project, view }: { project: ProjectDto; view: View }) {
               component="span"
               title="Revision"
               sx={{
-                fontFamily: FONT_MONO, fontSize: 11.5, fontWeight: 700, letterSpacing: '.06em',
-                padding: '3px 10px', borderRadius: '999px', lineHeight: 1.3,
-                background: T.pr, color: '#fff', border: `1px solid ${T.pr}`,
+                fontSize: 12, fontWeight: 600, letterSpacing: '.02em', lineHeight: 1,
+                fontVariantNumeric: 'tabular-nums', padding: '4px 9px', borderRadius: '6px',
+                background: T.inv, color: T.invTx, flex: '0 0 auto',
               }}
             >
               {project.revision}
             </Box>
           )}
         </Box>
-        <Box sx={{ fontSize: 11.5, color: T.dm, mt: '4px' }}>
-          {workflows?.length ?? 0} workflows
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', mt: '6px', fontSize: 11.5, color: T.dm, flexWrap: 'wrap' }}>
+          <Box component="span" sx={{ fontFamily: FONT_MONO, fontSize: 11, color: T.dm2 }}>{project.code}</Box>
+          <Box component="span" sx={{ color: T.ln3 }}>·</Box>
+          <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+            <Box sx={{ width: 6, height: 6, borderRadius: '50%', background: active ? T.pr : T.ln3 }} />
+            {project.status}
+          </Box>
+          <Box component="span" sx={{ color: T.ln3 }}>·</Box>
+          <Box component="span">{workflows?.length ?? 0} workflows</Box>
         </Box>
       </Box>
 
-      <Box sx={{ flex: row ? 1 : undefined, mt: row ? 0 : '16px' }}>
-        <Box sx={{ display: 'flex', alignItems: 'baseline', gap: '6px', mb: '6px' }}>
-          <Box sx={{ fontFamily: FONT_MONO, fontSize: 9.5, letterSpacing: '.08em', color: T.dm2 }}>
-            {current}
+      <Box sx={{ flex: row ? 1 : undefined, minWidth: 0 }}>
+        <Box sx={{ display: 'flex', alignItems: 'baseline', gap: '8px', mb: '7px', fontSize: 11.5 }}>
+          <Box sx={{ color: T.tx2, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {current ?? 'No schedule'}
           </Box>
           <Box sx={{ flex: 1 }} />
-          <Box sx={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 600, color: T.pr }}>{pct}%</Box>
-          <Box sx={{ fontSize: 10, color: T.dm2 }}>
-            {done}/{total} milestones
+          <Box sx={{ color: T.dm2, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+            {done}/{total} milestones · {pct}%
           </Box>
         </Box>
-        <Box sx={{ height: 6, borderRadius: 999, background: T.sf3, overflow: 'hidden' }}>
-          <Box
-            sx={{
-              width: `${pct}%`, height: '100%', borderRadius: 999,
-              background: T.pr,
-              transition: 'width .5s cubic-bezier(.2,.8,.3,1)',
-            }}
-          />
+        <Box sx={{ height: 4, borderRadius: 999, background: T.sf3, overflow: 'hidden' }}>
+          <Box sx={{ width: `${pct}%`, height: '100%', borderRadius: 999, background: T.pr, transition: 'width .5s cubic-bezier(.2,.8,.3,1)' }} />
         </Box>
 
-        {!row && (
-          <Box sx={{ display: 'flex', gap: '5px', flexWrap: 'wrap', mt: '13px' }}>
+        {!row && (workflows?.length ?? 0) > 0 && (
+          <Box sx={{ display: 'flex', gap: '5px', flexWrap: 'wrap', mt: '14px' }}>
             {(workflows ?? []).map((i) => (
               <Box
                 key={i.id}
                 sx={{
-                  fontSize: 10.5, padding: '2px 8px', borderRadius: '999px',
-                  background: T.sf2, border: `1px solid ${T.ln}`, color: T.dm,
-                  display: 'inline-flex', alignItems: 'center', gap: '5px',
+                  fontSize: 11, padding: '2px 8px', borderRadius: '6px',
+                  background: T.sf2, color: T.dm,
                 }}
               >
-                <Box sx={{ width: 6, height: 6, borderRadius: '50%', background: i.color || T.ln3 }} />
                 {i.name}
               </Box>
             ))}
@@ -282,14 +258,7 @@ function ProjectCard({ project, view }: { project: ProjectDto; view: View }) {
         )}
       </Box>
 
-      <Box
-        sx={{
-          display: 'flex', alignItems: 'center', gap: '10px',
-          mt: row ? 0 : '15px', pt: row ? 0 : '13px',
-          borderTop: row ? 'none' : `1px solid ${T.ln}`,
-          flex: row ? '0 0 auto' : undefined,
-        }}
-      >
+      <Box sx={{ display: 'flex', alignItems: 'center', flex: row ? '0 0 auto' : undefined, minHeight: 24 }}>
         <Box sx={{ display: 'flex' }}>
           {owners.slice(0, 4).map((u, i) => (
             <Box key={u.knoxId} sx={{ ml: i ? '-7px' : 0, borderRadius: '8px', border: `2px solid ${T.sf}`, display: 'flex' }}>
@@ -307,15 +276,6 @@ function ProjectCard({ project, view }: { project: ProjectDto; view: View }) {
               +{owners.length - 4}
             </Box>
           )}
-        </Box>
-        <Box sx={{ flex: 1 }} />
-        <Box
-          sx={{
-            display: 'inline-flex', alignItems: 'center', gap: '5px',
-            fontSize: 11.5, fontWeight: 600, color: T.pr,
-          }}
-        >
-          View project <Icon name="expand" />
         </Box>
       </Box>
     </Box>

@@ -104,14 +104,15 @@ export function DateInput({
 }
 
 export function TextArea({
-  value, onChange, rows = 4,
+  value, onChange, rows = 4, placeholder,
 }: {
-  value: string; onChange: (v: string) => void; rows?: number;
+  value: string; onChange: (v: string) => void; rows?: number; placeholder?: string;
 }) {
   return (
     <Box
       component="textarea"
       rows={rows}
+      placeholder={placeholder}
       value={value}
       onChange={(e) => onChange((e.target as HTMLTextAreaElement).value)}
       sx={{ ...controlSx, resize: 'vertical' }}

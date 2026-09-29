@@ -31,7 +31,7 @@ interface Props {
  *   그대로 유효하다는 보장이 없기 때문이다. 그 사실을 여기서 미리 알려 준다.
  */
 export function ChangeArtifactDialog({
-  node, projectId, myDepartments, departmentOptions, onClose, onSave, submitting,
+  node, projectId, projectCode, projectRevision, myDepartments, departmentOptions, onClose, onSave, submitting,
 }: Props) {
   const [name, setName] = useState(node.name);
   const [src, setSrc] = useState<ArtifactSourceState>(emptySourceState());
@@ -49,7 +49,7 @@ export function ChangeArtifactDialog({
     <ModalShell
       open
       onClose={onClose}
-      width={520}
+      width={900}
       header={
         <>
           <Ey>Change artifact</Ey>
@@ -84,6 +84,8 @@ export function ChangeArtifactDialog({
         state={src}
         onChange={setSrc}
         onSelectName={(n) => setName(n)}
+        projectCode={projectCode}
+        projectRevision={projectRevision}
       />
 
       {err && <Box sx={{ fontSize: 12, color: T.danger, mb: '10px' }}>{err}</Box>}

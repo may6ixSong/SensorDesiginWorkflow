@@ -5,6 +5,8 @@ export interface HubArtifactType {
   description: string;
   /** 이 종류가 Auto Run(설계서 10장)을 지원하는가 — Admin이 Service Manage에서 켠다. */
   supportsAutoRun?: boolean;
+  /** 이 종류의 대표 preview html(선택) — 없으면 선택 화면이 기본 카드를 보여준다. 렌더 전 sanitize 필수. */
+  previewHtml?: string;
 }
 
 /**

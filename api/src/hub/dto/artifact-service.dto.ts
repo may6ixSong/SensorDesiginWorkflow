@@ -53,6 +53,12 @@ export class RegisterArtifactTypeDto {
   @IsOptional()
   @IsBoolean()
   supportsAutoRun?: boolean;
+
+  /** 이 종류의 대표 preview html(선택, 최대 100KB). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(100000)
+  previewHtml?: string;
 }
 
 /** artifactTypes 항목 하나의 name/description만 고칠 때 쓴다 — key로 기존 항목을 찾아 맞춘다(새로 추가/삭제는 안 됨). */
@@ -75,6 +81,12 @@ export class UpdateArtifactTypeEntryDto {
   @IsOptional()
   @IsBoolean()
   supportsAutoRun?: boolean;
+
+  /** 비우려면 빈 문자열을 보낸다. 안 보내면 기존 값을 둔다. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(100000)
+  previewHtml?: string;
 }
 
 /**
@@ -133,6 +145,7 @@ export function toArtifactServiceDto(s: ArtifactServiceDocument) {
       name: t.name,
       description: t.description ?? '',
       supportsAutoRun: t.supportsAutoRun === true,
+      previewHtml: t.previewHtml ?? '',
     })),
   };
 }
