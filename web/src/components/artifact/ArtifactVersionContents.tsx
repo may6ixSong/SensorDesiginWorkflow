@@ -27,8 +27,6 @@ interface Props {
    */
   departmentLabel: string;
   onDownload: (v: CalypsoVersionView) => void;
-  /** sheet artifact면 — 이 버전을 sheet 편집기에서 읽기 전용으로 연다(설계서 11장 §4). */
-  onOpenSheet?: (v: CalypsoVersionView) => void;
 }
 
 /**
@@ -36,7 +34,7 @@ interface Props {
  * 이제 여기 없다 — Dialog(AddVersionDialog/PublishVersionDialog)로 옮겨서 version
  * history 위쪽 버튼과 트리 각 행에서 각각 띄운다(사용자 요청).
  */
-export function ArtifactVersionContents({ a, version: v, departmentLabel, onDownload, onOpenSheet }: Props) {
+export function ArtifactVersionContents({ a, version: v, departmentLabel, onDownload }: Props) {
   const { resolveUser } = useDirectory();
   const accent = v?.isReleased ? T.pr : T.warn;
   // "WORKING"은 지금 보이는 버전이 실제 latest일 때만 — 사용자가 버전 트리에서 과거의
@@ -122,16 +120,6 @@ export function ArtifactVersionContents({ a, version: v, departmentLabel, onDown
               )}
 
               <Box sx={{ mt: '20px', paddingTop: '16px', borderTop: `1px solid ${T.ln}` }}>
-                {onOpenSheet && (
-                  <Box sx={{ mb: '16px' }}>
-                    <Box sx={{ fontFamily: FONT_MONO, fontSize: 10, letterSpacing: '.15em', textTransform: 'uppercase', color: T.dm2, mb: '9px' }}>
-                      Sheet
-                    </Box>
-                    <SirenButton variant="primary" onClick={() => onOpenSheet(v)}>
-                      <Icon name="eye" /> Open sheet
-                    </SirenButton>
-                  </Box>
-                )}
                 {/* v.files는 서버 DTO(toVersionView)가 항상 배열을 보장하지만, 스키마 확장
                     이전(fileName/storageKey 단수 필드) 시절 문서나 raw driver로 직접 넣은
                     문서처럼 그 보장을 안 거친 데이터가 섞이면 undefined로 올 수 있다 —

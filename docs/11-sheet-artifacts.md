@@ -48,10 +48,38 @@ sheet artifact는 `templateId`·`templateKey`·`templateRevision`을 함께 가�
     아니라 **id**(`templateId`)로 가리킨다 — 삭제하면 key가 `deleted~<id>~<key>`로 바뀐다.
   - 삭제한 기본 template(Port List)은 재시작해도 다시 만들지 않는다.
 
-## 4. 버전과 저장 형식
+## 4. latest · Save · Publish
 
-sheet 버전은 **보통 파일 버전**이다. 업로드·다운로드·버전 트리·publish·Auto Run source 다운로드가
-전부 기존 경로 그대로 동작한다. 한 버전에 파일이 두세 개 들어간다.
+sheet에는 버전 업로드가 없다. 대신 **latest**(작업본) 하나와 **published 버전**들이 있다(사용자 결정).
+
+| | latest | published 버전 |
+|---|---|---|
+| 무엇 | 지금 고치고 있는 시트. 정식 버전이 아니다 | Publish할 때마다 생기는 major 버전(`1.0`, `2.0`, …) |
+| 표시 | 마지막 published 버전 + `+` — `v0+`(아직 publish 전), `v1.0+` | `v1.0` |
+| 생기는 때 | artifact를 만들 때부터 항상 있다. 첫 저장 전에는 template(또는 빈 시트)으로 시작한다 | Publish |
+| 고치기 | edit 권한자. **Save = 확인 후 덮어쓰기** — 새 버전도, SIREN hub 이벤트도 없다 | 읽기 전용 |
+| 누가 보나 | edit 권한자만(Calypso 화면). SIREN workflow·release는 모른다 | 기존 규칙 그대로(view는 released만) |
+
+- **Publish**: latest 내용으로 새 published 버전(major +1 · minor 0)을 만들고, 이때만 SIREN에 버전 이벤트가
+  간다. latest는 그대로 남아 계속 고칠 수 있다. 저장한 적이 없거나 마지막 publish 이후 저장한 내용이 없으면
+  막는다(같은 내용 재발행 방지). 저장 안 한 변경이 화면에 있으면 먼저 Save해야 한다.
+- 예전에 저장마다 minor 버전이 생기던 sheet는, latest가 아직 없으면 최신 미발행 버전(없으면 최신 published)을
+  latest의 시작점으로 쓴다. 첫 Save부터 새 방식이 된다. 그 옛 minor 버전은 화면 트리에 보이지 않는다.
+
+**Artifact 화면(SIREN FE `/projects/:id/artifacts/:id`).**
+
+- 왼쪽에 카드 대신 **시트를 영역 전체로** 띄운다. 머리글에 버전·마지막으로 저장(발행)한 사람과 시각,
+  Import/Export Excel, **Save**(latest일 때만)가 있다. published 버전을 보면 그때의 Version Note·Description이
+  머리글 아래에 같이 보인다.
+- 오른쪽 버전 트리는 맨 위 latest 행(`v1.0+ WORKING LATEST`) + published 버전들이다. published 버전을 고르면
+  그 시트를 읽기 전용으로 띄우고(Save 없음), latest 행을 다시 골라야 고칠 수 있다. 저장 안 한 변경이 있으면
+  옮기기 전에 확인한다. iframe은 한 번만 만들고 그 자리에서 다시 load한다(`sheet:load`).
+- "Add a new version" 자리에 **Publish** 버튼(기본 강조색 배경·흰 글자, 다크 테마는 토큰이 맞춘다). 기존
+  publish 다이얼로그를 그대로 쓴다.
+- **workflow detail slide**는 지금처럼 카드로 published 버전만 보여준다(latest는 정식 버전이 아니라 보이지 않는다).
+
+**저장 형식.** latest와 published 버전 모두 파일 두세 개다 — published 버전은 발행 순간의 latest 파일을 그대로
+가리킨다(복사하지 않는다). 다음 Save는 새 파일을 쓰고, 어느 버전도 가리키지 않는 이전 latest 파일만 지운다.
 
 | 파일 | 내용 | 누가 쓰나 |
 |---|---|---|
@@ -61,17 +89,6 @@ sheet 버전은 **보통 파일 버전**이다. 업로드·다운로드·버전 
 
 Calypso가 보는 것은 **모양뿐**이다. `.ssjson`과 `.grid.json`이 정확히 하나씩 있어야 하고, 격자 파일이
 §5의 모양이어야 한다. 셀 값은 보지 않는다.
-
-**편집 흐름.**
-
-1. "Edit sheet"를 누르면 다음 편집의 시작 시트를 받는다(`GET /calypso-artifacts/:id/sheet`). 최신 버전이
-   있으면 그 문서, 없으면 만들 때 고정한 template 개정본, 그것도 없으면 빈 시트다.
-2. 사용자가 고친다. 엑셀 가져오기(.xlsx)는 **워크북 전체를 그 파일로 바꾼다**. 내보내기는 언제든 된다.
-3. "Save as new version"(한 줄 메모 필수)을 누르면 편집기가 문서·격자·엑셀을 돌려주고, SIREN이 보통
-   업로드(`POST /calypso-artifacts/:id/versions`)로 올린다. minor +1.
-
-**보기.** 버전의 "Open sheet"는 그 버전을 읽기 전용으로 연다(`GET /calypso-artifacts/:id/sheet/:versionRef`,
-권한은 다운로드와 같다 — view 권한은 released만).
 
 ## 5. 격자(grid) 형식 — 소비자가 받는 것
 
@@ -148,9 +165,11 @@ SIREN FE는 SIREN BE만 부른다(07장 §2).
 | SIREN BE | Calypso | 권한 |
 |---|---|---|
 | `POST /calypso-artifacts` (+`contentKind`, `templateKey`) | `POST /artifacts` | project member |
-| `GET /calypso-artifacts/:id/sheet` | `GET /artifacts/:id/sheet` | edit |
+| `GET /calypso-artifacts/:id/sheet` (latest) | `GET /artifacts/:id/sheet` | edit |
+| `PUT /calypso-artifacts/:id/sheet` (Save, multipart `files`) | `PUT /artifacts/:id/sheet` | edit |
+| `POST /calypso-artifacts/:id/release` (Publish — sheet는 latest가 원본) | `POST /artifacts/:id/release` | edit |
 | `GET /calypso-artifacts/:id/sheet/:versionRef` | `GET /artifacts/:id/sheet/:versionRef` | 다운로드와 같음 |
-| `POST /calypso-artifacts/:id/versions` | `POST /artifacts/:id/versions` | edit (sheet면 파일 모양 확인) |
+| `POST /calypso-artifacts/:id/versions` | `POST /artifacts/:id/versions` | edit (sheet는 400 — 업로드 없음) |
 | `GET /calypso-sheet-templates` | `GET /sheet-templates` | 로그인 사용자 |
 | `GET /calypso-sheet-templates/:key/start?revision=` | `GET /sheet-templates/:key/start` | 로그인 사용자 |
 | `POST /calypso-sheet-templates` | `POST /sheet-templates` | Admin |

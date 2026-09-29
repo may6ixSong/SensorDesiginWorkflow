@@ -334,7 +334,7 @@ export class CalypsoClientService {
    * 돌려준다 — 판정은 Calypso가 하고 SIREN은 relay만 한다(calypso-proxy.controller.ts).
    */
   async forward(
-    method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
+    method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
     path: string,
     body: unknown,
     knoxId: string,

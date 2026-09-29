@@ -1,10 +1,13 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { Artifact, ArtifactDocument, ArtifactGrant, ArtifactVersion } from './schemas/artifact.schema';
+import {
+  Artifact, ArtifactDocument, ArtifactFile, ArtifactGrant, ArtifactSheetDraft, ArtifactVersion,
+} from './schemas/artifact.schema';
 import { Actor } from '../common/actor';
 import { CreateArtifactDto, ListArtifactsQuery } from './dto/artifact-crud.dto';
 import { StorageService } from '../storage/storage.service';
+import { draftOf, sheetLatestInfo } from '../sheets/sheet-latest';
 import { SheetStart, SheetTemplatesService } from '../sheets/sheet-templates.service';
 import {
   SHEET_DOCUMENT_EXT, SHEET_GRID_EXT, SheetGrid, isSheetDocumentFile, isSheetGridFile, parseSheetDocument, parseSheetGrid,
@@ -118,6 +121,10 @@ export class ArtifactsService {
       templateId: pin?.templateId ?? null,
       templateKey: pin ? dto.templateKey : null,
       templateRevision: pin?.revision ?? null,
+      // sheet는 처음부터 latest가 있다(v0+) — 아직 저장 전이라 파일은 없고, 시작 시트는 template이다.
+      sheetDraft: contentKind === 'sheet'
+        ? { files: [], updatedBy: actor.knoxId, updatedAt: new Date(), publishedVersionRef: null }
+        : null,
     });
   }
 
@@ -253,7 +260,7 @@ export class ArtifactsService {
   }
 
   /** 한 sheet 버전의 문서 JSON과 격자 — 편집기로 다시 열거나 소비자가 받아갈 때. */
-  async readSheet(a: ArtifactDocument, version: ArtifactVersion): Promise<{ document: Record<string, unknown>; grid: SheetGrid }> {
+  async readSheet(_a: ArtifactDocument, version: { files: ArtifactFile[] }): Promise<{ document: Record<string, unknown>; grid: SheetGrid }> {
     const { document, grid } = sheetFilesOf(version.files);
     if (!document || !grid) throw new BadRequestException('This version has no sheet content.');
     const [docBody, gridBody] = await Promise.all([
@@ -273,34 +280,67 @@ export class ArtifactsService {
   }
 
   /**
-   * 다음 편집의 시작 시트(SIREN 설계서 11장 §4) — 최신 버전이 있으면 그 문서를 그대로, 아직
-   * 버전이 없으면 만들 때 고정한 template 개정본, template도 없으면 빈 시트.
+   * latest 시트(SIREN 설계서 11장 §4) — 저장한 적이 있으면 그 문서, 없으면 만들 때 고정한 template
+   * 개정본, template도 없으면 빈 시트. 누가 언제 마지막으로 저장했는지도 같이 준다.
    */
   async sheetStart(a: ArtifactDocument): Promise<SheetStart & {
-    source: 'version' | 'template' | 'empty'; versionLabel: string | null; templateKey: string | null; templateRevision: number | null;
+    source: 'draft' | 'template' | 'empty'; latestLabel: string; templateKey: string | null; templateRevision: number | null;
+    updatedBy: string; updatedAt: string; hasUnpublishedChanges: boolean;
   }> {
     if (a.contentKind !== 'sheet') throw new BadRequestException('This artifact is not a sheet.');
-    const latest = a.versions[0];
-    if (latest) {
-      const { document } = await this.readSheet(a, latest);
-      return {
-        source: 'version', versionLabel: `${latest.major}.${latest.minor}`, templateKey: a.templateKey ?? null,
-        templateRevision: a.templateRevision ?? null, document, seed: null,
-      };
+    const draft = draftOf(a);
+    const info = sheetLatestInfo(a);
+    const meta = {
+      latestLabel: info.label,
+      templateKey: a.templateKey ?? null,
+      templateRevision: a.templateRevision ?? null,
+      updatedBy: info.updatedBy,
+      updatedAt: info.updatedAt,
+      hasUnpublishedChanges: info.hasUnpublishedChanges,
+    };
+    if ((draft.files ?? []).length) {
+      const { document } = await this.readSheet(a, draft);
+      return { ...meta, source: 'draft', document, seed: null };
+    }
+    // 예전 sheet: 저장본이 published 버전뿐이면 그걸 latest의 시작점으로 쓴다.
+    const lastPublished = a.versions[0];
+    if (lastPublished) {
+      const { document } = await this.readSheet(a, lastPublished);
+      return { ...meta, source: 'draft', document, seed: null };
     }
     if (a.templateKey && a.templateRevision) {
       const start = await this.sheetTemplates.startForArtifact({
         templateId: a.templateId ?? null, templateKey: a.templateKey, revision: a.templateRevision,
       });
       return {
-        source: 'template', versionLabel: null, templateKey: start.key, templateRevision: start.revision,
+        ...meta, source: 'template', templateKey: start.key, templateRevision: start.revision,
         document: start.document, seed: start.seed,
       };
     }
     return {
-      source: 'empty', versionLabel: null, templateKey: null, templateRevision: null, document: null,
+      ...meta, source: 'empty', document: null,
       seed: { sheets: [{ name: 'Sheet1', rows: [], merges: [], headerRowCount: 0 }] },
     };
+  }
+
+  /**
+   * Save — latest를 **덮어쓴다**(사용자 결정). 새 버전을 만들지 않고 hub 이벤트도 보내지 않는다 —
+   * SIREN이 보는 것은 published 버전뿐이다. 이전 latest 파일은 어느 버전도 가리키지 않으면 지운다.
+   */
+  async saveSheetDraft(id: string, files: ArtifactFile[], actor: Actor) {
+    const a = await this.findOrThrow(id);
+    this.assertCanEdit(a, actor);
+    if (a.contentKind !== 'sheet') throw new BadRequestException('This artifact is not a sheet.');
+    this.assertSheetFiles(files);
+    const previous = a.sheetDraft?.files ?? [];
+    a.sheetDraft = { files, updatedBy: actor.knoxId, updatedAt: new Date(), publishedVersionRef: null } as ArtifactSheetDraft;
+    a.markModified?.('sheetDraft');
+    await a.save();
+    const referenced = new Set(a.versions.flatMap((v) => (v.files ?? []).map((f) => f.storageKey)));
+    await Promise.all(previous
+      .filter((f) => !referenced.has(f.storageKey))
+      .map((f) => this.storage.remove(f.storageKey).catch(() => undefined)));
+    return a;
   }
 
   /** 업로드 = minor +1. 아직 릴리스가 아니다 (작업중). */
@@ -318,8 +358,10 @@ export class ArtifactsService {
   ) {
     const a = await this.findOrThrow(id);
     this.assertCanEdit(a, actor);
+    if (a.contentKind === 'sheet') {
+      throw new BadRequestException('A sheet is saved in place (Save) and published — it has no uploaded versions.');
+    }
     this.assertHasContent(a, input);
-    if (a.contentKind === 'sheet') this.assertSheetFiles(input.files ?? []);
 
     const latest = a.versions[0];
     const major = latest ? latest.major : 0;
@@ -361,6 +403,7 @@ export class ArtifactsService {
   ) {
     const a = await this.findOrThrow(id);
     this.assertCanEdit(a, actor);
+    if (a.contentKind === 'sheet') return this.publishSheet(a, versionNote, description, actor);
     const latest = a.versions[0];
     if (!latest) throw new BadRequestException('There is no uploaded version to release.');
 
@@ -385,6 +428,38 @@ export class ArtifactsService {
       createdByDept: source.createdByDept,
       createdAt: new Date(),
     } as ArtifactVersion);
+    await a.save();
+    return a;
+  }
+
+  /**
+   * sheet Publish — 지금 latest 내용으로 새 released 버전(major +1 · minor 0)을 만든다. latest는 그대로
+   * 남고 계속 고칠 수 있다. 마지막 저장 이후 이미 publish했으면(같은 내용) 막는다.
+   */
+  private async publishSheet(a: ArtifactDocument, versionNote: string, description: string | undefined, actor: Actor) {
+    const draft = draftOf(a);
+    if (!(draft.files ?? []).length) throw new BadRequestException('Save the sheet before publishing.');
+    if (draft.publishedVersionRef) {
+      throw new BadRequestException('Nothing changed since the last publish — save your changes first.');
+    }
+    const major = (a.versions[0]?.major ?? 0) + 1;
+    const versionRef = this.buildVersionRef(a, major, 0);
+    a.versions.unshift({
+      major,
+      minor: 0,
+      isReleased: true,
+      versionRef,
+      files: draft.files,
+      links: [],
+      paths: [],
+      versionNote,
+      description: description ?? '',
+      createdBy: actor.knoxId,
+      createdByDept: null,
+      createdAt: new Date(),
+    } as ArtifactVersion);
+    a.sheetDraft = { ...draft, files: draft.files, publishedVersionRef: versionRef } as ArtifactSheetDraft;
+    a.markModified?.('sheetDraft');
     await a.save();
     return a;
   }

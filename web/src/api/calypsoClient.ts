@@ -82,6 +82,22 @@ export interface CalypsoArtifact {
   /** sheet를 만들 때 불러온 template과 그 개정본. 없으면 빈 시트에서 시작했다. */
   templateKey: string | null;
   templateRevision: number | null;
+  /**
+   * sheet의 latest(작업본, 설계서 11장 §4) — 버전이 아니다. Save가 덮어쓰고 Publish가 이 내용으로
+   * 새 published 버전을 만든다. edit 권한자에게만 온다(view면 null).
+   */
+  sheetLatest: SheetLatestInfo | null;
+}
+
+export interface SheetLatestInfo {
+  /** "0+", "2.0+" — 마지막 published 버전 + "+". */
+  label: string;
+  /** 한 번이라도 저장했는가 — 아니면 시작 시트는 template(또는 빈 시트)이다. */
+  saved: boolean;
+  /** 마지막 publish 이후 저장한 내용이 있는가 — Publish 버튼을 여는 조건이다. */
+  hasUnpublishedChanges: boolean;
+  updatedBy: string;
+  updatedAt: string;
 }
 
 export async function listCalypsoArtifacts(query: {
@@ -257,10 +273,13 @@ export type SheetDocument = Record<string, unknown>;
 export type SheetSeed = Record<string, unknown>;
 
 export interface SheetStart {
-  source: 'version' | 'template' | 'empty';
-  versionLabel: string | null;
+  source: 'draft' | 'template' | 'empty';
+  latestLabel: string;
   templateKey: string | null;
   templateRevision: number | null;
+  updatedBy: string;
+  updatedAt: string;
+  hasUnpublishedChanges: boolean;
   document: SheetDocument | null;
   seed: SheetSeed | null;
 }
@@ -273,7 +292,7 @@ export interface SheetVersionContent {
   grid: SheetGrid;
 }
 
-/** 다음 편집의 시작 시트 — 최신 버전, 없으면 template, 그것도 없으면 빈 시트. edit 권한자만. */
+/** latest 시트 — 저장본, 없으면 template, 그것도 없으면 빈 시트. edit 권한자만. */
 export async function getCalypsoSheetStart(id: string, projectId: string): Promise<SheetStart> {
   const { data } = await apiClient.get<ApiEnvelope<SheetStart>>(`/calypso-artifacts/${id}/sheet`, { params: { projectId } });
   return data.data;
@@ -292,27 +311,27 @@ export function sheetFileBase(name: string): string {
 }
 
 /**
- * sheet 새 버전 — 편집기가 돌려준 문서 JSON·격자(·엑셀)를 보통 버전 업로드와 같은 경로로
- * 올린다. Calypso가 .ssjson/.grid.json 한 개씩 있는지만 본다(내용 검사 없음).
+ * sheet Save — latest를 **덮어쓴다**(설계서 11장 §4). 새 버전도, SIREN hub 이벤트도 없다.
+ * 편집기가 돌려준 문서 JSON·격자·엑셀을 파일로 보낸다. Calypso는 파일 모양만 본다(내용 검사 없음).
  */
-export async function addCalypsoSheetVersion(
+export async function saveCalypsoSheet(
   a: Pick<CalypsoArtifact, 'id' | 'name'>,
   projectId: string,
   content: { document: SheetDocument; grid: SheetGrid; xlsx: Blob | null },
-  versionNote: string,
-  description?: string,
 ): Promise<CalypsoArtifact> {
   const base = sheetFileBase(a.name);
-  const files: File[] = [
-    new File([JSON.stringify(content.document)], `${base}.ssjson`, { type: 'application/json' }),
-    new File([JSON.stringify(content.grid)], `${base}.grid.json`, { type: 'application/json' }),
-  ];
+  const form = new FormData();
+  form.append('files', new File([JSON.stringify(content.document)], `${base}.ssjson`, { type: 'application/json' }));
+  form.append('files', new File([JSON.stringify(content.grid)], `${base}.grid.json`, { type: 'application/json' }));
   if (content.xlsx) {
-    files.push(new File([content.xlsx], `${base}.xlsx`, {
+    form.append('files', new File([content.xlsx], `${base}.xlsx`, {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     }));
   }
-  return addCalypsoVersion(a.id, projectId, { files }, versionNote, description);
+  const { data } = await apiClient.put<ApiEnvelope<CalypsoArtifact>>(
+    `/calypso-artifacts/${a.id}/sheet`, form, { params: { projectId } },
+  );
+  return data.data;
 }
 
 export interface SheetTemplate {

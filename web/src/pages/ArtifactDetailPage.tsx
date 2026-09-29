@@ -12,7 +12,8 @@ import { PublishVersionDialog } from '@/components/artifact/PublishVersionDialog
 import { NetworkField } from '@/components/artifact/NetworkField';
 import { Badge, SirenButton } from '@/components/common/SirenButton';
 import { Icon } from '@/components/common/Icon';
-import { useCalypsoSheetDialogs } from '@/components/sheet/CalypsoSheetDialogs';
+import { SHEET_LATEST_REF, SheetArtifactPanel, sheetLatestRow } from '@/components/sheet/SheetArtifactPanel';
+import { ConfirmDialog } from '@/components/dialogs/ConfirmDialog';
 import { queryKeys } from '@/api/queryKeys';
 import {
   CalypsoGrantInput, CalypsoVersionView, addCalypsoEditor, addCalypsoVersion, addCalypsoViewGrant,
@@ -33,6 +34,9 @@ export function ArtifactDetailPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [publishing, setPublishing] = useState<CalypsoVersionView | null>(null);
   const [tab, setTab] = useState<DetailTab>('versions');
+  /** sheet — 저장 안 한 변경이 있는가, 그리고 그 상태로 다른 버전을 고르려 할 때 확인을 기다리는 대상. */
+  const [sheetDirty, setSheetDirty] = useState(false);
+  const [pendingPick, setPendingPick] = useState<CalypsoVersionView | null>(null);
   /**
    * Calypso artifact의 `department`는 SIREN `Project.departments[].id`다(02장 §9.3) — 이름은
    * 이 과제 캐시에서 찾아 쓴다. 추가 네트워크 호출은 없다(이미 project를 본 화면의 캐시 재사용).
@@ -53,14 +57,12 @@ export function ArtifactDetailPage() {
     if (forbidden) toast('You do not have view access to this artifact.');
   }, [forbidden]);
 
-  useEffect(() => { setPicked(null); setTab('versions'); }, [id]);
+  useEffect(() => { setPicked(null); setTab('versions'); setSheetDirty(false); }, [id]);
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: queryKeys.calypsoArtifact(id) });
     if (projectId) qc.invalidateQueries({ queryKey: queryKeys.calypsoArtifacts(projectId) });
   };
-
-  const sheet = useCalypsoSheetDialogs(a, projectId, invalidate);
 
   const upload = useMutation({
     mutationFn: ({ input, versionNote, description }: {
@@ -149,8 +151,25 @@ export function ArtifactDetailPage() {
     );
   }
 
+  const isSheet = a.contentKind === 'sheet';
   const shown = picked ?? a.latestVersion;
   const versions = a.versions ?? [];
+
+  // sheet(설계서 11장 §4) — 트리는 latest 행(edit 권한자만) + published 버전. 예전에 저장마다 생기던
+  // 미발행 minor는 정식 버전이 아니라 빼고 보여준다.
+  const latestRow = isSheet ? sheetLatestRow(a) : null;
+  const sheetVersions = isSheet
+    ? [...(latestRow ? [latestRow] : []), ...versions.filter((v) => v.isReleased)]
+    : [];
+  const sheetShown = isSheet
+    ? (picked?.versionRef === SHEET_LATEST_REF ? latestRow : picked) ?? sheetVersions[0] ?? null
+    : null;
+  const pickSheet = (v: CalypsoVersionView) => {
+    if (v.versionRef === sheetShown?.versionRef) return;
+    if (sheetDirty) setPendingPick(v);
+    else setPicked(v);
+  };
+  const canPublishSheet = !!a.sheetLatest?.hasUnpublishedChanges && !sheetDirty;
 
   return (
     <AppShell>
@@ -173,13 +192,23 @@ export function ArtifactDetailPage() {
 
         <Box sx={{ flex: 1, minHeight: 0, display: 'flex' }}>
           <Box sx={{ flex: 3, minWidth: 0, display: 'flex', borderRight: `1px solid ${T.ln}` }}>
-            <ArtifactVersionContents
-              a={a}
-              version={shown}
-              departmentLabel={deptLabel(a.department)}
-              onDownload={handleDownload}
-              onOpenSheet={a.contentKind === 'sheet' ? sheet.openView : undefined}
-            />
+            {isSheet ? (
+              // sheet는 카드 대신 시트를 이 영역 전체에 바로 띄운다.
+              <SheetArtifactPanel
+                a={a}
+                projectId={projectId}
+                selected={sheetShown}
+                onDirtyChange={setSheetDirty}
+                onSaved={invalidate}
+              />
+            ) : (
+              <ArtifactVersionContents
+                a={a}
+                version={shown}
+                departmentLabel={deptLabel(a.department)}
+                onDownload={handleDownload}
+              />
+            )}
           </Box>
           <Box sx={{ flex: 1, minWidth: 320, background: T.sf2, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <NetworkField
@@ -202,22 +231,37 @@ export function ArtifactDetailPage() {
             <TabPanel tabKey={tab}>
               {tab === 'versions' && (
                 <Box>
-                  {a.myAccess === 'edit' && (
+                  {a.myAccess === 'edit' && !isSheet && (
                     <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: '10px' }}>
-                      <SirenButton onClick={() => (a.contentKind === 'sheet' ? sheet.openEdit() : setAddOpen(true))}>
-                        {a.contentKind === 'sheet'
-                          ? <><Icon name="edit" size={12} /> Edit sheet</>
-                          : <><Icon name="plus" size={12} /> Add a new version</>}
+                      <SirenButton onClick={() => setAddOpen(true)}>
+                        <Icon name="plus" size={12} /> Add a new version
                       </SirenButton>
                     </Box>
                   )}
-                  <ArtifactVersionTree
-                    versions={versions}
-                    selected={shown}
-                    onSelect={setPicked}
-                    canPublish={a.myAccess === 'edit'}
-                    onPublish={setPublishing}
-                  />
+                  {/* sheet는 버전을 올리지 않는다 — 그 자리에 Publish(latest를 새 published 버전으로). */}
+                  {a.myAccess === 'edit' && isSheet && latestRow && (
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', mb: '10px' }}>
+                      <SirenButton variant="primary" disabled={!canPublishSheet} onClick={() => setPublishing(latestRow)}>
+                        <Icon name="send" size={12} /> Publish
+                      </SirenButton>
+                      {!canPublishSheet && (
+                        <Box sx={{ fontSize: 10.5, color: T.dm2 }}>
+                          {sheetDirty ? 'Save your changes before publishing.' : 'Save changes to the latest sheet to publish.'}
+                        </Box>
+                      )}
+                    </Box>
+                  )}
+                  {isSheet ? (
+                    <ArtifactVersionTree versions={sheetVersions} selected={sheetShown} onSelect={pickSheet} />
+                  ) : (
+                    <ArtifactVersionTree
+                      versions={versions}
+                      selected={shown}
+                      onSelect={setPicked}
+                      canPublish={a.myAccess === 'edit'}
+                      onPublish={setPublishing}
+                    />
+                  )}
                 </Box>
               )}
               {tab === 'access' && a.myAccess === 'edit' && (
@@ -244,14 +288,27 @@ export function ArtifactDetailPage() {
           onClose={() => setAddOpen(false)}
         />
       )}
-      {sheet.dialogs}
       {publishing && (
         <PublishVersionDialog
           a={a}
           version={publishing}
           submitting={release.isPending}
-          onConfirm={(versionNote, description) => release.mutate({ versionNote, description, sourceVersionRef: publishing.versionRef })}
+          onConfirm={(versionNote, description) => release.mutate({
+            versionNote,
+            description,
+            // sheet는 latest가 발행 원본이다 — Calypso가 알아서 고른다.
+            sourceVersionRef: publishing.versionRef === SHEET_LATEST_REF ? undefined : publishing.versionRef,
+          })}
           onClose={() => setPublishing(null)}
+        />
+      )}
+      {pendingPick && (
+        <ConfirmDialog
+          title="Discard unsaved changes?"
+          message="The latest sheet has changes that are not saved."
+          confirmLabel="Discard"
+          onCancel={() => setPendingPick(null)}
+          onConfirm={() => { setPicked(pendingPick); setPendingPick(null); setSheetDirty(false); }}
         />
       )}
     </AppShell>

@@ -115,6 +115,28 @@ export class ArtifactVersion {
 }
 export const ArtifactVersionSchema = SchemaFactory.createForClass(ArtifactVersion);
 
+/**
+ * sheet artifact의 **latest**(작업본, SIREN 설계서 11장 §4) — 버전이 아니다. Save는 이 자리를
+ * 덮어쓰고(새 버전·hub 이벤트 없음), Publish가 이 내용으로 새 released 버전을 만든다.
+ * files가 비어 있으면 아직 한 번도 저장하지 않은 것 — 시작 시트는 template(또는 빈 시트)이다.
+ */
+@Schema({ _id: false, timestamps: false })
+export class ArtifactSheetDraft {
+  @Prop({ type: [ArtifactFileSchema], default: [] })
+  files: ArtifactFile[];
+
+  @Prop({ required: true, trim: true })
+  updatedBy: string;
+
+  @Prop({ default: () => new Date() })
+  updatedAt: Date;
+
+  /** 마지막 저장 이후 publish했으면 그 versionRef — 저장하면 null로 돌아간다. 같은 내용 재발행을 막는다. */
+  @Prop({ type: String, default: null })
+  publishedVersionRef: string | null;
+}
+export const ArtifactSheetDraftSchema = SchemaFactory.createForClass(ArtifactSheetDraft);
+
 export type ArtifactDocument = Artifact & Document;
 
 /**
@@ -198,6 +220,10 @@ export class Artifact {
 
   @Prop({ type: Number, default: null })
   templateRevision: number | null;
+
+  /** contentKind==='sheet'일 때만 — 위 ArtifactSheetDraft. 만들 때 함께 생긴다(항상 latest가 있다). */
+  @Prop({ type: ArtifactSheetDraftSchema, default: null })
+  sheetDraft: ArtifactSheetDraft | null;
 
   @Prop({ type: [ArtifactVersionSchema], default: [] })
   versions: ArtifactVersion[];

@@ -5,7 +5,6 @@ import {
   CalypsoVersionView, addCalypsoVersion, downloadCalypsoVersion, getCalypsoArtifact, releaseCalypsoArtifact,
   setCalypsoNetwork,
 } from '@/api/calypsoClient';
-import { useCalypsoSheetDialogs } from '@/components/sheet/CalypsoSheetDialogs';
 import { queryKeys } from '@/api/queryKeys';
 import { ReleaseDto } from '@/types/domain';
 import { releaseBadgeMap } from '@/lib/releaseBadge';
@@ -66,8 +65,6 @@ export function CalypsoInlinePanel({ artifactId, projectId, nodeId, releases, on
     qc.invalidateQueries({ queryKey: queryKeys.calypsoArtifacts(projectId) });
   };
 
-  const sheet = useCalypsoSheetDialogs(a, projectId, invalidate);
-
   const upload = useMutation({
     mutationFn: ({ input, versionNote, description }: {
       input: { files?: File[]; viewUrl?: string; hpcPath?: string }; versionNote: string; description: string;
@@ -109,8 +106,9 @@ export function CalypsoInlinePanel({ artifactId, projectId, nodeId, releases, on
     return <Box sx={{ padding: '20px 0', textAlign: 'center', color: T.dm2, fontSize: 12.5 }}>Could not load this artifact from Calypso.</Box>;
   }
 
-  const shown = picked ?? a.latestVersion;
-  const versions = a.versions ?? [];
+  // sheet는 published 버전만 정식 버전이다 — 예전에 저장마다 생기던 미발행 minor는 보이지 않는다.
+  const versions = (a.versions ?? []).filter((v) => a.contentKind !== 'sheet' || v.isReleased);
+  const shown = picked ?? (a.contentKind === 'sheet' ? versions[0] ?? null : a.latestVersion);
   const relBadges = releaseBadgeMap(releases, nodeId);
   const canEdit = a.myAccess === 'edit';
 
@@ -124,7 +122,6 @@ export function CalypsoInlinePanel({ artifactId, projectId, nodeId, releases, on
           version={shown}
           departmentLabel={deptLabel(a.department)}
           onDownload={handleDownload}
-          onOpenSheet={a.contentKind === 'sheet' ? sheet.openView : undefined}
         />
       </Box>
 
@@ -132,11 +129,10 @@ export function CalypsoInlinePanel({ artifactId, projectId, nodeId, releases, on
         <NetworkField a={a} canEdit={canEdit} changing={network.isPending} onChange={(kind) => network.mutate(kind)} />
         <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', mb: '10px' }}>
           <Ey sx={{ flex: 1, mb: 0 }}>Version history</Ey>
-          {canEdit && (
-            <SirenButton onClick={() => (a.contentKind === 'sheet' ? sheet.openEdit() : setAddOpen(true))}>
-              {a.contentKind === 'sheet'
-                ? <><Icon name="edit" size={12} /> Edit sheet</>
-                : <><Icon name="plus" size={12} /> Add a new version</>}
+          {/* sheet는 Artifact 화면에서 Save·Publish한다 — 여기서는 published 버전만 카드로 본다(설계서 11장 §4). */}
+          {canEdit && a.contentKind !== 'sheet' && (
+            <SirenButton onClick={() => setAddOpen(true)}>
+              <Icon name="plus" size={12} /> Add a new version
             </SirenButton>
           )}
         </Box>
@@ -159,7 +155,6 @@ export function CalypsoInlinePanel({ artifactId, projectId, nodeId, releases, on
           onClose={() => setAddOpen(false)}
         />
       )}
-      {sheet.dialogs}
       {publishing && (
         <PublishVersionDialog
           a={a}
