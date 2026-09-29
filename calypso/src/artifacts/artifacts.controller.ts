@@ -23,7 +23,6 @@ import { SirenCallerGuard } from '../common/siren-caller.guard';
 import { ArtifactsService } from './artifacts.service';
 import { StorageService } from '../storage/storage.service';
 import {
-  AddTableVersionDto,
   AddVersionDto,
   CreateArtifactDto,
   GrantDto,
@@ -191,27 +190,6 @@ export class ArtifactsController {
     // 자체는 이미 성공했으므로 이 알림이 느리거나 실패해도 응답을 막지 않는다.
     void this.hubEvents.notifyVersionPublished(saved, saved.versions[0]);
     return { data: toArtifactDto(saved, 'edit') };
-  }
-
-  /**
-   * 표(table) 콘텐츠 새 버전(SIREN 설계서 11장) — 행 JSON을 받아 template으로 검증·요약한 뒤
-   * minor +1로 쌓는다. 오류가 있어도 저장은 된다(publish만 막힌다).
-   */
-  @Post(':id/table-versions')
-  async addTableVersion(@Param('id') id: string, @Body() dto: AddTableVersionDto, @CurrentActor() me: Actor) {
-    const saved = await this.artifacts.addTableVersion(
-      id,
-      { rows: dto.rows, versionNote: dto.versionNote, description: dto.description, dept: dto.dept ?? null },
-      me,
-    );
-    void this.hubEvents.notifyVersionPublished(saved, saved.versions[0]);
-    return { data: toArtifactDto(saved, 'edit') };
-  }
-
-  /** 한 버전의 표 데이터와 그때의 template 정의. */
-  @Get(':id/tables/:versionRef')
-  async table(@Param('id') id: string, @Param('versionRef') versionRef: string, @CurrentActor() me: Actor) {
-    return { data: await this.artifacts.getTable(id, decodeURIComponent(versionRef), me) };
   }
 
   @Post(':id/release')

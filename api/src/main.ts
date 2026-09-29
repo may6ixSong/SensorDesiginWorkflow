@@ -3,14 +3,10 @@ import { ENV_FILE, ENV_PATH } from './config/env';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
-  // 표(table) 콘텐츠 버전은 행 수천 개를 JSON 한 번에 보낸다(설계서 11장) — Express 기본
-  // 한도(100kb)로는 모자란다.
-  app.useBodyParser('json', { limit: '20mb' });
+  const app = await NestFactory.create(AppModule);
   const config = app.get(ConfigService);
 
   app.setGlobalPrefix(config.get<string>('apiPrefix') ?? 'api/v1');

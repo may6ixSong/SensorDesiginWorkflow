@@ -1,8 +1,6 @@
 import { Module } from '@nestjs/common';
 import { registerModels } from '../database/model-registration';
 import { Artifact, ArtifactSchema } from './schemas/artifact.schema';
-import { ArtifactTable, ArtifactTableSchema } from './schemas/artifact-table.schema';
-import { TemplatesModule } from '../templates/templates.module';
 import { ArtifactsService } from './artifacts.service';
 import { ArtifactsController } from './artifacts.controller';
 import { StorageModule } from '../storage/storage.module';
@@ -10,11 +8,7 @@ import { SirenCommonModule } from '../siren-common/siren-common.module';
 
 @Module({
   imports: [
-    registerModels([
-      { name: Artifact.name, schema: ArtifactSchema },
-      { name: ArtifactTable.name, schema: ArtifactTableSchema },
-    ]),
-    TemplatesModule,
+    registerModels([{ name: Artifact.name, schema: ArtifactSchema }]),
     StorageModule,
     SirenCommonModule,
   ],

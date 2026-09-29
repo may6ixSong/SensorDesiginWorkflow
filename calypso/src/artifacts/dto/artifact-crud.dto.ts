@@ -1,5 +1,5 @@
 import {
-  ArrayMaxSize, IsArray, IsBoolean, IsIn, IsOptional, IsString, MaxLength, MinLength, ValidateIf,
+  IsBoolean, IsIn, IsOptional, IsString, MaxLength, MinLength, ValidateIf,
 } from 'class-validator';
 import { ArtifactDocument, ArtifactGrant, ArtifactVersion } from '../schemas/artifact.schema';
 import { AccessLevel } from '../artifacts.service';
@@ -41,32 +41,6 @@ export class CreateArtifactDto {
   @IsOptional()
   @IsBoolean()
   restrictView?: boolean;
-
-  /** 주면 표(table) 콘텐츠 artifact가 된다 — 그 template으로 데이터를 관리한다(SIREN 설계서 11장). */
-  @IsOptional()
-  @IsString()
-  @MinLength(1)
-  templateKey?: string;
-}
-
-/** 표(table) 콘텐츠 새 버전 — 행은 `{ [column key]: string }`. 검증은 서비스가 template으로 한다. */
-export class AddTableVersionDto {
-  @IsString()
-  @MinLength(1)
-  @MaxLength(200)
-  versionNote: string;
-
-  @IsOptional()
-  @IsString()
-  description?: string;
-
-  @IsOptional()
-  @IsString()
-  dept?: string;
-
-  @IsArray()
-  @ArrayMaxSize(20000)
-  rows: Record<string, unknown>[];
 }
 
 /** PATCH /artifacts/:id/restrict-view 몸체. */
@@ -198,8 +172,6 @@ export function toArtifactDto(a: ArtifactDocument, access: Exclude<AccessLevel, 
     name: a.name,
     description: a.description ?? '',
     network: a.network,
-    contentKind: a.contentKind ?? 'file',
-    templateKey: a.templateKey ?? null,
     createdBy: a.createdBy,
     myAccess: access,
     versionCount: visible.length,
@@ -219,15 +191,6 @@ export function toVersionView(v: ArtifactVersion) {
     files: (v.files ?? []).map((f) => ({ fileName: f.fileName, storageKey: f.storageKey })),
     links: (v.links ?? []).map((l) => ({ url: l.url, label: l.label ?? '' })),
     paths: (v.paths ?? []).map((p) => ({ path: p.path, label: p.label ?? '' })),
-    table: v.table
-      ? {
-          templateKey: v.table.templateKey,
-          templateVersion: v.table.templateVersion,
-          rowCount: v.table.rowCount,
-          errorCount: v.table.errorCount,
-          warningCount: v.table.warningCount,
-        }
-      : null,
     versionNote: v.versionNote ?? '',
     description: v.description ?? '',
     createdBy: v.createdBy,

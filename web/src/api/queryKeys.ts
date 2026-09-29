@@ -66,8 +66,4 @@ export const queryKeys = {
   calypsoArtifacts: (projectId: string) => ['calypso', 'artifacts', projectId] as const,
   calypsoArtifact: (id: string) => ['calypso', 'artifacts', 'detail', id] as const,
   calypsoDepartmentRoster: (projectId: string) => ['calypso', 'department-roster', projectId] as const,
-  /** 표 template(설계서 11장) — Calypso 소유, 전역. */
-  calypsoTemplates: (includeArchived: boolean) => ['calypso', 'templates', includeArchived] as const,
-  calypsoTemplate: (key: string, version?: number) => ['calypso', 'template', key, version ?? 'latest'] as const,
-  calypsoTable: (artifactId: string, versionRef: string) => ['calypso', 'table', artifactId, versionRef] as const,
 };

@@ -2,21 +2,14 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Artifact, ArtifactDocument, ArtifactGrant, ArtifactVersion } from './schemas/artifact.schema';
-import { ArtifactTable, ArtifactTableDocument } from './schemas/artifact-table.schema';
 import { Actor } from '../common/actor';
 import { CreateArtifactDto, ListArtifactsQuery } from './dto/artifact-crud.dto';
-import { TemplatesService } from '../templates/templates.service';
-import { TableTemplateDef, sanitizeRows, validateTable } from '../templates/table-validation';
 
 export type AccessLevel = 'edit' | 'view' | 'none';
 
 @Injectable()
 export class ArtifactsService {
-  constructor(
-    @InjectModel(Artifact.name) private readonly model: Model<ArtifactDocument>,
-    @InjectModel(ArtifactTable.name) private readonly tables: Model<ArtifactTableDocument>,
-    private readonly templates: TemplatesService,
-  ) {}
+  constructor(@InjectModel(Artifact.name) private readonly model: Model<ArtifactDocument>) {}
 
   /**
    * 접근 등급 판정 — Artifact마다 독립적인 ACL이다(Workflow 권한을 상속하지 않는다,
@@ -89,20 +82,13 @@ export class ArtifactsService {
    *   논의) — 나중에 이 grant를 제거하는 정책으로 갈 것. 지금은 단순함을 우선해
    *   구분 없이 등록자에게 edit을 그대로 준다(사용자 결정).
    */
-  async create(dto: CreateArtifactDto, actor: Actor) {
-    // 표(table) 콘텐츠면 그 template이 실제로 있고 보관되지 않았는지 먼저 본다(SIREN 설계서 11장).
-    if (dto.templateKey) {
-      const t = await this.templates.findOrThrow(dto.templateKey);
-      if (t.archived) throw new BadRequestException(`Template "${dto.templateKey}" is archived.`);
-    }
+  create(dto: CreateArtifactDto, actor: Actor) {
     return this.model.create({
       projectId: dto.projectId,
       department: dto.department,
       name: dto.name,
       description: dto.description ?? '',
       network: dto.network,
-      contentKind: dto.templateKey ? 'table' : 'file',
-      templateKey: dto.templateKey ?? null,
       versions: [],
       createdBy: actor.knoxId,
       isMock: false,
@@ -234,9 +220,6 @@ export class ArtifactsService {
   ) {
     const a = await this.findOrThrow(id);
     this.assertCanEdit(a, actor);
-    if (a.contentKind === 'table') {
-      throw new BadRequestException('This artifact holds table data — save a table version instead of uploading files.');
-    }
     this.assertHasContent(a, input);
 
     const latest = a.versions[0];
@@ -251,7 +234,6 @@ export class ArtifactsService {
       files: input.files ?? [],
       links: input.links ?? [],
       paths: input.paths ?? [],
-      table: null,
       versionNote: input.versionNote,
       description: input.description ?? '',
       createdBy: actor.knoxId,
@@ -260,89 +242,6 @@ export class ArtifactsService {
     } as ArtifactVersion);
     await a.save();
     return a;
-  }
-
-  /**
-   * 표(table) 콘텐츠 새 버전 = minor +1(SIREN 설계서 11장 §3). 행은 template 컬럼만 남기고
-   * 완전히 빈 행은 버린 뒤, **그 template의 최신 정의**로 검증해 요약을 남긴다. 오류가 있어도
-   * 저장은 된다(작업 중 저장) — publish만 막는다.
-   */
-  async addTableVersion(
-    id: string,
-    input: { rows: unknown[]; versionNote: string; description?: string; dept?: string | null },
-    actor: Actor,
-  ) {
-    const a = await this.findOrThrow(id);
-    this.assertCanEdit(a, actor);
-    if (a.contentKind !== 'table' || !a.templateKey) {
-      throw new BadRequestException('This artifact is not a table artifact.');
-    }
-    const template = await this.templates.definition(a.templateKey);
-    const rows = sanitizeRows(template.columns, input.rows ?? []);
-    const result = validateTable(template.columns, rows);
-
-    const latest = a.versions[0];
-    const major = latest ? latest.major : 0;
-    const minor = latest ? latest.minor + 1 : 1;
-    const versionRef = this.buildVersionRef(a, major, minor);
-
-    await this.tables.create({
-      artifactId: a._id.toString(),
-      versionRef,
-      templateKey: template.key,
-      templateVersion: template.version,
-      rows,
-      createdAt: new Date(),
-    });
-    a.versions.unshift({
-      major,
-      minor,
-      isReleased: false,
-      versionRef,
-      files: [],
-      links: [],
-      paths: [],
-      table: {
-        templateKey: template.key,
-        templateVersion: template.version,
-        rowCount: rows.length,
-        errorCount: result.errorCount,
-        warningCount: result.warningCount,
-      },
-      versionNote: input.versionNote,
-      description: input.description ?? '',
-      createdBy: actor.knoxId,
-      createdByDept: input.dept ?? null,
-      createdAt: new Date(),
-    } as ArtifactVersion);
-    await a.save();
-    return a;
-  }
-
-  /**
-   * 한 버전의 표 데이터 + 그때의 template 정의. 열람 규칙은 상세와 같다 — view 등급은
-   * released 버전만 볼 수 있다.
-   */
-  async getTable(
-    id: string,
-    versionRef: string,
-    actor: Actor | null,
-  ): Promise<{ template: TableTemplateDef; rows: Record<string, string>[]; versionRef: string }> {
-    const a = actor ? await this.findVisibleOrThrow(id, actor) : await this.findOrThrow(id);
-    const version = a.versions.find((v) => v.versionRef === versionRef);
-    if (!version) throw new NotFoundException('Version not found.');
-    if (actor && this.computeAccess(a, actor) !== 'edit' && !version.isReleased) {
-      throw new ForbiddenException('Only released versions are available at your access level.');
-    }
-    return this.tableOf(version);
-  }
-
-  /** 권한 판정이 끝난 버전의 표 — Auto Run source 라우트도 이걸 쓴다. */
-  async tableOf(version: ArtifactVersion): Promise<{ template: TableTemplateDef; rows: Record<string, string>[]; versionRef: string }> {
-    if (!version.table) throw new BadRequestException('This version has no table data.');
-    const doc = await this.tables.findOne({ versionRef: version.versionRef }).exec();
-    const template = await this.templates.definition(version.table.templateKey, version.table.templateVersion);
-    return { template, rows: doc?.rows ?? [], versionRef: version.versionRef };
   }
 
   /**
@@ -371,43 +270,16 @@ export class ArtifactsService {
       : latest;
     if (!source) throw new NotFoundException('That version was not found.');
     if (source.isReleased) throw new BadRequestException('That version is already released.');
-    if (source.table && source.table.errorCount > 0) {
-      throw new BadRequestException(
-        `This table has ${source.table.errorCount} error(s). Fix them and save a new version before publishing.`,
-      );
-    }
 
     const major = latest.major + 1;
-    const releasedRef = this.buildVersionRef(a, major, 0);
-    if (source.table) {
-      // 표 데이터도 새 released 버전 ref로 복제해 둔다 — 버전마다 자기 데이터를 가진다.
-      const src = await this.tables.findOne({ versionRef: source.versionRef }).exec();
-      await this.tables.create({
-        artifactId: a._id.toString(),
-        versionRef: releasedRef,
-        templateKey: source.table.templateKey,
-        templateVersion: source.table.templateVersion,
-        rows: src?.rows ?? [],
-        createdAt: new Date(),
-      });
-    }
     a.versions.unshift({
       major,
       minor: 0,
       isReleased: true,
-      versionRef: releasedRef,
+      versionRef: this.buildVersionRef(a, major, 0),
       files: source.files,
       links: source.links,
       paths: source.paths,
-      table: source.table
-        ? {
-            templateKey: source.table.templateKey,
-            templateVersion: source.table.templateVersion,
-            rowCount: source.table.rowCount,
-            errorCount: source.table.errorCount,
-            warningCount: source.table.warningCount,
-          }
-        : null,
       versionNote,
       description: description ?? '',
       createdBy: actor.knoxId,

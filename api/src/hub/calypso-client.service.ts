@@ -490,41 +490,6 @@ export class CalypsoClientService {
     }
   }
 
-  /**
-   * JSON 요청 하나를 그대로 전달하고 상태 코드·본문을 돌려준다 — 표 template/표 버전(설계서
-   * 11장) 라우트가 쓴다. 실패하면 null(컨트롤러가 502로 번역한다).
-   */
-  async forward(
-    method: 'GET' | 'POST' | 'PUT',
-    path: string,
-    body: unknown,
-    knoxId: string,
-    departments: string[],
-    isAdmin: boolean,
-  ): Promise<{ status: number; body: any } | null> {
-    if (!this.baseUrl) return null;
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), TRANSFER_TIMEOUT_MS);
-    try {
-      const res = await fetch(`${this.baseUrl}${path}`, {
-        method,
-        signal: controller.signal,
-        headers: {
-          ...this.actorHeaders(knoxId, departments, isAdmin),
-          ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
-        },
-        body: body !== undefined ? JSON.stringify(body) : undefined,
-      });
-      const resBody = await res.json().catch(() => null);
-      return { status: res.status, body: resBody };
-    } catch (e) {
-      this.logger.warn(`Calypso ${method} ${path} error — ${(e as Error).message}`);
-      return null;
-    } finally {
-      clearTimeout(timer);
-    }
-  }
-
   /** view 기본 개방(false) ↔ viewGrants로만 제한(true) 전환. */
   async setRestrictView(
     externalArtifactId: string,
