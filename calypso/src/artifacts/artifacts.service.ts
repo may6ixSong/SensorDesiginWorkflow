@@ -110,7 +110,8 @@ export class ArtifactsService {
       department: dto.department,
       name: dto.name,
       description: dto.description ?? '',
-      network: dto.network,
+      // sheet는 항상 OA다(사용자 결정) — 요청 값과 무관하게 고정한다.
+      network: contentKind === 'sheet' ? 'OA' : dto.network,
       versions: [],
       createdBy: actor.knoxId,
       isMock: false,
@@ -145,6 +146,7 @@ export class ArtifactsService {
   async setNetwork(id: string, network: 'OA' | 'HPC', actor: Actor) {
     const a = await this.findOrThrow(id);
     this.assertCanEdit(a, actor);
+    if (a.contentKind === 'sheet') throw new BadRequestException('A sheet artifact is always OA — its network cannot be changed.');
     a.network = network;
     await a.save();
     return a;

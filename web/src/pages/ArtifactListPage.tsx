@@ -248,10 +248,14 @@ function RegisterDialog({
   const [nameErr, setNameErr] = useState(false);
 
   const dept = needsPicker ? (department || fallbackDept) : autoDept;
+  // sheet는 항상 OA다(사용자 결정) — Content가 Sheet면 network를 고를 수 없다.
+  const networkLocked = content.contentKind === 'sheet';
+  const effectiveNetwork: 'OA' | 'HPC' = networkLocked ? 'OA' : network;
 
   const mutation = useMutation({
     mutationFn: () => createCalypsoArtifact({
-      projectId: project._id, department: dept, name: name.trim(), description: description.trim(), network,
+      projectId: project._id, department: dept, name: name.trim(), description: description.trim(),
+      network: effectiveNetwork,
       ...sheetContentInput(content),
     }),
     onSuccess: () => {
@@ -285,20 +289,22 @@ function RegisterDialog({
       <Field label="Description">
         <TextArea value={description} onChange={setDescription} rows={3} />
       </Field>
-      <Field label="Network — can be changed later from the artifact detail">
+      <Field label={networkLocked ? 'Network — a Sheet is always OA' : 'Network — can be changed later from the artifact detail'}>
         <Box sx={{ display: 'flex', gap: '4px' }}>
           {(['OA', 'HPC'] as const).map((n) => (
             <Box
               key={n}
               component="button"
               type="button"
+              disabled={networkLocked}
               onClick={() => setNetwork(n)}
               sx={{
                 fontSize: 11.5, fontWeight: 600, padding: '4px 9px', borderRadius: '999px',
-                cursor: CURSOR_POINTER,
-                background: n === network ? T.pr : T.sf,
-                color: n === network ? '#fff' : T.dm,
-                border: `1px solid ${n === network ? T.pr : T.ln2}`,
+                cursor: networkLocked ? 'not-allowed' : CURSOR_POINTER,
+                opacity: networkLocked ? 0.55 : 1,
+                background: n === effectiveNetwork ? T.pr : T.sf,
+                color: n === effectiveNetwork ? '#fff' : T.dm,
+                border: `1px solid ${n === effectiveNetwork ? T.pr : T.ln2}`,
               }}
             >
               {n}

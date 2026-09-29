@@ -25,13 +25,36 @@ interface Props {
  */
 export function NetworkField({ a, canEdit, onChange, changing }: Props) {
   const { t } = useTranslation();
-  const current = a.network;
+  // sheet는 항상 OA다(사용자 결정) — 고칠 수 있는 사람에게도 버튼을 막아 둔다. Calypso도 거부한다.
+  const locked = a.contentKind === 'sheet';
+  const current = locked ? 'OA' : a.network;
   const [pending, setPending] = useState<'OA' | 'HPC' | null>(null);
 
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', mb: '12px', flexWrap: 'wrap' }}>
       <Box sx={{ fontSize: 11, fontWeight: 600, color: T.dm2 }}>Network</Box>
-      {canEdit ? (
+      {canEdit && locked ? (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: '4px' }} title="A Sheet is always OA">
+          {NETWORK_OPTIONS.map((n) => (
+            <Box
+              key={n}
+              component="button"
+              type="button"
+              disabled
+              sx={{
+                fontSize: 11.5, fontWeight: 600, padding: '4px 9px', borderRadius: '999px',
+                cursor: 'not-allowed', opacity: 0.55,
+                background: n === current ? T.pr : T.sf,
+                color: n === current ? '#fff' : T.dm,
+                border: `1px solid ${n === current ? T.pr : T.ln2}`,
+              }}
+            >
+              {n}
+            </Box>
+          ))}
+          <Box sx={{ fontSize: 10.5, color: T.dm2, ml: '4px' }}>A Sheet is always OA</Box>
+        </Box>
+      ) : canEdit ? (
         <Box sx={{ display: 'flex', gap: '4px' }}>
           {NETWORK_OPTIONS.map((n) => (
             <Box

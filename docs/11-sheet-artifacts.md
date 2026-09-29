@@ -27,7 +27,8 @@ Calypso artifact에 `contentKind`가 생겼다. 만들 때 정하고, 바꿀 수
 sheet artifact는 `templateId`·`templateKey`·`templateRevision`을 함께 가진다 — 만들 때 고른 template과 **그 순간의
 개정본**이다. 나중에 Admin이 template을 고쳐도 이 artifact의 첫 시작 시트는 바뀌지 않는다.
 
-`network`(OA/HPC)는 그대로 있다. sheet인지와 무관하다.
+sheet의 `network`는 **항상 OA로 고정**한다(사용자 결정). 만들 때 요청 값과 무관하게 OA로 저장하고, 바꾸기(`PATCH …/network`)는
+Calypso가 거부한다. 화면에서도 생성 폼과 상세의 network 버튼을 막아 둔다.
 
 ## 3. Template
 

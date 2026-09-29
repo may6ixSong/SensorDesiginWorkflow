@@ -185,6 +185,9 @@ export function ArtifactSourcePicker({
   const [newDept, setNewDept] = useState('');
   const [newNetwork, setNewNetwork] = useState<'OA' | 'HPC'>('OA');
   const [newContent, setNewContent] = useState<SheetContentChoice>(defaultSheetContentChoice);
+  // sheet는 항상 OA다(사용자 결정) — Content가 Sheet면 network를 고를 수 없다.
+  const newNetworkLocked = newContent.contentKind === 'sheet';
+  const effectiveNewNetwork: 'OA' | 'HPC' = newNetworkLocked ? 'OA' : newNetwork;
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(() => new Set());
   const didInitialExpand = useRef(false);
 
@@ -272,7 +275,7 @@ export function ArtifactSourcePicker({
       projectId: projectId as string,
       department: effectiveDept,
       name: newName.trim(),
-      network: newNetwork,
+      network: effectiveNewNetwork,
       ...sheetContentInput(newContent),
     }),
     onSuccess: (created) => {
@@ -310,20 +313,24 @@ export function ArtifactSourcePicker({
               />
             )}
             <Box>
-              <Box sx={{ fontSize: 10.5, color: T.dm2, mb: '5px' }}>Network — can be changed later from the artifact detail</Box>
+              <Box sx={{ fontSize: 10.5, color: T.dm2, mb: '5px' }}>
+                {newNetworkLocked ? 'Network — a Sheet is always OA' : 'Network — can be changed later from the artifact detail'}
+              </Box>
               <Box sx={{ display: 'flex', gap: '4px' }}>
                 {NETWORK_OPTIONS.map((n) => (
                   <Box
                     key={n}
                     component="button"
                     type="button"
+                    disabled={newNetworkLocked}
                     onClick={() => setNewNetwork(n)}
                     sx={{
                       fontSize: 11.5, fontWeight: 600, padding: '4px 9px', borderRadius: '999px',
-                      cursor: CURSOR_POINTER,
-                      background: n === newNetwork ? T.pr : T.sf,
-                      color: n === newNetwork ? '#fff' : T.dm,
-                      border: `1px solid ${n === newNetwork ? T.pr : T.ln2}`,
+                      cursor: newNetworkLocked ? 'not-allowed' : CURSOR_POINTER,
+                      opacity: newNetworkLocked ? 0.55 : 1,
+                      background: n === effectiveNewNetwork ? T.pr : T.sf,
+                      color: n === effectiveNewNetwork ? '#fff' : T.dm,
+                      border: `1px solid ${n === effectiveNewNetwork ? T.pr : T.ln2}`,
                     }}
                   >
                     {n}
