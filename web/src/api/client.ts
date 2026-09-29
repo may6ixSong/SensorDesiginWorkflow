@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 export const apiClient = axios.create({
-  baseURL: import.meta.env.SIREN_API || 'http://localhost:3000/api/v1',
+  baseURL: import.meta.env.SIREN_API || 'http://localhost:3001/api/v1',
 });
 
 /**

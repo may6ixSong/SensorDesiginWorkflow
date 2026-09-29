@@ -41,7 +41,7 @@ async function bootstrap() {
    * '0.0.0.0'을 붙이면 리스닝이 깨진다. 그래서 타입으로 분기한다.
    * (숫자/문자열 판별은 config/configuration.ts의 resolvePort가 담당한다.)
    */
-  const port = config.get<string | number>('port') ?? 3000;
+  const port = config.get<string | number>('port') ?? 3001;
   if (typeof port === 'string') {
     await app.listen(port);
   } else {

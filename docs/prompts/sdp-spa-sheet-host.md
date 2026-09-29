@@ -81,8 +81,8 @@
 ### 5. 로컬 확인
 
 1. SDP_SPA를 `npm start`로 띄운다(보통 `http://localhost:3000`).
-2. `{SIREN_REPO_PATH}`에서 SIREN을 띄운다 — `api`(3000과 겹치면 PORT를 바꾼다), `calypso`(3010), `web`(5173).
-   `web/.env.development`의 `SHEET_HOST_URL`을 `http://localhost:3000/sheet-host`로 바꾼다.
+2. `{SIREN_REPO_PATH}`에서 SIREN을 띄운다 — `api`(3001), `calypso`(3010), `web`(5173). SIREN의
+   `web/.env.development`는 이미 `SHEET_HOST_URL=http://localhost:3000/sheet-host`를 가리킨다.
 3. SIREN에서 artifact를 "Sheet"(template: Port List)로 만들고 → Edit sheet → 값 입력·붙여넣기·리본 서식 →
    Import/Export Excel → Save as new version → Open sheet(읽기 전용)까지 해 본다.
 4. 확인할 것:

@@ -84,7 +84,7 @@ FE/BE 공유 상수는 양쪽에 중복 정의되어 있다. 값을 바꿀 때�
 cd api
 cp .env.example .env
 npm install
-npm run start:dev       # http://localhost:3000/api/v1
+npm run start:dev       # http://localhost:3001/api/v1
 ```
 
 Object Storage(S3) 관련 값은 `.env.example` 에 비어 있다 — 비어 있는 동안 `storage` 모듈은
@@ -94,7 +94,7 @@ Object Storage(S3) 관련 값은 `.env.example` 에 비어 있다 — 비어 있
 
 ```bash
 cd web
-cp .env.example .env    # VITE_API_BASE_URL 확인 (기본 http://localhost:3000/api/v1)
+cp .env.example .env    # VITE_API_BASE_URL 확인 (기본 http://localhost:3001/api/v1)
 npm install
 npm run dev             # http://localhost:5173
 ```

@@ -18,7 +18,7 @@ function resolveMongodbUri(): string {
  * 그대로 통과시킨다. main.ts가 타입을 보고 listen 호출을 나눈다.
  */
 function resolvePort(): string | number {
-  // SIREN api 기본값(3000)과 겹치지 않는 Calypso 전용 기본 포트. .env.example과 일치한다.
+  // SIREN api 기본값(3001)과 겹치지 않는 Calypso 전용 기본 포트. .env.example과 일치한다.
   const raw = process.env.PORT?.trim() || '3010';
   const parsed = Number(raw);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : raw;
@@ -57,7 +57,7 @@ export default () => ({
    * URL — Calypso가 나중에 완전히 독립된 서비스로 분리돼도 그대로 쓸 수 있게, SIREN
    * FE가 project 데이터를 직접 읽지 않고 이 왕복을 거치기로 했다(사용자 결정).
    */
-  sirenBaseUrl: process.env.SIREN_BASE_URL || 'http://localhost:3000/api/v1',
+  sirenBaseUrl: process.env.SIREN_BASE_URL || 'http://localhost:3001/api/v1',
   /**
    * 위 호출에 실어 보내는 Bearer 토큰 — SIREN의 `HubTokenGuard`가 Calypso의 등록
    * 문서(`isBuiltIn:true`)의 token과 대조한다. 개발/목업 시드(api/src/database/seed-data.ts)는
