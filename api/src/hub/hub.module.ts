@@ -15,6 +15,7 @@ import { HubSyncService } from './hub-sync.service';
 import { HubController } from './hub.controller';
 import { HubEventsController } from './hub-events.controller';
 import { CalypsoProxyController } from './calypso-proxy.controller';
+import { CalypsoSheetTemplatesController } from './calypso-sheet-templates.controller';
 import { HubTokenGuard } from './guards/hub-token.guard';
 import { MockObserverController } from './mock/mock-observer.controller';
 import { AutoRunModule } from '../auto-run/auto-run.module';
@@ -58,7 +59,7 @@ const mockControllers = process.env.MOCKUP_ENABLED === 'true' ? [MockObserverCon
     HubSyncService,
     HubTokenGuard,
   ],
-  controllers: [HubController, HubEventsController, CalypsoProxyController, ...mockControllers],
+  controllers: [HubController, HubEventsController, CalypsoProxyController, CalypsoSheetTemplatesController, ...mockControllers],
   exports: [HubService, HubCommonService, ObserverClientService, CalypsoClientService, HubSyncService],
 })
 export class HubModule {}

@@ -9,6 +9,8 @@ import { Document, Types } from 'mongoose';
  */
 export type CalypsoNetwork = 'OA' | 'HPC' | null;
 
+export type ArtifactContentKind = 'file' | 'sheet';
+
 /** File 콘텐츠의 파일 한 개. 한 버전이 여러 개를 가질 수 있다(§3.9). */
 @Schema({ _id: false, timestamps: false })
 export class ArtifactFile {
@@ -174,6 +176,21 @@ export class Artifact {
    */
   @Prop({ type: String, enum: ['OA', 'HPC', null], default: null })
   network: CalypsoNetwork;
+
+  /**
+   * 'file'(기본) — 파일/링크/경로를 올리는 보통 artifact.
+   * 'sheet' — 엑셀처럼 편집하는 표(SIREN 설계서 11장). 버전은 여전히 파일 버전이지만 문서
+   * JSON(.ssjson)과 격자(.grid.json)가 꼭 들어 있다(sheets/sheet-format.ts).
+   */
+  @Prop({ type: String, enum: ['file', 'sheet'], default: 'file' })
+  contentKind: ArtifactContentKind;
+
+  /** sheet를 만들 때 불러온 template과 그 개정본 — 첫 편집의 시작 시트가 된다. 없으면 빈 시트. */
+  @Prop({ type: String, default: null })
+  templateKey: string | null;
+
+  @Prop({ type: Number, default: null })
+  templateRevision: number | null;
 
   @Prop({ type: [ArtifactVersionSchema], default: [] })
   versions: ArtifactVersion[];

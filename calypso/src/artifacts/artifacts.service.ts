@@ -4,12 +4,22 @@ import { Model } from 'mongoose';
 import { Artifact, ArtifactDocument, ArtifactGrant, ArtifactVersion } from './schemas/artifact.schema';
 import { Actor } from '../common/actor';
 import { CreateArtifactDto, ListArtifactsQuery } from './dto/artifact-crud.dto';
+import { StorageService } from '../storage/storage.service';
+import { SheetStart, SheetTemplatesService } from '../sheets/sheet-templates.service';
+import {
+  SHEET_DOCUMENT_EXT, SHEET_GRID_EXT, SheetGrid, isSheetDocumentFile, isSheetGridFile, parseSheetDocument, parseSheetGrid,
+  sheetFilesOf,
+} from '../sheets/sheet-format';
 
 export type AccessLevel = 'edit' | 'view' | 'none';
 
 @Injectable()
 export class ArtifactsService {
-  constructor(@InjectModel(Artifact.name) private readonly model: Model<ArtifactDocument>) {}
+  constructor(
+    @InjectModel(Artifact.name) private readonly model: Model<ArtifactDocument>,
+    private readonly storage: StorageService,
+    private readonly sheetTemplates: SheetTemplatesService,
+  ) {}
 
   /**
    * 접근 등급 판정 — Artifact마다 독립적인 ACL이다(Workflow 권한을 상속하지 않는다,
@@ -82,7 +92,16 @@ export class ArtifactsService {
    *   논의) — 나중에 이 grant를 제거하는 정책으로 갈 것. 지금은 단순함을 우선해
    *   구분 없이 등록자에게 edit을 그대로 준다(사용자 결정).
    */
-  create(dto: CreateArtifactDto, actor: Actor) {
+  async create(dto: CreateArtifactDto, actor: Actor) {
+    const contentKind = dto.contentKind ?? 'file';
+    if (contentKind !== 'sheet' && dto.templateKey) {
+      throw new BadRequestException('A template can only be used for sheet artifacts.');
+    }
+    // template은 만드는 순간의 개정본으로 고정한다 — 뒤에 Admin이 template을 고쳐도 이 artifact의
+    // 첫 시작 시트는 바뀌지 않는다.
+    const templateRevision = contentKind === 'sheet' && dto.templateKey
+      ? await this.sheetTemplates.pinForNewArtifact(dto.templateKey)
+      : null;
     return this.model.create({
       projectId: dto.projectId,
       department: dto.department,
@@ -95,6 +114,9 @@ export class ArtifactsService {
       editors: [],
       viewGrants: [],
       restrictView: dto.restrictView ?? false,
+      contentKind,
+      templateKey: templateRevision !== null ? dto.templateKey : null,
+      templateRevision,
     });
   }
 
@@ -205,6 +227,79 @@ export class ArtifactsService {
     );
   }
 
+  /**
+   * sheet artifact의 버전에는 문서 JSON과 격자가 정확히 하나씩 있어야 한다(sheets/sheet-format.ts).
+   * 모양만 본다 — 셀 값은 보지 않는다(사용자 결정: 검사는 소비자가 한다).
+   */
+  private assertSheetFiles(files: { fileName: string }[]): void {
+    const docs = files.filter((f) => isSheetDocumentFile(f.fileName));
+    const grids = files.filter((f) => isSheetGridFile(f.fileName));
+    if (docs.length !== 1 || grids.length !== 1) {
+      throw new BadRequestException(
+        `A sheet version needs exactly one ${SHEET_DOCUMENT_EXT} file and one ${SHEET_GRID_EXT} file.`,
+      );
+    }
+  }
+
+  /** 업로드 전에 파일 내용의 모양을 본다 — 스토리지에 쓰기 전에 걸러야 쓰레기 객체가 안 남는다. */
+  assertSheetUpload(a: ArtifactDocument, files: { originalname: string; buffer: Buffer }[]): void {
+    if (a.contentKind !== 'sheet') return;
+    this.assertSheetFiles(files.map((f) => ({ fileName: f.originalname })));
+    for (const f of files) {
+      if (isSheetDocumentFile(f.originalname)) parseSheetDocument(f.buffer);
+      if (isSheetGridFile(f.originalname)) parseSheetGrid(f.buffer);
+    }
+  }
+
+  /** 한 sheet 버전의 문서 JSON과 격자 — 편집기로 다시 열거나 소비자가 받아갈 때. */
+  async readSheet(a: ArtifactDocument, version: ArtifactVersion): Promise<{ document: Record<string, unknown>; grid: SheetGrid }> {
+    const { document, grid } = sheetFilesOf(version.files);
+    if (!document || !grid) throw new BadRequestException('This version has no sheet content.');
+    const [docBody, gridBody] = await Promise.all([
+      this.storage.download(document.storageKey),
+      this.storage.download(grid.storageKey),
+    ]);
+    if (!docBody || !gridBody) throw new NotFoundException('The stored sheet could not be found.');
+    return { document: parseSheetDocument(docBody), grid: parseSheetGrid(gridBody) };
+  }
+
+  /** 소비자용 — 격자만. sheet 버전이 아니면 null. */
+  async readSheetGrid(version: ArtifactVersion): Promise<SheetGrid | null> {
+    const { grid } = sheetFilesOf(version.files);
+    if (!grid) return null;
+    const body = await this.storage.download(grid.storageKey);
+    return body ? parseSheetGrid(body) : null;
+  }
+
+  /**
+   * 다음 편집의 시작 시트(SIREN 설계서 11장 §4) — 최신 버전이 있으면 그 문서를 그대로, 아직
+   * 버전이 없으면 만들 때 고정한 template 개정본, template도 없으면 빈 시트.
+   */
+  async sheetStart(a: ArtifactDocument): Promise<SheetStart & {
+    source: 'version' | 'template' | 'empty'; versionLabel: string | null; templateKey: string | null; templateRevision: number | null;
+  }> {
+    if (a.contentKind !== 'sheet') throw new BadRequestException('This artifact is not a sheet.');
+    const latest = a.versions[0];
+    if (latest) {
+      const { document } = await this.readSheet(a, latest);
+      return {
+        source: 'version', versionLabel: `${latest.major}.${latest.minor}`, templateKey: a.templateKey ?? null,
+        templateRevision: a.templateRevision ?? null, document, seed: null,
+      };
+    }
+    if (a.templateKey && a.templateRevision) {
+      const start = await this.sheetTemplates.start(a.templateKey, a.templateRevision);
+      return {
+        source: 'template', versionLabel: null, templateKey: start.key, templateRevision: start.revision,
+        document: start.document, seed: start.seed,
+      };
+    }
+    return {
+      source: 'empty', versionLabel: null, templateKey: null, templateRevision: null, document: null,
+      seed: { sheets: [{ name: 'Sheet1', rows: [], merges: [], headerRowCount: 0 }] },
+    };
+  }
+
   /** 업로드 = minor +1. 아직 릴리스가 아니다 (작업중). */
   async addVersion(
     id: string,
@@ -221,6 +316,7 @@ export class ArtifactsService {
     const a = await this.findOrThrow(id);
     this.assertCanEdit(a, actor);
     this.assertHasContent(a, input);
+    if (a.contentKind === 'sheet') this.assertSheetFiles(input.files ?? []);
 
     const latest = a.versions[0];
     const major = latest ? latest.major : 0;

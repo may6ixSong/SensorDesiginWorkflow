@@ -18,6 +18,6 @@ export default defineConfig({
   // here explicitly alongside the default 'VITE_'.
   envPrefix: [
     'VITE_', 'SIREN_API', 'CALYPSO_API', 'MOBILAVE', 'USER_GROUP_API', 'SDP_COMMON_API',
-    'SYSTEM_API', 'ENVIRONMENT',
+    'SYSTEM_API', 'ENVIRONMENT', 'SHEET_HOST_URL',
   ],
 });

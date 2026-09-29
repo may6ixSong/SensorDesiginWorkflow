@@ -5,12 +5,14 @@ import { ArtifactsService } from './artifacts.service';
 import { ArtifactsController } from './artifacts.controller';
 import { StorageModule } from '../storage/storage.module';
 import { SirenCommonModule } from '../siren-common/siren-common.module';
+import { SheetsModule } from '../sheets/sheets.module';
 
 @Module({
   imports: [
     registerModels([{ name: Artifact.name, schema: ArtifactSchema }]),
     StorageModule,
     SirenCommonModule,
+    SheetsModule,
   ],
   providers: [ArtifactsService],
   controllers: [ArtifactsController],

@@ -41,6 +41,17 @@ export class CreateArtifactDto {
   @IsOptional()
   @IsBoolean()
   restrictView?: boolean;
+
+  /** 생략하면 'file'. 'sheet'면 엑셀처럼 편집하는 표(SIREN 설계서 11장). */
+  @IsOptional()
+  @IsIn(['file', 'sheet'])
+  contentKind?: 'file' | 'sheet';
+
+  /** contentKind==='sheet'일 때만 — 첫 편집의 시작 시트로 쓸 template. 생략하면 빈 시트. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(63)
+  templateKey?: string;
 }
 
 /** PATCH /artifacts/:id/restrict-view 몸체. */
@@ -172,6 +183,9 @@ export function toArtifactDto(a: ArtifactDocument, access: Exclude<AccessLevel, 
     name: a.name,
     description: a.description ?? '',
     network: a.network,
+    contentKind: a.contentKind ?? 'file',
+    templateKey: a.templateKey ?? null,
+    templateRevision: a.templateRevision ?? null,
     createdBy: a.createdBy,
     myAccess: access,
     versionCount: visible.length,

@@ -25,12 +25,14 @@ CIS(CMOS Image Sensor) 설계 산출물을 workflow 캔버스 위에서 흐름�
 | [08-service-integration.md](08-service-integration.md) | **새 서비스 연동 API 레퍼런스** — SIREN↔서비스 양방향 호출과 DTO를 한 파일에. 새 OA/HPC Service를 연동할 땐 이것부터 |
 | [09-my-assignment.md](09-my-assignment.md) | **My Assignment** — 과제를 가로질러 내 release·산출물·달력을 모아 보는 화면. scope 판정과 조회 범위 |
 | [10-auto-run.md](10-auto-run.md) | **Auto Run** — node에 trigger를 걸어, source가 새로 publish되면 그 node의 artifact 서비스에 자동 생성 요청을 보낸다. 등록 조건·발화 조건·순환 방지·실행 기록·Calypso source 토큰 |
+| [11-sheet-artifacts.md](11-sheet-artifacts.md) | **Sheet artifact** — Calypso artifact를 엑셀처럼 편집하는 표로. SpreadJS iframe(sheet-host)·postMessage 규약, Admin template, 저장 형식(문서 JSON + 격자), HPC가 받는 격자 |
 | [prompts/a-tier-recipient-integration.md](prompts/a-tier-recipient-integration.md) | A Tier 연동 서비스에 전달할 **정책** 변경 요청 프롬프트 |
 | [prompts/rpm-access-endpoint.md](prompts/rpm-access-endpoint.md) | 위 요청 ①을 **구현 수준**으로 구체화한 것 — RPM 등 A Tier 서비스 세션에 그대로 전달 |
 | [prompts/db-migration-v3.md](prompts/db-migration-v3.md) | 실제 MongoDB의 데이터를 v3 스키마 모양으로 바꾸는 **실행 전용** 프롬프트 |
 | [prompts/rpm-and-mockdb-hub-v4-prompt.md](prompts/rpm-and-mockdb-hub-v4-prompt.md) | 허브 재설계(07장)에 맞춰 RPM 코드 갱신 + mock/dev DB 정리 — **실행 전용** 프롬프트 |
 | [prompts/db-my-assignment-backfill.md](prompts/db-my-assignment-backfill.md) | My Assignment(09장)가 실 DB에서 제대로 보이도록 인덱스·필드를 보정하는 **실행 전용** 프롬프트 |
 | [prompts/spreadjs-host-survey.md](prompts/spreadjs-host-survey.md) | SpreadJS를 운영 중인 사내 시스템을 데스크톱 세션이 **읽기만 해서** 분석하는 프롬프트 — iframe용 sheet-host 배포 가능 여부, 도메인, SpreadJS 버전·라이선스 설정, postMessage/헤더 제약 |
+| [prompts/sdp-spa-sheet-host.md](prompts/sdp-spa-sheet-host.md) | SDP_SPA에 `/sheet-host` 라우트를 추가하는 **구현** 프롬프트 — 이 저장소 `sheet-host/`의 참고 구현을 옮기고 기존 customRibbon을 붙인다(11장 §6) |
 
 > `prompts/` 아래 문서는 **SIREN·Calypso 저장소 밖에서 수행해야 하는 작업**을 다른 세션에
 > 그대로 붙여넣기 위한 것이다. 이 저장소의 코드로는 끝낼 수 없는 일(실 DB 변경, 외부 서비스
@@ -226,6 +228,19 @@ CIS(CMOS Image Sensor) 설계 산출물을 workflow 캔버스 위에서 흐름�
 | Calypso source | run별 읽기 전용 토큰(버전 하나, 24시간). 서비스 이벤트 토큰은 공유하지 않는다 |
 | 알림 | workflow owner에게만, 성공/실패만 |
 | 감사 로그 | 남기지 않는다 |
+
+### 3.9 Sheet artifact (11장)
+
+| 항목 | 결정 |
+|---|---|
+| 편집기 | SpreadJS. 라이선스 도메인(SDP_SPA)의 `/sheet-host`를 iframe으로 띄우고 postMessage로만 통신. 편집 도구는 기존 customRibbon 재사용 |
+| 콘텐츠 종류 | Calypso artifact `contentKind: file │ sheet` — 만들 때 정하고 바꿀 수 없다 |
+| template | Calypso 소유, Admin이 SIREN 화면에서 편집기로 고친다. 개정본이 쌓이고, artifact는 만들 때의 개정본으로 시작한다 |
+| 편집 자유도 | template은 시작점일 뿐. 이후 헤더 포함 엑셀처럼 자유 편집 |
+| 검사 | **하지 않는다.** 저장한 그대로 저장·열기·전달. 검사는 소비자(liberty generator) 몫 |
+| 저장 | 보통 파일 버전 — `.ssjson`(편집기용) + `.grid.json`(소비자용) + `.xlsx`(사람용) |
+| HPC 전달 | Auto Run contents 응답의 `sheet.grid` JSON. 파일 전송 없음 |
+| 엑셀 | 가져오기(.xlsx, 워크북 전체 교체)·내보내기·붙여넣기 |
 
 ---
 

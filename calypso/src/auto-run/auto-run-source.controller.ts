@@ -62,10 +62,14 @@ export class AutoRunSourceController {
   async contents(@Param('id') id: string, @Param('versionRef') versionRef: string, @Req() req: any) {
     const { artifact, version } = await this.authorize(req, id, versionRef);
     const files = version.files ?? [];
+    // sheet artifact면 격자를 그대로 싣는다 — HPC는 파일을 받지 않고 이 JSON만 읽으면 된다
+    // (SIREN 설계서 11장 §5). 사용자가 저장한 그대로이고, 값 검사는 받는 쪽이 한다.
+    const sheet = artifact.contentKind === 'sheet' ? await this.artifacts.readSheetGrid(version) : null;
     return {
       artifactId: artifact._id.toString(),
       name: artifact.name,
       network: artifact.network ?? null,
+      contentKind: artifact.contentKind ?? 'file',
       versionLabel: `${version.major}.${version.minor}`,
       versionRef: version.versionRef,
       isReleased: version.isReleased === true,
@@ -75,6 +79,7 @@ export class AutoRunSourceController {
       paths: (version.paths ?? []).map((p) => ({ path: p.path, label: p.label ?? '' })),
       // 같은 토큰으로 받는다 — 파일이 없으면 null.
       downloadPath: files.length ? 'download' : null,
+      sheet: sheet ? { grid: sheet } : null,
       createdBy: version.createdBy,
       createdAt: version.createdAt instanceof Date ? version.createdAt.toISOString() : String(version.createdAt),
     };

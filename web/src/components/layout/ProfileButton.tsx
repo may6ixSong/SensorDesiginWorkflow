@@ -124,6 +124,16 @@ export function ProfileButton() {
               </MenuItem>
             </span>
           </Tooltip>
+          <Tooltip title={isSimulating ? 'Stop the user simulator first' : ''} placement="right">
+            <span>
+              <MenuItem
+                disabled={isSimulating}
+                onClick={() => { setAnchorEl(null); navigate('/sheet-templates'); }}
+              >
+                Sheet Templates
+              </MenuItem>
+            </span>
+          </Tooltip>
         </Menu>
       )}
 

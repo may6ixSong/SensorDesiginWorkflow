@@ -66,4 +66,7 @@ export const queryKeys = {
   calypsoArtifacts: (projectId: string) => ['calypso', 'artifacts', projectId] as const,
   calypsoArtifact: (id: string) => ['calypso', 'artifacts', 'detail', id] as const,
   calypsoDepartmentRoster: (projectId: string) => ['calypso', 'department-roster', projectId] as const,
+  /** Sheet template(설계서 11장 §3) — 전역 데이터라 project로 나누지 않는다. */
+  sheetTemplates: (includeArchived: boolean) => ['calypso', 'sheet-templates', includeArchived] as const,
+  sheetTemplatesAll: ['calypso', 'sheet-templates'] as const,
 };

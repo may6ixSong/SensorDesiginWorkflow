@@ -13,6 +13,8 @@ interface ImportMetaEnv {
   readonly SYSTEM_API: string;
   /** 'dev' | 'prod' */
   readonly ENVIRONMENT: string;
+  /** SpreadJS sheet editor page loaded in an iframe (docs/11-sheet-artifacts.md). */
+  readonly SHEET_HOST_URL: string;
 }
 
 interface ImportMeta {

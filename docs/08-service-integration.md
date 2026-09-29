@@ -420,15 +420,20 @@ GET {calypso.downloadUrl}      Authorization: Bearer {calypso.accessToken}
 ```ts
 {
   artifactId: string; name: string; network: 'OA' | 'HPC' | null;
+  contentKind: 'file' | 'sheet';
   versionLabel: string; versionRef: string; isReleased: boolean; versionNote: string;
   files: { fileName: string }[];              // 있으면 downloadUrl로 받는다
   links: { url: string; label: string }[];    // OA 링크
   paths: { path: string; label: string }[];   // HPC 경로 — 이 서비스가 직접 읽는다
   downloadPath: 'download' | null;            // 파일이 없으면 null
+  sheet: { grid: SheetGrid } | null;          // contentKind==='sheet'일 때 — 11장 §5
   createdBy: string; createdAt: string;
 }
 ```
 `download`는 파일이 하나면 그 파일, 여러 개면 zip 하나를 내려준다.
+
+source가 **sheet artifact**(11장)면 `sheet.grid`에 셀 값 격자가 그대로 실린다 — 사용자가 저장한
+그대로이고 SIREN·Calypso는 값을 검사하지 않는다. 파일을 받을 필요 없이 이 JSON만 읽으면 된다.
 
 - 토큰은 **그 artifact의 그 버전 하나만** 읽을 수 있고(다른 버전·artifact는 403), 만료(기본 24시간)
   뒤에는 401이다. 쓰기 경로는 없다.

@@ -12,6 +12,9 @@ import { Icon } from '@/components/common/Icon';
 import { toast } from '@/store/toastStore';
 import { CURSOR_POINTER, FONT_MONO, R, T } from '@/theme/tokens';
 import { EditChip, NetworkChip, ServiceChip } from './ArtifactChips';
+import {
+  SheetContentChoice, SheetContentField, defaultSheetContentChoice, sheetContentInput,
+} from '@/components/sheet/SheetContentField';
 
 export type ArtifactSourceKind = 'live' | 'file' | 'hpc';
 
@@ -181,6 +184,7 @@ export function ArtifactSourcePicker({
   const [newName, setNewName] = useState('');
   const [newDept, setNewDept] = useState('');
   const [newNetwork, setNewNetwork] = useState<'OA' | 'HPC'>('OA');
+  const [newContent, setNewContent] = useState<SheetContentChoice>(defaultSheetContentChoice);
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(() => new Set());
   const didInitialExpand = useRef(false);
 
@@ -269,12 +273,14 @@ export function ArtifactSourcePicker({
       department: effectiveDept,
       name: newName.trim(),
       network: newNetwork,
+      ...sheetContentInput(newContent),
     }),
     onSuccess: (created) => {
       qc.invalidateQueries({ queryKey: queryKeys.calypsoArtifacts(projectId as string) });
       pickCalypso(created);
       setNewName('');
       setNewNetwork('OA');
+      setNewContent(defaultSheetContentChoice());
       toast('Artifact created — add its first version from the artifact detail once it\'s on the canvas.');
     },
     onError: (e: any) => toast(e?.response?.data?.message ?? 'Could not create the artifact'),
@@ -325,6 +331,7 @@ export function ArtifactSourcePicker({
                 ))}
               </Box>
             </Box>
+            <SheetContentField value={newContent} onChange={setNewContent} />
             <Box sx={{ display: 'flex', gap: '8px' }}>
               <SirenButton
                 variant="primary"
@@ -333,7 +340,7 @@ export function ArtifactSourcePicker({
               >
                 {createMutation.isPending ? 'Creating…' : 'Create'}
               </SirenButton>
-              <SirenButton onClick={() => { setCreating(false); setNewName(''); setNewNetwork('OA'); }}>Cancel</SirenButton>
+              <SirenButton onClick={() => { setCreating(false); setNewName(''); setNewNetwork('OA'); setNewContent(defaultSheetContentChoice()); }}>Cancel</SirenButton>
             </Box>
             <Box sx={{ fontSize: 10.5, color: T.dm2, lineHeight: 1.6 }}>
               This only registers an empty artifact. Add its first version — matching the network above —

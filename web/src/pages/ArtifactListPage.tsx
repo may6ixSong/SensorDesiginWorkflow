@@ -14,6 +14,9 @@ import { UserAvatar } from '@/components/common/Avatar';
 import { NetworkChip } from '@/components/artifact/ArtifactChips';
 import { queryKeys } from '@/api/queryKeys';
 import { CalypsoArtifact, createCalypsoArtifact, listCalypsoArtifacts } from '@/api/calypsoClient';
+import {
+  SheetContentChoice, SheetContentField, defaultSheetContentChoice, sheetContentInput,
+} from '@/components/sheet/SheetContentField';
 import { toast } from '@/store/toastStore';
 import { CURSOR_POINTER, FONT_MONO, T } from '@/theme/tokens';
 
@@ -241,6 +244,7 @@ function RegisterDialog({
   const [description, setDescription] = useState('');
   const [department, setDepartment] = useState('');
   const [network, setNetwork] = useState<'OA' | 'HPC'>('OA');
+  const [content, setContent] = useState<SheetContentChoice>(defaultSheetContentChoice);
   const [nameErr, setNameErr] = useState(false);
 
   const dept = needsPicker ? (department || fallbackDept) : autoDept;
@@ -248,6 +252,7 @@ function RegisterDialog({
   const mutation = useMutation({
     mutationFn: () => createCalypsoArtifact({
       projectId: project._id, department: dept, name: name.trim(), description: description.trim(), network,
+      ...sheetContentInput(content),
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.calypsoArtifacts(project._id) });
@@ -300,6 +305,9 @@ function RegisterDialog({
             </Box>
           ))}
         </Box>
+      </Field>
+      <Field label="Content">
+        <SheetContentField value={content} onChange={setContent} />
       </Field>
       {needsPicker ? (
         <Field label="Department">
