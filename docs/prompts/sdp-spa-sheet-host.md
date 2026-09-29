@@ -83,11 +83,11 @@
 1. SDP_SPA를 `npm start`로 띄운다(보통 `http://localhost:3000`).
 2. `{SIREN_REPO_PATH}`에서 SIREN을 띄운다 — `api`(3001), `calypso`(3010), `web`(5173). SIREN의
    `web/.env.development`는 이미 `SHEET_HOST_URL=http://localhost:3000/sheet-host`를 가리킨다.
-3. SIREN에서 artifact를 "Sheet"(template: Port List)로 만들고 → Edit sheet → 값 입력·붙여넣기·리본 서식 →
-   Import/Export Excel → Save as new version → Open sheet(읽기 전용)까지 해 본다.
+3. SIREN에서 artifact를 "Sheet"(template: Port List)로 만들고 → Artifact 화면에 바로 뜨는 시트에서 값 입력·
+   붙여넣기·리본 서식 → Import/Export Excel → Save → Publish → 버전 트리에서 published 버전(읽기 전용)까지 해 본다.
 4. 확인할 것:
    - 개발자 도구 콘솔에 origin 관련 경고·에러가 없다.
-   - 저장한 버전에 `.ssjson`, `.grid.json`, `.xlsx` 세 파일이 있다.
+   - publish한 버전에 `.ssjson`, `.grid.json`, `.xlsx` 세 파일이 있다.
    - 읽기 전용에서는 셀이 고쳐지지 않고, 리본이 안 보인다.
    - 기존 `/spreadSheet` 페이지(SFM)가 전과 똑같이 동작한다.
 

@@ -21,6 +21,11 @@ interface Props {
   /** 둘 중 하나 — document(저장된 시트)가 있으면 그걸, 없으면 seed(template 명세)로 만든다. */
   document: SheetDocument | null;
   seed: SheetSeed | null;
+  /**
+   * 무엇을 띄우고 있는지 가리키는 값. 바뀌면 iframe을 새로 만들지 않고 그 자리에서 다시 load한다
+   * (버전 트리에서 다른 버전을 고를 때). 생략하면 처음 한 번만 load한다.
+   */
+  loadKey?: string;
   /** load까지 끝나 편집할 수 있게 됐을 때. */
   onLoaded?: () => void;
   /** 사용자가 처음 고쳤을 때(저장 뒤 다시 고치면 또). */
@@ -35,7 +40,7 @@ const READY_TIMEOUT_MS = 20_000;
  * 시트 내용을 해석하지 않는다: 받은 문서를 넘기고, 돌려받은 문서·격자를 그대로 호출부에 준다.
  */
 export const SheetHostFrame = forwardRef<SheetHostHandle, Props>(function SheetHostFrame(
-  { mode, document, seed, onLoaded, onDirty }, ref,
+  { mode, document, seed, loadKey, onLoaded, onDirty }, ref,
 ) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const bridgeRef = useRef<SheetHostBridge | null>(null);
@@ -46,8 +51,24 @@ export const SheetHostFrame = forwardRef<SheetHostHandle, Props>(function SheetH
   // 최신 콜백을 ref로 들고 있어 message 리스너를 다시 달지 않는다.
   const cb = useRef({ onLoaded, onDirty });
   cb.current = { onLoaded, onDirty };
-  const content = useRef({ mode, document, seed });
-  content.current = { mode, document, seed };
+  const content = useRef({ mode, document, seed, loadKey });
+  content.current = { mode, document, seed, loadKey };
+  /** 마지막으로 load를 보낸 loadKey — 같은 걸 두 번 보내지 않는다. */
+  const sentKey = useRef<string | undefined>(undefined);
+
+  const load = (bridge: SheetHostBridge) => {
+    const c = content.current;
+    sentKey.current = c.loadKey;
+    setState('loading');
+    bridge.request('sheet:load', { mode: c.mode, document: c.document, seed: c.seed }, 'sheet:loaded')
+      .then(() => {
+        // 기다리는 사이 다른 걸 고르면 그 load가 뒤따라 온다 — 마지막 것만 완료로 친다.
+        if (sentKey.current !== content.current.loadKey) return;
+        setState('ready');
+        cb.current.onLoaded?.();
+      })
+      .catch((err: Error) => { setState('failed'); setError(err.message); });
+  };
 
   useEffect(() => {
     if (!origin) {
@@ -71,11 +92,7 @@ export const SheetHostFrame = forwardRef<SheetHostHandle, Props>(function SheetH
         bridgeRef.current?.dispose();
         const bridge = new SheetHostBridge(win, origin);
         bridgeRef.current = bridge;
-        setState('loading');
-        const c = content.current;
-        bridge.request('sheet:load', { mode: c.mode, document: c.document, seed: c.seed }, 'sheet:loaded')
-          .then(() => { setState('ready'); cb.current.onLoaded?.(); })
-          .catch((err: Error) => { setState('failed'); setError(err.message); });
+        load(bridge);
       } else if (msg.type === 'sheet:dirty') {
         cb.current.onDirty?.();
       }
@@ -88,6 +105,15 @@ export const SheetHostFrame = forwardRef<SheetHostHandle, Props>(function SheetH
       bridgeRef.current = null;
     };
   }, [origin]);
+
+  // 연결된 뒤 보여줄 대상이 바뀌면 그 자리에서 다시 load한다.
+  useEffect(() => {
+    const b = bridgeRef.current;
+    if (!b || loadKey === undefined || sentKey.current === loadKey) return;
+    load(b);
+    // load는 ref만 읽는다 — loadKey가 바뀔 때만 돈다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadKey]);
 
   useImperativeHandle(ref, () => ({
     save: (includeXlsx) => {

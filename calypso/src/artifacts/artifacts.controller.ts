@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -9,6 +10,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   StreamableFile,
   UploadedFiles,
@@ -165,8 +167,10 @@ export class ArtifactsController {
       throw new ForbiddenException('You do not have edit access to this artifact.');
     }
 
-    // sheet artifact면 문서/격자 파일의 모양부터 본다 — 스토리지에 쓰기 전에(설계서 11장 §4).
-    this.artifacts.assertSheetUpload(a, files ?? []);
+    // sheet는 버전을 올리지 않는다 — Save(덮어쓰기)와 Publish만 있다(설계서 11장 §4). 스토리지에 쓰기 전에 막는다.
+    if (a.contentKind === 'sheet') {
+      throw new BadRequestException('A sheet is saved in place (Save) and published — it has no uploaded versions.');
+    }
 
     const nextLabel = this.artifacts.nextVersionLabel(a);
     const uploaded = await Promise.all(
@@ -239,6 +243,35 @@ export class ArtifactsController {
       throw new ForbiddenException('You do not have edit access to this artifact.');
     }
     return { data: await this.artifacts.sheetStart(a) };
+  }
+
+  /**
+   * sheet Save — latest를 덮어쓴다(설계서 11장 §4). 새 버전도 hub 이벤트도 없다 — SIREN이 보는 건
+   * published 버전뿐이다. 파일은 버전 업로드와 같은 모양(.ssjson + .grid.json [+ .xlsx])이다.
+   */
+  @Put(':id/sheet')
+  @UseInterceptors(FilesInterceptor('files'))
+  async saveSheet(
+    @Param('id') id: string,
+    @UploadedFiles() files: Express.Multer.File[] | undefined,
+    @CurrentActor() me: Actor,
+  ) {
+    const a = await this.artifacts.findOrThrow(id);
+    if (this.artifacts.computeAccess(a, me) !== 'edit') {
+      throw new ForbiddenException('You do not have edit access to this artifact.');
+    }
+    if (a.contentKind !== 'sheet') throw new BadRequestException('This artifact is not a sheet.');
+    this.artifacts.assertSheetUpload(a, files ?? []);
+
+    const uploaded = await Promise.all(
+      (files ?? []).map(async (file) => {
+        const storageKey = this.storage.buildStorageKey(a.projectId, a._id.toString(), 'latest', file.originalname);
+        await this.storage.upload(storageKey, file.buffer, { originalname: file.originalname, uploader: me.knoxId });
+        return { fileName: file.originalname, storageKey };
+      }),
+    );
+    const saved = await this.artifacts.saveSheetDraft(id, uploaded, me);
+    return { data: toArtifactDto(saved, 'edit') };
   }
 
   /** 한 sheet 버전의 문서 JSON + 격자. 권한은 다운로드와 같다(view는 released만). */

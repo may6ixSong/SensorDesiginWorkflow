@@ -11,6 +11,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   StreamableFile,
   UploadedFiles,
@@ -207,6 +208,32 @@ export class CalypsoProxyController {
     const { departments, isAdmin } = await this.resolveContext(projectId, me);
     return this.relay(await this.calypso.forward(
       'GET', `/artifacts/${encodeURIComponent(id)}/sheet`, undefined, me.knoxId, departments, isAdmin,
+    ));
+  }
+
+  /**
+   * sheet Save — latest를 덮어쓴다(설계서 11장 §4). 버전이 생기지 않으므로 SIREN 캐시 동기화도
+   * 하지 않는다 — SIREN이 보는 것은 published 버전뿐이다.
+   */
+  @Put(':id/sheet')
+  @UseInterceptors(FilesInterceptor('files'))
+  async saveSheet(
+    @Param('id') id: string,
+    @Query('projectId') projectId: string,
+    @UploadedFiles() files: Express.Multer.File[] | undefined,
+    @CurrentActor() me: Actor,
+  ) {
+    const { departments, isAdmin } = await this.resolveContext(projectId, me);
+    const form = new FormData();
+    for (const file of files ?? []) {
+      form.append(
+        'files',
+        new Blob([file.buffer as unknown as BlobPart], { type: file.mimetype || 'application/octet-stream' }),
+        file.originalname,
+      );
+    }
+    return this.relay(await this.calypso.forward(
+      'PUT', `/artifacts/${encodeURIComponent(id)}/sheet`, form, me.knoxId, departments, isAdmin,
     ));
   }
 

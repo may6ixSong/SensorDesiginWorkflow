@@ -3,6 +3,7 @@ import {
 } from 'class-validator';
 import { ArtifactDocument, ArtifactGrant, ArtifactVersion } from '../schemas/artifact.schema';
 import { AccessLevel } from '../artifacts.service';
+import { sheetLatestInfo } from '../../sheets/sheet-latest';
 
 /**
  * 등록 시 **project + department만** 받는다 - workflow는 받지 않는다.
@@ -187,6 +188,8 @@ export function toArtifactDto(a: ArtifactDocument, access: Exclude<AccessLevel, 
     templateKey: a.templateKey ?? null,
     templateRevision: a.templateRevision ?? null,
     createdBy: a.createdBy,
+    // sheet의 latest(작업본) — 정식 버전이 아니라 edit 권한자에게만 보인다(설계서 11장 §4).
+    sheetLatest: a.contentKind === 'sheet' && access === 'edit' ? sheetLatestInfo(a) : null,
     myAccess: access,
     versionCount: visible.length,
     latestVersion: latest ? toVersionView(latest) : null,
