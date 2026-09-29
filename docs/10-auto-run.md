@@ -184,11 +184,25 @@ payload 전체 모양은 [08장 §1.6](08-service-integration.md). 요점만:
 SIREN이 그 run의 결과 버전으로 기록한다. 그 버전이 published이고 다른 Auto Run node의 source라면
 §4의 평가가 그대로 이어진다 — 이것이 연쇄다.
 
+### 6.5 source 때문에 실패했을 때
+
+서비스가 trigger를 받았지만 **source 데이터의 문제로 돌지 못했으면**(예: liberty generator가 Port
+List를 검사해 보니 Bits가 정수가 아님) 상태 콜백을 `failed`로 보내면서 `sourceErrors`에 어느 source의
+무엇이 문제인지 담는다(08장 §2.3). SIREN 쪽 검사는 없다 — 판정은 그 서비스가 한다.
+
+- SIREN은 서비스가 짚은 source를 이 run이 실제로 보낸 source와 맞춘다(sirenArtifactId →
+  externalArtifactId → nodeId 순). 못 맞춘 항목도 버리지 않고 서비스가 준 값 그대로 남긴다.
+- run에 `failureKind`('source' | 'service')와 `sourceErrors`가 기록되고, Auto Run 탭이 문제 source를
+  빨갛게 표시하고 사유를 보여준다.
+- 알림(§7): owner + **문제가 된 source 버전의 발행자(giver)**. 같은 사람은 한 통만.
+
 ---
 
 ## 7. 알림
 
-- **workflow owner 한 명에게만, 성공/실패일 때만** 보낸다. 시작·진행 중은 알리지 않는다(캔버스 표시로 충분).
+- **workflow owner에게, 성공/실패일 때만** 보낸다. 시작·진행 중은 알리지 않는다(캔버스 표시로 충분).
+- source 때문에 실패했으면(§6.5) **문제가 된 source 버전을 발행한 사람**에게도 실패 알림을 보낸다 —
+  고칠 사람이 바로 알아야 한다. owner와 같은 사람이면 한 통만 간다.
 - 지금은 `NotificationService.notifyAutoRun`이 로그만 남기는 stub이다 — 메일 어댑터(T3)가 붙으면 release
   알림과 같은 경로로 나간다.
 

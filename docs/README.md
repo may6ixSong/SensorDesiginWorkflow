@@ -30,6 +30,7 @@ CIS(CMOS Image Sensor) 설계 산출물을 workflow 캔버스 위에서 흐름�
 | [prompts/db-migration-v3.md](prompts/db-migration-v3.md) | 실제 MongoDB의 데이터를 v3 스키마 모양으로 바꾸는 **실행 전용** 프롬프트 |
 | [prompts/rpm-and-mockdb-hub-v4-prompt.md](prompts/rpm-and-mockdb-hub-v4-prompt.md) | 허브 재설계(07장)에 맞춰 RPM 코드 갱신 + mock/dev DB 정리 — **실행 전용** 프롬프트 |
 | [prompts/db-my-assignment-backfill.md](prompts/db-my-assignment-backfill.md) | My Assignment(09장)가 실 DB에서 제대로 보이도록 인덱스·필드를 보정하는 **실행 전용** 프롬프트 |
+| [prompts/spreadjs-host-survey.md](prompts/spreadjs-host-survey.md) | SpreadJS를 운영 중인 사내 시스템을 데스크톱 세션이 **읽기만 해서** 분석하는 프롬프트 — iframe용 sheet-host 배포 가능 여부, 도메인, SpreadJS 버전·라이선스 설정, postMessage/헤더 제약 |
 
 > `prompts/` 아래 문서는 **SIREN·Calypso 저장소 밖에서 수행해야 하는 작업**을 다른 세션에
 > 그대로 붙여넣기 위한 것이다. 이 저장소의 코드로는 끝낼 수 없는 일(실 DB 변경, 외부 서비스
