@@ -289,7 +289,7 @@ function RegisterDialog({
       <Field label="Description">
         <TextArea value={description} onChange={setDescription} rows={3} />
       </Field>
-      <Field label={networkLocked ? 'Network — a Sheet is always OA' : 'Network — can be changed later from the artifact detail'}>
+      <Field label={networkLocked ? 'Network' : 'Network — can be changed later from the artifact detail'}>
         <Box sx={{ display: 'flex', gap: '4px' }}>
           {(['OA', 'HPC'] as const).map((n) => (
             <Box

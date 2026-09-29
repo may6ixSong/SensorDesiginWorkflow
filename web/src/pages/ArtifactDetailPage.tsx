@@ -14,6 +14,8 @@ import { Badge, SirenButton } from '@/components/common/SirenButton';
 import { Icon } from '@/components/common/Icon';
 import { SHEET_LATEST_REF, SheetArtifactPanel, sheetLatestRow } from '@/components/sheet/SheetArtifactPanel';
 import { ConfirmDialog } from '@/components/dialogs/ConfirmDialog';
+import { ResizeHandle } from '@/components/common/ResizeHandle';
+import { useResizableSidePanel } from '@/hooks/useResizableSidePanel';
 import { queryKeys } from '@/api/queryKeys';
 import {
   CalypsoGrantInput, CalypsoVersionView, addCalypsoEditor, addCalypsoVersion, addCalypsoViewGrant,
@@ -37,6 +39,13 @@ export function ArtifactDetailPage() {
   /** sheet — 저장 안 한 변경이 있는가, 그리고 그 상태로 다른 버전을 고르려 할 때 확인을 기다리는 대상. */
   const [sheetDirty, setSheetDirty] = useState(false);
   const [pendingPick, setPendingPick] = useState<CalypsoVersionView | null>(null);
+  /**
+   * 본문(A)과 오른쪽 패널(B) 사이를 끌어 폭을 조절한다(사용자 요청). 원래 비율 3:1(오른쪽 최소 320px)의
+   * 오른쪽 폭이 최대, 그 절반이 최소다.
+   */
+  const side = useResizableSidePanel({
+    baseFraction: 0.25, baseMin: 320, minRatio: 0.5, storageKey: 'siren.artifactDetail.sideRatio',
+  });
   /**
    * Calypso artifact의 `department`는 SIREN `Project.departments[].id`다(02장 §9.3) — 이름은
    * 이 과제 캐시에서 찾아 쓴다. 추가 네트워크 호출은 없다(이미 project를 본 화면의 캐시 재사용).
@@ -190,8 +199,8 @@ export function ArtifactDetailPage() {
           </Box>
         </Box>
 
-        <Box sx={{ flex: 1, minHeight: 0, display: 'flex' }}>
-          <Box sx={{ flex: 3, minWidth: 0, display: 'flex', borderRight: `1px solid ${T.ln}` }}>
+        <Box ref={side.containerRef} sx={{ flex: 1, minHeight: 0, display: 'flex' }}>
+          <Box sx={{ flex: 1, minWidth: 0, display: 'flex' }}>
             {isSheet ? (
               // sheet는 카드 대신 시트를 이 영역 전체에 바로 띄운다.
               <SheetArtifactPanel
@@ -210,7 +219,8 @@ export function ArtifactDetailPage() {
               />
             )}
           </Box>
-          <Box sx={{ flex: 1, minWidth: 320, background: T.sf2, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <ResizeHandle onPointerDown={side.handleProps.onPointerDown} dragging={side.dragging} />
+          <Box sx={{ flex: `0 0 ${side.width}px`, width: side.width, minWidth: 0, background: T.sf2, overflowY: 'auto', overflowX: 'hidden', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <NetworkField
               a={a}
               canEdit={a.myAccess === 'edit'}
@@ -244,11 +254,6 @@ export function ArtifactDetailPage() {
                       <SirenButton variant="primary" disabled={!canPublishSheet} onClick={() => setPublishing(latestRow)}>
                         <Icon name="send" size={12} /> Publish
                       </SirenButton>
-                      {!canPublishSheet && (
-                        <Box sx={{ fontSize: 10.5, color: T.dm2 }}>
-                          {sheetDirty ? 'Save your changes before publishing.' : 'Save changes to the latest sheet to publish.'}
-                        </Box>
-                      )}
                     </Box>
                   )}
                   {isSheet ? (

@@ -314,7 +314,7 @@ export function ArtifactSourcePicker({
             )}
             <Box>
               <Box sx={{ fontSize: 10.5, color: T.dm2, mb: '5px' }}>
-                {newNetworkLocked ? 'Network — a Sheet is always OA' : 'Network — can be changed later from the artifact detail'}
+                {newNetworkLocked ? 'Network' : 'Network — can be changed later from the artifact detail'}
               </Box>
               <Box sx={{ display: 'flex', gap: '4px' }}>
                 {NETWORK_OPTIONS.map((n) => (

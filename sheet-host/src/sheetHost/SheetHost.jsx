@@ -188,19 +188,31 @@ export default function SheetHost({ renderToolbar }) {
     };
   }, [spread, markDirty, post]);
 
+  // SpreadJS는 만들어질 때 크기를 한 번 재고, 컨테이너 크기가 바뀌어도 스스로 다시 재지 않는다. 편집 도구가
+  // load 뒤에 나타나면 그 높이만큼 시트가 넘쳐 스크롤이 생기고, 부모(SIREN)가 패널 폭을 바꿀 때도 어긋난다 —
+  // 컨테이너 크기가 바뀔 때마다 refresh()로 다시 재게 한다.
+  const sheetBoxRef = useRef(null);
+  useEffect(() => {
+    const box = sheetBoxRef.current;
+    if (!spread || !box || typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver(() => spread.refresh());
+    ro.observe(box);
+    return () => ro.disconnect();
+  }, [spread]);
+
   const onInit = useCallback((wb) => {
     spreadRef.current = wb;
     setSpread(wb);
   }, []);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
       {spread && mode === 'edit' && renderToolbar ? (
         // 리본 동작(서식·테두리 등)은 API 호출이라 변경 이벤트가 안 올 수 있다 — 도구 영역을 누르면
         // "변경 있음"으로 본다. 이 표시는 저장 안 한 변경 경고용 힌트일 뿐, 저장 내용과는 무관하다.
         <div style={{ flex: 'none' }} onClick={() => markDirty()}>{renderToolbar(spread, mode)}</div>
       ) : null}
-      <div style={{ flex: 1, minHeight: 0 }}>
+      <div ref={sheetBoxRef} style={{ flex: 1, minHeight: 0 }}>
         <SpreadSheets workbookInitialized={onInit} hostStyle={{ width: '100%', height: '100%' }} />
       </div>
     </div>

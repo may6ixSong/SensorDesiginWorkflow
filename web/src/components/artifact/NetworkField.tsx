@@ -34,7 +34,7 @@ export function NetworkField({ a, canEdit, onChange, changing }: Props) {
     <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', mb: '12px', flexWrap: 'wrap' }}>
       <Box sx={{ fontSize: 11, fontWeight: 600, color: T.dm2 }}>Network</Box>
       {canEdit && locked ? (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: '4px' }} title="A Sheet is always OA">
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
           {NETWORK_OPTIONS.map((n) => (
             <Box
               key={n}
@@ -52,7 +52,6 @@ export function NetworkField({ a, canEdit, onChange, changing }: Props) {
               {n}
             </Box>
           ))}
-          <Box sx={{ fontSize: 10.5, color: T.dm2, ml: '4px' }}>A Sheet is always OA</Box>
         </Box>
       ) : canEdit ? (
         <Box sx={{ display: 'flex', gap: '4px' }}>

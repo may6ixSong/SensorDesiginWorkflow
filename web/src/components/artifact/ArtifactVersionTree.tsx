@@ -150,7 +150,7 @@ export function ArtifactVersionTree({
               {v.versionNote && (
                 <Box
                   sx={{
-                    fontSize: 12, color: T.tx, mt: '5px', lineHeight: 1.5,
+                    fontSize: 12, color: T.tx, mt: '5px', lineHeight: 1.5, overflowWrap: 'anywhere',
                     overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box',
                     WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
                   }}
@@ -158,8 +158,9 @@ export function ArtifactVersionTree({
                   {v.versionNote}
                 </Box>
               )}
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', mt: '5px' }}>
-                <Box sx={{ fontFamily: FONT_MONO, fontSize: 10, color: T.dm2, flex: 1, minWidth: 0 }}>
+              {/* 패널 폭을 줄이면(ArtifactDetailPage의 끌기) 이 줄이 넘치지 않고 접힌다. */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: '4px 8px', mt: '5px', flexWrap: 'wrap' }}>
+                <Box sx={{ fontFamily: FONT_MONO, fontSize: 10, color: T.dm2, flex: '1 1 120px', minWidth: 0, overflowWrap: 'anywhere' }}>
                   {by.name} · {fmtAt(v.createdAt)}
                 </Box>
                 {canPublish && !v.isReleased && onPublish && (
