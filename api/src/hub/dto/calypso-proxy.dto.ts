@@ -152,10 +152,6 @@ export class UpdateCalypsoSheetTemplateDto {
   @IsString()
   @MaxLength(500)
   description?: string;
-
-  @IsOptional()
-  @IsBoolean()
-  archived?: boolean;
 }
 
 export class AddCalypsoSheetTemplateRevisionDto {

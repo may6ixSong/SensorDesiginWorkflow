@@ -23,7 +23,6 @@ export function toTemplateDto(t: SheetTemplateDocument) {
     key: t.key,
     name: t.name,
     description: t.description ?? '',
-    archived: t.archived === true,
     currentRevision: t.currentRevision,
     revisions: [...(t.revisions ?? [])]
       .sort((a, b) => b.revision - a.revision)
@@ -52,16 +51,20 @@ export class SheetTemplatesService implements OnModuleInit {
     await this.seedBuiltins();
   }
 
-  /** 기본 template이 없을 때만 만든다 — Admin이 고친 내용을 부팅마다 덮지 않는다. */
+  /**
+   * 기본 template이 없을 때만 만든다 — Admin이 고친 내용을 부팅마다 덮지 않는다. Admin이 **삭제한**
+   * 기본 template도 다시 만들지 않는다(삭제 기록이 originalKey로 남아 있다).
+   */
   async seedBuiltins(): Promise<void> {
     for (const def of BUILTIN_SHEET_TEMPLATES) {
       const exists = await this.model.findOne({ key: def.key }).exec();
       if (exists) continue;
+      const deleted = await this.model.findOne({ originalKey: def.key }).exec();
+      if (deleted) continue;
       await this.model.create({
         key: def.key,
         name: def.name,
         description: def.description,
-        archived: false,
         currentRevision: 1,
         revisions: [{
           revision: 1, seed: parseSheetSeed(def.seed), documentKey: null, note: 'Built-in', createdBy: 'system', createdAt: new Date(),
@@ -78,14 +81,15 @@ export class SheetTemplatesService implements OnModuleInit {
     if (!actor.isAdmin) throw new ForbiddenException('Only admins can change sheet templates.');
   }
 
-  async list(includeArchived: boolean): Promise<SheetTemplateDocument[]> {
-    const all = await this.model.find(includeArchived ? {} : { archived: false }).exec();
-    return all.sort((a, b) => a.name.localeCompare(b.name));
+  async list(): Promise<SheetTemplateDocument[]> {
+    const all = await this.model.find({}).exec();
+    return all.filter((t) => !t.deletedAt).sort((a, b) => a.name.localeCompare(b.name));
   }
 
+  /** 살아 있는 template만. 삭제된 것은 key가 바뀌어 여기서 찾히지 않는다. */
   async findOrThrow(key: string): Promise<SheetTemplateDocument> {
     const t = await this.model.findOne({ key }).exec();
-    if (!t) throw new NotFoundException(`Sheet template "${key}" not found.`);
+    if (!t || t.deletedAt) throw new NotFoundException(`Sheet template "${key}" not found.`);
     return t;
   }
 
@@ -112,11 +116,38 @@ export class SheetTemplatesService implements OnModuleInit {
     return { document: null, seed: rev.seed ?? EMPTY_SEED };
   }
 
-  /** artifact를 만들 때 — 쓸 수 있는 template인지 보고, 그 순간의 개정본 번호를 돌려준다. */
-  async pinForNewArtifact(key: string): Promise<number> {
+  /** artifact를 만들 때 — 쓸 수 있는 template인지 보고, 그 순간의 template id와 개정본 번호를 돌려준다. */
+  async pinForNewArtifact(key: string): Promise<{ templateId: string; revision: number }> {
     const t = await this.findOrThrow(key);
-    if (t.archived) throw new BadRequestException(`Sheet template "${key}" is archived.`);
-    return t.currentRevision;
+    return { templateId: t._id.toString(), revision: t.currentRevision };
+  }
+
+  /**
+   * artifact의 첫 편집 시작 시트 — 삭제된 template이어도 고정된 개정본을 그대로 연다. templateId가
+   * 없는 예전 artifact는 key로, 그 key가 이미 삭제됐으면 originalKey로 찾는다.
+   */
+  async startForArtifact(pin: { templateId: string | null; templateKey: string; revision: number }): Promise<SheetStart & { key: string; revision: number }> {
+    let t: SheetTemplateDocument | null = null;
+    if (pin.templateId) t = await this.model.findById(pin.templateId).exec();
+    if (!t) t = await this.model.findOne({ key: pin.templateKey }).exec();
+    if (!t) t = await this.model.findOne({ originalKey: pin.templateKey }).exec();
+    if (!t) throw new NotFoundException(`Sheet template "${pin.templateKey}" not found.`);
+    const rev = this.revisionOf(t, pin.revision);
+    return { key: t.originalKey ?? t.key, revision: rev.revision, ...(await this.readRevision(rev)) };
+  }
+
+  /**
+   * 삭제 — 목록·생성 화면에서 사라지고 되살릴 수 없다. 문서와 개정본은 남기고(첫 저장 전 artifact용)
+   * key를 비워 같은 key로 새 template을 만들 수 있게 한다.
+   */
+  async remove(key: string, actor: Actor): Promise<void> {
+    this.assertAdmin(actor);
+    const t = await this.findOrThrow(key);
+    t.originalKey = t.key;
+    t.key = `deleted~${t._id.toString()}~${t.key}`;
+    t.deletedAt = new Date();
+    t.deletedBy = actor.knoxId;
+    await t.save();
   }
 
   /**
@@ -144,7 +175,6 @@ export class SheetTemplatesService implements OnModuleInit {
       key,
       name: input.name.trim(),
       description: input.description ?? '',
-      archived: false,
       currentRevision: 1,
       revisions: [{
         revision: 1, seed, documentKey, note: input.fromKey ? `Copied from ${input.fromKey}` : 'Created', createdBy: actor.knoxId, createdAt: new Date(),
@@ -155,12 +185,11 @@ export class SheetTemplatesService implements OnModuleInit {
     });
   }
 
-  async updateMeta(key: string, input: { name?: string; description?: string; archived?: boolean }, actor: Actor) {
+  async updateMeta(key: string, input: { name?: string; description?: string }, actor: Actor) {
     this.assertAdmin(actor);
     const t = await this.findOrThrow(key);
     if (input.name !== undefined) t.name = input.name.trim();
     if (input.description !== undefined) t.description = input.description;
-    if (input.archived !== undefined) t.archived = input.archived;
     t.updatedBy = actor.knoxId;
     t.updatedAt = new Date();
     await t.save();

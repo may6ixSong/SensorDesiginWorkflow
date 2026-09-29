@@ -319,18 +319,20 @@ export interface SheetTemplate {
   key: string;
   name: string;
   description: string;
-  archived: boolean;
   currentRevision: number;
   revisions: { revision: number; kind: 'document' | 'seed'; note: string; createdBy: string; createdAt: string }[];
   updatedBy: string;
   updatedAt: string | null;
 }
 
-export async function listSheetTemplates(includeArchived = false): Promise<SheetTemplate[]> {
-  const { data } = await apiClient.get<ApiEnvelope<SheetTemplate[]>>('/calypso-sheet-templates', {
-    params: includeArchived ? { includeArchived: 'true' } : {},
-  });
+export async function listSheetTemplates(): Promise<SheetTemplate[]> {
+  const { data } = await apiClient.get<ApiEnvelope<SheetTemplate[]>>('/calypso-sheet-templates');
   return data.data;
+}
+
+/** 삭제 — 되살릴 수 없다. 이미 만든 artifact는 영향이 없다(설계서 11장 §3). */
+export async function deleteSheetTemplate(key: string): Promise<void> {
+  await apiClient.delete(`/calypso-sheet-templates/${encodeURIComponent(key)}`);
 }
 
 export async function getSheetTemplateStart(key: string, revision?: number): Promise<{
@@ -350,7 +352,7 @@ export async function createSheetTemplate(input: {
 }
 
 export async function updateSheetTemplate(key: string, input: {
-  name?: string; description?: string; archived?: boolean;
+  name?: string; description?: string;
 }): Promise<SheetTemplate> {
   const { data } = await apiClient.patch<ApiEnvelope<SheetTemplate>>(`/calypso-sheet-templates/${encodeURIComponent(key)}`, input);
   return data.data;

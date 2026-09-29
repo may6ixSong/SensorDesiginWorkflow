@@ -1,4 +1,4 @@
-import { IsBoolean, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 
 export class CreateSheetTemplateDto {
   @IsString()
@@ -33,10 +33,6 @@ export class UpdateSheetTemplateDto {
   @IsString()
   @MaxLength(500)
   description?: string;
-
-  @IsOptional()
-  @IsBoolean()
-  archived?: boolean;
 }
 
 /** multipart — 파일 필드 `document`(SpreadJS 문서 JSON) + 이 필드. */

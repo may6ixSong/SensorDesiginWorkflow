@@ -99,7 +99,7 @@ export class ArtifactsService {
     }
     // template은 만드는 순간의 개정본으로 고정한다 — 뒤에 Admin이 template을 고쳐도 이 artifact의
     // 첫 시작 시트는 바뀌지 않는다.
-    const templateRevision = contentKind === 'sheet' && dto.templateKey
+    const pin = contentKind === 'sheet' && dto.templateKey
       ? await this.sheetTemplates.pinForNewArtifact(dto.templateKey)
       : null;
     return this.model.create({
@@ -115,8 +115,9 @@ export class ArtifactsService {
       viewGrants: [],
       restrictView: dto.restrictView ?? false,
       contentKind,
-      templateKey: templateRevision !== null ? dto.templateKey : null,
-      templateRevision,
+      templateId: pin?.templateId ?? null,
+      templateKey: pin ? dto.templateKey : null,
+      templateRevision: pin?.revision ?? null,
     });
   }
 
@@ -288,7 +289,9 @@ export class ArtifactsService {
       };
     }
     if (a.templateKey && a.templateRevision) {
-      const start = await this.sheetTemplates.start(a.templateKey, a.templateRevision);
+      const start = await this.sheetTemplates.startForArtifact({
+        templateId: a.templateId ?? null, templateKey: a.templateKey, revision: a.templateRevision,
+      });
       return {
         source: 'template', versionLabel: null, templateKey: start.key, templateRevision: start.revision,
         document: start.document, seed: start.seed,

@@ -1,5 +1,5 @@
 import {
-  BadRequestException, Body, Controller, Get, Param, Patch, Post, Query, UploadedFile, UseGuards, UseInterceptors,
+  BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Query, UploadedFile, UseGuards, UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { CurrentActor } from '../common/current-actor.decorator';
@@ -18,8 +18,8 @@ export class SheetTemplatesController {
   constructor(private readonly templates: SheetTemplatesService) {}
 
   @Get()
-  async list(@Query('includeArchived') includeArchived: string | undefined, @CurrentActor() me: Actor) {
-    const list = await this.templates.list(includeArchived === 'true' && me.isAdmin);
+  async list() {
+    const list = await this.templates.list();
     return { data: list.map(toTemplateDto) };
   }
 
@@ -43,6 +43,13 @@ export class SheetTemplatesController {
   @Patch(':key')
   async update(@Param('key') key: string, @Body() dto: UpdateSheetTemplateDto, @CurrentActor() me: Actor) {
     return { data: toTemplateDto(await this.templates.updateMeta(key, dto, me)) };
+  }
+
+  /** 삭제 — 되살릴 수 없다. 이미 만든 artifact는 영향이 없다. */
+  @Delete(':key')
+  async remove(@Param('key') key: string, @CurrentActor() me: Actor) {
+    await this.templates.remove(key, me);
+    return { data: { key, deleted: true } };
   }
 
   @Post(':key/revisions')

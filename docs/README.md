@@ -235,7 +235,7 @@ CIS(CMOS Image Sensor) 설계 산출물을 workflow 캔버스 위에서 흐름�
 |---|---|
 | 편집기 | SpreadJS. 라이선스 도메인(SDP_SPA)의 `/sheet-host`를 iframe으로 띄우고 postMessage로만 통신. 편집 도구는 기존 customRibbon 재사용 |
 | 콘텐츠 종류 | Calypso artifact `contentKind: file │ sheet` — 만들 때 정하고 바꿀 수 없다 |
-| template | Calypso 소유, Admin이 SIREN 화면에서 편집기로 고친다. 개정본이 쌓이고, artifact는 만들 때의 개정본으로 시작한다 |
+| template | Calypso 소유, Admin이 SIREN 화면에서 편집기로 고치거나 삭제한다. 개정본이 쌓이고, artifact는 만들 때의 개정본으로 시작한다(삭제돼도) |
 | 편집 자유도 | template은 시작점일 뿐. 이후 헤더 포함 엑셀처럼 자유 편집 |
 | 검사 | **하지 않는다.** 저장한 그대로 저장·열기·전달. 검사는 소비자(liberty generator) 몫 |
 | 저장 | 보통 파일 버전 — `.ssjson`(편집기용) + `.grid.json`(소비자용) + `.xlsx`(사람용) |

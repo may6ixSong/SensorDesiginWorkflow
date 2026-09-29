@@ -24,7 +24,7 @@ Calypso artifact에 `contentKind`가 생겼다. 만들 때 정하고, 바꿀 수
 | `file`(기본) | 지금까지의 artifact — 파일·OA 링크·HPC 경로 |
 | `sheet` | 엑셀처럼 편집하는 표. 버전은 sheet 편집기로만 만든다 |
 
-sheet artifact는 `templateKey`·`templateRevision`을 함께 가진다 — 만들 때 고른 template과 **그 순간의
+sheet artifact는 `templateId`·`templateKey`·`templateRevision`을 함께 가진다 — 만들 때 고른 template과 **그 순간의
 개정본**이다. 나중에 Admin이 template을 고쳐도 이 artifact의 첫 시작 시트는 바뀌지 않는다.
 
 `network`(OA/HPC)는 그대로 있다. sheet인지와 무관하다.
@@ -41,7 +41,12 @@ sheet artifact는 `templateKey`·`templateRevision`을 함께 가진다 — 만�
 - 기본 template **Port List (Liberty)** 를 부팅 때 없으면 한 번 만든다. LibertyGenScript가 읽는 헤더
   한 줄(Block … Digital Reg, 19열)에 필터·틀 고정을 걸고, 그 아래는 빈 표다. `{cell name}` 행은 두지
   않는다(사용자 결정).
-- `archived` template은 새 artifact에서 고를 수 없다. 이미 만든 artifact에는 영향이 없다.
+- 옛 양식을 새 양식으로 바꿀 때는 **고친다**(새 개정본). 더 이상 필요 없는 template은 **삭제한다**.
+  - 삭제하면 관리 화면과 생성 화면에서 사라지고 되살릴 수 없다. 같은 key로 새 template을 만들 수 있다.
+  - 이미 만든 artifact는 영향이 없다. 내부적으로 문서와 개정본을 남겨 두어, 그 template으로 만들고
+    아직 첫 저장을 안 한 artifact도 고정된 개정본으로 시작한다. 그래서 artifact는 template을 key가
+    아니라 **id**(`templateId`)로 가리킨다 — 삭제하면 key가 `deleted~<id>~<key>`로 바뀐다.
+  - 삭제한 기본 template(Port List)은 재시작해도 다시 만들지 않는다.
 
 ## 4. 버전과 저장 형식
 
@@ -149,7 +154,8 @@ SIREN FE는 SIREN BE만 부른다(07장 §2).
 | `GET /calypso-sheet-templates` | `GET /sheet-templates` | 로그인 사용자 |
 | `GET /calypso-sheet-templates/:key/start?revision=` | `GET /sheet-templates/:key/start` | 로그인 사용자 |
 | `POST /calypso-sheet-templates` | `POST /sheet-templates` | Admin |
-| `PATCH /calypso-sheet-templates/:key` | `PATCH /sheet-templates/:key` | Admin |
+| `PATCH /calypso-sheet-templates/:key` (이름·설명) | `PATCH /sheet-templates/:key` | Admin |
+| `DELETE /calypso-sheet-templates/:key` | `DELETE /sheet-templates/:key` | Admin |
 | `POST /calypso-sheet-templates/:key/revisions` (multipart `document`) | `POST /sheet-templates/:key/revisions` | Admin |
 
 ## 8. 제약과 남은 일

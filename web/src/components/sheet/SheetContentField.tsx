@@ -31,8 +31,8 @@ const KINDS: { value: 'file' | 'sheet'; label: string }[] = [
  */
 export function SheetContentField({ value, onChange }: { value: SheetContentChoice; onChange: (v: SheetContentChoice) => void }) {
   const { data: templates = [], isLoading } = useQuery({
-    queryKey: queryKeys.sheetTemplates(false),
-    queryFn: () => listSheetTemplates(false),
+    queryKey: queryKeys.sheetTemplates,
+    queryFn: listSheetTemplates,
     enabled: value.contentKind === 'sheet',
     staleTime: 60_000,
   });

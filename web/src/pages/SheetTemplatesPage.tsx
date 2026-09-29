@@ -5,9 +5,10 @@ import { Box } from '@mui/material';
 import { AppShell } from '@/components/layout/AppShell';
 import { useAuth } from '@/app/providers/AuthProvider';
 import {
-  SheetTemplate, addSheetTemplateRevision, createSheetTemplate, getSheetTemplateStart, listSheetTemplates,
-  updateSheetTemplate,
+  SheetTemplate, addSheetTemplateRevision, createSheetTemplate, deleteSheetTemplate, getSheetTemplateStart,
+  listSheetTemplates, updateSheetTemplate,
 } from '@/api/calypsoClient';
+import { ConfirmDialog } from '@/components/dialogs/ConfirmDialog';
 import { queryKeys } from '@/api/queryKeys';
 import { ModalShell } from '@/components/common/ModalShell';
 import { Field, SelectInput, TextArea, TextInput } from '@/components/common/Panel';
@@ -50,17 +51,18 @@ function SheetTemplatesContent() {
   const [creating, setCreating] = useState(false);
   const [meta, setMeta] = useState<SheetTemplate | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<SheetTemplate | null>(null);
 
   const { data: templates = [], isLoading } = useQuery({
-    queryKey: queryKeys.sheetTemplates(true),
-    queryFn: () => listSheetTemplates(true),
+    queryKey: queryKeys.sheetTemplates,
+    queryFn: listSheetTemplates,
   });
-  const invalidate = () => qc.invalidateQueries({ queryKey: queryKeys.sheetTemplatesAll });
+  const invalidate = () => qc.invalidateQueries({ queryKey: queryKeys.sheetTemplates });
 
-  const archive = useMutation({
-    mutationFn: (t: SheetTemplate) => updateSheetTemplate(t.key, { archived: !t.archived }),
-    onSuccess: (t) => { invalidate(); toast(t.archived ? 'Template archived' : 'Template restored'); },
-    onError: (e: any) => toast(e?.response?.data?.message ?? 'Could not update the template'),
+  const remove = useMutation({
+    mutationFn: (t: SheetTemplate) => deleteSheetTemplate(t.key),
+    onSuccess: () => { invalidate(); toast('Template deleted'); setDeleting(null); },
+    onError: (e: any) => toast(e?.response?.data?.message ?? 'Could not delete the template'),
   });
 
   return (
@@ -72,7 +74,7 @@ function SheetTemplatesContent() {
               <Box sx={{ fontSize: 15, fontWeight: 700, letterSpacing: '-.01em', mb: '4px' }}>Sheet Templates</Box>
               <Box sx={{ fontSize: 12, color: T.dm2, lineHeight: 1.6 }}>
                 The starting sheet loaded when someone creates a Sheet artifact. Users edit their sheet freely
-                afterwards — changing a template only affects artifacts created after the change.
+                afterwards — editing or deleting a template only affects artifacts created after the change.
               </Box>
             </Box>
             <SirenButton variant="primary" onClick={() => setCreating(true)}>
@@ -89,7 +91,7 @@ function SheetTemplatesContent() {
             {templates.map((t) => (
               <Box
                 key={t.key}
-                sx={{ background: T.sf, border: `1px solid ${T.ln}`, borderRadius: '10px', padding: '14px 16px', opacity: t.archived ? 0.65 : 1 }}
+                sx={{ background: T.sf, border: `1px solid ${T.ln}`, borderRadius: '10px', padding: '14px 16px' }}
               >
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                   <Icon name="excel" size={18} />
@@ -98,7 +100,6 @@ function SheetTemplatesContent() {
                       <Box sx={{ fontSize: 14, fontWeight: 700 }}>{t.name}</Box>
                       <Box sx={{ fontFamily: FONT_MONO, fontSize: 11, color: T.dm2 }}>{t.key}</Box>
                       <Badge color={T.pr} bg={T.prSoft} borderColor={T.prLine}>rev {t.currentRevision}</Badge>
-                      {t.archived && <Badge color={T.dm} bg={T.sf2} borderColor={T.ln}>Archived</Badge>}
                     </Box>
                     {t.description && <Box sx={{ fontSize: 12, color: T.dm, mt: '3px' }}>{t.description}</Box>}
                     <Box sx={{ fontSize: 11, color: T.dm2, mt: '3px' }}>
@@ -109,8 +110,8 @@ function SheetTemplatesContent() {
                     <Icon name="edit" /> Edit sheet
                   </SirenButton>
                   <SirenButton onClick={() => setMeta(t)}>Details</SirenButton>
-                  <SirenButton onClick={() => archive.mutate(t)} disabled={archive.isPending}>
-                    {t.archived ? 'Restore' : 'Archive'}
+                  <SirenButton onClick={() => setDeleting(t)}>
+                    <Icon name="trash" /> Delete
                   </SirenButton>
                   <SirenButton variant="ghost" onClick={() => setExpanded(expanded === t.key ? null : t.key)}>
                     {expanded === t.key ? 'Hide revisions' : `Revisions (${t.revisions.length})`}
@@ -167,6 +168,17 @@ function SheetTemplatesContent() {
           load={() => getSheetTemplateStart(editing.t.key, editing.revision)}
           exportName={`${editing.t.key}-rev${editing.revision}`}
           onClose={() => setEditing(null)}
+        />
+      )}
+      {deleting && (
+        <ConfirmDialog
+          title="Delete this template?"
+          message={`"${deleting.name}" will no longer be offered when creating Sheet artifacts.`}
+          warning="This cannot be undone. Artifacts already created from it are not affected."
+          confirmLabel="Delete"
+          busy={remove.isPending}
+          onCancel={() => setDeleting(null)}
+          onConfirm={() => remove.mutate(deleting)}
         />
       )}
       {creating && <NewTemplateDialog templates={templates} onClose={() => setCreating(false)} onCreated={invalidate} />}

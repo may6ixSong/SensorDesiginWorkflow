@@ -1,5 +1,5 @@
 import {
-  BadGatewayException, BadRequestException, Body, Controller, Get, HttpException, Param, Patch, Post, Query, UploadedFile,
+  BadGatewayException, BadRequestException, Body, Controller, Delete, Get, HttpException, Param, Patch, Post, Query, UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -34,9 +34,8 @@ export class CalypsoSheetTemplatesController {
   }
 
   @Get()
-  async list(@Query('includeArchived') includeArchived: string | undefined, @CurrentActor() me: Actor) {
-    const q = includeArchived === 'true' && me.isAdmin ? '?includeArchived=true' : '';
-    return this.relay(await this.calypso.forward('GET', `/sheet-templates${q}`, undefined, me.knoxId, [], me.isAdmin));
+  async list(@CurrentActor() me: Actor) {
+    return this.relay(await this.calypso.forward('GET', '/sheet-templates', undefined, me.knoxId, [], me.isAdmin));
   }
 
   @Get(':key')
@@ -60,6 +59,13 @@ export class CalypsoSheetTemplatesController {
   async update(@Param('key') key: string, @Body() dto: UpdateCalypsoSheetTemplateDto, @CurrentActor() me: Actor) {
     assertAdmin(me);
     return this.relay(await this.calypso.forward('PATCH', this.path(key), dto, me.knoxId, [], true));
+  }
+
+  /** 삭제 — 되살릴 수 없다. 이미 만든 artifact는 영향이 없다(Calypso가 개정본은 남긴다). */
+  @Delete(':key')
+  async remove(@Param('key') key: string, @CurrentActor() me: Actor) {
+    assertAdmin(me);
+    return this.relay(await this.calypso.forward('DELETE', this.path(key), undefined, me.knoxId, [], true));
   }
 
   /** Admin이 편집기로 저장한 시트(파일 필드 `document`)를 새 개정본으로 올린다. */

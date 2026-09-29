@@ -185,7 +185,14 @@ export class Artifact {
   @Prop({ type: String, enum: ['file', 'sheet'], default: 'file' })
   contentKind: ArtifactContentKind;
 
-  /** sheet를 만들 때 불러온 template과 그 개정본 — 첫 편집의 시작 시트가 된다. 없으면 빈 시트. */
+  /**
+   * sheet를 만들 때 불러온 template과 그 개정본 — 첫 편집의 시작 시트가 된다. 없으면 빈 시트.
+   * 시작 시트는 templateId로 찾는다 — template이 삭제되면 key가 바뀌고, 같은 key로 다른 template이
+   * 새로 생길 수 있어서다. templateKey는 표시용이다.
+   */
+  @Prop({ type: String, default: null })
+  templateId: string | null;
+
   @Prop({ type: String, default: null })
   templateKey: string | null;
 

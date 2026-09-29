@@ -49,9 +49,20 @@ export class SheetTemplate {
   @Prop({ default: '' })
   description: string;
 
-  /** true면 새 artifact를 만들 때 고를 수 없다. 이미 만든 artifact에는 영향이 없다. */
-  @Prop({ default: false })
-  archived: boolean;
+  /**
+   * 삭제(Admin). 목록·생성 화면에서 사라지고 되살릴 수 없다. 문서와 개정본은 남긴다 — 이 template으로
+   * 만들고 아직 첫 저장을 안 한 artifact가 고정된 개정본으로 시작해야 하기 때문이다(설계서 11장 §3).
+   * 삭제할 때 key를 `deleted~<id>~<key>`로 바꿔 같은 key로 새 template을 만들 수 있게 하고, 원래 key는
+   * originalKey에 둔다.
+   */
+  @Prop({ type: Date, default: null })
+  deletedAt: Date | null;
+
+  @Prop({ type: String, default: null })
+  deletedBy: string | null;
+
+  @Prop({ type: String, default: null })
+  originalKey: string | null;
 
   @Prop({ required: true, default: 1 })
   currentRevision: number;
