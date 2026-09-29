@@ -7,13 +7,15 @@ SIREN이 iframe으로 띄우는 SpreadJS 편집기의 **로컬 개발용 대역*
 ```bash
 cd sheet-host
 npm install
-npm run dev        # http://localhost:5175/
+npm run dev        # http://localhost:3000/sheet-host
 ```
 
-SIREN web의 `SHEET_HOST_URL`(web/.env.development)은 기본으로 SDP_SPA 개발 서버
-(`http://localhost:3000/sheet-host`)를 가리킨다. SDP_SPA 없이 돌릴 때만 `web/.env.development.local`에
-`SHEET_HOST_URL='http://localhost:5175/'`를 넣어 이 서버로 돌린다. 라이선스 키가 없어 평가판으로 돈다 —
-시트에 워터마크가 뜨는 것이 정상이다.
+SDP_SPA 개발 서버와 **같은 주소**(`http://localhost:3000/sheet-host`)에서 뜬다. 그래서 SIREN web의
+`SHEET_HOST_URL`(web/.env.development)을 바꾸지 않고 SDP_SPA 대신 이 서버를 띄우면 된다. 같은 포트라
+둘 중 하나만 띄운다. 라이선스 키가 없어 평가판으로 돈다 — 시트에 워터마크가 뜨는 것이 정상이다.
+
+**운영 규칙.** 이 폴더는 SDP_SPA `src/pages/sheetHost/`에 반영할 원본이다. 편집기를 고칠 일이 있으면 여기서
+고치고 SIREN과 함께 검증한 뒤, 사람이 SDP_SPA에 옮긴다. 사내 repo에 SIREN을 올릴 때는 이 폴더를 뺀다.
 
 | 경로 | 내용 |
 |---|---|
