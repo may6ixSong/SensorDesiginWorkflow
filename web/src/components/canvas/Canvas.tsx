@@ -66,6 +66,7 @@ export function Canvas({
   const edit = useCanvasStore((s) => s.edit);
   const sel = useCanvasStore((s) => s.sel);
   const hlSet = useCanvasStore((s) => s.hlSet);
+  const msel = useCanvasStore((s) => s.msel);
   const link = useCanvasStore((s) => s.link);
   const linkPos = useCanvasStore((s) => s.linkPos);
   const rev = useCanvasStore((s) => s.rev);
@@ -121,7 +122,10 @@ export function Canvas({
     const vp = vpRef.current;
     if (!vp) return;
     const containZ = Math.min(vp.clientWidth / W, vp.clientHeight / H, ZOOM_MAX);
-    const fitZ = Math.max(ZOOM_MIN, Math.max(containZ, ZOOM_DEFAULT_FLOOR));
+    // 진입 줌은 계산된 기본값에서 휠 2칸만큼 더 줌아웃한 값이다(사용자 요청) — 쿠키로
+    // canvas view가 바로 열리든, list view에서 전환해 들어오든 이 컴포넌트가 새로
+    // 마운트되며 여기를 거친다.
+    const fitZ = Math.max(ZOOM_MIN, Math.max(containZ, ZOOM_DEFAULT_FLOOR) - 2 * ZOOM_STEP);
 
     /*
      * 기본은 today 중앙이다 — 이 캔버스는 일정 위에 놓인 화면이라 "지금"이 기준점이다.
@@ -167,18 +171,16 @@ export function Canvas({
     return { x: (e.clientX - r.left) / zz, y: (e.clientY - r.top) / zz };
   };
 
-  /* ── WHEEL ZOOM — 조회 모드에서만 (설계서 7.1) ── */
+  /* ── WHEEL ZOOM — 조회/편집 모드 모두 (편집 중 줌은 사용자 요청으로 추가) ── */
   useEffect(() => {
     const vp = vpRef.current;
     if (!vp) return;
     const onWheel = (e: WheelEvent) => {
       const s = st.getState();
       e.preventDefault();
-      // 편집 중이거나 shift+휠 → 줌 대신 화면 이동 (뷰포트는 overflow:hidden 이라 네이티브 스크롤이 없다)
-      if (s.edit || e.shiftKey) {
-        const c = e.shiftKey
-          ? clampVP(s.z, s.x - e.deltaY, s.y)
-          : clampVP(s.z, s.x - e.deltaX, s.y - e.deltaY);
+      // shift+휠 → 줌 대신 가로 화면 이동 (뷰포트는 overflow:hidden 이라 네이티브 스크롤이 없다)
+      if (e.shiftKey) {
+        const c = clampVP(s.z, s.x - e.deltaY, s.y);
         s.setVP(c.z, c.x, c.y);
         return;
       }
@@ -204,6 +206,52 @@ export function Canvas({
   // 하므로 endPan에서 지우지 않고 onVpClick이 소비한 뒤 리셋한다(설계서 3.9 선택 해제 규칙 보강:
   // "배경 클릭"만 선택을 풀어야지, 드래그로 화면 이동한 것까지 클릭으로 잡히면 안 된다).
   const panMovedRef = useRef(false);
+
+  /* ── MARQUEE — 편집 모드에서 빈 캔버스 좌드래그로 여러 블록 선택 ──
+   * 편집 중 빈 곳 좌드래그는 팬 대신 선택 사각형이 된다. 팬은 휠 버튼 드래그 또는
+   * Space를 누른 채 좌드래그로 한다. Shift/Ctrl/⌘를 누르고 시작하면 기존 선택에 더한다.
+   * 좌표는 뷰포트 기준(screen-space) — 사각형 테두리가 줌과 무관하게 같은 두께로 보인다. */
+  const [marquee, setMarquee] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
+  const marqueeRef = useRef<{
+    x0: number; y0: number; pid: number; base: Set<string>; moved: boolean;
+  } | null>(null);
+  const spaceRef = useRef(false);
+  useEffect(() => {
+    const isTyping = (t: EventTarget | null) =>
+      t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
+    // 편집 중 Space는 팬 전용이다 — 포커스가 남은 툴박스 버튼(Save 등)이 Space로 눌리지 않게 막는다.
+    const down = (e: KeyboardEvent) => {
+      if (e.code === 'Space' && !isTyping(e.target) && st.getState().edit) {
+        spaceRef.current = true;
+        e.preventDefault();
+      }
+      // Esc → 편집 중 다중 선택 해제
+      if (e.key === 'Escape' && !isTyping(e.target)) {
+        const s = st.getState();
+        if (s.edit && s.msel.size) s.setMsel(new Set());
+      }
+    };
+    const up = (e: KeyboardEvent) => {
+      if (e.code !== 'Space') return;
+      if (spaceRef.current) e.preventDefault();
+      spaceRef.current = false;
+    };
+    const blur = () => { spaceRef.current = false; };
+    window.addEventListener('keydown', down);
+    window.addEventListener('keyup', up);
+    window.addEventListener('blur', blur);
+    return () => {
+      window.removeEventListener('keydown', down);
+      window.removeEventListener('keyup', up);
+      window.removeEventListener('blur', blur);
+    };
+  }, [st]);
+
+  const vpPt = (e: { clientX: number; clientY: number }) => {
+    const r = vpRef.current!.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  };
+
   const onVpPointerDown = (e: React.PointerEvent) => {
     if (dragRef.current || phResizeRef.current) return;
     const target = e.target as HTMLElement;
@@ -220,6 +268,17 @@ export function Canvas({
     if (!isMiddle && !isEmptyLeft) return;
     e.preventDefault();
     panMovedRef.current = false;
+    const s0 = st.getState();
+    if (isEmptyLeft && s0.edit && canEdit && !spaceRef.current) {
+      const p = vpPt(e);
+      const additive = e.shiftKey || e.ctrlKey || e.metaKey;
+      marqueeRef.current = {
+        x0: p.x, y0: p.y, pid: e.pointerId, moved: false,
+        base: additive ? new Set(s0.msel) : new Set(),
+      };
+      vpRef.current?.setPointerCapture(e.pointerId);
+      return;
+    }
     panRef.current = {
       startX: e.clientX - st.getState().x,
       startY: e.clientY - st.getState().y,
@@ -231,6 +290,26 @@ export function Canvas({
   const onVpPointerMove = (e: React.PointerEvent) => {
     const s = st.getState();
     if (s.link) s.setLinkPos(cvPt(e));
+    const m = marqueeRef.current;
+    if (m && m.pid === e.pointerId) {
+      const q = vpPt(e);
+      if (!m.moved && Math.hypot(q.x - m.x0, q.y - m.y0) < 4) return;
+      m.moved = true;
+      panMovedRef.current = true;
+      setMarquee({ x0: m.x0, y0: m.y0, x1: q.x, y1: q.y });
+      // 사각형을 캔버스 좌표로 바꿔 걸치는 블록을 모두 고른다.
+      const l = (Math.min(m.x0, q.x) - s.x) / s.z;
+      const r = (Math.max(m.x0, q.x) - s.x) / s.z;
+      const t = (Math.min(m.y0, q.y) - s.y) / s.z;
+      const b = (Math.max(m.y0, q.y) - s.y) / s.z;
+      const next = new Set(m.base);
+      allBlocks().forEach((k) => {
+        if (k.x < r && k.x + k.w > l && k.y < b && k.y + k.h > t) next.add(k.id);
+      });
+      const cur = s.msel;
+      if (next.size !== cur.size || [...next].some((id) => !cur.has(id))) s.setMsel(next);
+      return;
+    }
     const p = panRef.current;
     if (!p || p.pid !== e.pointerId) return;
     panMovedRef.current = true;
@@ -238,6 +317,13 @@ export function Canvas({
     s.setVP(c.z, c.x, c.y);
   };
   const endPan = (e: React.PointerEvent) => {
+    const m = marqueeRef.current;
+    if (m && m.pid === e.pointerId) {
+      marqueeRef.current = null;
+      setMarquee(null);
+      try { vpRef.current?.releasePointerCapture(e.pointerId); } catch { /* 이미 해제됨 */ }
+      return;
+    }
     if (!panRef.current || panRef.current.pid !== e.pointerId) return;
     panRef.current = null;
     if (vpRef.current) vpRef.current.style.cursor = '';
@@ -254,15 +340,20 @@ export function Canvas({
     const s = st.getState();
     if (s.link) s.setLink(null);
     else if (s.sel || s.hlSet) s.select(null, null);
+    else if (s.msel.size) s.setMsel(new Set());
   };
 
-  /* ── BLOCK DRAG (목업 pointerdown/move/up + accX 벽 저항) ── */
+  /* ── BLOCK DRAG (목업 pointerdown/move/up + accX 벽 저항) ──
+   * 편집 모드 다중 선택(msel)에 든 블록을 잡으면 선택된 블록 전부가 함께 움직인다.
+   * Phase 벽 저항/"확 넘어가는" 효과는 그룹 단위로 적용된다 — 한 멤버라도 벽에 막히면
+   * 그룹 전체가 멈추고, 충분히 당기면(WALL_FORCE) 그룹 전체가 같은 거리만큼 한 번에 넘어간다. */
   const dragRef = useRef<{
-    id: string; el: HTMLDivElement; dx: number; dy: number; moved: boolean; accX: number;
-    /** origin==='incoming' 노드가 Phase를 벗어나 원위치로 되돌려야 할 때 쓰는 드래그 시작 위치. */
-    origX: number; origY: number;
+    id: string; dx: number; dy: number; moved: boolean; accX: number;
+    /** 함께 움직일 블록 id들(잡은 블록 포함). */
+    group: string[];
+    /** 드래그 시작 위치 — origin==='incoming' 노드가 Phase를 벗어나 원위치로 되돌릴 때 쓴다. */
+    orig: Map<string, { x: number; y: number }>;
   } | null>(null);
-
   const findBlk = (id: string): Blk | undefined =>
     st.getState().nodes.find((n) => n.id === id) ?? st.getState().memos.find((m) => m.id === id);
 
@@ -295,15 +386,40 @@ export function Canvas({
     const el = elRefs.current.get(id);
     if (!b || !el) return;
     const p = cvPt(e);
+    const group = s.msel.has(id)
+      ? [...s.msel].filter((k) => !!findBlk(k))
+      : [id];
+    const orig = new Map<string, { x: number; y: number }>();
+    group.forEach((k) => {
+      const g = findBlk(k)!;
+      orig.set(k, { x: g.x, y: g.y });
+    });
     dragRef.current = {
-      id, el, dx: p.x - b.x, dy: p.y - b.y, moved: false, accX: 0, origX: b.x, origY: b.y,
+      id, dx: p.x - b.x, dy: p.y - b.y, moved: false, accX: 0, group, orig,
     };
     // origin==='incoming' 노드도 같은 Phase 안에서는 실제로 옮길 수 있다 — 드래그 비주얼도 동일하게 준다.
-    el.style.transition = 'none';
-    el.style.zIndex = '30';
+    group.forEach((k) => {
+      const ge = elRefs.current.get(k);
+      if (!ge) return;
+      ge.style.transition = 'none';
+      ge.style.zIndex = '30';
+    });
     el.style.cursor = 'grabbing';
     el.setPointerCapture(e.pointerId);
   };
+
+  /**
+   * origin==='incoming' 노드는 다른 workflow 소유라 Phase 벽 물리(wallAdj)를 적용하지 않고
+   * 자유롭게 옮기기만 한다 — Phase를 실제로 벗어났는지는 놓는 순간(pointerUp)에만
+   * 검사해서 벗어났으면 alert 후 원위치로 되돌린다.
+   * 일정을 잃은 산출물도 마찬가지로 벽 물리를 적용하지 않는다 — 속한 레인이 없는데
+   * 레인 경계에서 튕기면 "어디에도 안 붙는다"는 상태와 조작감이 서로 어긋난다.
+   * 자유롭게 옮길 수 있고, 어느 레인에 걸쳐 놔도 유실 상태는 그대로 유지된다
+   * (resolveNodePhases가 유실 노드는 건너뛴다).
+   */
+  const isFreeMove = (b: Blk) =>
+    ('origin' in b && b.origin === 'incoming') ||
+    ('phase' in b && 'origin' in b && isOrphanPhase(phases, b.phase));
 
   const onBlockPointerMove = (id: string) => (e: React.PointerEvent) => {
     const D = dragRef.current;
@@ -311,37 +427,52 @@ export function Canvas({
     const s = st.getState();
     const b = findBlk(id);
     if (!b) return;
-    const p = cvPt(e);
-    const rawX = Math.max(PAD, Math.min(W - b.w - PAD, p.x - D.dx));
-    // 위쪽엔 벽을 두지 않는다 — 기본 배치(TOP_PAD=40)와 최소 여백(PAD=8) 사이 32px밖에
-    // 안 남아 "위로 이동이 안 된다"고 느껴졌던 문제. Phase 이름 라벨과 겹치더라도
-    // 캔버스 맨 위(y<0)까지 자유롭게 끌어올릴 수 있게 한다.
-    const rawY = Math.min(H - b.h - PAD, p.y - D.dy);
-    D.moved = true;
-    // origin==='incoming' 노드는 다른 workflow 소유라 Phase 벽 물리(wallAdj)를 적용하지 않고
-    // 자유롭게 옮기기만 한다 — Phase를 실제로 벗어났는지는 놓는 순간(pointerUp)에만
-    // 검사해서 벗어났으면 alert 후 원위치로 되돌린다.
-    // 일정을 잃은 산출물도 마찬가지로 벽 물리를 적용하지 않는다 — 속한 레인이 없는데
-    // 레인 경계에서 튕기면 "어디에도 안 붙는다"는 상태와 조작감이 서로 어긋난다.
-    // 자유롭게 옮길 수 있고, 어느 레인에 걸쳐 놔도 유실 상태는 그대로 유지된다
-    // (resolveNodePhases가 유실 노드는 건너뛴다).
-    const freeMove =
-      ('origin' in b && b.origin === 'incoming') ||
-      ('phase' in b && 'origin' in b && isOrphanPhase(phases, b.phase));
-    if (freeMove) {
-      b.x = snp(rawX);
-      b.y = snp(rawY);
-      s.bumpNodes();
-      return;
+    const members = D.group.map(findBlk).filter((m): m is Blk => !!m);
+    if (!D.moved && D.group.length === 1 && s.msel.size && !s.msel.has(id)) {
+      // 선택 밖의 블록을 끌기 시작하면 선택을 그 블록 하나로 바꾼다.
+      s.setMsel(new Set([id]));
     }
-    D.accX += rawX - b.x;
-    const adj = wallAdj(phases, s.phasePW, b.x, b.w, rawX, D.accX);
-    const nx = snp(adj.x);
-    if (nx !== snp(rawX)) D.accX = 0;
-    if (adj.crossed !== null) s.flash(adj.crossed);
-    const ny = snp(rawY);
-    b.x = nx;
-    b.y = ny;
+    D.moved = true;
+    const p = cvPt(e);
+    // 그룹 전체가 캔버스 안에 머물도록 이동량을 제한한다. 위쪽엔 벽을 두지 않는다 —
+    // 기본 배치(TOP_PAD)와 최소 여백(PAD) 사이가 좁아 "위로 이동이 안 된다"고 느껴졌던
+    // 문제. Phase 이름 라벨과 겹치더라도 캔버스 맨 위(y<0)까지 자유롭게 끌어올릴 수 있게 한다.
+    let ddx = p.x - D.dx - b.x;
+    let ddy = p.y - D.dy - b.y;
+    members.forEach((m) => {
+      ddx = Math.max(PAD - m.x, Math.min(W - m.w - PAD - m.x, ddx));
+      ddy = Math.min(H - m.h - PAD - m.y, ddy);
+    });
+
+    // Phase 벽 저항 — 벽 물리를 받는 멤버마다 wallAdj를 돌려 그룹 이동량 하나로 합친다.
+    const walled = members.filter((m) => !isFreeMove(m));
+    let gdx = ddx;
+    let crossed: number | null = null;
+    if (walled.length) {
+      D.accX += ddx;
+      const blocked: number[] = [];
+      const jumps: { d: number; bnd: number; primary: boolean }[] = [];
+      walled.forEach((m) => {
+        const want = m.x + ddx;
+        const adj = wallAdj(phases, s.phasePW, m.x, m.w, want, D.accX);
+        if (adj.crossed !== null) jumps.push({ d: adj.x - m.x, bnd: adj.crossed, primary: m.id === id });
+        else if (adj.x !== want) blocked.push(adj.x - m.x);
+      });
+      if (blocked.length) {
+        // 가장 먼저 벽에 닿는 멤버 기준으로 그룹 전체를 멈춘다.
+        gdx = ddx >= 0 ? Math.min(...blocked) : Math.max(...blocked);
+      } else if (jumps.length) {
+        const j = jumps.find((x) => x.primary) ?? jumps[0];
+        gdx = j.d;
+        crossed = j.bnd;
+      }
+      if (snp(b.x + gdx) !== snp(b.x + ddx)) D.accX = 0;
+    }
+    if (crossed !== null) s.flash(crossed);
+    members.forEach((m) => {
+      m.x = snp(m.x + gdx);
+      m.y = snp(m.y + ddy);
+    });
     // 위치는 style prop으로 렌더되므로 상태만 갱신하면 블록과 엣지가 함께 따라온다.
     s.bumpNodes();
   };
@@ -350,10 +481,15 @@ export function Canvas({
     const D = dragRef.current;
     if (!D || D.id !== id) return;
     const s = st.getState();
-    D.el.style.cursor = '';
-    D.el.style.zIndex = '';
-    D.el.style.transition = '';
-    try { D.el.releasePointerCapture(e.pointerId); } catch { /* 이미 해제됨 */ }
+    D.group.forEach((k) => {
+      const ge = elRefs.current.get(k);
+      if (!ge) return;
+      ge.style.cursor = '';
+      ge.style.zIndex = '';
+      ge.style.transition = '';
+    });
+    const el = elRefs.current.get(id);
+    try { el?.releasePointerCapture(e.pointerId); } catch { /* 이미 해제됨 */ }
     const moved = D.moved;
     dragRef.current = null;
     s.flash(null);
@@ -362,33 +498,39 @@ export function Canvas({
     if (!b) return;
 
     if (moved) {
-      // origin==='incoming' 노드: 같은 Phase 안에서는 자유롭게 옮길 수 있지만, 다른
-      // Phase로 넘어가면 이 IP가 결정할 수 있는 스케줄이 아니므로 alert 후 드래그
-      // 시작 위치로 되돌린다. Phase 안에 머물렀으면 서버엔 저장하지 않고(이 캔버스
-      // 소유가 아니므로) 세션 동안만 유지되는 override로 기억해 hydrate 후에도 유지되게 한다.
-      if ('origin' in b && b.origin === 'incoming') {
-        const cx = b.x + b.w / 2;
+      let revertedIncoming = false;
+      const memoMoves: string[] = [];
+      D.group.forEach((k) => {
+        const m = findBlk(k);
+        if (!m) return;
+        const cx = m.x + m.w / 2;
         const np = phaseAtX(phases, s.phasePW, cx);
-        if (np !== b.phase) {
-          alert("Can't move a received artifact out of its phase.");
-          b.x = D.origX;
-          b.y = D.origY;
-        } else {
-          s.setIncomingOverride(id, b.x, b.y, b.phase);
+        // origin==='incoming' 노드: 같은 Phase 안에서는 자유롭게 옮길 수 있지만, 다른
+        // Phase로 넘어가면 이 IP가 결정할 수 있는 스케줄이 아니므로 alert 후 드래그
+        // 시작 위치로 되돌린다. Phase 안에 머물렀으면 서버엔 저장하지 않고(이 캔버스
+        // 소유가 아니므로) 세션 동안만 유지되는 override로 기억해 hydrate 후에도 유지되게 한다.
+        if ('origin' in m && m.origin === 'incoming') {
+          if (np !== m.phase) {
+            const o = D.orig.get(k)!;
+            m.x = o.x;
+            m.y = o.y;
+            revertedIncoming = true;
+          } else {
+            s.setIncomingOverride(k, m.x, m.y, m.phase);
+          }
+          return;
         }
-        s.bumpNodes();
-        return;
-      }
-      // 메모는 Phase 사이 어디든 걸쳐 있어도 무방 — 놓인 위치의 레인으로 소속만 갱신한다.
-      // 겹침은 이제 허용되므로(사용자 요청) 다른 블록을 밀어내는 재배치(reflowLane)는
-      // 절대 하지 않는다 — 내가 옮긴 블록 외에는 아무것도 움직이지 않아야 한다.
-      if (st.getState().memos.some((m) => m.id === id)) {
-        const cx = b.x + b.w / 2;
-        const np = phaseAtX(phases, s.phasePW, cx);
-        if (np && np !== b.phase) {
-          b.phase = np;
-          toast(`Moved to ${(phases.find((p) => p.id === np) || { name: '' }).name}`);
+        // 메모는 Phase 사이 어디든 걸쳐 있어도 무방 — 놓인 위치의 레인으로 소속만 갱신한다.
+        // 겹침은 이제 허용되므로(사용자 요청) 다른 블록을 밀어내는 재배치(reflowLane)는
+        // 절대 하지 않는다 — 옮긴 블록 외에는 아무것도 움직이지 않아야 한다.
+        if (s.memos.some((x) => x.id === k) && np && np !== m.phase) {
+          m.phase = np;
+          memoMoves.push(np);
         }
+      });
+      if (revertedIncoming) alert("Can't move a received artifact out of its phase.");
+      if (memoMoves.length === 1 && D.group.length === 1) {
+        toast(`Moved to ${(phases.find((p) => p.id === memoMoves[0]) || { name: '' }).name}`);
       }
       s.bumpNodes();
       return;
@@ -396,11 +538,19 @@ export function Canvas({
 
     // 이동 없이 클릭한 경우 (편집 모드) — out 포트로 연결을 시작해 둔 상태면 이 노드로 잇는다.
     if (s.link && s.link !== id && connectTo(id)) return;
+    // Shift/Ctrl/⌘ 클릭 → 다중 선택에 넣고 빼기
+    if (e.shiftKey || e.ctrlKey || e.metaKey) {
+      const next = new Set(s.msel);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      s.setMsel(next);
+      return;
+    }
     if (st.getState().memos.some((m) => m.id === id)) {
       s.setNoteDlg(id);
       return;
     }
-    s.select(s.sel === id ? null : id, null);
+    s.setMsel(s.msel.size === 1 && s.msel.has(id) ? new Set() : new Set([id]));
   };
 
   /* ── VIEW 모드 클릭 → 선택 + flow 하이라이트 (설계서 3.9) ── */
@@ -683,7 +833,7 @@ export function Canvas({
               key={n.id}
               n={n}
               edit={edit}
-              isSel={sel === n.id}
+              isSel={sel === n.id || msel.has(n.id)}
               onHl={!!hlSet && hlSet.has(n.id)}
               hasHl={!!hlSet}
               onGripDown={onGripDown}
@@ -702,7 +852,7 @@ export function Canvas({
               orphan={isOrphanPhase(phases, d.phase)}
               edit={edit}
               canEdit={canEdit}
-              isSel={sel === d.id}
+              isSel={sel === d.id || msel.has(d.id)}
               onHl={!!hlSet && hlSet.has(d.id)}
               hasHl={!!hlSet}
               dimLink={!!link && link !== d.id}
@@ -773,6 +923,20 @@ export function Canvas({
               and pick a phase under “Release schedule” to put it back on the plan.
             </Box>
           </Box>
+        )}
+
+        {marquee && (
+          <Box sx={{
+            position: 'absolute',
+            left: Math.min(marquee.x0, marquee.x1),
+            top: Math.min(marquee.y0, marquee.y1),
+            width: Math.abs(marquee.x1 - marquee.x0),
+            height: Math.abs(marquee.y1 - marquee.y0),
+            border: `1px solid ${T.select}`,
+            background: T.selectRing,
+            pointerEvents: 'none',
+            zIndex: 9,
+          }} />
         )}
 
         <Legend />

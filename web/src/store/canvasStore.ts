@@ -31,6 +31,12 @@ interface CanvasState {
   edit: boolean;
   sel: string | null;
   hlSet: Set<string> | null;
+  /**
+   * 편집 모드 전용 다중 선택 — 드래그(marquee)나 클릭으로 고른 블록 id들. 조회 모드의
+   * sel/hlSet(flow 하이라이트)과는 의미가 다르다: 여기 든 블록은 함께 이동되고, 편집이
+   * 끝나면(저장/취소) 비워진다.
+   */
+  msel: Set<string>;
   link: string | null;
   linkPos: { x: number; y: number } | null;
   flashBnd: number | null;
@@ -93,6 +99,7 @@ interface CanvasState {
   trackAddedDeliverable: (id: string) => void;
 
   select: (id: string | null, hl: Set<string> | null) => void;
+  setMsel: (ids: Set<string>) => void;
   setLink: (id: string | null) => void;
   setLinkPos: (p: { x: number; y: number } | null) => void;
   flash: (bnd: number | null) => void;
@@ -122,6 +129,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   edit: false,
   sel: null,
   hlSet: null,
+  msel: new Set(),
   link: null,
   linkPos: null,
   flashBnd: null,
@@ -152,6 +160,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       phasePW: s.loadedWorkflowId === workflowId ? s.phasePW : (d.phaseWidths ?? {}),
       sel: s.loadedWorkflowId === workflowId ? s.sel : null,
       hlSet: s.loadedWorkflowId === workflowId ? s.hlSet : null,
+      msel: s.loadedWorkflowId === workflowId ? s.msel : new Set<string>(),
       x: s.loadedWorkflowId === workflowId ? s.x : 0,
       y: s.loadedWorkflowId === workflowId ? s.y : 0,
       rev: s.rev + 1,
@@ -174,11 +183,15 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       link: null,
       sel: null,
       hlSet: null,
+      msel: new Set(),
       sessionAddedDeliverableIds: [],
     });
   },
   exitEdit: () =>
-    set({ edit: false, snapshot: null, link: null, sel: null, hlSet: null, sessionAddedDeliverableIds: [] }),
+    set({
+      edit: false, snapshot: null, link: null, sel: null, hlSet: null, msel: new Set(),
+      sessionAddedDeliverableIds: [],
+    }),
   cancelEdit: () => {
     const snap = get().snapshot;
     set((s) => ({
@@ -188,6 +201,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       link: null,
       sel: null,
       hlSet: null,
+      msel: new Set(),
       nodes: snap ? snap.nodes : s.nodes,
       memos: snap ? snap.memos : s.memos,
       edges: snap ? snap.edges : s.edges,
@@ -198,6 +212,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   },
 
   select: (id, hl) => set({ sel: id, hlSet: hl }),
+  setMsel: (ids) => set({ msel: ids }),
   setLink: (id) => set({ link: id, linkPos: null }),
   setLinkPos: (p) => set({ linkPos: p }),
   flash: (bnd) => set({ flashBnd: bnd }),
