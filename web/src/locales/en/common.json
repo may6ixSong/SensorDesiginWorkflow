@@ -124,7 +124,7 @@
     "deleteFlowWarning": "This cannot be undone.",
     "deleteFlowConfirm": "Remove",
     "deleteFlowCancel": "Cancel",
-    "addArtifact": "Add artifact",
+    "addArtifact": "Add node",
     "recipientFilter": "Recipient department",
     "allDepartments": "All departments",
     "lockExpired": "Your editing session has expired. Re-enter edit mode and try again."

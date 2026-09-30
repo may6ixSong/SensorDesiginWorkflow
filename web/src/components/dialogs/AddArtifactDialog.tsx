@@ -71,7 +71,12 @@ export function AddArtifactDialog({
     if (!phaseId) { setErr('Phase is required.'); return; }
     const finalName = name.trim();
     if (!finalName) { setErr('Name is required.'); return; }
-    if (!src.source) { setErr('Pick where this artifact comes from.'); return; }
+    // 출처를 안 골랐으면 자리(node)만 먼저 만든다 — artifact는 node 상세에서 나중에 매핑한다.
+    if (!src.source) {
+      setErr(null);
+      onCreate({ name: finalName, phaseId, intent, recipients: { departments: recipientDepts, users: [] } });
+      return;
+    }
     const newArtifact = resolveNewArtifact(src, finalName);
     if (!newArtifact) { setErr('Finish picking the artifact for that source.'); return; }
     setErr(null);
@@ -86,7 +91,7 @@ export function AddArtifactDialog({
       header={
         <>
           <Ey>{workflowName}</Ey>
-          <Box sx={{ fontSize: 16, fontWeight: 700, mt: '2px' }}>Add artifact</Box>
+          <Box sx={{ fontSize: 16, fontWeight: 700, mt: '2px' }}>Add node</Box>
         </>
       }
     >
@@ -193,6 +198,10 @@ export function AddArtifactDialog({
         )}
       </Field>
 
+      <Box sx={{ fontSize: 11.5, color: T.dm2, lineHeight: 1.6, mb: '10px' }}>
+        Optional — pick an artifact to map now, or leave it unselected to add just the node and map it later from the node&apos;s detail.
+      </Box>
+
       <ArtifactSourcePicker
         workflowId={workflowId}
         projectId={projectId}
@@ -209,7 +218,7 @@ export function AddArtifactDialog({
       {err && <Box sx={{ fontSize: 12, color: T.danger, mb: '10px' }}>{err}</Box>}
 
       <SirenButton variant="primary" onClick={submit} disabled={!phases.length || submitting}>
-        <Icon name="plus" /> {submitting ? 'Adding…' : 'Add artifact'}
+        <Icon name="plus" /> {submitting ? 'Adding…' : 'Add node'}
       </SirenButton>
     </ModalShell>
   );
