@@ -315,6 +315,12 @@ export function ArtifactSourcePicker({
 
   return (
     <Field label="Artifact Source">
+      <Box
+        sx={{
+          border: `1px solid ${T.ln2}`, borderRadius: `${R.md}px`, background: T.sf2,
+          boxShadow: T.shXs, padding: '14px',
+        }}
+      >
       {projectCode && (
         <Box sx={{ fontSize: 11, color: T.dm2, mb: '8px', lineHeight: 1.6 }}>
           Showing artifacts registered for project{' '}
@@ -467,6 +473,7 @@ export function ArtifactSourcePicker({
         }}
       >
         <ArtifactPreviewPane focus={focus} />
+      </Box>
       </Box>
       </Box>
     </Field>

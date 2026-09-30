@@ -59,6 +59,7 @@ export function AddArtifactDialog({
   const [phaseId, setPhaseId] = useState<string>(phases[0]?.id ?? '');
   const [src, setSrc] = useState<ArtifactSourceState>(emptySourceState());
   const [err, setErr] = useState<string | null>(null);
+  const [nameErr, setNameErr] = useState(false);
   /** 기본값으로 시작하되 사용자가 자유롭게 바꾼다. users는 이 화면에서 다루지 않는다 —
    *  생성 후 node 상세의 Recipients 탭에서 지정한다(스펙 §6.5). */
   const [recipientDepts, setRecipientDepts] = useState<string[]>(defaultRecipientDepartments);
@@ -70,7 +71,7 @@ export function AddArtifactDialog({
   const submit = () => {
     if (!phaseId) { setErr('Phase is required.'); return; }
     const finalName = name.trim();
-    if (!finalName) { setErr('Name is required.'); return; }
+    if (!finalName) { setNameErr(true); return; }
     // 출처를 안 골랐으면 자리(node)만 먼저 만든다 — artifact는 node 상세에서 나중에 매핑한다.
     if (!src.source) {
       setErr(null);
@@ -123,13 +124,15 @@ export function AddArtifactDialog({
         </Box>
       </Field>
 
-      <Field label="Name — required">
+      <Field label="Title">
         <TextInput
           value={name}
-          onChange={(v) => { setName(v); setErr(null); }}
+          onChange={(v) => { setName(v); setErr(null); setNameErr(false); }}
+          error={nameErr}
           autoFocus
           placeholder="e.g. Startup Sequence Verification Results"
         />
+        {nameErr && <Box sx={{ fontSize: 11, color: T.danger, mt: '4px' }}>Required</Box>}
       </Field>
 
       <Field label="Phase — a node sits in exactly one phase">
@@ -198,10 +201,6 @@ export function AddArtifactDialog({
         )}
       </Field>
 
-      <Box sx={{ fontSize: 11.5, color: T.dm2, lineHeight: 1.6, mb: '10px' }}>
-        Optional — pick an artifact to map now, or leave it unselected to add just the node and map it later from the node&apos;s detail.
-      </Box>
-
       <ArtifactSourcePicker
         workflowId={workflowId}
         projectId={projectId}
@@ -210,7 +209,7 @@ export function AddArtifactDialog({
         departmentOptions={departmentOptions}
         state={src}
         onChange={setSrc}
-        onSelectName={(n) => { if (!name.trim()) setName(n); }}
+        onSelectName={(n) => { if (!name.trim()) { setName(n); setNameErr(false); } }}
         projectCode={projectCode}
         projectRevision={projectRevision}
       />
