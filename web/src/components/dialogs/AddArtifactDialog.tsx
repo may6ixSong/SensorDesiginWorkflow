@@ -194,9 +194,6 @@ export function AddArtifactDialog({
                 );
               })}
             </Box>
-            {recipientDepts.length === 0 && (
-              <Box sx={{ fontSize: 11, color: T.warn, mt: '6px' }}>{t('node.recipientsEmptyHint')}</Box>
-            )}
           </>
         )}
       </Field>
