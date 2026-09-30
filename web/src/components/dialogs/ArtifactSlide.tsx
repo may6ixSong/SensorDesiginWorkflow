@@ -24,6 +24,7 @@ import { fmtAt, isOrphanPhase } from '@/lib/canvasModel';
 import { shortDate } from '@/lib/schedule';
 import { releaseBadgeMap } from '@/lib/releaseBadge';
 import { toast } from '@/store/toastStore';
+import { copyText } from '@/lib/clipboard';
 import { CURSOR_POINTER, FONT_MONO, R, T, TNUM } from '@/theme/tokens';
 import { NetworkChip } from '@/components/artifact/ArtifactChips';
 import { AutoRunTab } from '@/components/artifact/AutoRunTab';
@@ -635,10 +636,7 @@ function VersionList({
                   <SirenButton
                     variant="ghost"
                     title="Copy path"
-                    onClick={() => {
-                      navigator.clipboard?.writeText(v.hpcPath as string);
-                      toast('Path copied');
-                    }}
+                    onClick={() => copyText(v.hpcPath as string, 'Path')}
                     sx={{ minWidth: 0, padding: '2px' }}
                   >
                     <Icon name="copy" size={12} />

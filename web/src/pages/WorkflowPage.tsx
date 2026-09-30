@@ -14,7 +14,6 @@ import { WorkflowSettingsDialog } from '@/components/dialogs/WorkflowSettingsDia
 import { AddArtifactDialog } from '@/components/dialogs/AddArtifactDialog';
 import { NoteDialog } from '@/components/dialogs/NoteDialog';
 import { ReleaseDialog } from '@/components/release/ReleaseDialog';
-import { Toast } from '@/components/common/Toast';
 import { queryKeys } from '@/api/queryKeys';
 import { useProject, useProjectWorkflows, useProjectMilestones, useProjects } from '@/api/hooks/useProjects';
 import { useUpdateWorkflow, useReplaceWorkflowAccess, useWorkflow, useUpdateWorkflowPhases } from '@/api/hooks/useWorkflow';
@@ -449,7 +448,6 @@ export function WorkflowPage() {
           )}
         </>
       )}
-      <Toast />
     </AppShell>
   );
 }

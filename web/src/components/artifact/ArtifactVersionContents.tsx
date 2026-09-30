@@ -6,7 +6,7 @@ import { UserAvatar } from '@/components/common/Avatar';
 import { SirenButton, Badge } from '@/components/common/SirenButton';
 import { isRichTextEmpty } from '@/components/common/RichTextEditor';
 import { FileTypeIcon, Icon } from '@/components/common/Icon';
-import { toast } from '@/store/toastStore';
+import { copyText } from '@/lib/clipboard';
 import { FONT_DISPLAY, FONT_MONO, T } from '@/theme/tokens';
 
 function fmtAt(iso: string): string {
@@ -43,15 +43,6 @@ export function ArtifactVersionContents({ a, version: v, departmentLabel, onDown
   // 미발행 버전을 눌러 봐도 그게 "지금 작업 중인 것"처럼 보이면 안 된다(사용자 지적,
   // ArtifactVersionTree/ArtifactSlide의 generic 버전 목록과 같은 규칙).
   const isLatest = !!v && a.latestVersion?.versionRef === v.versionRef;
-
-  const copyPath = async (value: string) => {
-    try {
-      await navigator.clipboard.writeText(value);
-      toast('Path copied');
-    } catch {
-      toast('Could not copy — select and copy manually');
-    }
-  };
 
   return (
     <Box sx={{ flex: 1, minWidth: 0, overflowY: 'auto', background: T.sf3, padding: '22px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -167,16 +158,23 @@ export function ArtifactVersionContents({ a, version: v, departmentLabel, onDown
                         )}
                         {/* link 자신이 이미 hyperlink라 별도 "Open link" 버튼은 두지 않는다(사용자 요청). */}
                         <Box
-                          component="a"
-                          href={l.url}
-                          target="_blank"
-                          rel="noreferrer"
                           sx={{
-                            display: 'block', fontSize: 12.5, color: T.pr, wordBreak: 'break-all',
+                            display: 'flex', alignItems: 'center', gap: '8px', fontSize: 12.5,
                             background: T.sf2, border: `1px solid ${T.ln}`, borderRadius: '7px', padding: '9px 11px',
                           }}
                         >
-                          {l.url}
+                          <Box
+                            component="a"
+                            href={l.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            sx={{ flex: 1, minWidth: 0, color: T.pr, wordBreak: 'break-all' }}
+                          >
+                            {l.url}
+                          </Box>
+                          <SirenButton variant="ghost" title="Copy link" onClick={() => copyText(l.url, 'Link')} sx={{ minWidth: 0, padding: '4px', flex: '0 0 auto' }}>
+                            <Icon name="copy" size={13} />
+                          </SirenButton>
                         </Box>
                       </Box>
                     ))}
@@ -201,7 +199,7 @@ export function ArtifactVersionContents({ a, version: v, departmentLabel, onDown
                           }}
                         >
                           <Box sx={{ flex: 1, minWidth: 0 }}>{p.path}</Box>
-                          <SirenButton variant="ghost" onClick={() => copyPath(p.path)} sx={{ minWidth: 0, padding: '4px', flex: '0 0 auto' }}>
+                          <SirenButton variant="ghost" title="Copy path" onClick={() => copyText(p.path, 'Path')} sx={{ minWidth: 0, padding: '4px', flex: '0 0 auto' }}>
                             <Icon name="copy" size={13} />
                           </SirenButton>
                         </Box>

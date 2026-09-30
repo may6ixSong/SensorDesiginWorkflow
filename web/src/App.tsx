@@ -16,6 +16,7 @@ import { WorkflowPage } from '@/pages/WorkflowPage';
 import { NoAccessPage } from '@/pages/NoAccessPage';
 import { AccessDeniedPage } from '@/pages/AccessDeniedPage';
 import { GuidePage } from '@/pages/GuidePage';
+import { Toast } from '@/components/common/Toast';
 
 /**
  * 인증은 전부 프론트엔드(ADSSO)에서 끝난다 — app/providers/AuthProvider.tsx.
@@ -45,6 +46,8 @@ function LoginGate({ children }: { children: React.ReactNode }) {
 export default function App() {
   return (
     <LoginGate>
+      {/* 전역 — 어느 페이지에서든 toast()가 보이게 한다. */}
+      <Toast />
       <PageTransition>
       <Routes>
         <Route path="/" element={<HomePage />} />
