@@ -207,50 +207,16 @@ export function Canvas({
   // "배경 클릭"만 선택을 풀어야지, 드래그로 화면 이동한 것까지 클릭으로 잡히면 안 된다).
   const panMovedRef = useRef(false);
 
-  /* ── MARQUEE — 편집 모드에서 빈 캔버스 좌드래그로 여러 블록 선택 ──
-   * 편집 중 빈 곳 좌드래그는 팬 대신 선택 사각형이 된다. 팬은 휠 버튼 드래그 또는
-   * Space를 누른 채 좌드래그로 한다. Shift/Ctrl/⌘를 누르고 시작하면 기존 선택에 더한다.
-   * 좌표는 뷰포트 기준(screen-space) — 사각형 테두리가 줌과 무관하게 같은 두께로 보인다. */
-  const [marquee, setMarquee] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
-  const marqueeRef = useRef<{
-    x0: number; y0: number; pid: number; base: Set<string>; moved: boolean;
-  } | null>(null);
-  const spaceRef = useRef(false);
+  // Esc → 편집 중 다중 선택 해제
   useEffect(() => {
-    const isTyping = (t: EventTarget | null) =>
-      t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
-    // 편집 중 Space는 팬 전용이다 — 포커스가 남은 툴박스 버튼(Save 등)이 Space로 눌리지 않게 막는다.
     const down = (e: KeyboardEvent) => {
-      if (e.code === 'Space' && !isTyping(e.target) && st.getState().edit) {
-        spaceRef.current = true;
-        e.preventDefault();
-      }
-      // Esc → 편집 중 다중 선택 해제
-      if (e.key === 'Escape' && !isTyping(e.target)) {
-        const s = st.getState();
-        if (s.edit && s.msel.size) s.setMsel(new Set());
-      }
+      if (e.key !== 'Escape') return;
+      const s = st.getState();
+      if (s.edit && s.msel.size) s.setMsel(new Set());
     };
-    const up = (e: KeyboardEvent) => {
-      if (e.code !== 'Space') return;
-      if (spaceRef.current) e.preventDefault();
-      spaceRef.current = false;
-    };
-    const blur = () => { spaceRef.current = false; };
     window.addEventListener('keydown', down);
-    window.addEventListener('keyup', up);
-    window.addEventListener('blur', blur);
-    return () => {
-      window.removeEventListener('keydown', down);
-      window.removeEventListener('keyup', up);
-      window.removeEventListener('blur', blur);
-    };
+    return () => window.removeEventListener('keydown', down);
   }, [st]);
-
-  const vpPt = (e: { clientX: number; clientY: number }) => {
-    const r = vpRef.current!.getBoundingClientRect();
-    return { x: e.clientX - r.left, y: e.clientY - r.top };
-  };
 
   const onVpPointerDown = (e: React.PointerEvent) => {
     if (dragRef.current || phResizeRef.current) return;
@@ -268,17 +234,6 @@ export function Canvas({
     if (!isMiddle && !isEmptyLeft) return;
     e.preventDefault();
     panMovedRef.current = false;
-    const s0 = st.getState();
-    if (isEmptyLeft && s0.edit && canEdit && !spaceRef.current) {
-      const p = vpPt(e);
-      const additive = e.shiftKey || e.ctrlKey || e.metaKey;
-      marqueeRef.current = {
-        x0: p.x, y0: p.y, pid: e.pointerId, moved: false,
-        base: additive ? new Set(s0.msel) : new Set(),
-      };
-      vpRef.current?.setPointerCapture(e.pointerId);
-      return;
-    }
     panRef.current = {
       startX: e.clientX - st.getState().x,
       startY: e.clientY - st.getState().y,
@@ -290,26 +245,6 @@ export function Canvas({
   const onVpPointerMove = (e: React.PointerEvent) => {
     const s = st.getState();
     if (s.link) s.setLinkPos(cvPt(e));
-    const m = marqueeRef.current;
-    if (m && m.pid === e.pointerId) {
-      const q = vpPt(e);
-      if (!m.moved && Math.hypot(q.x - m.x0, q.y - m.y0) < 4) return;
-      m.moved = true;
-      panMovedRef.current = true;
-      setMarquee({ x0: m.x0, y0: m.y0, x1: q.x, y1: q.y });
-      // 사각형을 캔버스 좌표로 바꿔 걸치는 블록을 모두 고른다.
-      const l = (Math.min(m.x0, q.x) - s.x) / s.z;
-      const r = (Math.max(m.x0, q.x) - s.x) / s.z;
-      const t = (Math.min(m.y0, q.y) - s.y) / s.z;
-      const b = (Math.max(m.y0, q.y) - s.y) / s.z;
-      const next = new Set(m.base);
-      allBlocks().forEach((k) => {
-        if (k.x < r && k.x + k.w > l && k.y < b && k.y + k.h > t) next.add(k.id);
-      });
-      const cur = s.msel;
-      if (next.size !== cur.size || [...next].some((id) => !cur.has(id))) s.setMsel(next);
-      return;
-    }
     const p = panRef.current;
     if (!p || p.pid !== e.pointerId) return;
     panMovedRef.current = true;
@@ -317,13 +252,6 @@ export function Canvas({
     s.setVP(c.z, c.x, c.y);
   };
   const endPan = (e: React.PointerEvent) => {
-    const m = marqueeRef.current;
-    if (m && m.pid === e.pointerId) {
-      marqueeRef.current = null;
-      setMarquee(null);
-      try { vpRef.current?.releasePointerCapture(e.pointerId); } catch { /* 이미 해제됨 */ }
-      return;
-    }
     if (!panRef.current || panRef.current.pid !== e.pointerId) return;
     panRef.current = null;
     if (vpRef.current) vpRef.current.style.cursor = '';
@@ -538,8 +466,8 @@ export function Canvas({
 
     // 이동 없이 클릭한 경우 (편집 모드) — out 포트로 연결을 시작해 둔 상태면 이 노드로 잇는다.
     if (s.link && s.link !== id && connectTo(id)) return;
-    // Shift/Ctrl/⌘ 클릭 → 다중 선택에 넣고 빼기
-    if (e.shiftKey || e.ctrlKey || e.metaKey) {
+    // Ctrl(⌘) 클릭 → 이전 선택에 더하기(이미 선택된 블록이면 빼기)
+    if (e.ctrlKey || e.metaKey) {
       const next = new Set(s.msel);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -923,20 +851,6 @@ export function Canvas({
               and pick a phase under “Release schedule” to put it back on the plan.
             </Box>
           </Box>
-        )}
-
-        {marquee && (
-          <Box sx={{
-            position: 'absolute',
-            left: Math.min(marquee.x0, marquee.x1),
-            top: Math.min(marquee.y0, marquee.y1),
-            width: Math.abs(marquee.x1 - marquee.x0),
-            height: Math.abs(marquee.y1 - marquee.y0),
-            border: `1px solid ${T.select}`,
-            background: T.selectRing,
-            pointerEvents: 'none',
-            zIndex: 9,
-          }} />
         )}
 
         <Legend />
