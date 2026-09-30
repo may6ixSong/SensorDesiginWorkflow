@@ -32,7 +32,7 @@ interface CanvasState {
   sel: string | null;
   hlSet: Set<string> | null;
   /**
-   * 편집 모드 전용 다중 선택 — 클릭(Ctrl 클릭으로 추가)으로 고른 블록 id들. 조회 모드의
+   * 편집 모드 전용 다중 선택 — 클릭(Ctrl 클릭·Ctrl 드래그로 추가)으로 고른 블록 id들. 조회 모드의
    * sel/hlSet(flow 하이라이트)과는 의미가 다르다: 여기 든 블록은 함께 이동되고, 편집이
    * 끝나면(저장/취소) 비워진다.
    */

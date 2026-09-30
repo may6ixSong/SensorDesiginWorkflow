@@ -218,6 +218,19 @@ export function Canvas({
     return () => window.removeEventListener('keydown', down);
   }, [st]);
 
+  /* ── MARQUEE — 편집 모드에서 Ctrl(⌘)을 누른 채 빈 캔버스를 드래그하면 팬 대신 선택 사각형 ──
+   * 사각형에 걸친 블록을 기존 선택에 더한다(Ctrl 클릭과 같은 "추가" 의미). Ctrl 없이
+   * 드래그하면 예전처럼 화면 이동이다. 좌표는 뷰포트 기준(screen-space) — 사각형 테두리가
+   * 줌과 무관하게 같은 두께로 보인다. */
+  const [marquee, setMarquee] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
+  const marqueeRef = useRef<{
+    x0: number; y0: number; pid: number; base: Set<string>; moved: boolean;
+  } | null>(null);
+  const vpPt = (e: { clientX: number; clientY: number }) => {
+    const r = vpRef.current!.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  };
+
   const onVpPointerDown = (e: React.PointerEvent) => {
     if (dragRef.current || phResizeRef.current) return;
     const target = e.target as HTMLElement;
@@ -234,6 +247,13 @@ export function Canvas({
     if (!isMiddle && !isEmptyLeft) return;
     e.preventDefault();
     panMovedRef.current = false;
+    const s0 = st.getState();
+    if (isEmptyLeft && (e.ctrlKey || e.metaKey) && s0.edit && canEdit) {
+      const p = vpPt(e);
+      marqueeRef.current = { x0: p.x, y0: p.y, pid: e.pointerId, moved: false, base: new Set(s0.msel) };
+      vpRef.current?.setPointerCapture(e.pointerId);
+      return;
+    }
     panRef.current = {
       startX: e.clientX - st.getState().x,
       startY: e.clientY - st.getState().y,
@@ -245,6 +265,26 @@ export function Canvas({
   const onVpPointerMove = (e: React.PointerEvent) => {
     const s = st.getState();
     if (s.link) s.setLinkPos(cvPt(e));
+    const m = marqueeRef.current;
+    if (m && m.pid === e.pointerId) {
+      const q = vpPt(e);
+      if (!m.moved && Math.hypot(q.x - m.x0, q.y - m.y0) < 4) return;
+      m.moved = true;
+      panMovedRef.current = true;
+      setMarquee({ x0: m.x0, y0: m.y0, x1: q.x, y1: q.y });
+      // 사각형을 캔버스 좌표로 바꿔 걸치는 블록을 모두 고른다.
+      const l = (Math.min(m.x0, q.x) - s.x) / s.z;
+      const r = (Math.max(m.x0, q.x) - s.x) / s.z;
+      const t = (Math.min(m.y0, q.y) - s.y) / s.z;
+      const b = (Math.max(m.y0, q.y) - s.y) / s.z;
+      const next = new Set(m.base);
+      allBlocks().forEach((k) => {
+        if (k.x < r && k.x + k.w > l && k.y < b && k.y + k.h > t) next.add(k.id);
+      });
+      const cur = s.msel;
+      if (next.size !== cur.size || [...next].some((id) => !cur.has(id))) s.setMsel(next);
+      return;
+    }
     const p = panRef.current;
     if (!p || p.pid !== e.pointerId) return;
     panMovedRef.current = true;
@@ -252,6 +292,15 @@ export function Canvas({
     s.setVP(c.z, c.x, c.y);
   };
   const endPan = (e: React.PointerEvent) => {
+    const m = marqueeRef.current;
+    if (m && m.pid === e.pointerId) {
+      marqueeRef.current = null;
+      setMarquee(null);
+      // Ctrl을 누른 채 그냥 클릭(이동 없음)은 기존 선택을 지우지 않는다.
+      if (!m.moved) panMovedRef.current = true;
+      try { vpRef.current?.releasePointerCapture(e.pointerId); } catch { /* 이미 해제됨 */ }
+      return;
+    }
     if (!panRef.current || panRef.current.pid !== e.pointerId) return;
     panRef.current = null;
     if (vpRef.current) vpRef.current.style.cursor = '';
@@ -851,6 +900,20 @@ export function Canvas({
               and pick a phase under “Release schedule” to put it back on the plan.
             </Box>
           </Box>
+        )}
+
+        {marquee && (
+          <Box sx={{
+            position: 'absolute',
+            left: Math.min(marquee.x0, marquee.x1),
+            top: Math.min(marquee.y0, marquee.y1),
+            width: Math.abs(marquee.x1 - marquee.x0),
+            height: Math.abs(marquee.y1 - marquee.y0),
+            border: `1px solid ${T.select}`,
+            background: T.selectRing,
+            pointerEvents: 'none',
+            zIndex: 9,
+          }} />
         )}
 
         <Legend />
