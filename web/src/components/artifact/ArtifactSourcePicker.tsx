@@ -12,7 +12,7 @@ import { SirenButton } from '@/components/common/SirenButton';
 import { Icon } from '@/components/common/Icon';
 import { toast } from '@/store/toastStore';
 import { CURSOR_POINTER, FONT_MONO, R, T } from '@/theme/tokens';
-import { EditChip, NetworkChip, ServiceChip } from './ArtifactChips';
+import { NetworkChip, ServiceChip } from './ArtifactChips';
 import {
   SheetContentChoice, SheetContentField, defaultSheetContentChoice, sheetContentInput,
 } from '@/components/sheet/SheetContentField';
@@ -138,7 +138,6 @@ function ArtifactTypeRow({
                       </Box>
                     )}
                   </Box>
-                  <EditChip level={c.level} />
                 </Box>
               );
             })
@@ -447,7 +446,6 @@ export function ArtifactSourcePicker({
                 </Box>
               </Box>
               <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', flex: '0 0 auto' }}>
-                <EditChip level={a.myAccess} />
                 <NetworkChip network={a.network} />
               </Box>
             </Box>

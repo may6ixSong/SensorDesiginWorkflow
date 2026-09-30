@@ -6,7 +6,7 @@ import { CalypsoArtifact, CalypsoVersionView, getCalypsoSheetVersion } from '@/a
 import { HubService } from '@/hooks/useHubServices';
 import { ArtifactCandidateDto } from '@/types/domain';
 import { FONT_MONO, R, T } from '@/theme/tokens';
-import { EditChip, NetworkChip, ServiceChip } from './ArtifactChips';
+import { NetworkChip, ServiceChip } from './ArtifactChips';
 
 /** picker 왼쪽 목록에서 지금 오른쪽 칸에 보여주는 대상. */
 export type PickerFocus =
@@ -155,7 +155,6 @@ function CalypsoPreview({ f }: { f: Extract<PickerFocus, { kind: 'file' }> }) {
       <Box>
         <Box sx={{ fontSize: 14, fontWeight: 700, overflowWrap: 'anywhere' }}>{a.name}</Box>
         <Box sx={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap', mt: '6px' }}>
-          <EditChip level={a.myAccess} />
           <NetworkChip network={a.network} />
           <Box sx={{ fontFamily: FONT_MONO, fontSize: 10.5, color: T.dm2 }}>
             {a.contentKind} · {f.deptLabel} · {a.versionCount} version{a.versionCount === 1 ? '' : 's'}
@@ -220,7 +219,6 @@ export function ArtifactPreviewPane({ focus }: { focus: PickerFocus | null }) {
         <Box>
           <Box sx={{ fontSize: 14, fontWeight: 700, overflowWrap: 'anywhere' }}>{focus.candidate.name}</Box>
           <Box sx={{ display: 'flex', gap: '6px', alignItems: 'center', mt: '6px' }}>
-            <EditChip level={focus.candidate.level} />
             {focus.candidate.currentVersionLabel && (
               <Box sx={{ fontFamily: FONT_MONO, fontSize: 10.5, color: T.dm2 }}>{focus.candidate.currentVersionLabel}</Box>
             )}
